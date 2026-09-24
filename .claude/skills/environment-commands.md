@@ -39,7 +39,7 @@ Vault в не-dev режиме.
 | Чтение корпуса оболочкой | в `bypassPermissions` харнесс направляет чтение файлов в Bash, а чтение оболочкой правил со scope не подгружает. Хук `PreToolUse` на Bash и `Read` в `.claude/settings.json` — `tools/rule-touch-guard.py` — отказывает команде, касающейся корпусного `*.md` или `*.txt`, пока правило его области не пришло, и называет файл: прочитать его инструментом `Read` (хватит `limit: 1`) и повторить команду. Дальше оболочка по той же области идёт как прежде; код и поиск (`grep`, `git`, `ls`, `wc`) хук не трогает | проба 2026-09-23: одиннадцать сессий в режиме цепочки, у каждой пришедшие правила совпали с масками тронутого файла |
 | Артефакты тестового контура | **есть с 2026-09-19** — Testcontainers `2.0.2` (`testcontainers-postgresql`, `-kafka`, `-vault`, `-junit-jupiter`), `spring-boot-testcontainers` `4.0.0`, WireMock `wiremock-standalone:3.13.1`; Awaitility приезжает со `spring-boot-starter-test`. Версию Testcontainers держит Boot: своя разошлась бы с `testcontainers-bom` каркаса | прайминг §«Воспроизводимые команды»; `ls ~/.m2/repository/org/testcontainers/` |
 | Образы субстрата ящика | **есть** — `timescale/timescaledb-ha:pg17.10-ts2.29.2` (тот же тег, что в `deploy/base`) и `hashicorp/vault:1.15` с 2026-09-19; `apache/kafka:4.1.1` с 2026-09-20 (версия клиента `kafka-clients` дерева — манифест стенда версии брокера не называет вовсе, её выбирает оператор). Образ базы весит около 4 GB на диске и приезжает **разово**, как и jar'ы: прогон ящика его не тянет | `docker images`; пробы совпадения тегов — `SubstrateImagePinTest` деревьев `auth` и `trading-core` |
-| Демо-ключ OKX | **доказан отрицанием**: тот же ключ **без** заголовка `x-simulated-trading` → `HTTP 401`, `50101 APIKey does not match current environment`; с заголовком → `code=0` | прогон 2026-08-31 |
+| Демо-ключ OKX | **доказан отрицанием**: тот же ключ **без** заголовка `x-simulated-trading` → `HTTP 401`, `50101 APIKey does not match current environment`; с заголовком → `code=0`. **Лежит в Vault стенда донорской формой** — `secret/tradingbot/okx-test`, поля `OKX_API_KEY` / `OKX_SECRET_KEY` / `OKX_PASSPHRASE`, без контура; по адресу счёта, из которого читает коннектор (`<окружение>/exchange-accounts/<счёт>`, общие формы `ExchangeAccountKeyPath` и `ExchangeAccountSecretFields`), ключей нет, и монтирования окружения в хранилище стенда нет — есть только `secret/` | прогон 2026-08-31; повторён 2026-09-24 приватным чтением позиций (`vault kv list`, подписанный `GET /api/v5/account/positions`) |
 
 **Проверка демо-контура — падающая проба, а не флаг конфигурации.** Клейм
 «ключ демо-контура» доказывается тем, что боевой контур этот ключ
@@ -201,6 +201,10 @@ mvn -o -am -pl tests verify -Dtest.excluded.groups=smoke  # сквозной н�
 - **`psql -c`, несколько SQL** · create database cannot run inside a transaction block → ENV-061
 - **Docker, публикация порта** · bind: attempt to access a socket ... forbidden by access permissions → ENV-062
 - **Prometheus, `promtool`** · прогнать `promtool test rules` по правилам алерта без кластера → ENV-063
+
+### Площадка OKX
+
+- **OKX, `403` `error code: 1010`** · отказ CDN по `User-Agent` клиента, не ответ площадки → ENV-064
 
 ## Связи
 
