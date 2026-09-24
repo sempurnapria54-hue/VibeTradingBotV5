@@ -1,6 +1,7 @@
 package com.example.tradingcore.unit.fsm;
 
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingRung;
+import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeObserving;
 import static com.example.tradingcore.unit.fsm.FsmFixture.TRANCHE_ID;
 import static com.example.tradingcore.unit.fsm.FsmFixture.contextBuilder;
 import static com.example.tradingcore.unit.fsm.FsmFixture.deal;
@@ -201,6 +202,30 @@ class DealActiveExitChecksTest {
         DealTransition transition = harness.handle(context);
 
         assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.movesStatus()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U9.14 — каскад только добывает, агрегатный шаг сработал: ребро выхода, добыча не мешает")
+    void u9_14_anObservingCascadeDoesNotStarveTheDealLevelStep() {
+        harness.givenCascade(cascadeObserving(ServiceCommandType.REFRESH_ORDER_COMMAND));
+        harness.givenDealStep(StepSelection.of(step(1L, StrategyStepType.EXIT)));
+
+        DealTransition transition = harness.handle(managedContext());
+
+        assertThat(transition.getNextStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
+        assertThat(transition.hasCommands()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U9.15 — каскад только добывает, работы уровня сделки нет: добыча едет последней")
+    void u9_15_anObservingCascadeTravelsWhenThePassIsIdle() {
+        harness.givenCascade(cascadeObserving(ServiceCommandType.REFRESH_ORDER_COMMAND));
+
+        DealTransition transition = harness.handle(managedContext());
+
+        assertThat(transition.getCommands()).extracting(ServiceCommand::getType)
+                .containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND);
         assertThat(transition.movesStatus()).isFalse();
     }
 

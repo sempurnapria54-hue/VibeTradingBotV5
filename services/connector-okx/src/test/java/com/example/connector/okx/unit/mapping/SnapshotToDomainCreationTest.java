@@ -26,6 +26,8 @@ import java.lang.reflect.Field;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Снапшот → доменная модель созданием — группа `U21` документа
@@ -41,10 +43,9 @@ import org.junit.jupiter.api.Test;
  * статуса ни один переход не ставит — его ставит резолвер, последним
  * шагом чтения, у шлюза.
  *
- * <p>Кейсы {@code U21.6} и {@code U21.18} в код не пошли: дом и код
- * называют разное — `.claude/work/backlog.md` §«Четыре таблицы маппинга
- * отрицают поле, которое их модели несут» и §«Тип заявки: снапшот несёт
- * тип исполнения площадки под именем доменного бизнес-типа».
+ * <p>Кейс {@code U21.6} в код не пошёл: дом и код называют разное —
+ * `.claude/work/backlog.md` §«Четыре таблицы маппинга отрицают поле,
+ * которое их модели несут».
  */
 class SnapshotToDomainCreationTest {
 
@@ -55,11 +56,9 @@ class SnapshotToDomainCreationTest {
     private final DealCashFlowMapper cashFlowMapper = Mappers.cashFlow();
     private final BalanceContainerMapper balanceMapper = Mappers.balance();
 
-    /** Снапшот заявки базовой сборки; тип заявки пуст (см. `U21.18`). */
+    /** Снапшот заявки базовой сборки: ответ площадки несёт тип исполнения, как всякий реальный. */
     private OrderExternalSnapshot orderSnapshot() {
-        var source = OkxFixture.order();
-        source.setOrdType(null);
-        return orderMapper.integrationToSnapshot(source);
+        return orderMapper.integrationToSnapshot(OkxFixture.order());
     }
 
     @Test
@@ -79,6 +78,24 @@ class SnapshotToDomainCreationTest {
         assertThat(order.getExternalCreatedAt()).isEqualTo(OffsetDateTime.parse("2023-11-14T22:13:20Z"));
         assertThat(order.getExternalModifiedAt()).isEqualTo(OffsetDateTime.parse("2023-11-14T22:14:20Z"));
         assertThat(order.getType()).isNull();
+    }
+
+    /**
+     * Род заявки наш: его ставит создатель ноги, а площадка отдаёт тип
+     * исполнения. Перенос по имени разбирал бы {@code limit} доменным
+     * перечнем и ронял чтение каждой заявки.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"limit", "market", "post_only"})
+    @DisplayName("U21.18 — тип исполнения площадки в бизнес-тип заявки не переводится")
+    void u21_18_theSourceExecutionTypeDoesNotBecomeTheBusinessType(String ordType) {
+        var source = OkxFixture.order();
+        source.setOrdType(ordType);
+
+        Order order = orderMapper.snapshotToDomain(orderMapper.integrationToSnapshot(source));
+
+        assertThat(order.getType()).isNull();
+        assertThat(order.getInternalId()).isEqualTo("tb-1");
     }
 
     @Test
@@ -129,7 +146,6 @@ class SnapshotToDomainCreationTest {
     @DisplayName("U21.7 — сторона вне словаря отказывает на материализации")
     void u21_7_anUnknownSideRefusesOnMaterialization() {
         var source = OkxFixture.order();
-        source.setOrdType(null);
         source.setSide("long");
         OrderExternalSnapshot snapshot = orderMapper.integrationToSnapshot(source);
 

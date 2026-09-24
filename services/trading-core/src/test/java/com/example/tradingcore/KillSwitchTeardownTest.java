@@ -34,6 +34,8 @@ import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.safety.KillSwitchExecutor;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
+import com.example.tradingcore.persistence.service.InstrumentDataService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
@@ -70,7 +72,8 @@ class KillSwitchTeardownTest {
 
     @BeforeEach
     void setUp() {
-        executor = new KillSwitchExecutor(exchange, commands, contextService, properties);
+        executor = new KillSwitchExecutor(exchange, commands, contextService,
+                mock(ExchangeAccountDataService.class), mock(InstrumentDataService.class), properties);
         properties.setMaxTeardownAttempts(1);
         when(commands.execute(any(), any())).thenReturn(ServiceCommandExecutionResult.ok());
         when(exchange.cancelOrder(anyString(), any(), anyString())).thenReturn(ack());

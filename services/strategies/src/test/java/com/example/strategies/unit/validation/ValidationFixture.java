@@ -403,6 +403,7 @@ final class ValidationFixture {
         action.setOrderType(orderType);
         action.setDirection(direction);
         action.setAllocationPercents(decimal(allocation));
+        action.setPositionReducingOnly(Boolean.FALSE);
         return action;
     }
 

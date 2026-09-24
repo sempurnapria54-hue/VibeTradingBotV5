@@ -27,18 +27,35 @@ import com.example.strategies.persistence.service.OutboxDataService;
 import com.example.strategies.persistence.service.StrategyDataService;
 import com.example.strategies.util.Constants;
 import com.example.tradingbot.domain.event.StrategyEventType;
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.PhaseEntryPolicy;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyTranche;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.message.EventEnvelopeMessage;
+import com.example.tradingbot.message.StrategyActivatedMessage;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -92,6 +109,18 @@ class StrategyEventFormTest {
     private static final List<String> ENVELOPE_FORM =
             List.of("eventId", "eventType", "tenantId", "occurredAt", "version", "traceContext");
 
+    /**
+     * Имя числового ключа базы у узла дерева определения
+     * (docs/architecture/data-ownership.md §Идентификаторы).
+     */
+    private static final String OWNER_KEY = "id";
+
+    /**
+     * Значений ключа в дереве фикстуры: корень, три объявления, деталь,
+     * транш, два шага, три действия.
+     */
+    private static final Integer KEYED_VALUES = 11;
+
     private final StrategyDataService dataService = mock(StrategyDataService.class);
     private final TradingCoreReadClient coreClient = mock(TradingCoreReadClient.class);
     private final OutboxDataService outboxDataService = mock(OutboxDataService.class);
@@ -139,6 +168,56 @@ class StrategyEventFormTest {
         assertThat(content.path("definition").path("internalId").textValue())
                 .as("снимок дерева едет целиком: ядро дочитать его не может по построению")
                 .isEqualTo(STRATEGY);
+    }
+
+    /**
+     * Снимок активации едет без числовых ключей базы владельца — ни у
+     * одного вида узла — и разбирается обратно формой провода.
+     *
+     * <p><b>Дерево собрано С ключами на каждом виде узла</b>, и первая
+     * проверка это предъявляет: фикстура без ключей прошла бы и на снимке,
+     * который их везёт, — ровно так дефект и держался незамеченным у
+     * потребителя. Путь — писатель факта, маппер и живой сериализатор:
+     * проверки активации к предмету не относятся.
+     *
+     * <p><b>Обратно снимок читается так, как его читает потребитель:</b>
+     * маппер Boot неизвестных полей не отвергает, а доменное дерево везёт и
+     * предикаты — полями без сеттера.
+     */
+    @Test
+    @DisplayName("Снимок активации не несёт ключей базы владельца и читается формой провода")
+    void theActivationSnapshotCarriesNoOwnerDatabaseKeys() throws Exception {
+        Strategy definition = keyedDefinition();
+        when(outboxDataService.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        eventWriter.record(definition, StrategyEventType.STRATEGY_ACTIVATED, PRESENTED_PRINCIPAL);
+
+        assertThat(ownerKeyPaths(objectMapper.valueToTree(definition), "definition"))
+                .as("фикстура несёт ключ на каждом виде узла — иначе проба ниже прошла бы вхолостую")
+                .hasSize(KEYED_VALUES);
+        assertThat(ownerKeyPaths(contentOfWrittenRow().path("definition"), "definition"))
+                .as("числовой ключ базы границу сервиса не пересекает ни у одного узла")
+                .isEmpty();
+
+        StrategyActivatedMessage read = objectMapper.copy()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .readValue(writtenRow().getPayload(), StrategyActivatedMessage.class);
+        StrategyDetail detail = read.definition().getDetails().get(0);
+        List<StrategyAction> trancheActions = detail.getTranches().get(0)
+                .getStepsByStatus().get(DealTranche.Status.MANAGING).get(0).getActions();
+        assertThat(trancheActions)
+                .as("узел опознаётся положением в дереве: состав и порядок доезжают без ключей")
+                .extracting(StrategyAction::getKey)
+                .containsExactly("entry", "sl");
+        assertThat(detail.getStepsByStatus().get(Deal.Status.EXIT_PENDING).get(0).getActions())
+                .extracting(StrategyAction::getKey)
+                .containsExactly("exit-all");
+        assertThat(read.definition().getInstrumentInternalId())
+                .as("внешняя ссылка едет идентичностью, а не ключом")
+                .isEqualTo(INSTRUMENT);
+        assertThat(definition.getId())
+                .as("едет копия: дерево вызывающего остаётся с ключами")
+                .isEqualTo(101L);
     }
 
     /** Деактивация: идентичности и актор, дерева нет — оно у читателя лежит. */
@@ -235,6 +314,22 @@ class StrategyEventFormTest {
         return objectMapper.readTree(writtenRow().getPayload());
     }
 
+    /** Пути полей-ключей базы, несущих значение, по всему документу. */
+    private List<String> ownerKeyPaths(JsonNode node, String path) {
+        List<String> found = new ArrayList<>();
+        for (int index = 0; node.isArray() && index < node.size(); index++) {
+            found.addAll(ownerKeyPaths(node.get(index), path + "[" + index + "]"));
+        }
+        node.properties().forEach(field -> {
+            String fieldPath = path + "." + field.getKey();
+            if (Objects.equals(OWNER_KEY, field.getKey()) && isFalse(field.getValue().isNull())) {
+                found.add(fieldPath);
+            }
+            found.addAll(ownerKeyPaths(field.getValue(), fieldPath));
+        });
+        return found;
+    }
+
     private void givenPresentedPrincipal() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 PRESENTED_PRINCIPAL, "n/a", AuthorityUtils.createAuthorityList("ROLE_USER")));
@@ -255,6 +350,63 @@ class StrategyEventFormTest {
     private void givenRiskAppetite() {
         when(coreClient.getRiskAppetite(TENANT)).thenReturn(new RiskAppetiteCoreResponse(
                 TENANT, new BigDecimal("2"), new BigDecimal("3")));
+    }
+
+    /**
+     * Определение с ключом базы владельца на каждом виде узла: корень, три
+     * объявления, деталь, транш, шаги обоих уровней и
+     * действия трёх видов. Значения ключей — как их выдала бы база
+     * владельца.
+     */
+    private Strategy keyedDefinition() {
+        StrategyOrderAction entry = new StrategyOrderAction();
+        entry.setId(301L);
+        entry.setKey("entry");
+        StrategyAlgoOrderAction stop = new StrategyAlgoOrderAction();
+        stop.setId(302L);
+        stop.setKey("sl");
+        StrategyPositionAction exit = new StrategyPositionAction();
+        exit.setId(303L);
+        exit.setKey("exit-all");
+
+        StrategyTranche tranche = new StrategyTranche();
+        tranche.setId(151L);
+        tranche.setKey("main");
+        tranche.setStepsByStatus(Map.of(DealTranche.Status.MANAGING,
+                List.of(keyedStep(201L, StrategyStepType.ENTRY, List.of(entry, stop)))));
+
+        StrategyDetail detail = new StrategyDetail();
+        detail.setId(111L);
+        detail.setMarketPhaseType(MarketPhase.Type.BULL_TREND);
+        detail.setPhaseEntryPolicy(PhaseEntryPolicy.FOLLOW_PHASE);
+        detail.setTranches(List.of(tranche));
+        detail.setStepsByStatus(Map.of(Deal.Status.EXIT_PENDING,
+                List.of(keyedStep(202L, StrategyStepType.EXIT, List.of(exit)))));
+
+        StrategyMarketPhaseSetting phaseSetting = new StrategyMarketPhaseSetting();
+        phaseSetting.setId(121L);
+        StrategyIndicatorSetting indicator = new StrategyIndicatorSetting();
+        indicator.setId(131L);
+        indicator.setKey("atr");
+        StrategyMarketStructureSetting structure = new StrategyMarketStructureSetting();
+        structure.setId(141L);
+        structure.setKey("range");
+
+        Strategy definition = definition(Strategy.Status.ACTIVE);
+        definition.setId(101L);
+        definition.setMarketPhaseSetting(phaseSetting);
+        definition.setIndicatorSettings(List.of(indicator));
+        definition.setMarketStructureSettings(List.of(structure));
+        definition.setDetails(List.of(detail));
+        return definition;
+    }
+
+    private StrategyStep keyedStep(Long id, StrategyStepType type, List<StrategyAction> actions) {
+        StrategyStep step = new StrategyStep();
+        step.setId(id);
+        step.setStepType(type);
+        step.setActions(actions);
+        return step;
     }
 
     /**

@@ -155,13 +155,16 @@ class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
         // производит — реакция идёт с первого наблюдения.
         assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
         assertThat(eventTypes()).contains(HOLD_RAISED);
-        // Состав полной реакции отработал: отчёт критичной тропы доведён до
-        // терминала и несёт оба снимка.
+        // Снятие риска отработало, но закрыть позицию инструмента вне
+        // контура нечем — валюты расчёта у него нет, — и снятие не
+        // подтверждено: отчёт критичной тропы остаётся незакрытым, снимка
+        // «после» у него нет, закрытия к площадке не ушло.
         Map<String, Object> report = rows.row("anomaly_reports", "code", FOREIGN_INSTRUMENT_RISK);
         assertThat(report.get("severity")).isEqualTo("CRITICAL");
-        assertThat(report.get("status")).isEqualTo("COMPLETED");
+        assertThat(report.get("status")).isEqualTo("KILL_SWITCH_EXECUTED");
         assertThat(report.get("internal_before")).isNotNull();
-        assertThat(report.get("internal_after")).isNotNull();
+        assertThat(report.get("internal_after")).isNull();
+        assertThat(connector.requests(closurePath(ACCOUNT))).isEmpty();
         // Восстановительной тропы на этом признаке нет: строки инструмента
         // не существует, и приписать риск нечему.
         assertThat(rows.count("deals")).isZero();

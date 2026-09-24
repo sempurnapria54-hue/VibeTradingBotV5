@@ -227,6 +227,7 @@
                     "orderType": "ENTRY_ATTACHED_STOP_LOSS",
                     "direction": "LONG",
                     "allocationPercents": 95,
+                    "positionReducingOnly": false,
                     "attachedProtection": {
                       "attachedType": "ATTACHED_STOP_LOSS",
                       "stopLossSettings": {
@@ -470,6 +471,7 @@
                     "orderType": "ENTRY_ATTACHED_STOP_LOSS",
                     "direction": "SHORT",
                     "allocationPercents": 95,
+                    "positionReducingOnly": false,
                     "attachedProtection": {
                       "attachedType": "ATTACHED_STOP_LOSS",
                       "stopLossSettings": {

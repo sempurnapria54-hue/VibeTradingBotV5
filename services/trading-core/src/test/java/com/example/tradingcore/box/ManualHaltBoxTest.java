@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -283,6 +284,51 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
+    @DisplayName("B6.14 — полная постановка на паре снимает риск сделки пары, хотя триггерной сделки у вызова нет")
+    void theFullPairRaiseTearsThePairDealDownWithoutATriggerDeal() {
+        openDealWithLiveLeg();
+        Integer mark = AppLog.mark();
+
+        assertThat(fullHaltAnswer(ACCOUNT, INSTRUMENT).status()).isEqualTo(202);
+
+        // Сделку пары снятие риска берёт популяцией радиуса, а не из
+        // контекста вызова: обход дошёл до живой ноги, и её снятие ушло к
+        // площадке — разыменования пустой сделки нет.
+        assertThat(pairRung(INSTRUMENT)).isEqualTo(TRADE_BLOCKED);
+        assertThat(connector.requests(cancellationPath(ACCOUNT))).isNotEmpty();
+        assertThat(AppLog.since(mark)).doesNotContain("NullPointerException");
+        // Стаб снятия ноги не подтверждает, и ход доходит до развилки
+        // эскалации: неподтверждённое снятие пары поднимает ступень счёта.
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(dealRow().get("status")).isEqualTo("ERROR");
+    }
+
+    @Test
+    @DisplayName("B6.15 — полная постановка на счёте закрывает позицию без сделки и подтверждает снятие срезом позиций")
+    void theFullAccountRaiseClosesAPositionWithoutADeal() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+        connector.answersInTurn(positionsPath(ACCOUNT), Feed.array(Feed.livePosition("ex-dealless-1",
+                EXTERNAL_INSTRUMENT, "1", LAST_PRICE, POSITION_MOMENT)), Feed.emptyArray());
+        connector.answers(closurePath(ACCOUNT), Feed.ack("ex-close-1", "close-1"));
+
+        fullHalt(ACCOUNT);
+
+        // Сделки у счёта нет, а живая позиция есть: снятие риска закрывает её
+        // само, адресуя инструментом строки и валютой расчёта проекции.
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(rows.count("deals")).isZero();
+        List<LoggedRequest> closures = connector.requests(closurePath(ACCOUNT));
+        assertThat(closures).hasSize(1);
+        assertThat(closures.getFirst().queryParameter("externalInstrumentId").firstValue())
+                .isEqualTo(EXTERNAL_INSTRUMENT);
+        assertThat(closures.getFirst().queryParameter("settleCurrency").firstValue()).isEqualTo("USDT");
+        // Подтверждение пришло срезом позиций: следующее чтение пусто, и
+        // отчёт доведён до терминала.
+        assertThat(rows.row("anomaly_reports", "code", MANUAL_HALT_REQUESTED).get("status"))
+                .isEqualTo("COMPLETED");
+    }
+
+    @Test
     @DisplayName("B6.9 — непогашенный живой риск снятие сворачивания отвергает")
     void theUnclearedLiveRiskRefusesTheTeardownClearance() {
         standUnconfirmedTeardown();
@@ -530,6 +576,10 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
     /** Путь снятия обычной заявки: первый ход снятия живого риска. */
     private String cancellationPath(String accountInternalId) {
         return accountPath(accountInternalId) + "/orders/cancellations";
+    }
+
+    private String closurePath(String accountInternalId) {
+        return accountPath(accountInternalId) + "/positions/closures";
     }
 
     /** Живой эпизод позиции по инструменту: подтверждение закрытия экспозиции. */

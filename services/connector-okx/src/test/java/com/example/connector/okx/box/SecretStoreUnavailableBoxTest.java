@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.connector.okx.util.OkxConstants;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -43,13 +42,11 @@ class SecretStoreUnavailableBoxTest extends ConnectorBox {
     }
 
     /**
-     * Красна долгом {@code F-9}: отказ СОЕДИНЕНИЯ с хранилищем уезжает
-     * вызывающему классом «площадка недостижима» — тропа хранилища и тропа
-     * площадки обменялись классами. Долг — `.claude/work/backlog.md`
-     * §«Классы отказа границы разъехались со своими тропами».
+     * Отказ СОЕДИНЕНИЯ с хранилищем — класс хранилища, а не «площадка
+     * недостижима»: клиент хранилища бросает тот же транспортный класс, что
+     * и клиент площадки, и развести их обязан резолвер ключей.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B1.7 — хранилище недоступно — это не «ключей нет»")
     void b1_7_anUnavailableStoreIsNotAnAbsenceOfKeys() {
         exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH, Okx.ok());

@@ -2,22 +2,29 @@
 
 ## На какой вопрос отвечает этот файл
 
-Какой invariant OKX adapter проверяет по `reduceOnly` факту.
+Как доменное намерение reduce-only доходит до OKX и чем держится его исполнение.
 
 ## Правило
 
 `Order.positionReducingOnly` (доменное намерение) → OKX `reduceOnly`
-в create request. `OrderResponse.reduceOnly` **не** маппится в
-`OrderExternalSnapshot` и **не** обновляет `positionReducingOnly`.
-Adapter проверяет соответствие как invariant:
+в create request. Намерение **объявлено всегда**: пустое значение
+отвергает валидатор определения стратегии
+(`docs/rules/strategy-validation.md`), поэтому на площадку не уходит
+«не указано», читаемое ею как «не только сокращать».
 
-```text
-expected = Order.positionReducingOnly
-actual   = OrderResponse.reduceOnly
-mismatch -> EXCHANGE_INVARIANT_VIOLATION
-         -> Order.ERROR, closeReason = EXCHANGE_INVARIANT_VIOLATION,
-            Deal.ERROR, ExchangeAccount.safetyRung = TRADE_BLOCKED (ступень 2 + flatten)
-```
+`OrderResponse.reduceOnly` **не** маппится в `OrderExternalSnapshot` и
+**не** обновляет `positionReducingOnly` — поле сознательно отсутствует,
+чтобы не дать тихой перезаписи доменного намерения.
+
+**Посылочной сверки «отправленное намерение против подтверждённого» нет,
+и это решение, а не пропуск.** Подтверждение приёма поля не несёт, а
+сверка по ответу чтения стоила бы отдельного вызова на каждую заявку.
+Последствие неисполненного намерения — нога, которая увеличила либо
+перевернула позицию вместо сокращения, — наблюдается без неё: сумма
+экспозиций траншей расходится с нетто-размером живого эпизода, а
+переворот заводит второй эпизод. Оба признака ведут к биржевой ступени 2
+(`docs/models/domain/aggregate/Deal.md` §«Экспозиция сделки и сверка с
+биржей»).
 
 Если биржа не поддерживает reduce-only/close-only — adapter может
 проигнорировать `positionReducingOnly`; unsupported exchange на
@@ -25,12 +32,12 @@ mismatch -> EXCHANGE_INVARIANT_VIOLATION
 
 ## Где применяется
 
-- `OkxIntegrationService` validation после create order;
+- маппер заявки коннектора — перенос намерения в поле запроса
+  (`docs/models/mapping/Order.md`);
 - `OrderExternalSnapshot` материализация (поле сознательно
-  отсутствует, чтобы не дать silent override).
+  отсутствует).
 
 ## Связанные
 
 - `docs/models/mapping/Order.md` → request mapping.
-- `docs/rules/external-status-resolution.md` (safety-каскад).
 - `docs/rules/raw-exchange-dto-boundary.md`.

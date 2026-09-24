@@ -19,6 +19,7 @@ import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
+import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -42,11 +43,18 @@ class TrancheEntrySubmittedPassTest {
     private final TrancheHarness harness = new TrancheHarness();
 
     @Test
-    @DisplayName("U18.1 — базовая сборка: переход — исход рабочего блока, то есть пустой")
-    void u18_1_theBaseStateFallsThroughToTheWorkBlock() {
+    @DisplayName("U18.1 — базовая сборка, рабочий блок молчит: добыча живой ноги вместе с позицией")
+    void u18_1_theBaseStateObservesTheLegTogetherWithThePosition() {
+        givenFetches();
+
         TrancheTransition transition = handle(baseContext());
 
         assertThat(transition.hasCommands()).isFalse();
+        assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND,
+                ServiceCommandType.REFRESH_POSITION_COMMAND);
+        RefreshOrderCommandPayload payload =
+                (RefreshOrderCommandPayload) transition.getObservations().getFirst().getPayload();
+        assertThat(payload.getOrderId()).isEqualTo(30L);
         assertThat(transition.movesStatus()).isFalse();
         assertThat(transition.getDealErrorRequested()).isFalse();
     }
@@ -150,10 +158,11 @@ class TrancheEntrySubmittedPassTest {
     }
 
     @Test
-    @DisplayName("U18.11 — нога налита частично: консолидация не затребуется")
+    @DisplayName("U18.11 — нога налита частично: консолидация не затребуется, налив добывается дальше")
     void u18_11_aPartiallyFilledLegFallsThroughToTheWorkBlock() {
         harness.givenSystemCommand(SystemActionType.FINALIZE_DEAL_ENTRY_ACTION,
                 ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
+        givenFetches();
         DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "2", "0");
         subject.getOrders().add(leg(30L, TRANCHE_ID, Order.Status.PARTIALLY_COMPLETED, Boolean.FALSE, "2"));
         DealContext context = contextOf(Deal.Status.ACTIVE, subject);
@@ -162,6 +171,8 @@ class TrancheEntrySubmittedPassTest {
         TrancheTransition transition = handle(context);
 
         assertThat(transition.hasCommands()).isFalse();
+        assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND,
+                ServiceCommandType.REFRESH_POSITION_COMMAND);
         assertThat(transition.movesStatus()).isFalse();
     }
 
@@ -182,7 +193,40 @@ class TrancheEntrySubmittedPassTest {
         assertThat(transition.movesStatus()).isFalse();
     }
 
+    @Test
+    @DisplayName("U18.13 — нога налита, эпизод живой, звено консолидации ждёт: добыча не нужна — переход пустой")
+    void u18_13_aConfirmedEntryIsNotObservedAgain() {
+        givenFetches();
+
+        TrancheTransition transition = handle(confirmedEntryContext());
+
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.hasObservations()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U18.14 — рабочий блок заговорил: его исход, добычи нет")
+    void u18_14_aSpeakingWorkBlockTakesThePass() {
+        givenFetches();
+        harness.givenWork(TrancheTransition.escalate());
+
+        TrancheTransition transition = handle(baseContext());
+
+        assertThat(transition.getDealErrorRequested()).isTrue();
+        assertThat(transition.hasObservations()).isFalse();
+    }
+
     // --- сборка ------------------------------------------------------------
+
+    private void givenFetches() {
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        harness.givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
+    }
+
+    private List<ServiceCommandType> observationTypes(TrancheTransition transition) {
+        return transition.getObservations().stream().map(ServiceCommand::getType).toList();
+    }
+
 
     private TrancheTransition handle(DealContext context) {
         return harness.entrySubmitted().handle(context, context.getDeal().getTranches().getFirst());

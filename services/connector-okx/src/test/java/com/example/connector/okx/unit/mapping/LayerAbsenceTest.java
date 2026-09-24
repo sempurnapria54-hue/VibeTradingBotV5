@@ -82,7 +82,6 @@ class LayerAbsenceTest {
         OrderMapper orderMapper = Mappers.order();
         AlgoOrderMapper algoOrderMapper = Mappers.algoOrder();
         var source = OkxFixture.order();
-        source.setOrdType(null);
 
         assertThat(orderMapper.snapshotToDomain(orderMapper.integrationToSnapshot(source)).getStatus())
                 .isNull();

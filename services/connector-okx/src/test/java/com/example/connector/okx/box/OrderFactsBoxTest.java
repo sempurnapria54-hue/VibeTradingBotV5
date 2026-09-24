@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -27,15 +26,10 @@ import org.junit.jupiter.api.Test;
  * отказ. Принятая за полный, усечённая страница гасит детекторы читателя —
  * то есть пропуск выглядел бы чистым проходом.
  *
- * <p><b>Шесть клеток группы красны ОДНИМ долгом — находкой {@code F-7}.</b>
- * Перевод граничного снапшота в доменную заявку переводит {@code ordType}
- * ПЛОЩАДКИ в доменный род заявки ({@code Order.Type} — наши {@code ENTRY} и
- * {@code ENTRY_ATTACHED_STOP_LOSS}), которого площадка не отдаёт ни одним
- * значением: всякое чтение заявки отказывает разбором чужого слова. Зелена
- * при этом {@code B3.6} — усечение среза отказывает РАНЬШЕ перевода записей,
- * и это разводит два предмета, которые иначе слиплись бы. Долг —
- * `.claude/work/backlog.md` §«Чтение заявки с площадки отказывает на
- * переводе рода заявки».
+ * <p><b>Стаб отвечает реальным типом исполнения площадки</b>
+ * ({@code ordType}), и чтение заявки его не разбирает: род заявки наш и из
+ * эха площадки не выводится ({@code docs/models/mapping/Order.md}
+ * §«{@code OrderExternalSnapshot} → {@code Order}»).
  */
 class OrderFactsBoxTest extends SharedConnectorBox {
 
@@ -50,9 +44,7 @@ class OrderFactsBoxTest extends SharedConnectorBox {
 
     private static final String OTHER_INSTRUMENT = "ETH-USDT-SWAP";
 
-    /** Красна долгом {@code F-7} — довод в javadoc класса. */
     @Test
-    @Tag("debt")
     @DisplayName("B3.1 — заявка по идентификатору с резолвом доменного статуса")
     void b3_1_anOrderByIdentifierCarriesTheResolvedDomainStatus() {
         exchange.answers(OkxConstants.TRADE_ORDER_PATH, Okx.ok(Okx
@@ -73,9 +65,7 @@ class OrderFactsBoxTest extends SharedConnectorBox {
         assertThat(sent.getUrl()).doesNotContain("clOrdId");
     }
 
-    /** Красна долгом {@code F-7} — довод в javadoc класса. */
     @Test
-    @Tag("debt")
     @DisplayName("B3.2 — заявка по нашему идентификатору")
     void b3_2_anOrderByOurOwnIdentifier() {
         exchange.answers(OkxConstants.TRADE_ORDER_PATH, Okx.ok(Okx
@@ -107,9 +97,7 @@ class OrderFactsBoxTest extends SharedConnectorBox {
         assertThat(exchange.requests(OkxConstants.TRADE_ORDERS_PENDING_PATH)).hasSize(1);
     }
 
-    /** Красна долгом {@code F-7} — довод в javadoc класса. */
     @Test
-    @Tag("debt")
     @DisplayName("B3.4 — неизвестный сырой статус роняет весь ответ и несёт причину полем")
     void b3_4_anUnknownRawStatusDropsTheWholeAnswerAndCarriesItsReason() {
         exchange.answers(OkxConstants.TRADE_ORDERS_PENDING_PATH, Okx.ok(
@@ -124,9 +112,7 @@ class OrderFactsBoxTest extends SharedConnectorBox {
         assertThat(answer.body()).doesNotContain("ord-1", "ord-3");
     }
 
-    /** Красна долгом {@code F-7} — довод в javadoc класса. */
     @Test
-    @Tag("debt")
     @DisplayName("B3.5 — счёт-широкий срез несёт биржевое имя инструмента")
     void b3_5_theAccountWideSliceCarriesTheExchangeInstrumentName() {
         exchange.answers(OkxConstants.TRADE_ORDERS_PENDING_PATH, Okx.ok(
@@ -160,9 +146,7 @@ class OrderFactsBoxTest extends SharedConnectorBox {
         assertThat(answer.body()).doesNotContain("\"externalId\"");
     }
 
-    /** Красна долгом {@code F-7} — довод в javadoc класса. */
     @Test
-    @Tag("debt")
     @DisplayName("B3.7 — страница меньше потолка усечением не объявляется")
     void b3_7_aPageBelowTheCeilingIsNotDeclaredTruncated() {
         exchange.answers(OkxConstants.TRADE_ORDERS_PENDING_PATH, Okx.ok(orders(99)));
@@ -173,9 +157,7 @@ class OrderFactsBoxTest extends SharedConnectorBox {
         assertThat(answer.asList()).hasSize(99);
     }
 
-    /** Красна долгом {@code F-7} — довод в javadoc класса. */
     @Test
-    @Tag("debt")
     @DisplayName("B3.8 — живые заявки инструмента и история читаются разными путями")
     void b3_8_pendingAndHistoryAreReadByDifferentPaths() {
         exchange.answers(OkxConstants.TRADE_ORDERS_PENDING_PATH, Okx.ok(

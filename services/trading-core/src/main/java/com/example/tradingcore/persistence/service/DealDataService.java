@@ -114,6 +114,20 @@ public class DealDataService {
     }
 
     /**
+     * Нетерминальные сделки пары «счёт, инструмент» — популяция снятия риска
+     * инструментного радиуса (docs/components/KillSwitchService.md). Слот
+     * пары держит не больше одной незакрытой сделки, поэтому окна выборка не
+     * требует.
+     */
+    @Transactional(readOnly = true)
+    public List<Deal> findNonTerminalOnPair(Long exchangeAccountId, Long instrumentId) {
+        return repository.findByExchangeAccountIdAndInstrumentIdAndStatusNotIn(exchangeAccountId, instrumentId,
+                        TERMINAL_STATUSES).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Сделки счёта недавним окном — чтение поверхности. Статусом выборка
      * не сужается: читателю нужна торговая строка целиком, включая
      * закрытое.

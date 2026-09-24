@@ -16,7 +16,7 @@ Snapshot — нормализованный граничный объект; е�
 | `internalId` | `Order.internalId` | stable client id (сверка) |
 | `externalId` | `Order.externalId` | биржевой id (сохраняется при первом известном значении) |
 | `externalInstrumentId` | — | биржевое имя инструмента (`instId`). Приземляется в снапшот ради **счёт-широкого среза**: он читается по счёту, и строку адресует инструментом только это поле (`docs/components/AnomalyJob.md`). В `Order` не идёт — там инструмент известен из графа сделки |
-| `type` | `Order.type` | тип ордера (источник-нейтральный) |
+| — | `Order.type` | **не выводится из снапшота**: бизнес-тип заявки наш, его ставит создатель ноги (`docs/models/domain/core/Order.md` §Структура), и эхо площадки его не трогает, как не трогает статус. Площадка отдаёт тип **исполнения** (`ordType`: `limit`, `market`), а не род заявки, — и в снапшот он не приземляется (§«`OrderOkxResponse` → `OrderExternalSnapshot`» ниже) |
 | `side` | `Order.side` | `BUY`/`SELL`. **Здесь и происходит перевод словаря площадки в доменный перечень:** в снапшоте лежит литерал источника (`buy`/`sell` у OKX), в домене — `Order.Side`. Снапшот принадлежит коннектору (`docs/architecture/services.md` §«Общие артефакты монорепозитория»), поэтому перевод не пересекает границу домена ни в одну сторону |
 | `externalStatus` | — | raw статус, режим diagnostic; в FSM не используется (`external-status-resolution.md`) |
 | `price` | `Order.price` | empty→null |
@@ -51,7 +51,9 @@ Mapping-таблица обязана сказать, что этих колон
 
 - **Create**: `Instrument.externalId → instId`; `isolated → tdMode`
   (adapter-константа); `net → posSide` (adapter-константа);
-  `Order.side → side`; `Order.type/exec settings → ordType`;
+  `Order.side → side`; `Order.price` задана → `limit`, иначе
+  `market` → `ordType` (тип исполнения выводится из цены, а не из
+  бизнес-типа);
   `Order.size → sz`; `Order.price → px` (если нужен типу);
   `Order.internalId → clOrdId`; `Order.positionReducingOnly →
   reduceOnly`; `Order.attachedAlgoOrders → attachAlgoOrds`
@@ -117,7 +119,7 @@ evidence-cycle (специфика per-source — см. подразделы). �
 |---|---|
 | `clOrdId` | `internalId` |
 | `ordId` | `externalId` |
-| `ordType` | `type` |
+| `ordType` | **не маппится**: тип исполнения площадки доменного адресата не имеет — бизнес-тип заявки наш (§«`OrderExternalSnapshot` → `Order`» выше) |
 | `side` | `side` |
 | `state` | `externalStatus` (raw, не для FSM напрямую) |
 | `px` | `price` (empty→null) |
@@ -131,7 +133,7 @@ evidence-cycle (специфика per-source — см. подразделы). �
 | `attachAlgoClOrdId` | `attachedAlgoInternalId` |
 | `tpTriggerPx` | `takeProfitTriggerPrice` (future) |
 | `slTriggerPx` | `stopLossTriggerPrice` |
-| `reduceOnly` | **не маппится** — только invariant validation в adapter (см. правила OKX) |
+| `reduceOnly` | **не маппится**: посылочной сверки нет, последствие неисполненного намерения ловит сверка экспозиции (`docs/integrations/okx/rules/reduce-only-invariant.md`) |
 
 ### `OrderOkxResponse.attachAlgoOrds[*]` → `AttachedAlgoOrderExternalSnapshot`
 
@@ -310,7 +312,7 @@ required»). `algoId` материализованной записи нам н�
 | `slTriggerPx` | `stopLossTriggerPrice` | уровень срабатывания защиты; сторона — как у элемента `attachAlgoOrds` |
 | `slOrdPx` | **не маппится** | цена самой заявки защиты доменного поля не имеет: защита ставится рыночной (`-1`), и хранить объявленное «по рынку» числом значило бы заводить величину, у которой нет ни писателя, ни читателя (`docs/rules/writer-named-for-every-value.md`) |
 | `slTriggerPxType` | `triggerPriceType` | **операнд сверки объявленной базы** `MARK`; поле объявлено инвентарём и этой формы (`docs/models/integrations/okx/AlgoOrderOkxResponse.md`) |
-| `reduceOnly` | — | в снапшот не переносится; adapter сверяет его при разборе ответа и на несовпадении бросает нарушение биржевого инварианта (`docs/rules/external-status-resolution.md`) |
+| `reduceOnly` | — | в снапшот не переносится и не сверяется (`docs/integrations/okx/rules/reduce-only-invariant.md`) |
 
 **Вход резолвера при этом двухместный:** снапшот встроенной защиты
 приходит либо из тела родителя (`attachAlgoOrds[*]`), либо из
@@ -330,5 +332,3 @@ required»). `algoId` материализованной записи нам н�
 - `OrderResponse.state` комментарий: raw статус OKX; pending —
   `live`/`partially_filled`; details/history — `filled`/`canceled`/
   `mmp_canceled` и др. terminal.
-- `OrderResponse.reduceOnly` → только adapter invariant validation,
-  не в `OrderExternalSnapshot`.

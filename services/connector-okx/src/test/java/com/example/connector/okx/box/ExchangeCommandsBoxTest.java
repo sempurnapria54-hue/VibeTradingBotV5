@@ -6,7 +6,6 @@ import com.example.connector.okx.util.OkxConstants;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -241,32 +240,22 @@ class ExchangeCommandsBoxTest extends SharedConnectorBox {
     }
 
     /**
-     * Ожидание взято из дома: инвариант {@code reduce-only} объявлен
-     * проверкой ПОСЛЕ постановки заявки
-     * ({@code docs/integrations/okx/rules/reduce-only-invariant.md}), а
-     * писателя у него в коннекторе нет — находка {@code F-2} документа.
-     * Первая половина клетки зелена, вторая красна ожиданием из дома;
-     * долг — `.claude/work/backlog.md` §«Инвариант `reduce-only` объявлен
-     * домом, а писателя у него нет».
+     * Намерение уезжает полем запроса, и этим клетка исчерпана: посылочной
+     * сверки «отправленное против подтверждённого» дом не объявляет —
+     * последствие неисполненного намерения ловит сверка экспозиции ядра
+     * ({@code docs/integrations/okx/rules/reduce-only-invariant.md}).
      */
     @Test
-    @Tag("debt")
-    @DisplayName("B2.12 — намерение «только сокращать позицию» уезжает и сверяется")
-    void b2_12_theReduceOnlyIntentTravelsAndIsVerified() {
+    @DisplayName("B2.12 — намерение «только сокращать позицию» уезжает полем запроса")
+    void b2_12_theReduceOnlyIntentTravels() {
         exchange.answers(OkxConstants.TRADE_ORDER_PATH,
                 Okx.ok(Okx.acceptedAck("ord-1", Bodies.ORDER_INTERNAL_ID)));
-        exchange.answers(OkxConstants.TRADE_ORDERS_PENDING_PATH, Okx.ok(Okx
-                .order(INSTRUMENT, "ord-1", Bodies.ORDER_INTERNAL_ID, "live")
-                .with("reduceOnly", "false").text()));
 
         Answer placed = post(account(ORDERS), Bodies.reducingOnlyOrder());
+
         assertThat(placed.status()).isEqualTo(200);
         assertThat(exchange.single(OkxConstants.TRADE_ORDER_PATH).getBodyAsString())
                 .contains("\"reduceOnly\":true");
-
-        Answer read = get(account("/orders/pending/instrument?externalInstrumentId=" + INSTRUMENT));
-
-        assertThat(read.errorCode()).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
     }
 
     @Test

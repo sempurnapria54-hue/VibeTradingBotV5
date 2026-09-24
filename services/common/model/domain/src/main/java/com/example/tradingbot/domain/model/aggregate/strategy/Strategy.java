@@ -70,25 +70,13 @@ public class Strategy extends Auditable {
      */
     private String exchangeAccountInternalId;
 
-    /** Инструмент стратегии — его {@code internalId}. */
-    private String instrumentInternalId;
-
     /**
-     * Числовой ключ инструмента в базе донора.
-     *
-     * <p><b>Целевой модели поле не принадлежит:</b> определение адресует
-     * контекст идентичностями, а числовые ключи баз границу сервиса не
-     * пересекают (docs/architecture/data-ownership.md §Идентификаторы);
-     * у сервисов монорепозитория этот ключ живёт на строке
-     * персистентности и резолвится из {@link #instrumentInternalId} на
-     * границе domain → persistence (docs/models/mapping/Strategy.md).
-     *
-     * <p>Поле держалось ради монолита фазы 1, удалённого 2026-09-16;
-     * сервисы его не пишут и не читают. Снятие взято в работу —
-     * `.claude/work/backlog.md` §«Донорский числовой ключ инструмента у
-     * определения в общей библиотеке».
+     * Инструмент стратегии — его {@code internalId}. Числового ключа
+     * инструмента у определения нет: он живёт на строке персистентности
+     * сервиса и резолвится отсюда на границе domain → persistence
+     * (docs/models/mapping/Strategy.md).
      */
-    private Long instrumentId;
+    private String instrumentInternalId;
 
     /** Человекочитаемое имя стратегии. */
     private String name;

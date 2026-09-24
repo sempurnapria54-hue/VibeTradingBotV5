@@ -10,7 +10,9 @@ import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
+import com.example.tradingcore.domain.command.payload.RefreshAlgoOrderCommandPayload;
 import com.example.tradingcore.domain.command.payload.RefreshBalanceCommandPayload;
+import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.command.risk.RiskBlockAction;
 import com.example.tradingcore.domain.command.strategy.ActionPlan;
 import java.util.Optional;
@@ -91,6 +93,36 @@ public class TrancheActionDisposition {
     public TrancheTransition contextFetch(DealContext dealContext) {
         return command(systemActionExecutor.next(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION, dealContext,
                 null));
+    }
+
+    /**
+     * Добыча факта НАЗВАННОЙ заявки — ноги, чей налив либо снятие ждёт
+     * наблюдения. Звено называется явно, а не выводится: производный вывод
+     * берёт первую живую заявку СДЕЛКИ, и на многотраншевой сделке ею
+     * оказывалась бы нога соседа — эта не наблюдалась бы ни за какое число
+     * проходов (docs/components/SystemActionExecutor.md §«Вторая форма
+     * называет звено ЯВНО»). Пусто — звено ждёт отката повтора.
+     */
+    public Optional<ServiceCommand> orderFetch(DealContext dealContext, Long orderId) {
+        return systemActionExecutor.next(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION, dealContext, null,
+                ServiceCommandType.REFRESH_ORDER_COMMAND, new RefreshOrderCommandPayload(orderId));
+    }
+
+    /** Добыча факта названной отдельной условной заявки; довод явного звена — тот же. */
+    public Optional<ServiceCommand> algoOrderFetch(DealContext dealContext, Long algoOrderId) {
+        return systemActionExecutor.next(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION, dealContext, null,
+                ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND, new RefreshAlgoOrderCommandPayload(algoOrderId));
+    }
+
+    /**
+     * Добыча позиции: живой эпизод и запись закрытия. Звено сделки одно —
+     * эпизод у неё не бывает чужим, — но называется явно по тому же доводу:
+     * пока у сделки есть живая заявка, производный вывод до позиции не
+     * доходит.
+     */
+    public Optional<ServiceCommand> positionFetch(DealContext dealContext) {
+        return systemActionExecutor.next(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION, dealContext, null,
+                ServiceCommandType.REFRESH_POSITION_COMMAND, null);
     }
 
     /**

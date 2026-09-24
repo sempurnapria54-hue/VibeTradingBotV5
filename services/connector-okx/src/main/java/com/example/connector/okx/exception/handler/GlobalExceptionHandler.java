@@ -135,7 +135,16 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.SERVICE_UNAVAILABLE, ExchangeFailureClass.SECRET_STORE_UNAVAILABLE.name(), failure.getMessage());
     }
 
-    /** Негодный вход: неразобранное значение перечня, отсутствующий обязательный операнд. */
+    /**
+     * Негодный вход ВЫЗЫВАЮЩЕГО: неразобранное значение перечня,
+     * отсутствующий обязательный операнд.
+     *
+     * <p><b>Чужое содержимое сюда не доходит.</b> Ответ площадки,
+     * не разобранный формой контракта, переводит в нарушение инварианта
+     * сеть разбора шлюза, а испорченное содержимое хранилища — резолвер
+     * ключей в «ключей нет»: оба — классы границы, и ядро выбирает по ним
+     * реакцию, а не считает отказ своим дефектом.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorApiResponse> onIllegalArgument(IllegalArgumentException failure) {
         return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", failure.getMessage());

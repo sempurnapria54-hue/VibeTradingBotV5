@@ -64,6 +64,13 @@ import org.mapstruct.SubclassMapping;
  * внутри своего ключа группировки. Обратные ссылки дерева выставляет
  * связывание после маппинга; отложенный FK цели действия резолвит
  * {@code StrategyDataService} при сохранении.
+ *
+ * <p><b>Ключей владельца копия не берёт ни у одного узла.</b> Снимок
+ * приезжает с шины, а числовой ключ базы границу сервиса не пересекает
+ * (docs/architecture/data-ownership.md §Идентификаторы): ключи копии
+ * заводит база ядра, внешние ссылки резолвит {@code StrategyDataService}
+ * по {@code internalId}. Взятый чужой ключ сделал бы вставку слиянием —
+ * со строкой, которой нет, либо с ЧУЖОЙ копией, чей ключ совпал.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
         subclassExhaustiveStrategy = SubclassExhaustiveStrategy.RUNTIME_EXCEPTION,
@@ -72,23 +79,31 @@ public interface StrategyMapper {
 
     // ===== domain -> persistence =====
 
+    @Mapping(target = "id", ignore = true)
     StrategyEntity domainToPersistence(Strategy strategy);
 
+    @Mapping(target = "id", ignore = true)
     StrategyMarketPhaseSettingEntity domainToPersistence(StrategyMarketPhaseSetting setting);
 
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "params", source = "params", qualifiedByName = "indicatorParamsToJson")
     StrategyIndicatorSettingEntity domainToPersistence(StrategyIndicatorSetting setting);
 
+    @Mapping(target = "id", ignore = true)
     StrategyMarketStructureSettingEntity domainToPersistence(StrategyMarketStructureSetting setting);
 
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "steps", source = "stepsByStatus")
     StrategyDetailEntity domainToPersistence(StrategyDetail detail);
 
+    @Mapping(target = "id", ignore = true)
     StrategyStepEntity domainToPersistence(StrategyStep step);
 
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "steps", source = "stepsByStatus")
     StrategyTrancheEntity domainToPersistence(StrategyTranche tranche);
 
+    @Mapping(target = "id", ignore = true)
     @SubclassMapping(source = StrategyOrderAction.class, target = StrategyOrderActionEntity.class)
     @SubclassMapping(source = StrategyAlgoOrderAction.class, target = StrategyAlgoOrderActionEntity.class)
     @SubclassMapping(source = StrategyPositionAction.class, target = StrategyPositionActionEntity.class)

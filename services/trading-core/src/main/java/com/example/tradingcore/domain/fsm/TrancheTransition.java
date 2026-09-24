@@ -33,6 +33,14 @@ import lombok.Value;
  * (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша —
  * обработчик терминального ребра»).
  *
+ * <p><b>Добыча фактов отделена от работы.</b> Команда, которая только
+ * НАБЛЮДАЕТ сущность транша (звено добычи), едет своим списком: транш,
+ * ждущий налива, опрашивает его каждым проходом, и засчитанная работой
+ * такая команда занимала бы проход сделки бессрочно — её собственная
+ * работа уровня сделки не отбиралась бы, пока жива хоть одна нога
+ * (docs/processes/fsm-execution-layering.md §«Добыча не занимает
+ * проход»).
+ *
  * <p>Живёт только в памяти прохода — читателя за сериализацией у значения
  * нет (.claude/rules/codestyle.md §«Неизменяемое значение, пересекающее
  * сериализацию»).
@@ -42,6 +50,13 @@ public class TrancheTransition {
 
     /** Команды прохода в порядке диспетчеризации; пусто — команд нет. */
     List<ServiceCommand> commands;
+
+    /**
+     * Команды добычи фактов — наблюдение, а не работа; диспетчеризуются
+     * раньше команд работы (довод порядка —
+     * {@link TrancheCascadeResult#passCommands()}). Пусто — наблюдать нечего.
+     */
+    List<ServiceCommand> observations;
 
     /** Целевой статус транша; пусто — транш остаётся в своём. */
     DealTranche.Status nextStatus;
@@ -67,10 +82,12 @@ public class TrancheTransition {
     /** Затребованная ступень радиуса; пусто — ступени проход не просит. */
     HoldSignal holdSignal;
 
-    private TrancheTransition(List<ServiceCommand> commands, DealTranche.Status nextStatus,
-                              DealTranche.CloseReason closeReason, Boolean dealErrorRequested,
-                              Deal.ShutdownReason shutdownRequested, HoldSignal holdSignal) {
+    private TrancheTransition(List<ServiceCommand> commands, List<ServiceCommand> observations,
+                              DealTranche.Status nextStatus, DealTranche.CloseReason closeReason,
+                              Boolean dealErrorRequested, Deal.ShutdownReason shutdownRequested,
+                              HoldSignal holdSignal) {
         this.commands = List.copyOf(emptyIfNull(commands));
+        this.observations = List.copyOf(emptyIfNull(observations));
         this.nextStatus = nextStatus;
         this.closeReason = closeReason;
         this.dealErrorRequested = dealErrorRequested;
@@ -80,27 +97,36 @@ public class TrancheTransition {
 
     /** Транш остаётся в своём статусе, делать этим проходом нечего. */
     public static TrancheTransition stay() {
-        return new TrancheTransition(List.of(), null, null, Boolean.FALSE, null, null);
+        return new TrancheTransition(List.of(), List.of(), null, null, Boolean.FALSE, null, null);
     }
 
     /** Команда прохода без смены статуса. */
     public static TrancheTransition command(ServiceCommand command) {
-        return new TrancheTransition(commandList(command), null, null, Boolean.FALSE, null, null);
+        return new TrancheTransition(commandList(command), List.of(), null, null, Boolean.FALSE, null, null);
+    }
+
+    /**
+     * Добыча факта без работы; пустая команда (звено ждёт отката повтора)
+     * даёт пустой исход.
+     */
+    public static TrancheTransition observe(ServiceCommand observation) {
+        return new TrancheTransition(List.of(), commandList(observation), null, null, Boolean.FALSE, null, null);
     }
 
     /** Переход в названный статус. */
     public static TrancheTransition moveTo(DealTranche.Status status) {
-        return new TrancheTransition(List.of(), status, null, Boolean.FALSE, null, null);
+        return new TrancheTransition(List.of(), List.of(), status, null, Boolean.FALSE, null, null);
     }
 
     /** Терминал транша с его причиной — одним ходом. */
     public static TrancheTransition close(DealTranche.CloseReason reason) {
-        return new TrancheTransition(List.of(), DealTranche.Status.CLOSED, reason, Boolean.FALSE, null, null);
+        return new TrancheTransition(List.of(), List.of(), DealTranche.Status.CLOSED, reason, Boolean.FALSE,
+                null, null);
     }
 
     /** Просьба увести сделку ошибочной тропой; ступени проход не требует. */
     public static TrancheTransition escalate() {
-        return new TrancheTransition(List.of(), null, null, Boolean.TRUE, null, null);
+        return new TrancheTransition(List.of(), List.of(), null, null, Boolean.TRUE, null, null);
     }
 
     /**
@@ -108,12 +134,12 @@ public class TrancheTransition {
      * причиной выхода из штатного ведения.
      */
     public static TrancheTransition requestShutdown(Deal.ShutdownReason reason) {
-        return new TrancheTransition(List.of(), null, null, Boolean.FALSE, reason, null);
+        return new TrancheTransition(List.of(), List.of(), null, null, Boolean.FALSE, reason, null);
     }
 
     /** Затребованная ступень без просьбы менять статус сделки. */
     public static TrancheTransition requestRung(HoldSignal signal) {
-        return new TrancheTransition(List.of(), null, null, Boolean.FALSE, null, signal);
+        return new TrancheTransition(List.of(), List.of(), null, null, Boolean.FALSE, null, signal);
     }
 
     /**
@@ -122,7 +148,7 @@ public class TrancheTransition {
      * (docs/rules/live-risk-protection.md §«Реакция на непокрытый риск»).
      */
     public static TrancheTransition escalate(HoldSignal signal) {
-        return new TrancheTransition(List.of(), null, null, Boolean.TRUE, null, signal);
+        return new TrancheTransition(List.of(), List.of(), null, null, Boolean.TRUE, null, signal);
     }
 
     /** Тот же исход плюс команда прохода. */
@@ -132,13 +158,29 @@ public class TrancheTransition {
         }
         List<ServiceCommand> extended = new ArrayList<>(commands);
         extended.add(command);
-        return new TrancheTransition(extended, nextStatus, closeReason, dealErrorRequested, shutdownRequested,
-                holdSignal);
+        return new TrancheTransition(extended, observations, nextStatus, closeReason, dealErrorRequested,
+                shutdownRequested, holdSignal);
     }
 
-    /** Переход несёт команды к диспетчеризации. */
+    /** Тот же исход плюс команда добычи факта. */
+    public TrancheTransition withObservation(ServiceCommand observation) {
+        if (isNull(observation)) {
+            return this;
+        }
+        List<ServiceCommand> extended = new ArrayList<>(observations);
+        extended.add(observation);
+        return new TrancheTransition(commands, extended, nextStatus, closeReason, dealErrorRequested,
+                shutdownRequested, holdSignal);
+    }
+
+    /** Переход несёт команды работы к диспетчеризации. */
     public Boolean hasCommands() {
         return isNotEmpty(commands);
+    }
+
+    /** Переход несёт команды добычи фактов. */
+    public Boolean hasObservations() {
+        return isNotEmpty(observations);
     }
 
     /** Переход двигает статус транша. */
@@ -151,14 +193,14 @@ public class TrancheTransition {
      * обработчика, дописывающая ребро к уже собранным командам.
      */
     public TrancheTransition withStatus(DealTranche.Status status) {
-        return new TrancheTransition(commands, status, closeReason, dealErrorRequested, shutdownRequested,
-                holdSignal);
+        return new TrancheTransition(commands, observations, status, closeReason, dealErrorRequested,
+                shutdownRequested, holdSignal);
     }
 
     /** Тот же исход без статусного ребра — им пользуется гейт матрицы. */
     public TrancheTransition withoutStatus() {
-        return new TrancheTransition(commands, null, null, dealErrorRequested, shutdownRequested,
-                holdSignal);
+        return new TrancheTransition(commands, observations, null, null, dealErrorRequested,
+                shutdownRequested, holdSignal);
     }
 
     private static List<ServiceCommand> commandList(ServiceCommand command) {

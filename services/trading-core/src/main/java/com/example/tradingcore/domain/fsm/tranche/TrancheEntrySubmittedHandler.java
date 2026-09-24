@@ -9,6 +9,7 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.domain.command.DealContext;
+import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
 import com.example.tradingcore.domain.fsm.DealTrancheHandler;
@@ -28,6 +29,11 @@ import org.springframework.stereotype.Component;
  * команду консолидации входа, а само ребро пишет звено в одной
  * транзакции со своим завершением: обработчик ГЕЙТИТ эмиссию, а не
  * двигает статус (docs/processes/fsm-execution-layering.md).
+ *
+ * <p><b>Налив входа наблюдает этот обработчик.</b> Пока вход не
+ * подтверждён и рабочий блок молчит, проход отдаёт добычу ноги, а по её
+ * наливу — позиции; иначе транш стоял бы в отправленном входе бессрочно,
+ * а живая экспозиция сделки не наблюдалась бы вовсе.
  *
  * <p><b>Требование детали безусловно: восстановленный транш в этот статус
  * не приходит.</b> Входа он не отправлял, а ребро переоткрытия требует и
@@ -77,7 +83,38 @@ public class TrancheEntrySubmittedHandler implements DealTrancheHandler {
         if (isTrue(entryConfirmed(entry, deal))) {
             return consolidateEntry(dealContext, tranche);
         }
-        return workPass.run(dealContext, tranche);
+        TrancheTransition work = workPass.run(dealContext, tranche);
+        if (isTrue(workPass.spoke(work))) {
+            return work;
+        }
+        return observeEntry(dealContext, entry);
+    }
+
+    /**
+     * Добыча налива входа — единственная тропа, которой он наблюдается:
+     * строка исполнения создания ноги завершается на подтверждённой
+     * ОТПРАВКЕ, и дальше живых строк у транша нет.
+     *
+     * <p><b>Живая нога добывается ВМЕСТЕ с позицией, одним проходом.</b>
+     * Налив, наблюдённый без позиции, делает следующий проход ложным
+     * дважды: сверка экспозиций траншей с нетто-размером живого эпизода
+     * расходится (биржевая ступень на штатном входе), а «вход налился,
+     * живого эпизода нет» читается как уже закрытая позиция. Налитая нога
+     * — одна позиция: её живой эпизод и есть второй операнд подтверждённого
+     * входа.
+     *
+     * <p>Добыча едет наблюдением, а не работой: транш опрашивает налив
+     * каждым проходом, и работу уровня сделки это занимать не должно
+     * (docs/components/TrancheEntrySubmittedHandler.md §«Налив наблюдается
+     * добычей»).
+     */
+    private TrancheTransition observeEntry(DealContext dealContext, Order entry) {
+        ServiceCommand position = disposition.positionFetch(dealContext).orElse(null);
+        if (isFalse(entry.isLive())) {
+            return TrancheTransition.observe(position);
+        }
+        return TrancheTransition.observe(disposition.orderFetch(dealContext, entry.getId()).orElse(null))
+                .withObservation(position);
     }
 
     /**

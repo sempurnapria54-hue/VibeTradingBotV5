@@ -208,21 +208,23 @@ class ServiceCommandDispatchTest {
     }
 
     /**
-     * Исчерпанный бюджет незавершённого звена уводит строку в отказ и
-     * <b>эскалации не порождает</b>: «мы не смогли дозвониться» — про
-     * площадку, а здесь площадка ни при чём, и радиусная реакция со
-     * снятием живого риска поднималась бы на неполном графе.
+     * Исчерпанный бюджет незавершённого звена уводит строку в отказ <b>и
+     * бросает исчерпание</b>, как и бюджет отказа площадки: отказавшую
+     * строку не читает никто, и следующий проход завёл бы новую строку той
+     * же надобности с новым бюджетом — ожидание, объявленное конечным, не
+     * кончалось бы никогда. Порядок «сперва отказ строки, затем бросок» —
+     * часть контракта.
      */
     @Test
-    void exhaustedBudgetOfAnUnfinishedLinkFailsWithoutEscalation() {
+    void exhaustedBudgetOfAnUnfinishedLinkFailsAndEscalates() {
         DealActionState row = strategyRow();
         row.setAttemptCount(2);
         givenRow(row);
         when(executor.execute(any(), any(), any()))
                 .thenReturn(ServiceCommandExecutionResult.notCompleted("deal graph incomplete"));
 
-        assertThatCode(() -> dispatcher.execute(command(ServiceCommandType.SUBMIT_ORDER_COMMAND), context(row)))
-                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> dispatcher.execute(command(ServiceCommandType.SUBMIT_ORDER_COMMAND), context(row)))
+                .isInstanceOf(RetryBudgetExhaustedException.class);
 
         assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.FAILED);
     }

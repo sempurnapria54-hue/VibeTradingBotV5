@@ -2,6 +2,7 @@ package com.example.tradingcore.unit.fsm;
 
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingError;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingRung;
+import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeObserving;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeWithCommands;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.command;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.silentCascade;
@@ -10,6 +11,7 @@ import static com.example.tradingcore.unit.fsm.FsmFixture.TRANCHE_ID;
 import static com.example.tradingcore.unit.fsm.FsmFixture.closedPosition;
 import static com.example.tradingcore.unit.fsm.FsmFixture.contextBuilder;
 import static com.example.tradingcore.unit.fsm.FsmFixture.deal;
+import static com.example.tradingcore.unit.fsm.FsmFixture.decimal;
 import static com.example.tradingcore.unit.fsm.FsmFixture.exposed;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.livePosition;
@@ -34,6 +36,7 @@ import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
+import com.example.tradingcore.domain.command.calc.DealResultCalculator;
 import com.example.tradingcore.domain.command.payload.ClosePositionCommandPayload;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
 import com.example.tradingcore.domain.fsm.DealTransition;
@@ -56,11 +59,16 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка.</b> Сделка {@code EXIT_PENDING}, два
  * нетерминальных транша; живой эпизод есть, его риск живой; граф полон;
  * живых входных ног нет; живых агрегатных строк исполнения нет; каскад и
- * исполнитель звеньев подменены.
+ * исполнитель звеньев подменены, звенья добычи отдают свои команды.
  *
- * <p><b>Обе половины исхода называются вместе:</b> отсутствие закрытия
- * нетто-экспозиции проход не останавливает — он доходит до затребования
- * финализации выхода тем же ходом.
+ * <p><b>Порядок выхода называется тремя ступенями:</b> при живом риске
+ * позиции — закрытие нетто-экспозиции и его добыча; пока транши не
+ * терминальны — ничего; затем добыча фактов закрытия и финализация. Прежде
+ * финализация затребовалась бы на любом проходе без закрытия — и её бюджет
+ * тратился бы, пока транши ещё снимаются.
+ *
+ * <p>Калькулятор итога — сервис-коллаборатор, и подменён: его предмет —
+ * своя спека, а здесь спрашивается только, чем проход отвечает на его исход.
  */
 class DealExitPendingPassTest {
 
@@ -68,70 +76,73 @@ class DealExitPendingPassTest {
 
     private final SystemActionExecutor systemActionExecutor = mock(SystemActionExecutor.class);
 
+    private final DealResultCalculator resultCalculator = mock(DealResultCalculator.class);
+
     private final DealExitPendingHandler handler = new DealExitPendingHandler(cascade,
-            new DealTransitionGate(new DealTerminalGate()), systemActionExecutor);
+            new DealTransitionGate(new DealTerminalGate()), systemActionExecutor, resultCalculator);
 
     DealExitPendingPassTest() {
         when(cascade.run(any())).thenReturn(silentCascade());
         when(systemActionExecutor.next(any(), any(), any())).thenReturn(Optional.empty());
+        givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
+        givenFetch(ServiceCommandType.REFRESH_BILLS_COMMAND);
+        when(resultCalculator.flowsAwaitFetch(any())).thenReturn(Boolean.FALSE);
     }
 
     @Test
-    @DisplayName("U10.1 — базовая сборка при молчащем каскаде: одна команда закрытия позиции")
-    void u10_1_theBaseStateEmitsTheNetClose() {
+    @DisplayName("U10.1 — базовая сборка при молчащем каскаде: добыча позиции, затем её закрытие")
+    void u10_1_theBaseStateEmitsTheNetCloseAfterItsFetch() {
         DealContext context = baseContext();
 
         DealTransition transition = handler.handle(context);
 
-        assertThat(transition.getCommands()).singleElement()
-                .satisfies(emitted -> {
-                    assertThat(emitted.getType()).isEqualTo(ServiceCommandType.CLOSE_POSITION_COMMAND);
-                    ClosePositionCommandPayload payload = (ClosePositionCommandPayload) emitted.getPayload();
-                    assertThat(payload.getRequestedCloseReason())
-                            .isEqualTo(Position.CloseReason.CLOSED_BY_STRATEGY);
-                });
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND,
+                ServiceCommandType.CLOSE_POSITION_COMMAND);
+        ClosePositionCommandPayload payload =
+                (ClosePositionCommandPayload) transition.getCommands().get(1).getPayload();
+        assertThat(payload.getRequestedCloseReason()).isEqualTo(Position.CloseReason.CLOSED_BY_STRATEGY);
         assertThat(transition.movesStatus()).isFalse();
         assertThat(transition.getHoldSignal()).isNull();
     }
 
     @Test
-    @DisplayName("U10.2 — у транша живая входная нога: закрытия нет, затребование финализации есть")
-    void u10_2_aLiveEntryLegHoldsTheNetCloseButNotTheFinalization() {
+    @DisplayName("U10.2 — у транша живая входная нога: ни закрытия, ни финализации")
+    void u10_2_aLiveEntryLegHoldsTheNetCloseAndTheFinalization() {
         DealContext context = baseContext();
         context.getDeal().getTranches().getFirst().getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
         givenFinalizationCommand();
 
-        assertOnlyFinalization(handler.handle(context));
+        assertIdle(handler.handle(context));
     }
 
     @Test
-    @DisplayName("U10.3 — граф предъявлен не целиком: то же обеими половинами")
-    void u10_3_anIncompleteGraphHoldsTheNetCloseButNotTheFinalization() {
+    @DisplayName("U10.3 — граф предъявлен не целиком: то же")
+    void u10_3_anIncompleteGraphHoldsTheNetCloseAndTheFinalization() {
         DealContext context = contextBuilder(baseDeal()).graphComplete(Boolean.FALSE).build();
         givenFinalizationCommand();
 
-        assertOnlyFinalization(handler.handle(context));
+        assertIdle(handler.handle(context));
     }
 
     @Test
-    @DisplayName("U10.4 — живого эпизода нет вовсе: закрывать нечего, проход идёт к финализации")
-    void u10_4_aDealWithoutALiveEpisodeGoesStraightToTheFinalization() {
+    @DisplayName("U10.4 — живого эпизода нет, транши не терминальны: финализация не затребуется")
+    void u10_4_aDealWithoutALiveEpisodeWaitsForItsTranches() {
         Deal collapsing = baseDeal();
         collapsing.getPositions().clear();
         givenFinalizationCommand();
 
-        assertOnlyFinalization(handler.handle(contextBuilder(collapsing).build()));
+        assertIdle(handler.handle(contextBuilder(collapsing).build()));
     }
 
     @Test
-    @DisplayName("U10.5 — эпизод есть, живого риска не несёт: то же")
-    void u10_5_aClosedEpisodeGoesStraightToTheFinalization() {
+    @DisplayName("U10.5 — эпизод без живого риска, транши не терминальны: то же")
+    void u10_5_aClosedEpisodeWaitsForItsTranches() {
         Deal collapsing = baseDeal();
         collapsing.getPositions().clear();
         collapsing.getPositions().add(closedPosition("2"));
         givenFinalizationCommand();
 
-        assertOnlyFinalization(handler.handle(contextBuilder(collapsing).build()));
+        assertIdle(handler.handle(contextBuilder(collapsing).build()));
     }
 
     @Test
@@ -142,31 +153,30 @@ class DealExitPendingPassTest {
                 .build();
         givenFinalizationCommand();
 
-        assertOnlyFinalization(handler.handle(context));
+        assertIdle(handler.handle(context));
     }
 
     @Test
-    @DisplayName("U10.7 — живого риска нет и живых строк нет: терминал ставит звено")
+    @DisplayName("U10.7 — транши терминальны, сделка не входила: терминал ставит звено")
     void u10_7_aQuietCollapseRequestsTheExitFinalization() {
-        Deal collapsing = baseDeal();
-        collapsing.getPositions().clear();
         givenFinalizationCommand();
 
-        DealTransition transition = handler.handle(contextBuilder(collapsing).build());
+        DealTransition transition = handler.handle(contextBuilder(settledDeal()).build());
 
         assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.FINALIZE_DEAL_EXIT_COMMAND);
         assertThat(transition.movesStatus()).isFalse();
     }
 
     @Test
-    @DisplayName("U10.8 — каскад выдал команды: закрытие нетто-экспозиции на этом проходе не эмитится")
-    void u10_8_theCascadeCommandsPreemptTheNetClose() {
+    @DisplayName("U10.8 — каскад выдал команды при живом риске позиции: закрытие их не ждёт и едет первым")
+    void u10_8_theNetCloseDoesNotWaitForTheCascade() {
         DealContext context = baseContext();
         when(cascade.run(any())).thenReturn(cascadeWithCommands(ServiceCommandType.CANCEL_ORDER_COMMAND));
 
         DealTransition transition = handler.handle(context);
 
-        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.CANCEL_ORDER_COMMAND);
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND,
+                ServiceCommandType.CLOSE_POSITION_COMMAND, ServiceCommandType.CANCEL_ORDER_COMMAND);
         assertThat(transition.movesStatus()).isFalse();
     }
 
@@ -211,7 +221,7 @@ class DealExitPendingPassTest {
 
         DealTransition transition = handler.handle(context);
 
-        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.CLOSE_POSITION_COMMAND);
+        assertThat(commandTypes(transition)).contains(ServiceCommandType.CLOSE_POSITION_COMMAND);
     }
 
     @Test
@@ -223,35 +233,147 @@ class DealExitPendingPassTest {
 
         DealTransition transition = handler.handle(context);
 
-        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.CLOSE_POSITION_COMMAND);
+        assertThat(commandTypes(transition)).contains(ServiceCommandType.CLOSE_POSITION_COMMAND);
     }
 
     @Test
     @DisplayName("U10.13 — каскад просит ступень, работы больше нет: ступень едет с финализацией")
     void u10_13_aRungRequestTravelsWithTheFinalization() {
-        Deal collapsing = baseDeal();
-        collapsing.getPositions().clear();
         HoldSignal rung = HoldSignal.instrument(Constants.Hold.INSTRUMENT_MARKET_DATA_EXPIRED);
         when(cascade.run(any())).thenReturn(cascadeAskingRung(rung));
         givenFinalizationCommand();
 
-        DealTransition transition = handler.handle(contextBuilder(collapsing).build());
+        DealTransition transition = handler.handle(contextBuilder(settledDeal()).build());
 
         assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.FINALIZE_DEAL_EXIT_COMMAND);
         assertThat(transition.getHoldSignal()).isEqualTo(rung);
     }
 
+    @Test
+    @DisplayName("U10.14 — намерение закрытия стоит, позиция добывается этим проходом: закрытие едет за добычей")
+    void u10_14_aStandingCloseIntentIsRepeatedBehindAFreshObservation() {
+        DealContext context = baseContext();
+        context.getDeal().livePosition().setCloseReason(Position.CloseReason.CLOSED_BY_STRATEGY);
+
+        DealTransition transition = handler.handle(context);
+
+        assertThat(commandTypes(transition))
+                .as("позиция, пережившая принятое закрытие, закрывается снова; плоскую исполнитель "
+                        + "закрытия пропустит по наблюдению той же добычи")
+                .containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND,
+                        ServiceCommandType.CLOSE_POSITION_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U10.20 — намерение закрытия стоит, звено добычи ждёт отката: ни добычи, ни повтора")
+    void u10_20_aStandingCloseIntentWithoutAnObservationIsNotRepeated() {
+        DealContext context = baseContext();
+        context.getDeal().livePosition().setCloseReason(Position.CloseReason.CLOSED_BY_STRATEGY);
+        when(systemActionExecutor.next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
+                eq(ServiceCommandType.REFRESH_POSITION_COMMAND), any()))
+                .thenReturn(Optional.empty());
+
+        DealTransition transition = handler.handle(context);
+
+        assertThat(transition.getCommands())
+                .as("без наблюдения этого прохода «отправлено, ещё не наблюдено» от «наблюдено, "
+                        + "осталась» не отличить")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("U10.21 — намерения нет, звено добычи ждёт отката: первое закрытие едет и без добычи")
+    void u10_21_theFirstCloseDoesNotWaitForAnObservation() {
+        DealContext context = baseContext();
+        when(systemActionExecutor.next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
+                eq(ServiceCommandType.REFRESH_POSITION_COMMAND), any()))
+                .thenReturn(Optional.empty());
+
+        DealTransition transition = handler.handle(context);
+
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.CLOSE_POSITION_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U10.15 — каскад только наблюдает, транши не терминальны, риска нет: добыча занимает проход")
+    void u10_15_aCascadeObservationHoldsTheFinalization() {
+        Deal collapsing = baseDeal();
+        collapsing.getPositions().clear();
+        when(cascade.run(any())).thenReturn(cascadeObserving(ServiceCommandType.REFRESH_ORDER_COMMAND));
+        givenFinalizationCommand();
+
+        DealTransition transition = handler.handle(contextBuilder(collapsing).build());
+
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U10.16 — транши терминальны, эпизод ждёт записи закрытия: добыча позиции, финализации нет")
+    void u10_16_aMissingCloseRecordIsFetchedBeforeTheFinalization() {
+        Deal entered = enteredSettledDeal();
+        entered.getPositions().add(closedPosition("2"));
+        givenFinalizationCommand();
+
+        DealTransition transition = handler.handle(contextBuilder(entered).build());
+
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U10.17 — записи закрытия добыты, движения ждут добычи: звено движений, финализации нет")
+    void u10_17_theBillsLinkIsEmittedBeforeTheFinalization() {
+        Deal entered = enteredSettledDeal();
+        entered.getPositions().add(recordedPosition());
+        when(resultCalculator.flowsAwaitFetch(any())).thenReturn(Boolean.TRUE);
+        givenFinalizationCommand();
+
+        DealTransition transition = handler.handle(contextBuilder(entered).build());
+
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_BILLS_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U10.18 — факты закрытия добыты: финализация выхода")
+    void u10_18_harvestedFactsLeadToTheFinalization() {
+        Deal entered = enteredSettledDeal();
+        entered.getPositions().add(recordedPosition());
+        givenFinalizationCommand();
+
+        DealTransition transition = handler.handle(contextBuilder(entered).build());
+
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.FINALIZE_DEAL_EXIT_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U10.19 — работа каскада при живой входной ноге: закрытия нет, едет только каскад")
+    void u10_19_aLiveEntryLegKeepsTheNetCloseOutOfTheCascadePass() {
+        DealContext context = baseContext();
+        context.getDeal().getTranches().getFirst().getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
+        when(cascade.run(any())).thenReturn(cascadeWithCommands(ServiceCommandType.CANCEL_ORDER_COMMAND));
+
+        DealTransition transition = handler.handle(context);
+
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.CANCEL_ORDER_COMMAND);
+    }
+
     // --- сборка ------------------------------------------------------------
 
-    /** Закрытия нет, затребование финализации есть — обе половины исхода. */
-    private void assertOnlyFinalization(DealTransition transition) {
-        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.FINALIZE_DEAL_EXIT_COMMAND);
+    /** Ни закрытия, ни финализации: проход ждёт траншей. */
+    private void assertIdle(DealTransition transition) {
+        assertThat(transition.getCommands()).isEmpty();
         assertThat(transition.movesStatus()).isFalse();
     }
 
     private void givenFinalizationCommand() {
         when(systemActionExecutor.next(eq(SystemActionType.FINALIZE_DEAL_EXIT_ACTION), any(), isNull()))
                 .thenReturn(Optional.of(command(ServiceCommandType.FINALIZE_DEAL_EXIT_COMMAND)));
+    }
+
+    /** Звено добычи, названное явно, отдаёт свою команду. */
+    private void givenFetch(ServiceCommandType link) {
+        when(systemActionExecutor.next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
+                eq(link), any()))
+                .thenReturn(Optional.of(command(link)));
     }
 
     /** Живая строка исполнения УРОВНЯ СДЕЛКИ: транша у неё нет. */
@@ -274,6 +396,27 @@ class DealExitPendingPassTest {
                 exposed(tranche(SECOND_TRANCHE_ID, DealTranche.Status.EXIT_PENDING), "1"));
         collapsing.getPositions().add(livePosition("2"));
         return collapsing;
+    }
+
+    /** Транши терминальны, сделка не входила, эпизодов нет. */
+    private Deal settledDeal() {
+        return deal(Deal.Status.EXIT_PENDING,
+                tranche(TRANCHE_ID, DealTranche.Status.CLOSED),
+                tranche(SECOND_TRANCHE_ID, DealTranche.Status.CLOSED));
+    }
+
+    /** Транши терминальны, вход исполнялся: позиция по сделке наблюдалась. */
+    private Deal enteredSettledDeal() {
+        return deal(Deal.Status.EXIT_PENDING,
+                exposed(tranche(TRANCHE_ID, DealTranche.Status.CLOSED), "1"),
+                tranche(SECOND_TRANCHE_ID, DealTranche.Status.CLOSED));
+    }
+
+    /** Закрытый эпизод с добытой записью закрытия. */
+    private Position recordedPosition() {
+        Position recorded = closedPosition("2");
+        recorded.setExternalRealizedProfit(decimal("3"));
+        return recorded;
     }
 
     private List<ServiceCommandType> commandTypes(DealTransition transition) {

@@ -222,6 +222,21 @@ class TrancheCascadeResultTest {
         assertThat(result.getHoldSignal()).isEqualTo(HARD);
     }
 
+    @Test
+    @DisplayName("U16.15 — транш только добывает факт: добыча работой не является и едет своей лентой")
+    void u16_15_anObservationAloneIsNotWork() {
+        DealContext context = baseContext();
+        givenFirst(context, TrancheTransition.observe(command(ServiceCommandType.REFRESH_ORDER_COMMAND)));
+
+        TrancheCascadeResult result = cascade.run(context);
+
+        assertThat(result.acted()).isFalse();
+        assertThat(result.observed()).isTrue();
+        assertThat(result.getCommands()).isEmpty();
+        assertThat(result.passCommands()).extracting(ServiceCommand::getType)
+                .containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND);
+    }
+
     // --- сборка ------------------------------------------------------------
 
     private void givenFirst(DealContext context, TrancheTransition transition) {

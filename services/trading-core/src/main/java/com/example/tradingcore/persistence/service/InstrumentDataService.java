@@ -10,9 +10,11 @@ import com.example.tradingcore.persistence.model.InstrumentEntity;
 import com.example.tradingcore.persistence.repository.InstrumentRepository;
 import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -200,5 +202,17 @@ public class InstrumentDataService {
         }
         return repository.findInternalIdsByIdIn(ids).stream()
                 .collect(Collectors.toMap(row -> (Long) row[0], row -> (String) row[1]));
+    }
+
+    /**
+     * Биржевые имена названных инструментов. Пустой вход запроса не
+     * производит: ответ известен заранее.
+     */
+    @Transactional(readOnly = true)
+    public Set<String> findExternalIdsByIds(Collection<Long> ids) {
+        if (isEmpty(ids)) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(repository.findExternalIdsByIdIn(ids));
     }
 }

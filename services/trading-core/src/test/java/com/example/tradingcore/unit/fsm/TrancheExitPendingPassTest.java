@@ -19,12 +19,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
+import com.example.tradingcore.domain.command.payload.CancelAttachedProtectionCommandPayload;
 import com.example.tradingcore.domain.command.payload.CancelOrderCommandPayload;
+import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.fsm.DealTrancheHandler;
 import com.example.tradingcore.domain.fsm.DealTrancheStateMachine;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
@@ -44,9 +47,11 @@ import org.junit.jupiter.api.Test;
  * граф полон; рабочий блок подменён и молчит; диспозиция настоящая,
  * исполнитель звеньев подменён.
  *
- * <p><b>Клетка {@code U21.14} добрана этим заходом</b> — она закрывает
- * пробел {@code G3} документа: тропа «экспозиция ненулевая, рабочий блок
- * молчит» доходит до добычи фактов, и кейса на неё группа не имела.
+ * <p><b>Защиты транша снимаются только при нулевой экспозиции, и снятие
+ * наблюдается тем же проходом</b> (docs/rules/exit-teardown-order.md
+ * §«Защиты снимаются последними»): клетки {@code U21.4}, {@code U21.10},
+ * {@code U21.14}-{@code U21.19} держат этот порядок; добыча едет
+ * наблюдением, отдельным от команд работы списком.
  */
 class TrancheExitPendingPassTest {
 
@@ -85,15 +90,18 @@ class TrancheExitPendingPassTest {
     }
 
     @Test
-    @DisplayName("U21.4 — входных ног нет, сделка сворачивается: своей ноги транш не выпускает")
-    void u21_4_aCollapsingDealSuppressesTheOwnReduceOnlyLeg() {
+    @DisplayName("U21.4 — сделка сворачивается при живом риске позиции: ни своей ноги, ни снятия, ни добычи")
+    void u21_4_aCollapsingDealWithLiveRiskLeavesTheTrancheQuiet() {
         harness.givenWork(TrancheTransition.command(command(ServiceCommandType.CREATE_ORDER_COMMAND)));
-        harness.givenSystemCommand(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION,
-                ServiceCommandType.REFRESH_POSITION_COMMAND);
+        harness.givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
+        DealTranche subject = exitingTranche();
+        subject.getAlgoOrders().add(protection(40L, TRANCHE_ID, "5"));
 
-        TrancheTransition transition = handle(contextOf(Deal.Status.EXIT_PENDING, exitingTranche()));
+        TrancheTransition transition = handle(contextOf(Deal.Status.EXIT_PENDING, subject));
 
-        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND);
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.hasObservations()).isFalse();
+        assertThat(transition.movesStatus()).isFalse();
         harness.verifyWorkPassNotRun();
     }
 
@@ -154,18 +162,26 @@ class TrancheExitPendingPassTest {
     }
 
     @Test
-    @DisplayName("U21.10 — транш всё ещё несёт живой риск: команда звена добычи фактов")
-    void u21_10_aRiskBearingTrancheRequestsTheContextHarvest() {
-        harness.givenSystemCommand(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION,
-                ServiceCommandType.REFRESH_POSITION_COMMAND);
+    @DisplayName("U21.10 — экспозиция ноль, живая встроенная защита: её снятие и добыча родителя")
+    void u21_10_aLiveAttachedProtectionIsCancelledAndItsParentObserved() {
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
         DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.EXIT_PENDING), "5", "5");
         Order parent = filledEntryLeg(30L, TRANCHE_ID, "5");
-        parent.getAttachedAlgoOrders().add(attachedProtection(60L, "5"));
+        AttachedAlgoOrder attached = attachedProtection(60L, "5");
+        attached.setOrderId(parent.getId());
+        parent.getAttachedAlgoOrders().add(attached);
         subject.getOrders().add(parent);
 
         TrancheTransition transition = handle(contextOf(Deal.Status.ACTIVE, subject));
 
-        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND);
+        assertThat(transition.getCommands()).singleElement().satisfies(emitted -> {
+            assertThat(emitted.getType()).isEqualTo(ServiceCommandType.CANCEL_ATTACHED_PROTECTION_COMMAND);
+            CancelAttachedProtectionCommandPayload payload =
+                    (CancelAttachedProtectionCommandPayload) emitted.getPayload();
+            assertThat(payload.getAttachedAlgoOrderId()).isEqualTo(60L);
+            assertThat(payload.getCancelReason()).isEqualTo(AttachedAlgoOrder.CloseReason.CANCELED_BY_STRATEGY);
+        });
+        assertThat(observedOrderIds(transition)).containsExactly(30L);
         assertThat(transition.movesStatus()).isFalse();
     }
 
@@ -214,15 +230,90 @@ class TrancheExitPendingPassTest {
     }
 
     @Test
-    @DisplayName("U21.14 — экспозиция ненулевая, рабочий блок молчит: проход доходит до добычи фактов")
-    void u21_14_aQuietWorkBlockWithLiveExposureRequestsTheContextHarvest() {
-        harness.givenSystemCommand(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION,
-                ServiceCommandType.REFRESH_POSITION_COMMAND);
+    @DisplayName("U21.14 — экспозиция ненулевая, рабочий блок молчит: проход наблюдает позицию")
+    void u21_14_aQuietWorkBlockWithLiveExposureObservesThePosition() {
+        harness.givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
 
         TrancheTransition transition = handle(contextOf(Deal.Status.ACTIVE, exitingTranche()));
 
-        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND);
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND);
         assertThat(transition.movesStatus()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U21.15 — экспозиция ненулевая, живые защита и своя нога: защита не снимается, нога добывается")
+    void u21_15_aLiveExposureKeepsItsProtectionAndObservesItsOwnLeg() {
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        harness.givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
+        DealTranche subject = exitingTranche();
+        subject.getOrders().add(liveReduceOnlyLeg(31L, TRANCHE_ID));
+        subject.getAlgoOrders().add(protection(40L, TRANCHE_ID, "5"));
+
+        TrancheTransition transition = handle(contextOf(Deal.Status.ACTIVE, subject));
+
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND,
+                ServiceCommandType.REFRESH_POSITION_COMMAND);
+        assertThat(observedOrderIds(transition)).containsExactly(31L);
+    }
+
+    @Test
+    @DisplayName("U21.16 — сделка сворачивается, живого риска позиции нет, экспозиция есть: позиция добывается")
+    void u21_16_aCollapsingDealWithoutLiveRiskObservesTheTrancheExposure() {
+        harness.givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
+        DealTranche subject = exitingTranche();
+        subject.getAlgoOrders().add(protection(40L, TRANCHE_ID, "5"));
+        DealContext context = contextOf(Deal.Status.EXIT_PENDING, subject);
+        context.getDeal().getPositions().clear();
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_POSITION_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U21.17 — намерение снятия входной ноги уже стоит: снятие не повторяется, нога добывается")
+    void u21_17_aStandingCancelIntentIsObservedNotRepeated() {
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        DealTranche subject = exitingTranche();
+        Order leg = liveEntryLeg(32L, TRANCHE_ID);
+        leg.setCloseReason(Order.CloseReason.CANCELED_BY_STRATEGY);
+        subject.getOrders().add(leg);
+
+        TrancheTransition transition = handle(contextOf(Deal.Status.ACTIVE, subject));
+
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(observedOrderIds(transition)).containsExactly(32L);
+    }
+
+    @Test
+    @DisplayName("U21.18 — экспозиция ноль, у условной заявки намерение стоит: только её добыча")
+    void u21_18_aStandingAlgoCancelIntentIsObservedNotRepeated() {
+        harness.givenFetch(ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND);
+        DealTranche subject = tranche(TRANCHE_ID, DealTranche.Status.EXIT_PENDING);
+        AlgoOrder algo = protection(40L, TRANCHE_ID, "5");
+        algo.setCloseReason(AlgoOrder.CloseReason.CANCELED_BY_STRATEGY);
+        subject.getAlgoOrders().add(algo);
+
+        TrancheTransition transition = handle(contextOf(Deal.Status.ACTIVE, subject));
+
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U21.19 — снятие входной ноги едет вместе с её добычей тем же проходом")
+    void u21_19_aCancelTravelsWithTheFetchOfTheSameLeg() {
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        DealTranche subject = exitingTranche();
+        subject.getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
+
+        TrancheTransition transition = handle(contextOf(Deal.Status.ACTIVE, subject));
+
+        assertThat(cancelledOrderId(transition)).isEqualTo(30L);
+        assertThat(observedOrderIds(transition)).containsExactly(30L);
     }
 
     // --- сборка ------------------------------------------------------------
@@ -255,6 +346,17 @@ class TrancheExitPendingPassTest {
         ServiceCommand emitted = transition.getCommands().getFirst();
         assertThat(emitted.getType()).isEqualTo(ServiceCommandType.CANCEL_ORDER_COMMAND);
         return ((CancelOrderCommandPayload) emitted.getPayload()).getOrderId();
+    }
+
+    private List<ServiceCommandType> observationTypes(TrancheTransition transition) {
+        return transition.getObservations().stream().map(ServiceCommand::getType).toList();
+    }
+
+    private List<Long> observedOrderIds(TrancheTransition transition) {
+        return transition.getObservations().stream()
+                .filter(observed -> ServiceCommandType.REFRESH_ORDER_COMMAND.equals(observed.getType()))
+                .map(observed -> ((RefreshOrderCommandPayload) observed.getPayload()).getOrderId())
+                .toList();
     }
 
     private List<ServiceCommandType> commandTypes(TrancheTransition transition) {

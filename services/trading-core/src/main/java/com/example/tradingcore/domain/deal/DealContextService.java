@@ -123,6 +123,10 @@ public class DealContextService {
         deal.setAlgoOrders(algoOrders);
         deal.setPositions(positionDataService.findEpisodes(deal.getId()));
         deal.setTranches(withOwnOrders(dealTrancheDataService.findByDealId(deal.getId()), orders, algoOrders));
+        // Экспозиция транша производна от наблюдённых фактов и пересчитывается
+        // целиком каждой сборкой графа: колонки налива на строке транша не
+        // пишет никто, и прочитанные оттуда слагаемые были бы пусты всегда.
+        deal.deriveTrancheExposures();
     }
 
     /**

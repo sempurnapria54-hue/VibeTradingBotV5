@@ -34,7 +34,6 @@ class OrderToSnapshotTest {
 
         assertThat(snapshot.getInternalId()).isEqualTo("tb-1");
         assertThat(snapshot.getExternalId()).isEqualTo("1");
-        assertThat(snapshot.getType()).isEqualTo("limit");
         assertThat(snapshot.getSide()).isEqualTo("buy");
         assertThat(snapshot.getExternalStatus()).isEqualTo("live");
         assertThat(snapshot.getPrice()).isEqualByComparingTo("100");
@@ -139,7 +138,7 @@ class OrderToSnapshotTest {
                 .doesNotContain("reduceOnly");
         assertThat(OrderExternalSnapshot.class.getDeclaredFields())
                 .extracting(Field::getName)
-                .doesNotContain("reduceOnly", "positionReducingOnly");
+                .doesNotContain("reduceOnly", "positionReducingOnly", "type");
     }
 
     /** Структурной валидации маппер не делает: она у читателя. */
@@ -153,7 +152,6 @@ class OrderToSnapshotTest {
 
         assertThat(snapshot.getInternalId()).isEqualTo("tb-1");
         assertThat(snapshot.getExternalId()).isNull();
-        assertThat(snapshot.getType()).isNull();
         assertThat(snapshot.getSide()).isNull();
         assertThat(snapshot.getExternalStatus()).isNull();
         assertThat(snapshot.getPrice()).isNull();

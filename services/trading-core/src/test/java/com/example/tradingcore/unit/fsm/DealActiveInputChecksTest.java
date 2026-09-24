@@ -18,9 +18,6 @@ import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.fsm.DealTransition;
-import com.example.tradingcore.domain.safety.HoldRung;
-import com.example.tradingcore.domain.safety.HoldScope;
-import com.example.tradingcore.util.Constants;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,19 +53,30 @@ class DealActiveInputChecksTest {
     }
 
     @Test
-    @DisplayName("U7.2 — сумма экспозиций 1 при живом эпизоде 2: только просьба биржевой ступени")
-    void u7_2_anExposureShortfallRequestsTheAccountRung() {
+    @DisplayName("U7.2 — сумма экспозиций 1 при живом эпизоде 2: добыча позиции, ни работы, ни ступени")
+    void u7_2_anExposureShortfallIsObservedAgainWithoutARung() {
         DealContext context = contextOf(exposedTranche("1"), livePosition("2"));
 
-        assertUncoveredRiskRung(context);
+        assertReobserved(context, ServiceCommandType.REFRESH_POSITION_COMMAND);
     }
 
     @Test
     @DisplayName("U7.3 — сумма экспозиций 2 без живого эпизода: правая сторона сверки — ноль")
-    void u7_3_anExposureWithoutALiveEpisodeRequestsTheSameRung() {
+    void u7_3_anExposureWithoutALiveEpisodeIsObservedTheSameWay() {
         DealContext context = contextOf(exposedTranche("2"), null);
 
-        assertUncoveredRiskRung(context);
+        assertReobserved(context, ServiceCommandType.REFRESH_POSITION_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U7.10 — расхождение при живой ноге транша: нога добывается первой, позиция последней")
+    void u7_10_aLiveLegIsObservedBeforeThePosition() {
+        DealTranche tranche = exposedTranche("1");
+        tranche.getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
+        DealContext context = contextOf(tranche, livePosition("2"));
+
+        assertReobserved(context, ServiceCommandType.REFRESH_ORDER_COMMAND,
+                ServiceCommandType.REFRESH_POSITION_COMMAND);
     }
 
     @Test
@@ -129,15 +137,19 @@ class DealActiveInputChecksTest {
 
     // --- сборка ------------------------------------------------------------
 
-    /** Просьба биржевой ступени 2 — и ничего сверх неё. */
-    private void assertUncoveredRiskRung(DealContext context) {
+    /**
+     * Обе стороны сверки добываются заново — и ничего сверх: ни ступени
+     * (её поднимает детектор вне прохода на устойчивом расхождении), ни
+     * ребра, ни работы каскада.
+     */
+    private void assertReobserved(DealContext context, ServiceCommandType... observations) {
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        harness.givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
+
         DealTransition transition = harness.handle(context);
 
-        assertThat(transition.getHoldSignal().getScope()).isEqualTo(HoldScope.EXCHANGE_ACCOUNT);
-        assertThat(transition.getHoldSignal().getRung()).isEqualTo(HoldRung.HARD);
-        assertThat(transition.getHoldSignal().getCode())
-                .isEqualTo(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED);
-        assertThat(transition.hasCommands()).isFalse();
+        assertThat(commandTypes(transition)).containsExactly(observations);
+        assertThat(transition.getHoldSignal()).isNull();
         assertThat(transition.movesStatus()).isFalse();
         assertThat(transition.getTrancheEdges()).isEmpty();
         harness.verifyCascadeNotRun();

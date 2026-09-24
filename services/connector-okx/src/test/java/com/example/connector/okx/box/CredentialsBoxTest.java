@@ -7,7 +7,6 @@ import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -129,13 +128,9 @@ class CredentialsBoxTest extends SharedConnectorBox {
     /**
      * Ожидание взято из дома: перечень классов границы закрыт, и «негодного
      * входа» в нём нет — испорчено содержимое ХРАНИЛИЩА, а запрос
-     * вызывающего корректен. Сегодня разбор чужого значения уезжает
-     * вызывающему как его собственный дефект; долг —
-     * `.claude/work/backlog.md` §«Отказ разбора ответа площадки уезжает
-     * ядру классом «негодный вход»».
+     * вызывающего корректен.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B1.6 — испорченное значение контура отказывает классом отказа границы")
     void b1_6_aBrokenContourValueRefusesWithABoundaryFailureClass() {
         String account = "ACC-B1-6";

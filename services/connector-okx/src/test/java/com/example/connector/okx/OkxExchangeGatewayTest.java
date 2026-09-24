@@ -1,6 +1,7 @@
 package com.example.connector.okx;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.connector.okx.credentials.ExchangeCredentials;
 import com.example.connector.okx.credentials.ExchangeCredentialsResolver;
+import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import com.example.tradingbot.domain.resolve.AlgoOrderExternalStatusResolver;
 import com.example.tradingbot.domain.resolve.OrderExternalStatusResolver;
 import com.example.connector.okx.gateway.OkxExchangeGateway;
@@ -27,6 +29,7 @@ import com.example.connector.okx.mapping.TimeFrameMapper;
 import com.example.connector.okx.mapping.TradeFeeRateMapper;
 import com.example.connector.okx.source.OkxSourceReader;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
+import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
 
@@ -47,13 +50,14 @@ class OkxExchangeGatewayTest {
 
     private final OkxSourceReader reader = mock(OkxSourceReader.class);
     private final ExchangeCredentialsResolver resolver = mock(ExchangeCredentialsResolver.class);
+    private final TimeFrameMapper timeFrameMapper = mock(TimeFrameMapper.class);
     private final OkxExchangeGateway gateway = new OkxExchangeGateway(
             reader, resolver,
             mock(OrderMapper.class), mock(AlgoOrderMapper.class),
             mock(OrderExternalStatusResolver.class), mock(AlgoOrderExternalStatusResolver.class),
             mock(PositionMapper.class),
             mock(InstrumentMapper.class), mock(InstrumentExternalRulesMapper.class),
-            mock(BalanceContainerMapper.class), mock(CandleMapper.class), mock(TimeFrameMapper.class),
+            mock(BalanceContainerMapper.class), mock(CandleMapper.class), timeFrameMapper,
             mock(DealCashFlowMapper.class), mock(TradeFeeRateMapper.class),
             mock(MarketPriceDataMapper.class), mock(MarketSnapshotMapper.class));
 
@@ -110,6 +114,40 @@ class OkxExchangeGatewayTest {
 
         assertThat(gateway.getPositions(ACCOUNT)).isEmpty();
         assertThat(gateway.getBills(ACCOUNT, OffsetDateTime.now(), OffsetDateTime.now())).isEmpty();
+    }
+
+    /**
+     * Ответ площадки, не разобранный формой контракта, — нарушение
+     * инварианта контракта, а не негодный вход вызывающего: вызывающий не
+     * ошибся, ответ пришёл не той формы.
+     */
+    @Test
+    void anUnparsedSourceAnswerIsAContractViolation() {
+        when(resolver.resolve(ACCOUNT)).thenReturn(credentials());
+        when(reader.getPositions(any())).thenThrow(new NumberFormatException("abc"));
+        when(reader.getIndexCandleAt(any(), any(), any())).thenThrow(new IndexOutOfBoundsException(5));
+
+        assertThatThrownBy(() -> gateway.getPositions(ACCOUNT))
+                .isInstanceOf(ExternalInvariantViolationException.class)
+                .hasCauseInstanceOf(NumberFormatException.class);
+        assertThatThrownBy(() -> gateway.getIndexCandleAt(INSTRUMENT, TimeFrame.ONE_MINUTE, OffsetDateTime.now()))
+                .isInstanceOf(ExternalInvariantViolationException.class);
+    }
+
+    /**
+     * Операнд вызывающего переводится ДО сети разбора: его отказ остаётся
+     * своим классом, и сеть не выдаёт негодный запрос за негодный ответ.
+     */
+    @Test
+    void theCallerOperandIsTranslatedOutsideTheParseNet() {
+        when(timeFrameMapper.domainToOkx(any())).thenThrow(new IllegalArgumentException("bar"));
+        when(resolver.resolve(OTHER_ACCOUNT)).thenThrow(new IllegalArgumentException("path"));
+
+        assertThatThrownBy(() -> gateway.getLatestCandles(INSTRUMENT, TimeFrame.ONE_MINUTE, 1))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> gateway.getPositions(OTHER_ACCOUNT))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+        verify(reader, never()).getLatestCandles(any(), any(), any());
     }
 
     private ExchangeCredentials credentials() {

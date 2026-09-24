@@ -46,7 +46,7 @@
 
 `ordType` (резолвится по conditionType — adapter сверяет),
 `side`, `actualSide`, `tdMode` (=`isolated` константа),
-`posSide` (=`net` константа), `reduceOnly` (invariant validation),
+`posSide` (=`net` константа), `reduceOnly` (не сверяется — `docs/integrations/okx/rules/reduce-only-invariant.md`),
 `closeFraction`.
 
 ### Диагностика / специфические режимы

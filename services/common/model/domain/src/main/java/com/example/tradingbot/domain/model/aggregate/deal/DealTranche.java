@@ -124,6 +124,27 @@ public class DealTranche extends Auditable {
     }
 
     /**
+     * Выводит три собственных слагаемых экспозиции из заявок и защит
+     * транша (docs/spec/protection-coverage.json, величины
+     * {@code trancheEntryFilled}, {@code trancheReduceOnlyFilled},
+     * {@code trancheProtectionClosed}): налив входных заявок, налив
+     * reduce-only заявок и закрытый объём сработавших защит — встроенной её
+     * размером при терминальном срабатывании, отдельной её фактическим
+     * размером срабатывания.
+     *
+     * <p><b>Производная, а не накопитель:</b> пересчитывается целиком из
+     * наблюдённых фактов при каждой сборке графа, и порядок событий на неё
+     * не влияет (docs/models/domain/aggregate/DealTranche.md §«Экспозиция
+     * транша»). Заявка с пустым намерением reduce-only не входит ни в одно
+     * слагаемое — тот же отбор, что у входной ноги.
+     */
+    public void deriveOwnFills() {
+        entryFilled = fillOf(order -> isFalse(order.getPositionReducingOnly()));
+        reduceOnlyFilled = fillOf(order -> isTrue(order.getPositionReducingOnly()));
+        protectionClosed = attachedClosed().add(standaloneClosed());
+    }
+
+    /**
      * Экспозиция транша ДО атрибуции закрывающих исполнений уровня сделки
      * — первые три слагаемых формулы дома.
      */
@@ -463,6 +484,27 @@ public class DealTranche extends Auditable {
         return exposure().signum() > 0
                 || isTrue(hasLiveEntryOrder())
                 || isTrue(hasLiveProtection());
+    }
+
+    private BigDecimal fillOf(Predicate<Order> selected) {
+        return emptyIfNull(orders).stream()
+                .filter(selected)
+                .map(order -> zeroIfNull(order.getAccumulatedFillSize()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal attachedClosed() {
+        return emptyIfNull(orders).stream()
+                .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
+                .filter(protection -> AttachedAlgoOrder.Status.COMPLETED.equals(protection.getStatus()))
+                .map(protection -> zeroIfNull(protection.getSize()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal standaloneClosed() {
+        return emptyIfNull(algoOrders).stream()
+                .map(algoOrder -> zeroIfNull(algoOrder.getExternalSize()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal zeroIfNull(BigDecimal value) {

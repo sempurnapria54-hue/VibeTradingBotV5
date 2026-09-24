@@ -7,7 +7,6 @@ import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -93,13 +92,10 @@ class PublicReadsBoxTest extends SharedConnectorBox {
     /**
      * Ожидание взято из дома: перечень классов границы закрыт, и
      * «негодного входа» в нём нет — ответ ПЛОЩАДКИ пришёл не той формы,
-     * а запрос вызывающего корректен. Сегодня отказ разбора уезжает
-     * вызывающему как его собственный дефект (находка {@code F-1}); долг
-     * — `.claude/work/backlog.md` §«Отказ разбора ответа площадки уезжает
-     * ядру классом «негодный вход»».
+     * а запрос вызывающего корректен: ответ разобран конвертом, но строка
+     * нарушает форму контракта.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B6.4 — свеча источника разбирается по длине массива")
     void b6_4_aSourceCandleIsParsedByArrayLength() {
         exchange.answers(OkxConstants.CANDLES_PATH, Okx.ok(
@@ -109,11 +105,11 @@ class PublicReadsBoxTest extends SharedConnectorBox {
 
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode()).isNotEqualTo("INVALID_REQUEST");
+        assertThat(answer.errorCode()).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
     }
 
-    /** Довод красноты тот же, что у {@code B6.4}: отказ разбора чужого ответа. */
+    /** Короткая строка индекса — тот же отказ разбора чужого ответа, что у {@code B6.4}. */
     @Test
-    @Tag("debt")
     @DisplayName("B6.5 — свеча индекса читается своей формой строки")
     void b6_5_anIndexCandleIsReadByItsOwnRowShape() {
         exchange.answers(OkxConstants.HISTORY_INDEX_CANDLES_PATH,
@@ -136,6 +132,7 @@ class PublicReadsBoxTest extends SharedConnectorBox {
 
         assertThat(short_.carriesErrorDto()).isTrue();
         assertThat(short_.errorCode()).isNotEqualTo("INVALID_REQUEST");
+        assertThat(short_.errorCode()).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
     }
 
     @Test

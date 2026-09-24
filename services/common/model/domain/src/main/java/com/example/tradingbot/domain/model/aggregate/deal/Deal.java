@@ -15,6 +15,7 @@ import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -394,6 +395,57 @@ public class Deal extends Auditable {
     public Boolean hasLivePositionRisk() {
         Position live = livePosition();
         return nonNull(live) && isTrue(live.hasLiveRisk());
+    }
+
+    /**
+     * Выводит слагаемые экспозиции каждого транша: три собственных — из его
+     * заявок и защит, четвёртое — приписанный ему объём закрывающего
+     * исполнения уровня сделки (docs/spec/protection-coverage.json,
+     * величины {@code trancheCloseAttributed} и {@code dealInTeardown}).
+     *
+     * <p><b>Правило сопоставления — FIFO по возрасту транша:</b> старшие
+     * гасятся целиком, младшие остаются. Замкнутая форма: траншу достаётся
+     * его gross-экспозиция минус та часть нетто-размера, которую младшие
+     * транши покрыть не могут; отсечки держат величину в {@code [0; gross]}
+     * по построению (docs/models/domain/aggregate/DealTranche.md
+     * §«Правило сопоставления закрывающего исполнения уровня сделки»).
+     *
+     * <p><b>Окно атрибуции</b> — координированный выход безусловно,
+     * ошибочное состояние только при плоской позиции; вне окна приписанное
+     * ноль, и сокращение нетто-размера остаётся расхождением сверки.
+     * Нетто-размер берётся у живого эпизода: закрытый эпизод несёт
+     * необнулённый размер, и читать его значило бы приписывать закрытое
+     * заново.
+     *
+     * <p>Возраст — порядок материализации, то есть идентификатор транша.
+     */
+    public void deriveTrancheExposures() {
+        List<DealTranche> byAge = emptyIfNull(tranches).stream()
+                .sorted(Comparator.comparing(DealTranche::getId,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.toList());
+        byAge.forEach(DealTranche::deriveOwnFills);
+        BigDecimal netSize = isTrue(hasLivePositionRisk()) ? livePosition().getExternalSize() : BigDecimal.ZERO;
+        boolean window = isTrue(inAttributionWindow(netSize));
+        BigDecimal youngerGross = BigDecimal.ZERO;
+        for (int index = byAge.size() - 1; index >= 0; index--) {
+            DealTranche tranche = byAge.get(index);
+            BigDecimal gross = tranche.grossExposure();
+            tranche.setCloseAttributed(window ? attributedTo(gross, youngerGross, netSize) : BigDecimal.ZERO);
+            youngerGross = youngerGross.add(gross);
+        }
+    }
+
+    /** Окно атрибуции закрытия уровня сделки (величина {@code dealInTeardown}). */
+    private Boolean inAttributionWindow(BigDecimal netSize) {
+        return Objects.equals(Status.EXIT_PENDING, status)
+                || (Objects.equals(Status.ERROR, status) && netSize.signum() == 0);
+    }
+
+    /** Приписанное траншу: {@code max(0, min(gross, gross + младшие − нетто))}. */
+    private BigDecimal attributedTo(BigDecimal gross, BigDecimal youngerGross, BigDecimal netSize) {
+        BigDecimal uncovered = gross.add(youngerGross).subtract(netSize);
+        return gross.min(uncovered).max(BigDecimal.ZERO);
     }
 
     /**

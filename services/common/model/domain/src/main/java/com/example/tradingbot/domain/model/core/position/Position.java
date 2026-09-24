@@ -112,9 +112,17 @@ public class Position extends Auditable {
 
     /** Live market risk: ACTIVE и externalSize > 0 (ACTIVE сам по себе риска не гарантирует). */
     public Boolean hasLiveRisk() {
-        return Objects.equals(Status.ACTIVE, status)
-                && nonNull(externalSize)
-                && externalSize.compareTo(BigDecimal.ZERO) > 0;
+        return Objects.equals(Status.ACTIVE, status) && isTrue(hasLiveSize());
+    }
+
+    /**
+     * Строка несёт ненулевой размер. Единственный признак живой позиции у
+     * строки, прочитанной с площадки вне графа сделки: статус такой строке
+     * никто не резолвит, а по закрытой позиции источник отдаёт строку с
+     * нулевым размером.
+     */
+    public Boolean hasLiveSize() {
+        return nonNull(externalSize) && externalSize.compareTo(BigDecimal.ZERO) > 0;
     }
 
     /** Эпизод закрыт. */

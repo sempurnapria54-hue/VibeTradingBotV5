@@ -36,7 +36,6 @@ public interface OrderMapper {
 
     @Mapping(target = "internalId", source = "clOrdId")
     @Mapping(target = "externalId", source = "ordId")
-    @Mapping(target = "type", source = "ordType")
     @Mapping(target = "externalStatus", source = "state")
     @Mapping(target = "price", source = "px")
     @Mapping(target = "size", source = "sz")
@@ -98,6 +97,12 @@ public interface OrderMapper {
      * последним шагом чтения
      * (docs/rules/external-status-resolution.md §«Где резолвится —
      * сторона выбирается по словарю источника»).
+     *
+     * <p><b>Бизнес-тип заявки отсюда не выводится.</b> Род заявки наш —
+     * его ставит создатель ноги; площадка отдаёт тип ИСПОЛНЕНИЯ
+     * ({@code ordType}: {@code limit}, {@code market}), и перенос его в
+     * {@code Order.type} ронял разбор на каждом реальном ответе
+     * (docs/models/mapping/Order.md §«OrderExternalSnapshot → Order»).
      */
     @Mapping(target = "side", source = "side", qualifiedByName = "okxOrderSideToDomain")
     Order snapshotToDomain(OrderExternalSnapshot snapshot);

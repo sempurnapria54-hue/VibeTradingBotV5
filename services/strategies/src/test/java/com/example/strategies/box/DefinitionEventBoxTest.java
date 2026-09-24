@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -82,13 +81,12 @@ class DefinitionEventBoxTest extends SharedStrategiesBox {
     }
 
     /**
-     * Ожидание взято из дома, а не из сегодняшнего факта: числовые ключи
-     * баз границу сервиса не пересекают
-     * (docs/architecture/data-ownership.md §Идентификаторы), а снимок
-     * едет доменным деревом как есть — вместе с полем технического ключа
-     * каждого узла. Клетка красна этим и предъявляет находку F-5
-     * (.claude/work/backlog.md §«Числовой ключ базы владельца едет в
-     * снимке определения»).
+     * Ожидание взято из дома: числовые ключи баз границу сервиса не
+     * пересекают (docs/architecture/data-ownership.md §Идентификаторы).
+     * Снимок едет доменным деревом, и поле технического ключа у узла
+     * остаётся — но без значения: копию без ключей строит маппер формы.
+     * Перепись пустых значений не считает, поэтому клетка мерит ровно
+     * значение ключа, а не имя поля (находка F-5 закрыта).
      *
      * <p><b>Сравнение состава идёт «не меньше», а не «поровну», и причина
      * названа.</b> Предмет клетки — что ни один узел дерева не опущен;
@@ -99,7 +97,6 @@ class DefinitionEventBoxTest extends SharedStrategiesBox {
      * одну из них нельзя было бы прочитать по падению.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B6.2 — Снимок едет деревом целиком, а не ссылкой на него")
     void b6_2_theSnapshotTravelsAsTheWholeTreeNotAsAReferenceToIt() {
         peerResolvesEverything();
@@ -112,9 +109,9 @@ class DefinitionEventBoxTest extends SharedStrategiesBox {
         given.forEach((node, count) -> assertThat(snapshot.getOrDefault(node, 0))
                 .as("узел «%s» снимком не опущен", node)
                 .isGreaterThanOrEqualTo(count));
-        assertThat(contentTextOf(event(ACTIVATED)))
-                .as("ключей базы владельца в снимке нет по дому (F-5)")
-                .doesNotContain("\"id\":");
+        assertThat(snapshot)
+                .as("значений ключей базы владельца в снимке нет по дому ни у одного узла (F-5)")
+                .doesNotContainKey("id");
     }
 
     @Test

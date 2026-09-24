@@ -149,11 +149,14 @@ public class ServiceCommandExecutor {
     /**
      * Учёт незавершённого звена: отказа площадки и «факта не добыто».
      *
-     * <p><b>Эскалацию «бюджет кончился» порождает только отказ
-     * площадки.</b> У незавершённого звена без классификации площадка ни
-     * при чём — исчерпанный бюджет уводит строку в отказ, и дальше её
-     * подхватывает штатная ошибочная тропа действия, а не радиусная
-     * реакция «мы не смогли дозвониться».
+     * <p><b>Эскалацию «бюджет кончился» порождает исчерпание ЛЮБОГО
+     * повторяемого класса</b> — и отказа площадки, и незавершённого звена
+     * без классификации (факт не добыт, курс не пришёл). Отказавшую
+     * системную строку не читает никто, а следующий проход заводит новую
+     * строку той же надобности с новым бюджетом: без броска ожидание,
+     * которое дом объявляет конечным, не кончалось бы никогда
+     * (docs/rules/pnl-reconciliation.md §«Ожидание курса чужой валюты»).
+     * Неповторяемые классы бюджета не тратят и броска не порождают.
      */
     private void applyFailureAccounting(ServiceCommand command, DealActionState actionState,
                                         RuntimeErrorCode errorCode, String message) {
@@ -163,9 +166,9 @@ public class ServiceCommandExecutor {
         boolean retryable = recordAttempt(actionState, command.getType(), errorCode, message);
         actionState.setStatus(retryable ? DealActionStateStatus.RETRY_PENDING : DealActionStateStatus.FAILED);
         dealActionStateDataService.save(actionState);
-        if (isFalse(retryable) && RuntimeErrorCode.EXCHANGE_ERROR.equals(errorCode)) {
-            // Бюджет кончился на повторяемой ошибке — это «мы не смогли
-            // дозвониться», и радиус со ступенью резолвит обработчик прохода.
+        if (isFalse(retryable) && isTrue(retryableClass(errorCode))) {
+            // Бюджет кончился на повторяемом классе — радиус со ступенью и
+            // ошибочную тропу системной строки резолвит обработчик прохода.
             throw new RetryBudgetExhaustedException(
                     "Retry budget exhausted for command " + command.getType() + ": " + message,
                     actionState, isFalse(actionState.isSystem()));
@@ -215,11 +218,16 @@ public class ServiceCommandExecutor {
         Integer attemptCount = isNull(actionState.getAttemptCount()) ? 0 : actionState.getAttemptCount();
         actionState.setAttemptCount(attemptCount + 1);
         actionState.setLastError(new RetryError(null, message, errorCode));
-        boolean canRetry = (isNull(errorCode) || RuntimeErrorCode.EXCHANGE_ERROR.equals(errorCode))
+        boolean canRetry = isTrue(retryableClass(errorCode))
                 && isTrue(retryPolicyService.canRetry(actionState, commandType));
         if (canRetry) {
             actionState.setNextRetryAt(retryPolicyService.calculateNextRetryAt(actionState, commandType));
         }
         return canRetry;
+    }
+
+    /** Класс повторяем: отказ площадки либо пустая классификация — «звено не завершено». */
+    private Boolean retryableClass(RuntimeErrorCode errorCode) {
+        return isNull(errorCode) || RuntimeErrorCode.EXCHANGE_ERROR.equals(errorCode);
     }
 }

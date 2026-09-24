@@ -13,7 +13,7 @@
 | Категория | Кто бросает | Когда | `closeReason` |
 |---|---|---|---|
 | `ExternalStatusException` | resolver статуса сущности | внешний статус получен, но неизвестен либо означает проблемное состояние | `UNKNOWN_EXTERNAL_STATUS`, `ORDER_FAILED`, `PARTIALLY_FAILED` |
-| `ExternalInvariantViolationException` | граница интеграции | ответ получен, но нарушает ожидаемый инвариант контракта (режим маржи, сторона позиции, тип заявки, reduce-only, недостача обязательного поля) | `EXCHANGE_INVARIANT_VIOLATION` |
+| `ExternalInvariantViolationException` | граница интеграции | ответ получен, но нарушает ожидаемый инвариант контракта (режим маржи, сторона позиции, тип заявки, недостача обязательного поля, значение вне формы контракта) | `EXCHANGE_INVARIANT_VIOLATION` |
 | `ExternalNotFoundException` | граница рефреша и поиска | после **полного** цикла добычи сущность не найдена и финал безопасно объяснить нельзя | `MISSING_AFTER_REFRESH` |
 
 **`ExternalNotFoundException` нельзя бросать после одного пустого

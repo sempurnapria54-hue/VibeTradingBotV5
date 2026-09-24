@@ -1263,6 +1263,28 @@ public class StrategyDefinitionValidator {
     }
 
     /**
+     * Намерение reduce-only ОБЪЯВЛЕНО у всякого действия-заявки — и
+     * отрицанием, и утверждением, но не пустотой.
+     *
+     * <p>Пустота значения не имеет ни на одной стороне: транш ищет свою
+     * ногу входа отрицанием намерения, и пустое намерение отрицанием не
+     * является — нога выпадает из выборки, транш не получает входного
+     * ребра и стоит в предвходовой проверке навсегда, а на площадку то же
+     * значение уезжает «не только сокращать». Умолчания у поля нет по
+     * тому же доводу, что у доли аллокации: подставленное значение
+     * отвечало бы за автора. Дом правила — docs/rules/strategy-validation.md;
+     * счётчик — docs/spec/strategy-reference.json
+     * §{@code reduceOnlyIntentNotDeclared}.
+     */
+    private void validateReduceOnlyIntentDeclared(StrategyOrderActionApiModel action, String path,
+                                                  List<String> violations) {
+        if (isNull(action.getPositionReducingOnly())) {
+            violations.add(path + ".positionReducingOnly STRATEGY_ACTION_REDUCE_ONLY_NOT_DECLARED: "
+                    + "действие-заявка обязано объявить намерение reduce-only");
+        }
+    }
+
+    /**
      * Доля, которой действие объявлено, ПОЛОЖИТЕЛЬНА — обе доли, а не одна.
      *
      * <p>Предмет проверки — диапазон, а не наличие: пустая доля проходит
@@ -1369,6 +1391,7 @@ public class StrategyDefinitionValidator {
                                      Set<String> structureKeys, List<String> violations) {
         validateEnum(Order.Type.class, action.getOrderType(), path + ".orderType", violations);
         validateEnum(StrategyTradeDirection.class, action.getDirection(), path + ".direction", violations);
+        validateReduceOnlyIntentDeclared(action, path, violations);
         validateEntryAllocationDeclared(action, path, violations);
         validateFractionPositive(action.getAllocationPercents(), "STRATEGY_ACTION_ALLOCATION_NOT_POSITIVE",
                 path + ".allocationPercents", violations);

@@ -1,6 +1,7 @@
 package com.example.tradingcore.unit.fsm;
 
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.command;
+import static com.example.tradingcore.unit.fsm.FsmFixture.DEAL_ID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.tradingcore.config.DealContextProperties;
+import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
@@ -89,6 +91,21 @@ final class TrancheHarness {
         when(systemActionExecutor.next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
                 eq(ServiceCommandType.REFRESH_BALANCE_COMMAND), any()))
                 .thenReturn(Optional.of(command(ServiceCommandType.REFRESH_BALANCE_COMMAND)));
+    }
+
+    /**
+     * Звено добычи, названное явно, отдаёт свою команду с тем же
+     * содержимым, с каким его назвал обработчик: так клетка видит, ЧЬЯ
+     * сущность добывается.
+     */
+    void givenFetch(ServiceCommandType link) {
+        when(systemActionExecutor.next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
+                eq(link), any()))
+                .thenAnswer(invocation -> Optional.of(ServiceCommand.builder()
+                        .type(link)
+                        .dealId(DEAL_ID)
+                        .payload(invocation.getArgument(4))
+                        .build()));
     }
 
     /** Толерантность возраста снимка средств; пусто — срока никто не объявил. */

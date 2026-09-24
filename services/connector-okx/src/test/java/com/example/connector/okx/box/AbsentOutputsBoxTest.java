@@ -6,7 +6,6 @@ import com.example.connector.okx.util.OkxConstants;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -87,9 +86,7 @@ class AbsentOutputsBoxTest extends SharedConnectorBox {
         assertThat(neighbour.count()).isEqualTo(0);
     }
 
-    /** Красна долгом {@code F-7}: чтение заявки отказывает — см. группу {@code B3}. */
     @Test
-    @Tag("debt")
     @DisplayName("B10.4 — сырая форма источника за границу не выходит")
     void b10_4_theRawSourceShapeDoesNotCrossTheBoundary() {
         exchange.answers(OkxConstants.TRADE_ORDERS_PENDING_PATH, Okx.ok(Okx
@@ -125,9 +122,7 @@ class AbsentOutputsBoxTest extends SharedConnectorBox {
         }
     }
 
-    /** Красна долгом {@code F-7}: чтение заявки отказывает — см. группу {@code B3}. */
     @Test
-    @Tag("debt")
     @DisplayName("B10.5 — между вызовами сервис не помнит ничего, кроме ключей")
     void b10_5_theServiceRemembersNothingBetweenCallsButKeys() {
         exchange.answers(OkxConstants.TRADE_ORDERS_PENDING_PATH, Okx.ok(

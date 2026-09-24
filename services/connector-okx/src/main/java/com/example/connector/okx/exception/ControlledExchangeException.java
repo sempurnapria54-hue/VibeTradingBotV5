@@ -11,4 +11,8 @@ public class ControlledExchangeException extends RuntimeException {
     public ControlledExchangeException(String message) {
         super(message);
     }
+
+    public ControlledExchangeException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

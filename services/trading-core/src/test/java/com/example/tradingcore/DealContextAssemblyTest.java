@@ -282,10 +282,12 @@ class DealContextAssemblyTest {
         return account;
     }
 
+    /**
+     * Транш, чей налив приходит его входной ногой: слагаемые экспозиции
+     * выводятся сборкой графа из ног, а не читаются со строки транша.
+     */
     private DealTranche filledTranche() {
-        DealTranche tranche = emptyTranche();
-        tranche.setEntryFilled(BigDecimal.ONE);
-        return tranche;
+        return emptyTranche();
     }
 
     private DealTranche terminalTranche() {
@@ -293,7 +295,6 @@ class DealContextAssemblyTest {
         tranche.setId(22L);
         tranche.setDealId(DEAL_ID);
         tranche.setStatus(DealTranche.Status.CLOSED);
-        tranche.setEntryFilled(BigDecimal.ONE);
         return tranche;
     }
 
@@ -305,11 +306,14 @@ class DealContextAssemblyTest {
         return tranche;
     }
 
+    /** Входная нога с наливом: из неё сборка графа выводит налив транша. */
     private Order leg(Long id, Long trancheId) {
         Order order = new Order();
         order.setId(id);
         order.setDealId(DEAL_ID);
         order.setDealTrancheId(trancheId);
+        order.setPositionReducingOnly(Boolean.FALSE);
+        order.setAccumulatedFillSize(BigDecimal.ONE);
         return order;
     }
 

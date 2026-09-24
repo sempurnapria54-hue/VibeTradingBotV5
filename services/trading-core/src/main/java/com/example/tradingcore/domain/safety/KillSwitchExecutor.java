@@ -1,5 +1,6 @@
 package com.example.tradingcore.domain.safety;
 
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
@@ -8,9 +9,11 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.config.KillSwitchProperties;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.RuntimeErrorCode;
@@ -22,8 +25,11 @@ import com.example.tradingcore.domain.command.payload.RefreshAlgoOrderCommandPay
 import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
+import com.example.tradingcore.persistence.service.InstrumentDataService;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +70,8 @@ public class KillSwitchExecutor {
     private final ExchangeOperationsClient exchangeOperationsClient;
     private final ServiceCommandExecutor serviceCommandExecutor;
     private final DealContextService dealContextService;
+    private final ExchangeAccountDataService exchangeAccountDataService;
+    private final InstrumentDataService instrumentDataService;
     private final KillSwitchProperties properties;
 
     /**
@@ -87,6 +95,87 @@ public class KillSwitchExecutor {
         return ServiceCommandExecutionResult.failure(RuntimeErrorCode.EXCHANGE_ERROR,
                 "Kill-switch could not confirm flat instId=" + externalInstrumentId
                         + " after " + maxAttempts + " attempts");
+    }
+
+    /**
+     * Снять живой риск радиуса вне графа сделок и подтвердить радиус
+     * позициями площадки (docs/components/KillSwitchExecutor.md §«Риск вне
+     * графа сделок»).
+     *
+     * <p><b>Закрывается только позиция на инструменте без нетерминальной
+     * сделки.</b> Позицию сделки снимает ход сделки: ноги траншей там
+     * снимаются раньше экспозиции, и закрытие её здесь, мимо ног, открыло бы
+     * позицию заново их исполнением.
+     *
+     * <p><b>Подтверждает радиус ЛЮБАЯ живая позиция</b>, а не только
+     * закрываемая: остаток на инструменте сделки значит, что ход сделки
+     * риска не снял, как бы он о себе ни отчитался. Не добытые позиции
+     * подтверждением не считаются.
+     *
+     * @param externalInstrumentId инструмент радиуса пары; пусто — радиус
+     *                             счёта целиком
+     * @param population           нетерминальные сделки радиуса
+     */
+    public Boolean closePositionsOutsideDeals(Long exchangeAccountId, String externalInstrumentId,
+                                              List<Deal> population) {
+        ExchangeAccount account = exchangeAccountDataService.getRequiredById(exchangeAccountId);
+        Set<String> dealInstruments = instrumentDataService.findExternalIdsByIds(population.stream()
+                .map(Deal::getInstrumentId)
+                .collect(Collectors.toSet()));
+        Integer maxAttempts = teardownAttempts();
+        List<Position> live = livePositionsOnScope(account, externalInstrumentId);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            if (nonNull(live) && isEmpty(live)) {
+                return true;
+            }
+            if (nonNull(live)) {
+                live.stream()
+                        .filter(position -> isFalse(dealInstruments.contains(position.getExternalInstrumentId())))
+                        .forEach(position -> closeOutsideDeal(account, position));
+            }
+            live = livePositionsOnScope(account, externalInstrumentId);
+            log.warn("Kill-switch scope is not confirmed flat by positions exchangeAccountId={} instId={}"
+                    + " attempt={}/{}", exchangeAccountId, externalInstrumentId, attempt, maxAttempts);
+        }
+        return nonNull(live) && isEmpty(live);
+    }
+
+    /**
+     * Позиции радиуса с ненулевым размером; пусто — позиции этой попыткой
+     * не добыты. Читается срез счёта целиком и сужается инструментом: одно
+     * чтение на оба радиуса.
+     */
+    private List<Position> livePositionsOnScope(ExchangeAccount account, String externalInstrumentId) {
+        try {
+            return emptyIfNull(exchangeOperationsClient.getPositions(account.getInternalId())).stream()
+                    .filter(position -> isTrue(position.hasLiveSize()))
+                    .filter(position -> isNull(externalInstrumentId)
+                            || Objects.equals(externalInstrumentId, position.getExternalInstrumentId()))
+                    .collect(Collectors.toList());
+        } catch (RuntimeException e) {
+            log.warn("Kill-switch positions read failed exchangeAccountId={}: {}", account.getId(),
+                    e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Закрытие позиции без сделки. Валюту расчёта площадка требует, а
+     * строка позиции её не несёт — она читается у инструмента проекции;
+     * инструмента вне контура закрыть нечем, и остаток оставляет радиус
+     * неподтверждённым.
+     */
+    private void closeOutsideDeal(ExchangeAccount account, Position position) {
+        String externalInstrumentId = position.getExternalInstrumentId();
+        Optional<String> settleCurrency = instrumentDataService.findSettlementCurrency(account.getExchangeCode(),
+                externalInstrumentId);
+        if (settleCurrency.isEmpty()) {
+            log.error("Kill-switch cannot address a position outside the contour exchangeAccountId={} instId={}",
+                    account.getId(), externalInstrumentId);
+            return;
+        }
+        callSafely("close-position-outside-deal", account.getId(), () -> exchangeOperationsClient
+                .closePosition(account.getInternalId(), externalInstrumentId, settleCurrency.get()));
     }
 
     /**

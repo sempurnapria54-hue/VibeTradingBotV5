@@ -1,12 +1,17 @@
 package com.example.tradingcore.unit.safety;
 
 import static com.example.tradingcore.unit.safety.SafetyFixture.ACCOUNT_ID;
+import static com.example.tradingcore.unit.safety.SafetyFixture.INSTRUMENT_EXTERNAL_ID;
+import static com.example.tradingcore.unit.safety.SafetyFixture.INSTRUMENT_ID;
 import static com.example.tradingcore.unit.safety.SafetyFixture.deal;
 import static com.example.tradingcore.unit.safety.SafetyFixture.deals;
 import static com.example.tradingcore.unit.safety.SafetyFixture.pairContext;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -21,6 +26,7 @@ import com.example.tradingcore.domain.safety.KillSwitchExecutor;
 import com.example.tradingcore.domain.safety.KillSwitchService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,8 +37,9 @@ import org.junit.jupiter.api.Test;
  * (дом — docs/components/KillSwitchService.md §«Два радиуса»).
  *
  * <p><b>Базовая сборка:</b> триггер снятия риска; служба сделок отдаёт
- * нетерминальные сделки счёта; сборщик контекста строит контекст по
- * каждой; исполнитель снятия риска подменён и отвечает по сделке.
+ * нетерминальные сделки счёта либо пары; сборщик контекста строит контекст
+ * по каждой; исполнитель снятия риска подменён и отвечает по сделке и по
+ * риску радиуса вне графа сделок — там по умолчанию «подтверждено».
  *
  * <p><b>Сам ход снятия риска предметом не является</b> — у него
  * ввод-вывод к площадке по построению, и его дом — чёрный ящик
@@ -53,6 +60,7 @@ class KillSwitchAggregationTest {
         killSwitchService = new KillSwitchService(deals, contexts, executor);
         when(contexts.build(any())).thenReturn(pairContext());
         when(executor.execute(any())).thenReturn(ServiceCommandExecutionResult.ok());
+        when(executor.closePositionsOutsideDeals(anyLong(), any(), any())).thenReturn(true);
     }
 
     private void nonTerminal(List<Deal> population) {
@@ -95,7 +103,7 @@ class KillSwitchAggregationTest {
             assertThat(killSwitchService.fireExchangeAccount(ACCOUNT_ID)).isFalse();
 
             assertThat(log.messages())
-                    .anyMatch(message -> message.contains("Account-wide kill-switch failed"));
+                    .anyMatch(message -> message.contains("Kill-switch failed on a deal"));
         }
         verify(executor, times(2)).execute(any());
     }
@@ -122,15 +130,17 @@ class KillSwitchAggregationTest {
         assertThat(killSwitchService.fireExchangeAccount(ACCOUNT_ID)).isFalse();
     }
 
-    /** Инструментный радиус идёт по графу триггерной сделки; обхода счёта нет. */
+    /** Инструментный радиус идёт по сделкам пары; триггерная — своим контекстом прохода. */
     @Test
-    @DisplayName("U8.6 — инструментный радиус: снятие по графу триггерной сделки, служба сделок не позвана")
-    void u8_6_theInstrumentScopeUsesTheTriggerDealOnly() {
-        DealContext trigger = pairContext();
+    @DisplayName("U8.6 — инструментный радиус с триггерной сделкой: снятие по её контексту, сборщик и обход счёта не позваны")
+    void u8_6_theInstrumentScopeTearsTheTriggerDealDownInItsOwnContext() {
+        DealContext trigger = pairContext(deal(61L));
+        when(deals.findNonTerminalOnPair(ACCOUNT_ID, INSTRUMENT_ID)).thenReturn(deals(deal(61L)));
 
         assertThat(killSwitchService.fireInstrument(trigger)).isTrue();
 
         verify(executor, times(1)).execute(trigger);
+        verify(contexts, never()).build(any());
         verify(deals, never()).findNonTerminalByExchangeAccountId(anyLong());
     }
 
@@ -145,5 +155,46 @@ class KillSwitchAggregationTest {
 
         assertThat(killSwitchService.fireExchangeAccount(ACCOUNT_ID)).isFalse();
         verify(executor, times(1)).execute(any());
+    }
+
+    /** Ручной вызов триггерной сделки не несёт: сделка пары берётся популяцией. */
+    @Test
+    @DisplayName("U8.8 — инструментный радиус без сделки в контексте: сделка пары снята собранным контекстом")
+    void u8_8_aManualPairCallTearsThePairDealDownByItsBuiltContext() {
+        DealContext built = pairContext();
+        when(deals.findNonTerminalOnPair(ACCOUNT_ID, INSTRUMENT_ID)).thenReturn(deals(deal(62L)));
+        when(contexts.build(any())).thenReturn(built);
+
+        assertThat(killSwitchService.fireInstrument(pairContext())).isTrue();
+
+        verify(contexts, times(1)).build(argThat(deal -> Objects.equals(62L, deal.getId())));
+        verify(executor, times(1)).execute(built);
+    }
+
+    /** Риск вне графа сделок входит в агрегат наравне со сделкой. */
+    @Test
+    @DisplayName("U8.9 — сделки подтверждены, риск вне графа сделок нет: исход не подтверждён")
+    void u8_9_anUnconfirmedOutsideDealsRiskFailsTheCascade() {
+        nonTerminal(deals(deal(63L)));
+        when(executor.closePositionsOutsideDeals(anyLong(), any(), any())).thenReturn(false);
+
+        assertThat(killSwitchService.fireExchangeAccount(ACCOUNT_ID)).isFalse();
+        verify(executor, times(1)).execute(any());
+    }
+
+    /** Снятию вне графа отдаются радиус и его популяция: позиции сделок оно не трогает. */
+    @Test
+    @DisplayName("U8.10 — снятие вне графа получает радиус и популяцию: у счёта инструмента нет, у пары — инструмент пары")
+    void u8_10_theOutsideDealsTeardownReceivesTheScopeAndItsPopulation() {
+        List<Deal> accountPopulation = deals(deal(64L));
+        List<Deal> pairPopulation = deals(deal(65L));
+        nonTerminal(accountPopulation);
+        when(deals.findNonTerminalOnPair(ACCOUNT_ID, INSTRUMENT_ID)).thenReturn(pairPopulation);
+
+        killSwitchService.fireExchangeAccount(ACCOUNT_ID);
+        killSwitchService.fireInstrument(pairContext());
+
+        verify(executor).closePositionsOutsideDeals(eq(ACCOUNT_ID), isNull(), eq(accountPopulation));
+        verify(executor).closePositionsOutsideDeals(ACCOUNT_ID, INSTRUMENT_EXTERNAL_ID, pairPopulation);
     }
 }

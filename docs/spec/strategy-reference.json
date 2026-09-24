@@ -303,6 +303,13 @@
       "note": "Входное действие не объявило доли аллокации. Обязательность записана здесь, а не только аннотацией api-модели: без неё пустота проходила ОБЕ прежние проверки — фильтр диапазона исключал её условием notNull, а сумма объявленного нотинала читала её нулём через coalesce, — и опустить поле было ВЫГОДНЕЕ, чем объявить 100 %: тот же расклад со 100 давал реджект по превышению статического запаса. Молчаливая коррекция пустоты в благоприятную сторону запрещена docs/concept.md §П1. Код реджекта — STRATEGY_ACTION_ALLOCATION_NOT_DECLARED (docs/rules/strategy-validation.md)."
     },
     {
+      "name": "reduceOnlyIntentNotDeclared",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
+      "where": "actionKind == 'ORDER' && isNull(?positionReducingOnly)",
+      "note": "Действие-заявка не объявило намерения reduce-only. Пустота значения не имеет ни на одной стороне: транш ищет свою ногу входа ОТРИЦАНИЕМ намерения, и пустое намерение отрицанием не является — нога выпадает из выборки, транш не получает входного ребра и стоит в предвходовой проверке навсегда, а на площадку то же значение уезжает как «не только сокращать». Умолчания у поля нет по доводу allocationNotDeclared: подставленное значение отвечало бы за автора. Код реджекта — STRATEGY_ACTION_REDUCE_ONLY_NOT_DECLARED (docs/rules/strategy-validation.md)."
+    },
+    {
       "name": "allocationOutOfRange",
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
@@ -921,6 +928,7 @@
       "expect": {
         "allocationOutOfRange": 0,
         "allocationNotDeclared": 0,
+        "reduceOnlyIntentNotDeclared": 0,
         "levelSourceAmbiguous": 0
       }
     },
@@ -1342,6 +1350,7 @@
         "entryActionsWithoutAttachedProtection": 1,
         "allocationOutOfRange": 1,
         "allocationNotDeclared": 1,
+        "reduceOnlyIntentNotDeclared": 2,
         "stopSettingsMisdeclared": 1,
         "attachedStopSettingsMisdeclared": 1
       }

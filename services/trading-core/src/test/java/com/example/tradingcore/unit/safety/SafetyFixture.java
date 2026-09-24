@@ -104,6 +104,11 @@ final class SafetyFixture {
         return DealContext.builder().exchangeAccount(account()).instrument(instrument()).build();
     }
 
+    /** Контекст прохода по сделке пары — так приходит автоматический сигнал. */
+    static DealContext pairContext(Deal deal) {
+        return DealContext.builder().deal(deal).exchangeAccount(account()).instrument(instrument()).build();
+    }
+
     /** Контекст объекта счётного радиуса: инструмента нет по построению. */
     static DealContext accountContext() {
         return DealContext.builder().exchangeAccount(account()).build();

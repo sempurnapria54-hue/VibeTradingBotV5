@@ -13,7 +13,8 @@
 
 | Поле | Тип | Назначение |
 |---|---|---|
-| `commands` | `List<ServiceCommand>` | Команды прохода этого транша. |
+| `commands` | `List<ServiceCommand>` | Команды работы прохода этого транша. |
+| `observations` | `List<ServiceCommand>` | Команды добычи фактов — наблюдение сущностей транша; диспетчеризуются после работы (`docs/processes/fsm-execution-layering.md` §«Добыча не занимает проход»). |
 | `nextStatus` | `DealTranche.Status` | Целевой статус; пусто — ребра нет. |
 | `closeReason` | `DealTranche.CloseReason` | Причина закрытия; едет с терминальным ребром. |
 | `dealErrorRequested` | `Boolean` | Просьба увести СДЕЛКУ в ошибку. |

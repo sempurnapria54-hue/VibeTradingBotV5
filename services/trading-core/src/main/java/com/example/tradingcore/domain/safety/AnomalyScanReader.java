@@ -4,13 +4,13 @@ import static java.util.Objects.nonNull;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.exception.ControlledExchangeException;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -80,8 +80,7 @@ public class AnomalyScanReader {
     /** Строки закрытых позиций (нулевой размер) из среза выбывают. */
     private List<Position> livePositions(List<Position> rows) {
         return rows.stream()
-                .filter(row -> nonNull(row.getExternalSize()))
-                .filter(row -> row.getExternalSize().compareTo(BigDecimal.ZERO) > 0)
+                .filter(row -> isTrue(row.hasLiveSize()))
                 .collect(toList());
     }
 

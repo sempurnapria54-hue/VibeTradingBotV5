@@ -108,4 +108,12 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
      */
     @Query("select i.id, i.internalId from InstrumentEntity i where i.id in :ids")
     List<Object[]> findInternalIdsByIdIn(@Param("ids") Collection<Long> ids);
+
+    /**
+     * Биржевые имена названных инструментов — проекцией одного поля и одним
+     * запросом на пачку: читателю нужно ровно имя, по которому площадка
+     * адресует позицию (.claude/rules/codestyle.md §«Выборка данных»).
+     */
+    @Query("select i.externalId from InstrumentEntity i where i.id in :ids")
+    List<String> findExternalIdsByIdIn(@Param("ids") Collection<Long> ids);
 }

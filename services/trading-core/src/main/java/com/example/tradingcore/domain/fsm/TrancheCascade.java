@@ -48,6 +48,7 @@ public class TrancheCascade {
     /** Один проход каскада по всем живым траншам сделки. */
     public TrancheCascadeResult run(DealContext dealContext) {
         List<ServiceCommand> commands = new ArrayList<>();
+        List<ServiceCommand> observations = new ArrayList<>();
         List<TrancheEdge> edges = new ArrayList<>();
         boolean errorRequested = false;
         Deal.ShutdownReason shutdown = null;
@@ -55,6 +56,7 @@ public class TrancheCascade {
         for (DealTranche tranche : dealContext.getDeal().liveTranches()) {
             TrancheTransition transition = trancheStateMachine.run(dealContext, tranche);
             commands.addAll(transition.getCommands());
+            observations.addAll(transition.getObservations());
             if (isTrue(transition.movesStatus())) {
                 edges.add(new TrancheEdge(tranche, transition.getNextStatus(), transition.getCloseReason()));
             }
@@ -62,7 +64,7 @@ public class TrancheCascade {
             shutdown = firstNonNull(shutdown, transition.getShutdownRequested());
             signal = stronger(signal, transition.getHoldSignal());
         }
-        return new TrancheCascadeResult(commands, edges, errorRequested, shutdown, signal);
+        return new TrancheCascadeResult(commands, observations, edges, errorRequested, shutdown, signal);
     }
 
     private Deal.ShutdownReason firstNonNull(Deal.ShutdownReason kept, Deal.ShutdownReason candidate) {

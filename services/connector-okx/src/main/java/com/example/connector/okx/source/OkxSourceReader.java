@@ -703,12 +703,25 @@ public class OkxSourceReader {
                 .collect(toList());
     }
 
+    /**
+     * Вызов площадки.
+     *
+     * <p><b>Транспортный отказ уезжает своим классом, а не отказом
+     * ответившей площадки.</b> Статусы ошибок клиент не бросает — их тело
+     * разбирает {@link #verifyCode}; сюда доходит только то, где ответа нет
+     * вовсе либо его тело не читается конвертом. Завёрнутый в
+     * {@link ExchangeIntegrationException}, такой отказ уезжал бы классом
+     * «площадка ответила и объяснила», и ветка недостижимости у обработчика
+     * была бы мертва для всех троп площадки
+     * (docs/components/IntegrationService.md §«Классы отказа на границе —
+     * дом здесь»).
+     */
     private <T> T execute(Supplier<T> call, String endpoint, String context) {
         try {
             return call.get();
         } catch (RestClientException e) {
             log.error("OKX transport error [{}] {}", endpoint, context, e);
-            throw new ExchangeIntegrationException("OKX transport error [" + endpoint + "] " + context, e);
+            throw e;
         }
     }
 

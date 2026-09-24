@@ -6,6 +6,7 @@ import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
+import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -206,12 +207,18 @@ public class DealTerminalFeaturesWriter {
      * Исход одного эпизода. Непригодный операнд — пустой тип либо тип вне
      * перечня — даёт UNDETERMINED наравне с недобытой записью: корзина
      * одна, различает их отчёт, а не пятое значение перечня.
+     *
+     * <p>Пустое значение приводится к пустой строке ДО проверки
+     * принадлежности: перечни собраны {@code Set.of}, а его
+     * {@code contains(null)} — отказ, а не ложь, и отказ уронил бы всё
+     * терминальное ребро на штатной популяции «площадка типа не вернула»
+     * (docs/spec/position-close-outcome.json).
      */
     private Deal.CloseOutcome episodeOutcome(Position episode) {
         if (isNull(episode.getExternalRealizedProfit())) {
             return Deal.CloseOutcome.UNDETERMINED;
         }
-        String closeType = episode.getExternalCloseType();
+        String closeType = Objects.toString(episode.getExternalCloseType(), EMPTY);
         if (NORMAL_EXIT_TYPES.contains(closeType)) {
             return Deal.CloseOutcome.NORMAL_EXIT;
         }

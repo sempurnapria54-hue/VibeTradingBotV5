@@ -381,6 +381,31 @@ class PlacementExecutorTest {
         verify(positionDataService).save(live);
     }
 
+    /**
+     * Позиция, которую добыча того же прохода уже наблюдала плоской, не
+     * закрывается: площадка не зовётся, намерение не пишется — повтор
+     * закрытия за остатком стоит на этом отказе от работы.
+     */
+    @Test
+    void aFlatPositionIsNotClosedAgain() {
+        Position flat = new Position();
+        flat.setId(5L);
+        flat.setStatus(Position.Status.CLOSED);
+        flat.setExternalSize(BigDecimal.ZERO);
+        when(positionDataService.getRequiredById(5L)).thenReturn(flat);
+
+        DealActionState row = row();
+        ServiceCommandExecutionResult result = closePositionExecutor().execute(
+                command(ServiceCommandType.CLOSE_POSITION_COMMAND, row,
+                        new ClosePositionCommandPayload(5L, Position.CloseReason.CLOSED_BY_STRATEGY)), row,
+                context(deal()));
+
+        assertThat(result.getSuccess()).isTrue();
+        verify(exchange, never()).closePosition(any(), any(), any());
+        verify(positionDataService, never()).save(any());
+        assertThat(flat.getCloseReason()).isNull();
+    }
+
     /** Отклонённая площадкой команда снятия не пишет намерения вовсе. */
     @Test
     void rejectedCancelWritesNoIntent() {

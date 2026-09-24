@@ -35,11 +35,10 @@ import org.junit.jupiter.api.Test;
  * {@code 4} — ликвидация; {@code 5}, {@code 6} — принудительное
  * сокращение.
  *
- * <p><b>Два кейса группы красны по построению</b> и помечены
- * {@code @Tag("debt")}: {@code U6.7} предъявляет находку {@code F6}
- * (пустое значение сырого типа роняет счёт исхода разыменованием),
- * {@code U6.18} — находку {@code F3} (охрана полноты графа читает пустое
- * не так, как читает его охрана итога).
+ * <p><b>Один кейс группы красен по построению</b> и помечен
+ * {@code @Tag("debt")}: {@code U6.18} предъявляет находку {@code F3}
+ * (охрана полноты графа читает пустое не так, как читает его охрана
+ * итога).
  */
 class TerminalCloseOutcomeTest {
 
@@ -105,17 +104,15 @@ class TerminalCloseOutcomeTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("U6.7 — добытая запись с пустым типом закрытия: та же корзина и тот же отчёт")
     void u6_7_anEmptyCloseTypeOnAFetchedRecordGivesTheBasketAndTheReport() {
         DealTerminalFeatures features = applyTo(enteredDeal(closedEpisode("10", null)));
 
         assertThat(features.getCloseOutcome())
-                .as("ожидание дома: пустое значение приводится к пустой строке, чтобы обе формы "
-                        + "непригодности шли одной ветвью. Сегодня счёт исхода доносит пустое до "
-                        + "`Set.of#contains`, и вызов отказывает разыменованием — запись признаков "
-                        + "умирает до четырёх сеттеров, отчётов и контроля валюты (находка F6, Z17)")
+                .as("пустое значение приводится к пустой строке, чтобы обе формы непригодности "
+                        + "шли одной ветвью: `Set.of#contains` на пустом — отказ, а не ложь (Z17)")
                 .isEqualTo(Deal.CloseOutcome.UNDETERMINED);
+        assertThat(features.getUnrecognizedCloseTypeReported()).isTrue();
         assertThat(harness.journalledCodes()).containsExactly(Constants.Hold.UNRECOGNIZED_CLOSE_TYPE);
     }
 

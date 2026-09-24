@@ -26,9 +26,6 @@ public class OrderExternalSnapshot {
     /** Биржевой id (OKX ordId). */
     String externalId;
 
-    /** Тип ордера (источник-нейтральный). */
-    String type;
-
     /** Сторона (BUY/SELL). */
     String side;
 

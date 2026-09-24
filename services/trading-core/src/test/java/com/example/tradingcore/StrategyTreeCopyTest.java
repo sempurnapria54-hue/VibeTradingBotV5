@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -21,6 +22,9 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAct
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyActionType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIndicatorSetting;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
+import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingcore.mapping.StrategyJsonConverter;
@@ -39,10 +43,12 @@ import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Копия дерева стратегии в базе ядра: чем читается уровень объявления и
@@ -58,17 +64,23 @@ import org.junit.jupiter.api.Test;
  * уровнями её шагов. Сужение области до одного уровня сделало бы цель
  * нерезолвимой ровно там, где она объявлена соседним уровнем, и отказ
  * пришёл бы на приёме определения, а не на его авторинге.
+ *
+ * <p>Третье — <b>ключей владельца копия не берёт</b>: снимок с шины
+ * приезжает деревом, и числовой ключ его базы сделал бы вставку слиянием с
+ * чужой строкой (docs/architecture/data-ownership.md §Идентификаторы).
  */
 class StrategyTreeCopyTest {
 
     private final StrategyRepository repository = mock(StrategyRepository.class);
     private final StrategyDetailRepository detailRepository = mock(StrategyDetailRepository.class);
+    private final ExchangeAccountDataService exchangeAccountDataService = mock(ExchangeAccountDataService.class);
+    private final InstrumentDataService instrumentDataService = mock(InstrumentDataService.class);
     private final StrategyMapper mapper = new StrategyMapperImpl(new StrategyJsonConverter(new ObjectMapper()));
     private final StrategyDataService dataService =
             new StrategyDataService(repository, detailRepository,
                     mock(StrategyIndicatorSettingRepository.class),
                     mock(StrategyMarketStructureSettingRepository.class), mapper,
-                    mock(ExchangeAccountDataService.class), mock(InstrumentDataService.class));
+                    exchangeAccountDataService, instrumentDataService);
 
     @Test
     void declarationLevelIsCarriedByTheRowParent() {
@@ -128,6 +140,39 @@ class StrategyTreeCopyTest {
         assertThatThrownBy(() -> dataService.saveTree(strategy))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("nowhere");
+    }
+
+    /**
+     * Снимок С ключами базы владельца на каждом виде узла даёт копию на
+     * своих: ключей у строк нет — их заведёт база ядра, — а инструмент
+     * резолвится по идентичности. Фикстура без ключей этого не проверяла
+     * бы: дефект и держался на том, что ключей в ней не было.
+     */
+    @Test
+    void ownerKeysOfTheSnapshotAreNotTakenByTheCopy() {
+        when(exchangeAccountDataService.getRequiredIdByInternalId("ea-0007")).thenReturn(5001L);
+        when(instrumentDataService.getRequiredIdByInternalId("in-0042")).thenReturn(9001L);
+        when(repository.save(any(StrategyEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        dataService.saveTree(keyedStrategy());
+
+        ArgumentCaptor<StrategyEntity> saved = ArgumentCaptor.forClass(StrategyEntity.class);
+        verify(repository).save(saved.capture());
+        StrategyEntity copy = saved.getValue();
+        StrategyDetailEntity detail = single(copy.getDetails());
+        StrategyTrancheEntity tranche = single(detail.getTranches());
+        StrategyStepEntity dealLevelStep = single(detail.getSteps());
+        StrategyStepEntity trancheStep = single(tranche.getSteps());
+        assertThat(Arrays.asList(copy.getId(), copy.getMarketPhaseSetting().getId(),
+                single(copy.getIndicatorSettings()).getId(), single(copy.getMarketStructureSettings()).getId(),
+                detail.getId(), tranche.getId(), dealLevelStep.getId(), trancheStep.getId(),
+                single(dealLevelStep.getActions()).getId(), single(trancheStep.getActions()).getId()))
+                .as("ни один узел копии не несёт ключа базы владельца")
+                .containsOnlyNulls();
+        assertThat(copy.getInstrumentId())
+                .as("ключ инструмента — свой, резолвленный по идентичности")
+                .isEqualTo(9001L);
+        assertThat(copy.getExchangeAccountId()).isEqualTo(5001L);
     }
 
     /** Строки шагов возвращаются в домен в порядке индекса, а не в порядке чтения. */
@@ -191,6 +236,39 @@ class StrategyTreeCopyTest {
         strategy.setName("copy");
         strategy.setStatus(Strategy.Status.ACTIVE);
         strategy.setDetails(List.of(detail));
+        return strategy;
+    }
+
+    /**
+     * Та же стратегия, какой её отдаёт база владельца: ключ у корня, у
+     * трёх объявлений каталога и фазы и у каждого узла
+     * дерева.
+     */
+    private Strategy keyedStrategy() {
+        Strategy strategy = strategy();
+        strategy.setId(101L);
+        StrategyMarketPhaseSetting phaseSetting = new StrategyMarketPhaseSetting();
+        phaseSetting.setId(121L);
+        strategy.setMarketPhaseSetting(phaseSetting);
+        StrategyIndicatorSetting indicator = new StrategyIndicatorSetting();
+        indicator.setId(131L);
+        indicator.setKey("atr");
+        strategy.setIndicatorSettings(List.of(indicator));
+        StrategyMarketStructureSetting structure = new StrategyMarketStructureSetting();
+        structure.setId(141L);
+        structure.setKey("range");
+        strategy.setMarketStructureSettings(List.of(structure));
+
+        StrategyDetail detail = strategy.getDetails().get(0);
+        detail.setId(111L);
+        StrategyTranche tranche = detail.getTranches().get(0);
+        tranche.setId(151L);
+        StrategyStep trancheStep = tranche.getStepsByStatus().get(DealTranche.Status.MANAGING).get(0);
+        trancheStep.setId(201L);
+        algoAction(trancheStep).setId(301L);
+        StrategyStep dealLevelStep = detail.getStepsByStatus().get(Deal.Status.EXIT_PENDING).get(0);
+        dealLevelStep.setId(202L);
+        ((StrategyPositionAction) dealLevelStep.getActions().get(0)).setId(303L);
         return strategy;
     }
 

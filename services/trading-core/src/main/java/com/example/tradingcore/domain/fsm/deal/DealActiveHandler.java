@@ -2,15 +2,22 @@ package com.example.tradingcore.domain.fsm.deal;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingcore.domain.command.DealContext;
+import com.example.tradingcore.domain.command.ServiceCommand;
+import com.example.tradingcore.domain.command.ServiceCommandPayload;
+import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
+import com.example.tradingcore.domain.command.payload.RefreshAlgoOrderCommandPayload;
+import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
 import com.example.tradingcore.domain.fsm.DealHandler;
 import com.example.tradingcore.domain.fsm.DealTransition;
@@ -20,6 +27,9 @@ import com.example.tradingcore.domain.fsm.TrancheCascade;
 import com.example.tradingcore.domain.fsm.TrancheCascadeResult;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.util.Constants;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,17 +44,23 @@ import org.springframework.stereotype.Component;
  * заводит открытие сделки атомарно с ней.
  *
  * <p><b>Расхождение суммы экспозиций уводит сделку не решением
- * обработчика, а КАСКАДОМ биржевой ступени 2.</b> Живой риск есть, но не
- * приписан ни одному траншу — значит сломался наш собственный учёт, и
- * радиус доверия к нему неизвестен. Ступень названа домом инварианта
+ * обработчика, а КАСКАДОМ биржевой ступени 2</b>, и запрашивает её не
+ * проход: он при расхождении только добывает обе стороны сверки заново и
+ * работы не делает, а устойчивое расхождение поднимает детектор инварианта
+ * вне прохода с гистерезисом в два тика. Ступень названа домом инварианта
  * (docs/models/domain/aggregate/Deal.md §«Экспозиция сделки и сверка с
  * биржей»), обработчик её не выбирает.
  *
  * <p><b>У восстановленной сделки закреплённой детали нет, и это не отказ
  * проверки:</b> заводил её не выбор входа. Зато расхождение суммы
  * наступает у неё по построению — заявок у её транша нет, а живой эпизод
- * ненулевого размера есть, — и первый же проход ловит его названной выше
- * тропой.
+ * ненулевого размера есть, — и держится на каждом тике, то есть детектор
+ * подтверждает его вторым же тиком.
+ *
+ * <p><b>Добыча траншей прохода не занимает.</b> Команды наблюдения каскада
+ * едут вместе с его работой либо последними, когда проходу больше нечего
+ * делать: работа уровня сделки их не ждёт
+ * (docs/processes/fsm-execution-layering.md §«Добыча не занимает проход»).
  *
  * <p><b>Удаление определения сворачивает сделку, и проверка стои́т ПОСЛЕ
  * реакции на устаревание данных.</b> Удаление — управляемое
@@ -73,9 +89,9 @@ public class DealActiveHandler implements DealHandler {
     public DealTransition handle(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         if (isFalse(terminalGate.exposureReconciled(deal.livePosition(), deal.getTranches()))) {
-            log.error("Deal exposure does not reconcile with the exchange dealId={}", deal.getId());
-            return DealTransition.requestRung(
-                    HoldSignal.exchangeAccount(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED));
+            log.warn("Deal exposure does not reconcile with the exchange, observing both sides dealId={}",
+                    deal.getId());
+            return reobserveExposure(dealContext);
         }
         if (isTrue(deal.moreThanOneLiveEpisode()) || isTrue(deal.unattributedLiveRisk())) {
             log.warn("Unsafe live risk on an active deal dealId={}", deal.getId());
@@ -96,9 +112,57 @@ public class DealActiveHandler implements DealHandler {
                             Deal.CloseReason.STRATEGY_EXIT)
                     .withTrancheEdges(cascade.getEdges());
         }
-        return exitCheck(dealContext)
+        return observeIfIdle(exitCheck(dealContext), cascade)
                 .withTrancheEdges(cascade.getEdges())
                 .withRung(cascade.getHoldSignal());
+    }
+
+    /**
+     * Расхождение сверки наблюдается заново — ОБЕ стороны, тем же проходом,
+     * — и работы проход не делает; ступень отсюда не запрашивается.
+     *
+     * <p>Стороны сверки добываются разными вызовами площадки: нога,
+     * доналившаяся между добычей заявки и добычей позиции, либо добыча
+     * позиции, отказавшая после добычи ноги, дают расхождение, которого на
+     * бирже нет. Жёсткая ступень счёта на такой гонке снимала бы покрытый
+     * риск по рынку. Поэтому живые заявки траншей добываются первыми, а
+     * позиция — последней, чтобы правая сторона была не старше левой.
+     * Устойчивое расхождение поднимает детектор инварианта вне прохода с
+     * гистерезисом в два тика, и ступень у него та же — биржевая ступень 2
+     * (docs/models/domain/aggregate/Deal.md §«Экспозиция сделки и сверка с
+     * биржей»).
+     */
+    private DealTransition reobserveExposure(DealContext dealContext) {
+        List<ServiceCommand> observations = new ArrayList<>();
+        for (DealTranche tranche : emptyIfNull(dealContext.getDeal().getTranches())) {
+            tranche.liveOrders().forEach(order -> fetch(dealContext, ServiceCommandType.REFRESH_ORDER_COMMAND,
+                    new RefreshOrderCommandPayload(order.getId())).ifPresent(observations::add));
+            tranche.liveAlgoOrders().forEach(algo -> fetch(dealContext,
+                    ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND,
+                    new RefreshAlgoOrderCommandPayload(algo.getId())).ifPresent(observations::add));
+        }
+        fetch(dealContext, ServiceCommandType.REFRESH_POSITION_COMMAND, null).ifPresent(observations::add);
+        return DealTransition.commands(observations);
+    }
+
+    /** Звено добычи, названное явно; пусто — звено ждёт отката повтора. */
+    private Optional<ServiceCommand> fetch(DealContext dealContext, ServiceCommandType link,
+                                           ServiceCommandPayload payload) {
+        return systemActionExecutor.next(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION, dealContext, null,
+                link, payload);
+    }
+
+    /**
+     * Добыча траншей едет последней: только когда ни работа каскада, ни
+     * работа уровня сделки, ни выходная проверка прохода не заняли. Иначе
+     * транш, опрашивающий налив каждым проходом, отнимал бы у сделки её
+     * собственную работу, пока жива хоть одна нога.
+     */
+    private DealTransition observeIfIdle(DealTransition exit, TrancheCascadeResult cascade) {
+        if (isTrue(exit.hasCommands()) || isTrue(exit.movesStatus()) || isFalse(cascade.observed())) {
+            return exit;
+        }
+        return DealTransition.commands(cascade.getObservations());
     }
 
     /**
@@ -119,7 +183,7 @@ public class DealActiveHandler implements DealHandler {
                     .withRung(cascade.getHoldSignal());
         }
         if (isTrue(cascade.acted())) {
-            return DealTransition.commands(cascade.getCommands()).withRung(cascade.getHoldSignal());
+            return DealTransition.commands(cascade.passCommands()).withRung(cascade.getHoldSignal());
         }
         return null;
     }

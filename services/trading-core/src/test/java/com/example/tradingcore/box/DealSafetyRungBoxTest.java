@@ -270,6 +270,7 @@ class DealSafetyRungBoxTest extends SharedTradingCoreBox {
                 Feed.featuresWithPrice(MarketPhase.Type.BULL_TREND.name(), LAST_PRICE));
         connector.answers(balancePath(ACCOUNT), balanceBody());
         connector.answers(positionPath(ACCOUNT), Feed.absent());
+        connector.answers(positionsPath(ACCOUNT), Feed.emptyArray());
         connector.answers(closedPositionsPath(ACCOUNT), Feed.emptyArray());
         connector.answers(PEER_SERVER_TIME, Feed.serverTime(EXCHANGE_MOMENT));
         activate(Definitions.withEntryCommandOnPhase(DEFINITION, ACCOUNT, INSTRUMENT,

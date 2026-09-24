@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.connector.okx.credentials.ExchangeCredentials;
 import com.example.connector.okx.credentials.ExchangeCredentialsResolver;
+import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import com.example.connector.okx.mapping.AlgoOrderMapper;
 import com.example.connector.okx.mapping.BalanceContainerMapper;
 import com.example.connector.okx.mapping.CandleMapper;
@@ -43,10 +44,12 @@ import com.example.tradingbot.domain.resolve.AlgoOrderExternalStatusResolver;
 import com.example.tradingbot.domain.resolve.OrderExternalStatusResolver;
 import com.example.tradingbot.domain.resolve.ProtectionHistoryLeg;
 import java.math.BigDecimal;
+import java.time.DateTimeException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -141,190 +144,256 @@ public class OkxExchangeGateway implements ExchangeGateway {
     @Override
     public Order getOrder(String accountInternalId, String externalInstrumentId, String externalId,
                           String internalId) {
-        return one(reader.getOrder(keys(accountInternalId), externalInstrumentId, externalId, internalId),
-                this::toOrder);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("order", () -> one(
+                reader.getOrder(credentials, externalInstrumentId, externalId, internalId), this::toOrder));
     }
 
     @Override
     public List<Order> getPendingOrders(String accountInternalId, String externalInstrumentId) {
-        return many(reader.getPendingOrders(keys(accountInternalId), externalInstrumentId),
-                this::toOrder);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("orders-pending", () -> many(
+                reader.getPendingOrders(credentials, externalInstrumentId), this::toOrder));
     }
 
     @Override
     public List<Order> getAllPendingOrders(String accountInternalId) {
-        return many(reader.getAllPendingOrders(keys(accountInternalId)), this::toOrder);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("orders-pending", () -> many(reader.getAllPendingOrders(credentials), this::toOrder));
     }
 
     @Override
     public List<Order> getOrderHistory(String accountInternalId, String externalInstrumentId) {
-        return many(reader.getOrderHistory(keys(accountInternalId), externalInstrumentId),
-                this::toOrder);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("orders-history", () -> many(
+                reader.getOrderHistory(credentials, externalInstrumentId), this::toOrder));
     }
 
     @Override
     public AlgoOrder getAlgoOrder(String accountInternalId, String externalInstrumentId, String externalId,
                                   String internalId) {
-        return one(reader.getAlgoOrder(keys(accountInternalId), externalInstrumentId, externalId, internalId),
-                this::toAlgoOrder);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("order-algo", () -> one(
+                reader.getAlgoOrder(credentials, externalInstrumentId, externalId, internalId),
+                this::toAlgoOrder));
     }
 
     @Override
     public List<AlgoOrder> getAllPendingAlgoOrders(String accountInternalId) {
-        return many(reader.getAllPendingAlgoOrders(keys(accountInternalId)), this::toAlgoOrder);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("orders-algo-pending", () -> many(
+                reader.getAllPendingAlgoOrders(credentials), this::toAlgoOrder));
     }
 
     @Override
     public List<AlgoOrder> getPendingAlgoOrders(String accountInternalId, String externalInstrumentId,
                                                 AlgoOrder.ConditionType conditionType) {
-        return many(reader.getPendingAlgoOrders(keys(accountInternalId), externalInstrumentId, conditionType),
-                this::toAlgoOrder);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("orders-algo-pending", () -> many(
+                reader.getPendingAlgoOrders(credentials, externalInstrumentId, conditionType),
+                this::toAlgoOrder));
     }
 
     @Override
     public List<AlgoOrder> getAlgoOrderHistory(String accountInternalId, String externalInstrumentId,
                                                AlgoOrder.ConditionType conditionType, String externalId) {
-        return many(reader.getAlgoOrderHistory(keys(accountInternalId), externalInstrumentId, conditionType,
-                externalId), this::toAlgoOrder);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("orders-algo-history", () -> many(
+                reader.getAlgoOrderHistory(credentials, externalInstrumentId, conditionType, externalId),
+                this::toAlgoOrder));
     }
 
     @Override
     public List<AttachedAlgoOrder> getPendingMaterializedProtections(String accountInternalId,
                                                                      String externalInstrumentId) {
-        return many(reader.getPendingMaterializedProtections(keys(accountInternalId), externalInstrumentId),
-                orderMapper::snapshotToDomain);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("orders-algo-pending", () -> many(
+                reader.getPendingMaterializedProtections(credentials, externalInstrumentId),
+                orderMapper::snapshotToDomain));
     }
 
     @Override
     public List<AttachedAlgoOrder> getMaterializedProtectionHistory(String accountInternalId,
                                                                     String externalInstrumentId,
                                                                     ProtectionHistoryLeg leg) {
-        return many(reader.getMaterializedProtectionHistory(keys(accountInternalId), externalInstrumentId, leg),
-                orderMapper::snapshotToDomain);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("orders-algo-history", () -> many(
+                reader.getMaterializedProtectionHistory(credentials, externalInstrumentId, leg),
+                orderMapper::snapshotToDomain));
     }
 
     @Override
     public List<Position> getPositionCloseRecords(String accountInternalId, String externalInstrumentId,
                                                   OffsetDateTime windowBegin) {
-        return many(reader.getPositionCloseRecords(keys(accountInternalId), externalInstrumentId, windowBegin),
-                this::toClosedPosition);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("positions-history", () -> many(
+                reader.getPositionCloseRecords(credentials, externalInstrumentId, windowBegin),
+                this::toClosedPosition));
     }
 
     @Override
     public Position getPosition(String accountInternalId, String externalInstrumentId) {
-        return one(reader.getPosition(keys(accountInternalId), externalInstrumentId),
-                positionMapper::snapshotToDomain);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("positions", () -> one(
+                reader.getPosition(credentials, externalInstrumentId), positionMapper::snapshotToDomain));
     }
 
     @Override
     public List<Position> getPositions(String accountInternalId) {
-        return many(reader.getPositions(keys(accountInternalId)), positionMapper::snapshotToDomain);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("positions", () -> many(reader.getPositions(credentials), positionMapper::snapshotToDomain));
     }
 
     @Override
     public BalanceContainer getBalance(String accountInternalId, String settleCurrency) {
-        return one(reader.getBalance(keys(accountInternalId), settleCurrency),
-                balanceContainerMapper::snapshotToDomain);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("account-balance", () -> one(
+                reader.getBalance(credentials, settleCurrency), balanceContainerMapper::snapshotToDomain));
     }
 
     @Override
     public List<DealCashFlow> getBills(String accountInternalId, OffsetDateTime begin, OffsetDateTime end) {
-        return many(reader.getBills(keys(accountInternalId), begin, end), dealCashFlowMapper::snapshotToDomain);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("account-bills", () -> many(
+                reader.getBills(credentials, begin, end), dealCashFlowMapper::snapshotToDomain));
     }
 
     @Override
     public List<DealCashFlow> getBillsArchive(String accountInternalId, OffsetDateTime begin, OffsetDateTime end) {
-        return many(reader.getBillsArchive(keys(accountInternalId), begin, end),
-                dealCashFlowMapper::snapshotToDomain);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("account-bills-archive", () -> many(
+                reader.getBillsArchive(credentials, begin, end), dealCashFlowMapper::snapshotToDomain));
     }
 
     @Override
     public List<TradeFeeRate> getTradeFeeRates(String accountInternalId, String externalInstrumentType) {
-        return many(reader.getTradeFeeRates(keys(accountInternalId), externalInstrumentType),
-                tradeFeeRateMapper::snapshotToDomain);
+        ExchangeCredentials credentials = keys(accountInternalId);
+        return parsed("account-trade-fee", () -> many(
+                reader.getTradeFeeRates(credentials, externalInstrumentType), tradeFeeRateMapper::snapshotToDomain));
     }
 
     // --- публичные чтения --------------------------------------------------
 
     @Override
     public Instrument getInstrument(String externalInstrumentId, String externalInstrumentType) {
-        return toInstrument(reader.getInstrument(externalInstrumentId, externalInstrumentType));
+        return parsed("public-instruments", () -> toInstrument(
+                reader.getInstrument(externalInstrumentId, externalInstrumentType)));
     }
 
     @Override
     public List<Instrument> getInstruments(String externalInstrumentType) {
-        return many(reader.getInstruments(externalInstrumentType), this::toInstrument);
+        return parsed("public-instruments", () -> many(
+                reader.getInstruments(externalInstrumentType), this::toInstrument));
     }
 
     @Override
     public List<Candle> getLatestCandles(String externalInstrumentId, TimeFrame timeframe, Integer limit) {
-        return closedOnly(reader.getLatestCandles(externalInstrumentId,
-                timeFrameMapper.domainToOkx(timeframe), limit));
+        String externalBar = timeFrameMapper.domainToOkx(timeframe);
+        return parsed("market-candles", () -> closedOnly(
+                reader.getLatestCandles(externalInstrumentId, externalBar, limit)));
     }
 
     @Override
     public List<Candle> getHistoryCandles(String externalInstrumentId, TimeFrame timeframe, Long afterMillis,
                                           Integer limit) {
-        return closedOnly(reader.getHistoryCandles(externalInstrumentId,
-                timeFrameMapper.domainToOkx(timeframe), afterMillis, limit));
+        String externalBar = timeFrameMapper.domainToOkx(timeframe);
+        return parsed("market-history-candles", () -> closedOnly(
+                reader.getHistoryCandles(externalInstrumentId, externalBar, afterMillis, limit)));
     }
 
     @Override
     public InstrumentExternalRules getInstrumentRules(String externalInstrumentId,
                                                       String externalInstrumentType) {
-        return one(reader.getInstrumentRules(externalInstrumentId, externalInstrumentType),
-                instrumentExternalRulesMapper::snapshotToDomain);
+        return parsed("public-instruments", () -> one(
+                reader.getInstrumentRules(externalInstrumentId, externalInstrumentType),
+                instrumentExternalRulesMapper::snapshotToDomain));
     }
 
     @Override
     public Candle getIndexCandleAt(String indexInstrumentId, TimeFrame timeframe, OffsetDateTime at) {
-        return one(reader.getIndexCandleAt(indexInstrumentId, timeFrameMapper.domainToOkx(timeframe), at),
-                candleMapper::snapshotToDomain);
+        String externalBar = timeFrameMapper.domainToOkx(timeframe);
+        return parsed("history-index-candles", () -> one(
+                reader.getIndexCandleAt(indexInstrumentId, externalBar, at), candleMapper::snapshotToDomain));
     }
 
     @Override
     public MarketPriceData getMarketPriceData(String externalInstrumentId) {
-        return one(reader.getMarketPriceData(externalInstrumentId), marketPriceDataMapper::snapshotToDomain);
+        return parsed("market-price-data", () -> one(
+                reader.getMarketPriceData(externalInstrumentId), marketPriceDataMapper::snapshotToDomain));
     }
 
     @Override
     public Map<String, MarketTicker> getTickers(String externalInstrumentType) {
-        List<MarketTickerExternalSnapshot> snapshots = reader.getTickers(externalInstrumentType);
+        return parsed("market-tickers", () -> tickers(reader.getTickers(externalInstrumentType)));
+    }
+
+    @Override
+    public MarketOrderBook getOrderBook(String externalInstrumentId, Integer depth) {
+        return parsed("market-books", () -> one(
+                reader.getOrderBook(externalInstrumentId, depth), marketSnapshotMapper::snapshotToDomain));
+    }
+
+    @Override
+    public Map<String, BigDecimal> getMarkPrices(String externalInstrumentType) {
+        return parsed("public-mark-price", () -> reader.getMarkPrices(externalInstrumentType));
+    }
+
+    @Override
+    public Map<String, BigDecimal> getIndexPrices(String quoteCurrency) {
+        return parsed("market-index-tickers", () -> reader.getIndexPrices(quoteCurrency));
+    }
+
+    @Override
+    public OffsetDateTime getServerTime() {
+        return parsed("public-time", reader::getServerTime);
+    }
+
+    // --- общее -------------------------------------------------------------
+
+    /**
+     * Разбор ответа площадки под сетью: чужое содержимое, не разобранное
+     * формой контракта, уезжает нарушением инварианта контракта, а не
+     * негодным входом вызывающего.
+     *
+     * <p><b>Под сетью только разбор — операнды вызывающего переводятся ДО
+     * неё.</b> Ключи счёта и таймфрейм резолвятся снаружи: их отказ
+     * принадлежит своим классам, и сеть, накрывшая их, выдала бы негодный
+     * запрос вызывающего за негодный ответ площадки.
+     *
+     * <p><b>Сеть родовая, а не поточечная.</b> Точек, где ответ впервые
+     * разбирается, много — число, время, позиционная строка, перечень, — и
+     * правка, заводящая следующую, о сети не знает; класс её отказу тогда
+     * выбирает сеть, а не память пишущего. Без сети такой отказ уезжал
+     * классом «негодный вход», и ядро молча переводило строку в провал, не
+     * поднимая ступени там, где площадка ответила не той формой
+     * ({@code docs/rules/controlled-exchange-exceptions.md}).
+     */
+    private <T> T parsed(String endpoint, Supplier<T> read) {
+        try {
+            return read.get();
+        } catch (IllegalArgumentException | IndexOutOfBoundsException | DateTimeException e) {
+            throw new ExternalInvariantViolationException(
+                    "OKX response not parsed [" + endpoint + "]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Срез тикеров картой по инструменту.
+     *
+     * <p>Повтор инструмента в ответе площадки схлопывается в первую строку,
+     * а не роняет чтение: без функции слияния toMap бросает на дубле
+     * ключа, и одна лишняя строка стоила бы читателю всего среза цен по
+     * листингу — на каждом проходе, пока площадка её отдаёт.
+     */
+    private Map<String, MarketTicker> tickers(List<MarketTickerExternalSnapshot> snapshots) {
         if (isNull(snapshots)) {
             return Map.of();
         }
-        // Повтор инструмента в ответе площадки схлопывается в первую строку,
-        // а не роняет чтение: без функции слияния toMap бросает на дубле
-        // ключа, и одна лишняя строка стоила бы читателю всего среза цен по
-        // листингу — на каждом проходе, пока площадка её отдаёт.
         return snapshots.stream().collect(Collectors.toMap(
                 MarketTickerExternalSnapshot::getExternalInstrumentId,
                 marketSnapshotMapper::snapshotToDomain,
                 (first, duplicate) -> first));
     }
-
-    @Override
-    public MarketOrderBook getOrderBook(String externalInstrumentId, Integer depth) {
-        return one(reader.getOrderBook(externalInstrumentId, depth),
-                marketSnapshotMapper::snapshotToDomain);
-    }
-
-    @Override
-    public Map<String, BigDecimal> getMarkPrices(String externalInstrumentType) {
-        return reader.getMarkPrices(externalInstrumentType);
-    }
-
-    @Override
-    public Map<String, BigDecimal> getIndexPrices(String quoteCurrency) {
-        return reader.getIndexPrices(quoteCurrency);
-    }
-
-    @Override
-    public OffsetDateTime getServerTime() {
-        return reader.getServerTime();
-    }
-
-    // --- общее -------------------------------------------------------------
 
     /**
      * Ключи счёта.

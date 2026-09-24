@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -96,12 +95,9 @@ class FailureClassesBoxTest extends SharedConnectorBox {
     /**
      * Ожидание взято из дома: «площадка не ответила» и «площадка ответила
      * и объяснила отказ» — разные классы, и повтор осмыслен только у
-     * первого. Сегодня разбор ответа и транспорт сведены в один класс
-     * читателем ответа; долг — `.claude/work/backlog.md` §«Транспортный
-     * отказ площадки уезжает ядру классом ответившей площадки».
+     * первого.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B7.5 — площадка не ответила")
     void b7_5_theExchangeDidNotAnswer() {
         exchange.breaks(OkxConstants.INSTRUMENTS_PATH);
@@ -116,9 +112,8 @@ class FailureClassesBoxTest extends SharedConnectorBox {
         assertThat(privateRead.errorCode()).isEqualTo("EXCHANGE_UNREACHABLE");
     }
 
-    /** Довод красноты тот же, что у {@code B7.5}. */
+    /** Тело, не читаемое конвертом, — ответа нет, как у {@code B7.5}. */
     @Test
-    @Tag("debt")
     @DisplayName("B7.6 — неразбираемое тело ответа — тот же класс, что недостижимость")
     void b7_6_anUnparseableBodyIsTheSameClassAsUnreachability() {
         exchange.answers(OkxConstants.INSTRUMENTS_PATH, "{\"code\":\"0\",\"data\":[{\"instId\":");
@@ -153,7 +148,6 @@ class FailureClassesBoxTest extends SharedConnectorBox {
      * забыто.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B7.8 — перечень классов отказа закрыт и совпадает с домом")
     void b7_8_theFailureClassListIsClosedAndMatchesItsHome() {
         Set<String> observed = new LinkedHashSet<>();

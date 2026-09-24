@@ -10,9 +10,12 @@ import com.example.tradingbot.domain.util.ExchangeAccountKeyPath;
 import com.example.tradingbot.domain.util.ExchangeAccountSecretFields;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.EnumUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.vault.VaultException;
 import org.springframework.vault.core.VaultTemplate;
 import org.springframework.vault.support.VaultResponse;
+import org.springframework.web.client.RestClientException;
 
 /**
  * Ключи счёта из Vault по адресу, выводимому из идентификатора счёта.
@@ -47,8 +50,7 @@ public class VaultExchangeCredentialsResolver implements ExchangeCredentialsReso
     @Override
     public ExchangeCredentials resolve(String accountInternalId) {
         requireEnvironment();
-        VaultResponse response = vaultTemplate.read(
-                ExchangeAccountKeyPath.of(environment.getName(), accountInternalId));
+        VaultResponse response = read(ExchangeAccountKeyPath.of(environment.getName(), accountInternalId));
         if (isNull(response) || isNull(response.getData())) {
             throw new CredentialsUnavailableException(accountInternalId);
         }
@@ -58,6 +60,24 @@ public class VaultExchangeCredentialsResolver implements ExchangeCredentialsReso
                 field(data, ExchangeAccountSecretFields.SECRET, accountInternalId),
                 field(data, ExchangeAccountSecretFields.PASSPHRASE, accountInternalId),
                 contour(data, accountInternalId));
+    }
+
+    /**
+     * Чтение хранилища.
+     *
+     * <p><b>Отказ соединения — «хранилище не ответило», а не «площадка не
+     * ответила».</b> Клиент хранилища бросает тот же транспортный класс,
+     * что и клиент площадки; не переведённый здесь, он уезжал бы классом
+     * недостижимой площадки, и ядро повторяло бы вызов площадки там, где
+     * молчит хранилище (docs/components/IntegrationService.md §«Классы
+     * отказа на границе — дом здесь»).
+     */
+    private VaultResponse read(String path) {
+        try {
+            return vaultTemplate.read(path);
+        } catch (RestClientException e) {
+            throw new VaultException("Хранилище секретов не ответило: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -88,8 +108,19 @@ public class VaultExchangeCredentialsResolver implements ExchangeCredentialsReso
      * <p>Умолчания у него нет намеренно: угадать контур значило бы при
      * первой же неполноте секрета отправить боевую заявку в демо либо
      * демо-ключ на боевую площадку.
+     *
+     * <p><b>Значение вне перечня — тот же отказ, что пустое.</b> Испорчено
+     * содержимое хранилища, а не запрос вызывающего: отказ уезжает классом
+     * границы «ключей нет», а не классом негодного входа
+     * (docs/components/IntegrationService.md §«Классы отказа на границе —
+     * дом здесь»).
      */
     private ExchangeAccount.Contour contour(Map<String, Object> data, String accountInternalId) {
-        return ExchangeAccount.Contour.valueOf(field(data, ExchangeAccountSecretFields.CONTOUR, accountInternalId));
+        ExchangeAccount.Contour contour = EnumUtils.getEnum(ExchangeAccount.Contour.class,
+                field(data, ExchangeAccountSecretFields.CONTOUR, accountInternalId));
+        if (isNull(contour)) {
+            throw new CredentialsUnavailableException(accountInternalId);
+        }
+        return contour;
     }
 }

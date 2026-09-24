@@ -67,6 +67,23 @@ public class DealResultCalculator {
     }
 
     /**
+     * Разбивка движений ждёт звена их добычи: окно не добыто ни разу либо
+     * строка блокирующей области ждёт курса. Ровно та половина
+     * недоступности итога, которую снимает это звено; предел строк окна сюда
+     * не входит — перечитывание окна его не снимает, и звено гонялось бы
+     * вхолостую.
+     */
+    public Boolean flowsAwaitFetch(DealContext dealContext) {
+        if (isNull(dealContext.getDeal().getBillsFetchedThrough())) {
+            return true;
+        }
+        ExchangeContourProperties.Contour contour = exchangeContourProperties
+                .forExchange(dealContext.getExchangeAccount().getExchangeCode());
+        return rateBlocking(dealContext.getCashFlows(), dealContext.getInstrument().getExternalSettlementCurrency(),
+                contour);
+    }
+
+    /**
      * Записи закрытия добыты у ВСЕХ эпизодов. Пустое слагаемое нулём не
      * подставляется: эпизод без записи закрытия делает сумму недоступной,
      * а не заниженной.

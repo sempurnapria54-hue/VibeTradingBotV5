@@ -16,7 +16,6 @@
 | `instType` | string | тип инструмента (`SWAP`/...) |
 | `ordId` | string | биржевой order id |
 | `clOrdId` | string | client order id |
-| `ordType` | string | тип ордера (`market`/`limit`/`post_only`/`fok`/`ioc`/`optimal_limit_ioc`/...) |
 | `side` | string | `buy` / `sell` |
 | `state` | string | сырой статус (`live`/`partially_filled`/`filled`/`canceled`/`mmp_canceled`) |
 | `px` | string-decimal | цена; для market часто пусто |
@@ -26,7 +25,7 @@
 | `fee` | string-decimal | комиссия (обычно отрицательная) |
 | `cTime` | string-ms | время создания |
 | `uTime` | string-ms | время обновления |
-| `reduceOnly` | string-bool | reduce-only факт (используется adapter'ом для invariant validation) |
+| `reduceOnly` | string-bool | reduce-only факт; не используется — посылочной сверки нет (`docs/integrations/okx/rules/reduce-only-invariant.md`) |
 | `tdMode` | string | режим торговли (`isolated`/`cross`/`cash`); adapter сверяет `=isolated` |
 | `posSide` | string | сторона позиции (`net`/`long`/`short`); adapter сверяет `=net` |
 | `attachAlgoClOrdId` | string | top-level attached client id |
@@ -55,7 +54,7 @@
 
 ### Не используется bot'ом (отбрасываются на маппинге)
 
-`ccy` (валюта маржи; adapter использует USDT-policy), `lever` (плечо;
+`ordType` (тип исполнения — `market`/`limit`/`post_only`/`fok`/`ioc`/`optimal_limit_ioc`/...; бизнес-тип заявки наш и из эха не выводится — `docs/models/mapping/Order.md`), `ccy` (валюта маржи; adapter использует USDT-policy), `lever` (плечо;
 сверка против биржевого максимума `externalMaxLeverage`), `fillPx`/`fillSz`/`fillTime`/
 `tradeId` (поля «последнего исполнения»; order-level fill-факты берутся из
 used-полей `accFillSz`/`avgPx`, отдельный fills-DTO не нужен),

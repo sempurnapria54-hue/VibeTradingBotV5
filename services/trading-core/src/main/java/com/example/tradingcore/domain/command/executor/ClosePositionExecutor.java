@@ -41,6 +41,11 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Преконтроль риска эту команду не блокирует: она риск уменьшает
  * (docs/rules/risk-validator-scope.md).
+ *
+ * <p><b>Позиция без живого риска не закрывается</b> — исполнитель читает
+ * её из базы, а не из контекста прохода, и видит то, что записала добыча,
+ * идущая перед ним тем же проходом. На этом стоит повтор закрытия,
+ * пережитого остатком (docs/rules/exit-teardown-order.md).
  */
 @Component
 @RequiredArgsConstructor
@@ -61,6 +66,12 @@ public class ClosePositionExecutor implements CommandExecutor {
                                                  DealContext dealContext) {
         ClosePositionCommandPayload payload = (ClosePositionCommandPayload) command.getPayload();
         Position position = positionDataService.getRequiredById(payload.getPositionId());
+        if (isFalse(position.hasLiveRisk())) {
+            // Закрывать нечего: добыча, идущая перед закрытием тем же проходом,
+            // уже наблюдала позицию плоской. Отказ площадки «позиции нет» на
+            // этом месте был бы отказом на штатной тропе повтора закрытия.
+            return ServiceCommandExecutionResult.ok();
+        }
         ExchangeAck ack = exchangeOperationsClient.closePosition(
                 dealContext.getExchangeAccount().getInternalId(),
                 dealContext.getInstrument().getExternalId(),

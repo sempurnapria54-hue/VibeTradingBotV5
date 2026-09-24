@@ -41,6 +41,13 @@ safety checks, отправляет full close request, сохраняет ACK /
 противоречит known exchange state. ACK не runtime truth (см.
 `docs/rules/ack-not-runtime-truth.md`).
 
+**Позиция без живого риска не закрывается** — площадка не зовётся,
+намерение не пишется, исход успешный. Позицию исполнитель читает из базы,
+а не из контекста прохода, и видит то, что записала добыча, идущая перед
+ним тем же проходом. На этой проверке стоит повтор закрытия, пережитого
+остатком (`docs/rules/exit-teardown-order.md`): повтор за плоской добычей
+на площадку не уходит и отказа «позиции нет» не получает.
+
 ## ClosePositionCommandPayload
 
 `positionId`, `requestedCloseReason` (`Position.CloseReason`). Не содержит
