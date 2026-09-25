@@ -29,7 +29,29 @@
 #      контейнеров, неотличимыми от дефекта кода. Docker — ПРЕДУСЛОВИЕ
 #      реактора, а не условие пропуска тестов
 #      (.claude/decisions/test-contour-design-pass.md §«9. Docker — предусловие
-#      реактора, а не условие пропуска тестов»).
+#      реактора, а не условие пропуска тестов»);
+#   7) режим модулей: названный модуль не исполнил ни одного теста — прогон
+#      не измерил того, ради чего назван (отбор классов промахнулся), и
+#      зелёным не объявляется;
+#   8) режим модулей: названное не является модулем реактора — прогон не
+#      начинается;
+#   9) режим модулей: перечень изъятия несёт тесты прочих модулей и не несёт
+#      тестов названных;
+#  10) режим модулей: знаменатель оси 3 — без агрегатора, когда его нет в
+#      сборке (`-am` от листового модуля родителя-агрегатора не тянет).
+#
+# РЕЖИМ МОДУЛЕЙ — `--modules <модуль>[,<модуль>…]`: закрывающий прогон сессии,
+# изменившей только тестовый код этих модулей
+# (.claude/rules/session-work-unit.md §«Объём закрывающего прогона»).
+# Модули собираются с `-am` фазой `verify`, как в реакторе, но ТЕСТЫ
+# исполняются только у названных: тесты прочих модулей сборки изымаются
+# файлом `-Dsurefire.excludesFile`. Без изъятия `-am` прогонял бы тесты всех
+# зависимостей — у сквозного набора `tests` это семь сервисов, то есть весь
+# реактор под другим именем. Изъятие — файлом, а не `-Dtest`: перечень
+# классов сервиса в строке команды не помещается в предел `mvn.cmd`, а
+# шаблон пакета в `-Dtest` не отбирает ничего и выглядит зелёным
+# (.claude/traps/environment-commands-traps.md ENV-005) — против этого же
+# стоит ось 7.
 #
 # Каталоги `target/classes` и `target/test-classes` всех модулей реактора
 # СНОСЯТСЯ перед прогоном: плагин `clean` в офлайне не резолвится, а без
@@ -50,10 +72,13 @@
 # их нет, и набор отказал бы «не измерялось». Реактор поэтому пакует каждый
 # модуль до того, как дойдёт до набора.
 #
-# Запуск (из корня репозитория):  bash tools/reactor-test.sh
-# Код возврата: 0 — дерево скомпилировано целиком и тесты зелёные;
+# Запуск (из корня репозитория):
+#   bash tools/reactor-test.sh                                  # полный реактор
+#   bash tools/reactor-test.sh --modules services/bff,tests     # режим модулей
+# Код возврата: 0 — собранное скомпилировано целиком и тесты зелёные;
 # 1 — сборка или тесты упали; 2 — ПРОВЕРКА НЕ ПРОВОДИЛАСЬ (нет JDK, нет
-# maven, не отвечает демон Docker, либо прогон оказался вакуумным).
+# maven, не отвечает демон Docker, прогон оказался вакуумным, названное — не
+# модуль реактора, названный модуль не исполнил ни одного теста).
 #
 # Переопределяется окружением: REACTOR_JDK (JAVA_HOME сборки), REACTOR_MVN
 # (путь к mvn), REACTOR_MVN_ARGS (аргументы прогона), REACTOR_DOCKER
@@ -62,10 +87,28 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+MODULES=""
+case "${1:-}" in
+  "") ;;
+  --modules)
+    MODULES="${2:-}"
+    if [ -z "$MODULES" ] || [ $# -ne 2 ]; then
+      echo 'ПРОВЕРКА НЕ ПРОВОДИТСЯ: --modules требует один аргумент — модули через запятую'
+      exit 2
+    fi
+    ;;
+  *)
+    echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: неизвестный аргумент «$1» (допустим только --modules <модуль>[,<модуль>…])"
+    exit 2
+    ;;
+esac
+
 # --- разбор лога: чистая функция, на ней же стои́т батарея ----------------
 # Печатает вердикт одной строкой: OK | VACUUM | EMPTY | SHORT:<есть>/<надо>.
+# Второй аргумент — сколько в сборке агрегаторов без исходников (умолчание 1:
+# корень реактора); режим модулей передаёт счёт строк упаковки `[ pom ]`.
 analyze_log() {
-  local log="$1"
+  local log="$1" aggregators="${2:-1}"
   local nothing compiled building
   nothing="$(grep -c 'Nothing to compile' "$log")"
   compiled="$(grep -cE '^\[INFO\] Compiling [0-9]+ source files' "$log")"
@@ -84,10 +127,85 @@ analyze_log() {
   fi
   # Агрегатор реактора («Building vibetradingbot») исходников не несёт и
   # компилировать ему нечего — он из знаменателя выведен.
-  if [ "$compiled" -lt $((building - 1)) ]; then
-    echo "SHORT:${compiled}/$((building - 1))"
+  if [ "$compiled" -lt $((building - aggregators)) ]; then
+    echo "SHORT:${compiled}/$((building - aggregators))"
     return
   fi
+  echo "OK"
+}
+
+# --- режим модулей: чистые функции, на них стоят оси 7-9 -----------------
+# Модули реактора — по объявлению корневого pom.xml.
+reactor_modules() {
+  grep -oE '<module>[^<]+</module>' "$1/pom.xml" | sed -E 's#</?module>##g'
+}
+
+# Названное — модуль реактора? Печатает OK | UNKNOWN:<названное>.
+modules_verdict() {
+  local root="$1" wanted known
+  shift
+  for wanted in "$@"; do
+    known=0
+    while IFS= read -r module; do
+      [ "$module" = "$wanted" ] && known=1
+    done < <(reactor_modules "$root")
+    if [ "$known" -eq 0 ]; then
+      echo "UNKNOWN:$wanted"
+      return
+    fi
+  done
+  echo "OK"
+}
+
+# artifactId модуля — тот, что maven печатает заголовком `< группа:artifactId >`.
+module_artifact() {
+  sed '/<parent>/,/<\/parent>/d' "$1/pom.xml" | grep -m1 -oE '<artifactId>[^<]+' | sed 's/<artifactId>//'
+}
+
+# Перечень изъятия: тестовые исходники всех модулей реактора, кроме
+# названных, — путями от корня тестовых исходников, как их читает surefire.
+exclusion_list() {
+  local root="$1" module wanted skip
+  shift
+  while IFS= read -r module; do
+    skip=0
+    for wanted in "$@"; do
+      [ "$module" = "$wanted" ] && skip=1
+    done
+    [ "$skip" -eq 1 ] && continue
+    [ -d "$root/$module/src/test/java" ] || continue
+    (cd "$root/$module/src/test/java" && find . -name '*.java' | sed 's#^\./##')
+  done < <(reactor_modules "$root")
+}
+
+# Исполнил ли каждый названный модуль хоть один тест. Счёт — по ИТОГУ
+# модуля (строка без хвоста «, Time elapsed …»), отнесённому к заголовку
+# `< группа:artifactId >`, под которым он напечатан. Печатает OK | UNTESTED:<artifactId>.
+module_tests_verdict() {
+  local log="$1" artifact counted
+  shift
+  for artifact in "$@"; do
+    counted="$(awk -v want="$artifact" '
+      /^\[INFO\] -+< [^:]+:[^ ]+ >-+$/ {
+        current = $0
+        sub(/^\[INFO\] -+< [^:]+:/, "", current)
+        sub(/ >-+$/, "", current)
+        next
+      }
+      /^\[(INFO|WARNING|ERROR)\] Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+$/ {
+        if (current == want) {
+          line = $0
+          sub(/^.*Tests run: /, "", line)
+          sub(/,.*$/, "", line)
+          sum += line
+        }
+      }
+      END { print sum + 0 }' "$log")"
+    if [ "$counted" -eq 0 ]; then
+      echo "UNTESTED:$artifact"
+      return
+    fi
+  done
   echo "OK"
 }
 
@@ -149,6 +267,25 @@ battery() {
   report_axis '10. контроль: демон отвечает — отказа нет' "$(docker_verdict true)" OK || failed=1
   report_axis '11. клиента docker нет вовсе — отказ' "$(docker_verdict "$work/нет-такого-клиента")" NO_DOCKER || failed=1
 
+  # Режим модулей. Итог модуля — строка без хвоста; строка класса несёт
+  # «, Time elapsed …» и в счёт не идёт.
+  printf '[INFO] ---< com.example:a >---\n[INFO] Building a\n[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.2 s\n[INFO] ---< com.example:b >---\n[INFO] Building b\n[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0\n' > "$work/modules.log"
+  report_axis '12. названный модуль без единого теста — отказ' "$(module_tests_verdict "$work/modules.log" b a)" UNTESTED:a || failed=1
+  report_axis '13. контроль: названный модуль исполнил тесты — отказа нет' "$(module_tests_verdict "$work/modules.log" b)" OK || failed=1
+
+  mkdir -p "$work/root/x/src/test/java/p" "$work/root/y/src/test/java/q"
+  printf '<project>\n  <modules>\n    <module>x</module>\n    <module>y</module>\n  </modules>\n</project>\n' > "$work/root/pom.xml"
+  : > "$work/root/x/src/test/java/p/XTest.java"
+  : > "$work/root/y/src/test/java/q/YTest.java"
+  report_axis '14. названное вне реактора — отказ' "$(modules_verdict "$work/root" x z)" UNKNOWN:z || failed=1
+  report_axis '15. контроль: модуль реактора принят' "$(modules_verdict "$work/root" y)" OK || failed=1
+  report_axis '16. изъятие несёт тесты прочих модулей, а не названного' "$(exclusion_list "$work/root" x | paste -sd, -)" q/YTest.java || failed=1
+
+  printf '[INFO] Building a\n[INFO] Compiling 3 source files\n[INFO] Building b\n' > "$work/short-noagg.log"
+  report_axis '17. без агрегатора недосчитанный модуль — отказ' "$(analyze_log "$work/short-noagg.log" 0)" SHORT:1/2 || failed=1
+  printf '[INFO] Building a\n[INFO] Compiling 3 source files\n[INFO] Building b\n[INFO] Compiling 2 source files\n' > "$work/ok-noagg.log"
+  report_axis '18. контроль: без агрегатора полный прогон — отказа нет' "$(analyze_log "$work/ok-noagg.log" 0)" OK || failed=1
+
   rm -rf "$work"
   return $failed
 }
@@ -197,12 +334,42 @@ rm -rf "$REPO_ROOT"/services/*/target/classes "$REPO_ROOT"/services/*/target/tes
        "$REPO_ROOT"/services/common/model/*/target/test-classes \
        "$REPO_ROOT"/tests/target/test-classes
 
-LOG="$(mktemp)"
-JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-verify} \
-    -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
-MVN_CODE=$?
+TARGETS=()
+TARGET_ARTIFACTS=()
+if [ -n "$MODULES" ]; then
+  IFS=',' read -r -a TARGETS <<< "$MODULES"
+  for i in "${!TARGETS[@]}"; do
+    TARGETS[$i]="${TARGETS[$i]%/}"
+  done
+  KNOWN="$(modules_verdict "$REPO_ROOT" "${TARGETS[@]}")"
+  if [ "$KNOWN" != "OK" ]; then
+    echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: «${KNOWN#UNKNOWN:}» — не модуль реактора (перечень — <module> корневого pom.xml)"
+    exit 2
+  fi
+  for module in "${TARGETS[@]}"; do
+    TARGET_ARTIFACTS+=("$(module_artifact "$REPO_ROOT/$module")")
+  done
+fi
 
-VERDICT="$(analyze_log "$LOG")"
+LOG="$(mktemp)"
+if [ -n "$MODULES" ]; then
+  EXCLUDES="$(mktemp)"
+  exclusion_list "$REPO_ROOT" "${TARGETS[@]}" > "$EXCLUDES"
+  # Путь файла — в форме, которую прочтёт JVM, а не только Git Bash.
+  EXCLUDES_ARG="$(cygpath -m "$EXCLUDES" 2>/dev/null || printf '%s' "$EXCLUDES")"
+  JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-verify} \
+      -am -pl "$(IFS=,; printf '%s' "${TARGETS[*]}")" "-Dsurefire.excludesFile=$EXCLUDES_ARG" \
+      -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
+  MVN_CODE=$?
+  rm -f "$EXCLUDES"
+  VERDICT="$(analyze_log "$LOG" "$(grep -cE '^\[INFO\] -+\[ pom \]-+$' "$LOG")")"
+else
+  JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-verify} \
+      -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
+  MVN_CODE=$?
+  VERDICT="$(analyze_log "$LOG")"
+fi
+
 OUTCOME="$(decide "$VERDICT" "$MVN_CODE")"
 case "$OUTCOME" in
   VACUUM)
@@ -232,6 +399,17 @@ if [ "$OUTCOME" = "RED" ]; then
   grep -E '^\[ERROR\]' "$LOG" | head -30
   echo "полный лог: $LOG"
   exit 1
+fi
+
+if [ -n "$MODULES" ]; then
+  TESTED="$(module_tests_verdict "$LOG" "${TARGET_ARTIFACTS[@]}")"
+  if [ "$TESTED" != "OK" ]; then
+    echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: модуль ${TESTED#UNTESTED:} не исполнил ни одного теста — отбор промахнулся; лог: $LOG"
+    exit 2
+  fi
+  echo "режим модулей: ${MODULES}; скомпилировано файлов: $SOURCES; тестов пройдено: $TESTS; ДЕФЕКТОВ: 0"
+  rm -f "$LOG"
+  exit 0
 fi
 
 echo "скомпилировано файлов: $SOURCES; тестов пройдено: $TESTS; ДЕФЕКТОВ: 0"

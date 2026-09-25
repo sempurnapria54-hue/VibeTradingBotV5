@@ -35,8 +35,17 @@
   * `агент:` — запуск субагента; его собственные действия идут строками с
     префиксом `↳`.
   * всё прочее — `bash:` с началом команды либо именем инструмента.
-  * пульс `…` — при тишине дольше пяти минут: сколько идёт сессия и что
-    последнее (для незавершённого прогона — что идёт).
+  * `идёт:` — ВСЯКАЯ команда оболочки, чей результат не пришёл за пять
+    минут, — опознанный прогон, правка перенаправлением, `bash:` — строкой
+    раз в пять минут, независимо от прочих действий сессии:
+    `… 37 мин, идёт: mvn -o -am -pl services/bff verify (12 мин; лог обновлён
+    0 мин назад)`. Лог — файл, в который команда пишет перенаправлением
+    (`> файл`, `>> файл`, `| tee файл`); время — его последней записи. Лога
+    нет (вывод не перенаправлен, путь из переменной `$LOG`, файл не создан) —
+    хвост просто `(N мин)`. Отличает прогон от зависания: у живого прогона
+    лог свежий, у зависшего — стареет.
+  * пульс `…` — при тишине дольше пяти минут, когда долгой команды нет:
+    сколько идёт сессия и что последнее.
 
 Первой строкой сессии печатается `модель: … · effort: …`. МОДЕЛЬ — ФАКТ
 ПОТОКА (поле `model` события `system/init`), EFFORT — ОБЪЯВЛЕНИЕ ЦИКЛА
@@ -60,6 +69,7 @@ import os
 import queue
 import re
 import shlex
+import subprocess
 import sys
 import threading
 import time
@@ -85,10 +95,14 @@ READ_GIT = {"diff", "log", "status", "show", "grep", "ls-files", "rev-parse",
             "write-tree", "branch", "blame", "config", "describe", "remote"}
 RUN_WORDS = {"mvn", "docker", "kubectl", "kind", "helm", "npm", "npx", "gradle"}
 RUN_SCRIPT = re.compile(r"tools/[\w./-]+\.(?:py|sh|ps1)")
+ENV_ASSIGNMENT = re.compile(r"""^(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S)*\s+)+""")
 PATH_TOKEN = re.compile(
     r"[\w~./\\-]+\.(?:md|json|java|py|sh|ps1|yaml|yml|xml|txt|sql|properties|"
     r"svg|html|css|js|ts|toml|cfg|ini|ndjson|csv|hcl|env)\b")
 REDIRECT = re.compile(r"(?<![0-9&])>>?\s*([^\s|;&]+)")
+HEAD_TOKEN = re.compile(r"""^(?:"([^"]+)"|'([^']+)'|(\S+))""")
+TEE = re.compile(r"\|\s*tee\s+(?:-a\s+)?([^\s|;&]+)")
+GIT_BASH_DRIVE = re.compile(r"^/([A-Za-z])/(.*)$")
 EXIT_CODE = re.compile(r"[Ee]xit code (\d+)")
 
 # Статус шага несёт НЕОБЯЗАТЕЛЬНЫЙ счёт под-шага (`CODE·2/3`) — дом формы
@@ -167,8 +181,10 @@ class Feed:
         self.last_action = None
         self.last_pulse_at = self.started
         self.last_edit = None
+        self.cygpaths = {}
         self.pending = {}          # tool_use_id → (метка прогона, момент, префикс)
-        self.batch = None          # {"at": момент, "stamp": ЧЧ:ММ, "names": [], "prefix": str}
+        self.running = {}        # tool_use_id → {label, started, prefix, log, reported}
+        self.batch = None         # {"at": момент, "stamp": ЧЧ:ММ, "names": [], "prefix": str}
 
     # --- вывод
 
@@ -208,6 +224,36 @@ class Feed:
     def base(self, path):
         return self.relative(path).rstrip("/").rsplit("/", 1)[-1]
 
+    def local_path(self, path, base_dir):
+        """Путь из текста команды — в путь, который откроет эта машина.
+        `/c/…` Git Bash — в `C:/…`; прочий абсолютный путь Git Bash (`/tmp/…`)
+        — через `cygpath`; относительный — от каталога команды."""
+        path = os.path.expanduser(path.strip("\"'"))
+        drive = GIT_BASH_DRIVE.match(path)
+        if drive:
+            return "%s:/%s" % (drive.group(1).upper(), drive.group(2))
+        if path.startswith("/"):
+            return self.cygpath(path)
+        return path if os.path.isabs(path) else os.path.join(base_dir, path)
+
+    def cygpath(self, path):
+        if path not in self.cygpaths:
+            try:
+                done = subprocess.run(["cygpath", "-w", path], capture_output=True, text=True, timeout=5)
+                self.cygpaths[path] = done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else path
+            except (OSError, subprocess.SubprocessError):
+                self.cygpaths[path] = path
+        return self.cygpaths[path]
+
+    def log_file(self, first, base_dir):
+        """Файл, в который команда пишет перенаправлением либо `tee`; `None`,
+        когда его нет или путь не читается из текста (`$LOG`)."""
+        for target in REDIRECT.findall(first) + TEE.findall(first):
+            if target in ("&1", "&2") or target.startswith("/dev/") or "$" in target:
+                continue
+            return self.local_path(target, base_dir)
+        return None
+
     # --- чтения пачкой
 
     def read(self, name, prefix=""):
@@ -236,26 +282,58 @@ class Feed:
 
     def shell(self, command, tool_id, prefix, background):
         text = command.strip()
-        first = text.split("\n", 1)[0]
-        # `cd … &&` и `export … &&` — обвязка, а не действие: отбрасываются.
+        # Продолжение строки `\` склеивается: перенаправление в лог часто
+        # стои́т на последней строке длинной команды.
+        first = text.replace("\\\n", " ").split("\n", 1)[0]
+        # `cd … &&`, `export … &&`, `date … &&` — обвязка, а не действие:
+        # отбрасываются; каталог `cd` запоминается — от него читается
+        # относительный путь лога.
         segments = [part.strip() for part in first.split("&&")]
-        while len(segments) > 1 and segments[0].split()[:1] and segments[0].split()[0] in ("cd", "export", "set"):
-            segments.pop(0)
+        base_dir = self.cwd
+        while len(segments) > 1 and segments[0].split()[:1] and (
+                segments[0].split()[0] in ("cd", "export", "set", "date", "echo")
+                or not ENV_ASSIGNMENT.sub("", segments[0] + " ").strip()):
+            words = segments.pop(0).split(None, 1)
+            if words[0] == "cd" and len(words) > 1:
+                base_dir = self.local_path(words[1].strip(), self.cwd)
         first = " && ".join(segments)
+        # Присваивания среды перед командой (`JAVA_HOME=… mvn …`) — тоже
+        # обвязка: без них голова команды — присваивание, а не запускающий.
+        assignment = ENV_ASSIGNMENT.match(first)
+        while assignment:
+            first = first[assignment.end():]
+            assignment = ENV_ASSIGNMENT.match(first)
         script = RUN_SCRIPT.search(text)
         words = first.split()
         head = words[0] if words else ""
+        # Запускающий, названный путём (`"C:/…/maven3/bin/mvn.cmd" -o …`),
+        # опознаётся по имени файла: иначе голова — кусок пути, а не `mvn`.
+        quoted = HEAD_TOKEN.match(first)
+        if quoted and head not in RUN_WORDS:
+            token = next(group for group in quoted.groups() if group)
+            name = re.sub(r"\.(?:cmd|exe|bat)$", "", token.replace("\\", "/").rsplit("/", 1)[-1])
+            if name in RUN_WORDS:
+                head = name
+                words = [name] + first[quoted.end():].split()
+        if not background and tool_id:
+            self.running[tool_id] = {"label": None, "started": time.time(), "prefix": prefix,
+                                     "log": self.log_file(first, base_dir), "reported": time.time()}
         if script or head in RUN_WORDS:
-            label = shorten(self.run_label(text, script.group(0)) if script else " ".join(words[:4]))
+            label = shorten(self.run_label(text, script.group(0)) if script
+                            else re.split(r"[|>;&]", " ".join(words))[0].strip())
             if background:
                 self.action("бэкграунд: %s" % label, prefix)
                 return
+            if tool_id in self.running:
+                self.running[tool_id]["label"] = "прогон " + label
             self.pending[tool_id] = (label, time.time(), prefix, clock())
             self.last_action = prefix + "прогон " + label + " (идёт)"
             self.last_action_at = time.time()
             self.last_pulse_at = self.last_action_at
             self.flush_batch()
             return
+        if tool_id in self.running:
+            self.running[tool_id]["label"] = shorten(first, 60)
         target = self.write_target(first, words)
         if target:
             key = ("правит", prefix, target)
@@ -360,6 +438,7 @@ class Feed:
 
     def tool_result(self, block, prefix):
         tool_id = block.get("tool_use_id")
+        self.running.pop(tool_id, None)
         if tool_id not in self.pending:
             return
         label, started, run_prefix, stamp = self.pending.pop(tool_id)
@@ -403,15 +482,30 @@ class Feed:
         now = time.time()
         if self.batch and now - self.batch["at"] >= READ_BATCH_SECONDS:
             self.flush_batch()
-        if now - self.last_action_at >= PULSE_SECONDS and now - self.last_pulse_at >= PULSE_SECONDS:
-            minutes = int((now - self.started) // 60)
-            if self.pending:
-                label, started, prefix, _ = sorted(self.pending.values(), key=lambda item: item[1])[0]
-                what = "идёт: %sпрогон %s (%d мин)" % (prefix, label, int((now - started) // 60))
-            else:
-                what = "последнее: %s" % (self.last_action or "ничего")
-            self.line("  … %d мин, %s" % (minutes, what))
+        minutes = int((now - self.started) // 60)
+        # Долгая команда печатается раз в пять минут САМА, а не только при
+        # тишине: субагент рядом с ней действует, и пульс тишины молчал бы.
+        long_running = sorted((item for item in self.running.values() if now - item["started"] >= PULSE_SECONDS),
+                              key=lambda item: item["started"])
+        for item in long_running:
+            if now - item["reported"] < PULSE_SECONDS:
+                continue
+            self.line("  … %d мин, идёт: %s%s (%s)" % (minutes, item["prefix"], item["label"], self.age(item, now)))
+            item["reported"] = now
             self.last_pulse_at = now
+        if long_running:
+            return
+        if now - self.last_action_at >= PULSE_SECONDS and now - self.last_pulse_at >= PULSE_SECONDS:
+            self.line("  … %d мин, последнее: %s" % (minutes, self.last_action or "ничего"))
+            self.last_pulse_at = now
+
+    @staticmethod
+    def age(item, now):
+        """`N мин` команды и, когда лог есть, давность его последней записи."""
+        text = "%d мин" % int((now - item["started"]) // 60)
+        if item["log"] and os.path.isfile(item["log"]):
+            text += "; лог обновлён %d мин назад" % int(max(0, now - os.path.getmtime(item["log"])) // 60)
+        return text
 
     def close(self):
         self.flush_batch()

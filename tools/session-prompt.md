@@ -21,7 +21,8 @@
 1. Прочитай последний снапшот (`.claude/snapshots/`), таблицу статусов
    текущей фазы (`.claude/work/roadmap/`) и хронику шага
    (`.claude/work/progress/phase-<N>-step-<M>-chronicle.md`); перечень
-   `сейчас` печатает `py tools/backlog-check.py`.
+   `сейчас` печатает `py tools/backlog-check.py`. До первой правки отбей
+   метку `git write-tree`: по ней закрытие решает, какой прогон нужен.
 2. Веди текущий шаг по машине статусов
    `.claude/processes/roadmap-step-execution.md` —
    `CONCEPT → CONCEPT_REVIEW → CODE → DOCS → REVIEW → DONE` — со всеми её
@@ -65,7 +66,9 @@
 `.claude/rules/session-work-unit.md` §«Порядок закрытия сессии», и порядок
 несущий:
 
-1. реактор, если тронуто дерево кода;
+1. прогон по дельте сессии — полный реактор, сборка изменённых модулей
+   либо ничего; решает команда по списку изменённых файлов
+   (`.claude/rules/session-work-unit.md` §«Объём закрывающего прогона»);
 2. записи: документ кейсов, хроника шага, дайджест, снапшот — если картина
    сдвинулась (формат — `.claude/rules/snapshot-format.md`);
 3. гейт инструментов корпуса
