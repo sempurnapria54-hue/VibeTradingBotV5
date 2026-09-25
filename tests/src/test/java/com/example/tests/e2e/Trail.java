@@ -21,6 +21,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -28,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.GroupListing;
+import org.apache.kafka.clients.admin.ListGroupsOptions;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -552,8 +557,19 @@ public final class Trail implements AutoCloseable {
      * @return идентичность определения
      */
     public String createDefinition() {
+        return createDefinition(referenceDefinition());
+    }
+
+    /**
+     * Заводит определение у владельца его поверхностью — названным телом на
+     * паре тропы.
+     *
+     * @param definition тело определения
+     * @return идентичность определения
+     */
+    public String createDefinition(String definition) {
         Answer answer = call(Party.STRATEGIES, "POST", STRATEGIES, tenant,
-                referenceDefinition().replace("\"" + ACCOUNT + "\"", "\"" + account + "\""));
+                definition.replace("\"" + ACCOUNT + "\"", "\"" + account + "\""));
         if (answer.status() != 201) {
             throw new IllegalStateException("Предусловие не поставлено: создание определения — "
                     + answer.status() + " " + answer.body());
@@ -624,8 +640,19 @@ public final class Trail implements AutoCloseable {
      * @return идентичность определения
      */
     public String activeDefinition() {
+        return activeDefinition(referenceDefinition());
+    }
+
+    /**
+     * Активное определение названного тела с копией у ядра — теми же ходами,
+     * что {@link #activeDefinition()}.
+     *
+     * @param body тело определения
+     * @return идентичность определения
+     */
+    public String activeDefinition(String body) {
         retireActiveDefinitions();
-        String definition = createDefinition();
+        String definition = createDefinition(body);
         Answer moved = moveDefinition(definition, "ACTIVE");
         if (moved.status() != 200) {
             throw new IllegalStateException("Предусловие не поставлено: активация — " + moved.status() + " "
@@ -643,7 +670,18 @@ public final class Trail implements AutoCloseable {
      * входное условие бычьей детали эталона истинно.
      */
     public void marketFavoursEntry() {
-        marketData.answersPost(PEER_FEATURES, entryFeaturesBody());
+        marketPhaseIs("BULL_TREND");
+    }
+
+    /**
+     * Стаб владельца рыночных данных отдаёт ту же раскладку фич с названной
+     * фазой рынка: у эталона фаза, сменившаяся после входа, истинит шаг
+     * выхода уровня сделки.
+     *
+     * @param phase фаза рынка раскладки
+     */
+    public void marketPhaseIs(String phase) {
+        marketData.answersPost(PEER_FEATURES, featuresBody(phase));
     }
 
     /**
@@ -839,6 +877,74 @@ public final class Trail implements AutoCloseable {
         }
     }
 
+    /**
+     * Живые группы потребителей с названным префиксом и темы, назначенные их
+     * участникам, — администратором брокера, а не участником группы.
+     *
+     * <p>Группа без участников в ответ не входит: у эфемерной группы
+     * остановленной реплики назначений нет, и потребителем она не является.
+     *
+     * @param prefix префикс имени группы
+     * @return группа → темы её назначений
+     */
+    public Map<String, Set<String>> consumingGroups(String prefix) {
+        Map<String, Object> settings = new HashMap<>();
+        settings.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBootstrapServers());
+        try (Admin admin = Admin.create(settings)) {
+            List<String> named = admin.listGroups(ListGroupsOptions.forConsumerGroups()).all()
+                    .get(30, TimeUnit.SECONDS).stream()
+                    .map(GroupListing::groupId)
+                    .filter(group -> group.startsWith(prefix))
+                    .toList();
+            Map<String, Set<String>> consuming = new TreeMap<>();
+            if (named.isEmpty()) {
+                return consuming;
+            }
+            admin.describeConsumerGroups(named).all().get(30, TimeUnit.SECONDS).forEach((group, description) -> {
+                Set<String> topics = new TreeSet<>();
+                description.members().forEach(member -> member.assignment().topicPartitions()
+                        .forEach(partition -> topics.add(partition.topic())));
+                if (isFalse(description.members().isEmpty())) {
+                    consuming.put(group, topics);
+                }
+            });
+            return consuming;
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Чтение групп прервано", failure);
+        } catch (ExecutionException | TimeoutException failure) {
+            throw new IllegalStateException("Группы с префиксом " + prefix + " не прочитаны", failure);
+        }
+    }
+
+    /**
+     * Темы брокера тропы — администратором брокера, без служебных тем самого
+     * брокера.
+     *
+     * @return имена тем
+     */
+    public Set<String> topics() {
+        Map<String, Object> settings = new HashMap<>();
+        settings.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBootstrapServers());
+        try (Admin admin = Admin.create(settings)) {
+            return new TreeSet<>(admin.listTopics().names().get(30, TimeUnit.SECONDS));
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Чтение тем прервано", failure);
+        } catch (ExecutionException | TimeoutException failure) {
+            throw new IllegalStateException("Темы брокера не прочитаны", failure);
+        }
+    }
+
+    /**
+     * Останавливает брокер тропы. Поднять его обратно нечем: новый контейнер
+     * опубликовал бы новый порт, которого стороны не знают, — поэтому ход
+     * законен только последним ходом тропы.
+     */
+    public void stopBroker() {
+        broker.stop();
+    }
+
     /** Конец темы на её единственной партиции — смещение следующей записи. */
     public Long endOffset(String topic) {
         return (long) records(topic).size();
@@ -985,16 +1091,16 @@ public final class Trail implements AutoCloseable {
     }
 
     /**
-     * Раскладка фич момента, на которой входной шаг бычьей детали эталона
-     * истинен: фаза — бычий тренд, быстрая средняя выше медленной, осциллятор
-     * не ниже порога; плюс волатильность под стоп и цены момента под расчёт
-     * заявки.
+     * Раскладка фич момента с названной фазой рынка. На бычьей фазе входной
+     * шаг бычьей детали эталона истинен: быстрая средняя выше медленной,
+     * осциллятор не ниже порога; плюс волатильность под стоп и цены момента
+     * под расчёт заявки.
      *
      * <p><b>Раскладка ключуется авторскими именами операндов эталона</b> —
      * так её отдаёт владелец данных (форму соседа мерит его ящик), и имя вне
      * эталона гасило бы условие молча, как отсутствующий операнд.
      */
-    private static String entryFeaturesBody() {
+    private static String featuresBody(String phase) {
         String candle = OffsetDateTime.now(ZoneOffset.UTC).withSecond(0).withNano(0).toString();
         return """
                 {
@@ -1006,7 +1112,7 @@ public final class Trail implements AutoCloseable {
                   },
                   "previousIndicators": {},
                   "structures": {},
-                  "marketPhase": {"type": "BULL_TREND"},
+                  "marketPhase": {"type": "%3$s"},
                   "marketPriceData": {
                     "externalLastPrice": "%2$s",
                     "externalBidPrice": "1999.9",
@@ -1016,7 +1122,7 @@ public final class Trail implements AutoCloseable {
                     "externalTimestamp": "%1$s"
                   }
                 }
-                """.formatted(candle, ENTRY_PRICE);
+                """.formatted(candle, ENTRY_PRICE, phase);
     }
 
     private Map<String, String> settingsOf(Party party) {

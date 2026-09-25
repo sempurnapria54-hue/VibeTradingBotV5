@@ -46,6 +46,36 @@ final class Prologue {
      * @return тенант, счёт, определение и сделка пролога
      */
     static Tenancy walk(Trail trail, String token) {
+        Tenancy tenancy = walkToOpenDeal(trail, token);
+        trail.entrySubmitted();
+        trail.relayCore();
+        trail.exchangeFillsEntry();
+        trail.passUntil("пролог: налив наблюдён", () -> isFalse(trail.database(Party.TRADING_CORE)
+                .query("select id from orders where external_status = 'filled'").isEmpty()));
+        trail.relayCore();
+        trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
+        Trail.await("пролог: строка суток сложена с решением о заявке", () -> isFalse(trail
+                .database(Party.STATISTICS)
+                .query("select id from incident_aggregates where tenant_id = ? and bucket_date = ?"
+                        + " and order_decisions = 1", tenancy.tenant(), LocalDate.now(ZoneOffset.UTC)).isEmpty()));
+        trail.statisticsRecomputes(NEVER);
+        return tenancy;
+    }
+
+    /**
+     * Проходит пролог до заведённой сделки, чья входная заявка ещё не решена:
+     * факт открытия опубликован, а следующий проход по сделке решает заявку.
+     *
+     * <p><b>Это единственная точка пролога, где проход ядра решает заявку</b> —
+     * у налитой сделки таких шагов нет: сопровождение эталона ставит только
+     * условные заявки, а факт решения пишет лишь создание заявки. Поэтому
+     * группа, чей вход — факт ядра, начинает здесь.
+     *
+     * @param trail тропа периметра
+     * @param token браузерный токен субъекта
+     * @return тенант, счёт, определение и сделка без решённой заявки
+     */
+    static Tenancy walkToOpenDeal(Trail trail, String token) {
         Answer context = trail.callWith(token, Party.BFF, "GET", CONTEXT, null, null);
         require(context, 200, "контекст субъекта");
         String tenant = String.valueOf(Json.object(context.body()).get("tenantId"));
@@ -67,18 +97,7 @@ final class Prologue {
         trail.commonPreconditions();
         String definition = trail.activeDefinition();
         String deal = trail.openDeal();
-        trail.entrySubmitted();
         trail.relayCore();
-        trail.exchangeFillsEntry();
-        trail.passUntil("пролог: налив наблюдён", () -> isFalse(trail.database(Party.TRADING_CORE)
-                .query("select id from orders where external_status = 'filled'").isEmpty()));
-        trail.relayCore();
-        trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
-        Trail.await("пролог: строка суток сложена с решением о заявке", () -> isFalse(trail
-                .database(Party.STATISTICS)
-                .query("select id from incident_aggregates where tenant_id = ? and bucket_date = ?"
-                        + " and order_decisions = 1", tenant, LocalDate.now(ZoneOffset.UTC)).isEmpty()));
-        trail.statisticsRecomputes(NEVER);
         return new Tenancy(tenant, account, definition, deal);
     }
 
