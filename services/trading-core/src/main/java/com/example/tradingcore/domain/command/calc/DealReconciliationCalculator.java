@@ -5,6 +5,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotFalse;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -75,6 +76,21 @@ public class DealReconciliationCalculator {
     public Boolean rungRequested(DealContext dealContext, Deal.ReconciliationStatus status) {
         return Deal.ReconciliationStatus.MISMATCHED.equals(status)
                 && isFalse(contourOf(dealContext).getReconciliationExploratory());
+    }
+
+    /**
+     * Расхождение сверх допуска в разведочном режиме: отчёт без ступени.
+     * Расхождение и тут должно быть видно не одной колонкой сделки —
+     * разведочный режим заведён ради разбора
+     * (docs/rules/pnl-reconciliation.md §«Реакция на расхождение»).
+     *
+     * <p><b>Дополнение к ступени, а не соседний предикат:</b> пустой режим
+     * ступени не просит, значит просит отчёта — на расхождении срабатывает
+     * ровно одна из двух реакций.
+     */
+    public Boolean journalOnlyRequested(DealContext dealContext, Deal.ReconciliationStatus status) {
+        return Deal.ReconciliationStatus.MISMATCHED.equals(status)
+                && isNotFalse(contourOf(dealContext).getReconciliationExploratory());
     }
 
     private ExchangeContourProperties.Contour contourOf(DealContext dealContext) {

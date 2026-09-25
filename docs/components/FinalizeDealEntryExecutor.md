@@ -7,7 +7,9 @@
 ## Назначение
 
 Получает `FINALIZE_DEAL_ENTRY_COMMAND` — консолидацию результата входа
-после того, как entry order финализирован и позиция подтверждена;
+после того, как entry order финализирован (налив окончателен и непуст —
+`docs/spec/deal-condition.json`, величина `entryOrderFinalized`) и позиция
+подтверждена;
 единственное звено системного действия **`FINALIZE_DEAL_ENTRY_ACTION`**
 (`docs/components/SystemActionExecutor.md`). **Читает** подтверждённые
 факты входа (entry `Order` финализирован; `Position` активна и

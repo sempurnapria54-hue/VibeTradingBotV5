@@ -67,8 +67,10 @@ public class TrancheEntrySubmittedHandler implements DealTrancheHandler {
         // сворачиванием сделки живую входную ногу снимает дочистка обработчика
         // выхода — тем же порядком «сначала нога, потом экспозиция»
         // (docs/rules/exit-teardown-order.md). Без него ногу не снимал бы никто.
+        // Налив снятой ноги тоже уводит в выход: прямой терминал — только у
+        // транша без живой ноги и без операций, иначе экспозиция ушла бы мимо выхода.
         if (isTrue(deal.isCollapsing())) {
-            return isTrue(tranche.hasLiveEntryOrder())
+            return isTrue(tranche.hasLiveEntryOrder()) || isTrue(tranche.hasEntryFill())
                     ? TrancheTransition.moveTo(DealTranche.Status.EXIT_PENDING)
                     : TrancheTransition.close(disposition.inheritedCloseReason(deal));
         }
@@ -151,8 +153,13 @@ public class TrancheEntrySubmittedHandler implements DealTrancheHandler {
                 && isFalse(tranche.hasLiveEntryOrder());
     }
 
-    /** Входная нога налита целиком, и живой эпизод по сделке есть. */
+    /**
+     * Налив входной ноги окончателен — она налита целиком либо снята после
+     * частичного налива, — и живой эпизод по сделке есть. Снятая частично
+     * налитая нога входом с окончательным размером и является: иначе транш
+     * добывал бы её каждым проходом бессрочно.
+     */
     private Boolean entryConfirmed(Order entry, Deal deal) {
-        return isTrue(entry.isFilled()) && isTrue(deal.hasLivePositionRisk());
+        return isTrue(entry.hasFinalFill()) && isTrue(deal.hasLivePositionRisk());
     }
 }

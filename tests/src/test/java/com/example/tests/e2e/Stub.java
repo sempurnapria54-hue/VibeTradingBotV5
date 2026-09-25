@@ -80,6 +80,47 @@ public final class Stub {
     }
 
     /**
+     * Отвечает на {@code GET} по пути телом JSON, собранным шаблоном: момент
+     * ответа площадки ставится моментом запроса, и постоянное тело состарилось
+     * бы за время тропы.
+     *
+     * @param path     путь
+     * @param template тело с выражениями шаблонизатора WireMock
+     */
+    public void answersTemplated(String path, String template) {
+        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path))
+                .willReturn(WireMock.okJson(template).withTransformers("response-template")));
+    }
+
+    /**
+     * Отвечает на {@code POST} по пути телом JSON, собранным шаблоном по
+     * запросу: площадка эхом возвращает клиентский идентификатор команды, и
+     * постоянное тело эха не дало бы.
+     *
+     * @param path     путь
+     * @param template тело с выражениями шаблонизатора WireMock
+     */
+    public void answersPostTemplated(String path, String template) {
+        server.stubFor(WireMock.post(WireMock.urlPathEqualTo(path))
+                .willReturn(WireMock.okJson(template).withTransformers("response-template")));
+    }
+
+    /**
+     * На первый {@code POST} по пути рвёт соединение, дальше отвечает прежним
+     * ответом пути: команда, не дошедшая до ответа, после которой площадка
+     * жива.
+     *
+     * @param path путь
+     */
+    public void failsPostTransportOnce(String path) {
+        server.stubFor(WireMock.post(WireMock.urlPathEqualTo(path))
+                .inScenario("post " + path)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+                .willSetStateTo(ANSWERING));
+    }
+
+    /**
      * На первое обращение по пути — любым глаголом — рвёт соединение, на
      * следующие отвечает телом: отказ транспорта, после которого сосед жив.
      *

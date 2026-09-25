@@ -47,8 +47,13 @@ import org.springframework.stereotype.Service;
  * <p><b>Пересчёт запрещён на неполном графе, и это обязанность каждого
  * писателя.</b> На неполном графе заявленный риск вышел бы заниженным, то
  * есть ослабил бы кумулятивный потолок — ошибка в разрешающую сторону.
- * Признак читается ГОТОВЫМ с контекста прохода и не пересобирается: иначе
- * каждый писатель обязан был бы знать объём загрузки.
+ *
+ * <p><b>Граф полон при сборке ЛИБО стал полным правкой самого писателя.</b>
+ * Признак сборки снят до добычи, а добыча позиции и есть ход, который
+ * недостающий эпизод заводит: читай писатель только признак сборки, звено,
+ * дополнившее граф, отчитывалось бы «не завершено» и держало бы строку
+ * исполнения той же надобности до отката. Предикат при этом один — у
+ * модели сделки, — и знать объём загрузки писателю не нужно.
  */
 @Slf4j
 @Service
@@ -73,7 +78,7 @@ public class DealRiskNumbersService {
      */
     public Boolean recompute(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
-        if (isNotTrue(dealContext.getGraphComplete())) {
+        if (isNotTrue(dealContext.getGraphComplete()) && isNotTrue(deal.graphComplete())) {
             log.debug("Risk numbers not recomputed: deal graph incomplete dealId={}", deal.getId());
             return false;
         }

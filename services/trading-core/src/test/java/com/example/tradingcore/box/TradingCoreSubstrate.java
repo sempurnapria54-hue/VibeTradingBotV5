@@ -137,6 +137,26 @@ final class TradingCoreSubstrate {
      */
     static final String ANOMALY_ENABLED_KEY = "anomaly-job.enabled";
 
+    /**
+     * Ключ выключателя прохода сопровождения.
+     *
+     * <p>Тот же довод: выключатель есть ВХОД клетки {@code B5.15} — снятие
+     * риска обязано состояться и тогда, когда петля не бьётся вовсе.
+     */
+    static final String PASS_ENABLED_KEY = "deal-orchestrator.enabled";
+
+    /**
+     * Ключ режима допуска сверки у контура площадки.
+     *
+     * <p>Штатно режим разведочный; боевой — ВХОД клеток {@code B5.13} и
+     * {@code B5.7}: только в нём расхождение сверки запрашивает ступень.
+     */
+    static final String RECONCILIATION_EXPLORATORY_KEY =
+            "exchange-contour.exchanges.OKX.reconciliation-exploratory";
+
+    /** Ключ пола допуска сверки: его правит вторая половина клетки {@code B13.7}. */
+    static final String TOLERANCE_FLOOR_KEY = "pnl-reconciliation.floor";
+
     /** Ключ окна выборки контура у прохода проактивной детекции. */
     static final String CONTOUR_WINDOW_KEY = "anomaly-job.contour-window";
 

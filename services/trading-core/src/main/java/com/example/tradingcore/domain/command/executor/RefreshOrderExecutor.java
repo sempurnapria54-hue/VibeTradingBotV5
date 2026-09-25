@@ -33,6 +33,7 @@ import com.example.tradingcore.mapping.OrderMapper;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.OrderDataService;
 import com.example.tradingcore.util.Constants;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <pre>
  * цикл 1 — заявка: по идентификатору → ожидающие → история
- *          исчерпан ⇒ терминал «не найдена после добычи»
+ *          исчерпан ⇒ терминал «не найдена после добычи»; у неотправленной
+ *          ноги — «не дошла до площадки»
  * цикл 2 — материализованная встроенная защита, только у ТЕРМИНАЛЬНОГО
  *          родителя: живые условные по инструменту → разбор истории
  * </pre>
@@ -94,9 +96,14 @@ public class RefreshOrderExecutor implements CommandExecutor {
         RefreshOrderCommandPayload payload = (RefreshOrderCommandPayload) command.getPayload();
         Order order = target(payload.getOrderId(), dealContext);
         Order fetched = fetchOrFail(order, dealContext);
-        orderMapper.updateFromFetched(fetched, order);
-        applyStatus(order, fetched);
-        HoldSignal requestedRung = resolveAttached(order, fetched, dealContext);
+        HoldSignal requestedRung = null;
+        if (isNull(fetched)) {
+            order.toNotPlaced();
+        } else {
+            orderMapper.updateFromFetched(fetched, order);
+            applyStatus(order, fetched);
+            requestedRung = resolveAttached(order, fetched, dealContext);
+        }
         orderDataService.save(order);
         if (isFalse(dealRiskNumbersService.recompute(dealContext))) {
             return ServiceCommandExecutionResult.notCompleted(
@@ -126,6 +133,12 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * Цикл 1; исчерпан без находки — терминал и бросок. Пустой ответ
      * одного источника основанием не является
      * (docs/rules/controlled-exchange-exceptions.md).
+     *
+     * <p><b>Пусто — только у неотправленной ноги.</b> Исчерпанный цикл
+     * доказывает, что на площадке её нет, а пропавшей сущностью нога без
+     * подтверждённой отправки не является: терминал ей ставит вызывающий,
+     * биржевая ступень не поднимается (docs/lifecycles/Order.md
+     * §«Неотправленная нога, не найденная добычей»).
      */
     private Order fetchOrFail(Order order, DealContext dealContext) {
         Order fetched;
@@ -134,6 +147,9 @@ public class RefreshOrderExecutor implements CommandExecutor {
         } catch (ExternalStatusException e) {
             failWith(order, toCloseReason(e.getReasonCode()));
             throw e;
+        }
+        if (isNull(fetched) && isTrue(order.isNotSubmitted())) {
+            return null;
         }
         if (isNull(fetched)) {
             failWith(order, Order.CloseReason.MISSING_AFTER_REFRESH);
@@ -236,18 +252,23 @@ public class RefreshOrderExecutor implements CommandExecutor {
                 ? matchProtection(exchangeOperationsClient.getPendingMaterializedProtections(accountInternalId,
                         externalInstrumentId), attached.getInternalId())
                 : null;
-        ProtectionHistoryLeg leg = isNull(live) && searchCycle
-                ? findInHistory(attached.getInternalId(), accountInternalId, externalInstrumentId, tranche)
+        BigDecimal trancheExposure = isNull(tranche) ? null : tranche.exposure();
+        Boolean standaloneProtectionExists = nonNull(tranche) && isTrue(tranche.hasStandaloneProtection());
+        Boolean cancelIntentStanding = nonNull(attached.getCloseReason());
+        boolean analysisRuns = isNull(live) && searchCycle && isFalse(attachedStateResolver.coverageLost(
+                trancheExposure, standaloneProtectionExists, cancelIntentStanding));
+        ProtectionHistoryLeg leg = analysisRuns
+                ? findInHistory(attached.getInternalId(), accountInternalId, externalInstrumentId)
                 : null;
         AttachedProtectionFacts facts = AttachedProtectionFacts.builder()
                 .observed(isNull(live) ? parentBody : live)
                 .parentStatus(order.getStatus())
                 .parentAccumulatedFillSize(order.getAccumulatedFillSize())
                 .standaloneRecordFound(nonNull(live))
-                .trancheExposure(isNull(tranche) ? null : tranche.exposure())
-                .standaloneProtectionExists(nonNull(tranche) && isTrue(tranche.hasStandaloneProtection()))
+                .trancheExposure(trancheExposure)
+                .standaloneProtectionExists(standaloneProtectionExists)
                 .historyLegFound(leg)
-                .cancelIntentStanding(nonNull(attached.getCloseReason()))
+                .cancelIntentStanding(cancelIntentStanding)
                 .build();
         AttachedProtectionResolution resolution = attachedStateResolver.resolve(facts);
         applyResolution(attached, resolution);
@@ -281,16 +302,14 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * обрыв на первой нашедшей.
      *
      * <p>Разбор идёт только на ветви, где покрытие ещё может быть
-     * объяснено: если транш несёт живую экспозицию и отдельной защиты у
-     * него нет, вторая ступень терминализует защиту потерянной, и любой
-     * факт истории этого не меняет — опрашивать её значило бы платить
-     * источнику за ответ, на который решение не смотрит.
+     * объяснено: на ветви потерянного покрытия
+     * ({@link AttachedAlgoOrderStateResolver#coverageLost}) вторая ступень
+     * терминализует защиту потерянной, и любой факт истории этого не
+     * меняет — опрашивать её значило бы платить источнику за ответ, на
+     * который решение не смотрит.
      */
     private ProtectionHistoryLeg findInHistory(String internalId, String accountInternalId,
-                                               String externalInstrumentId, DealTranche tranche) {
-        if (analysisSkipped(tranche)) {
-            return null;
-        }
+                                               String externalInstrumentId) {
         for (ProtectionHistoryLeg leg : ProtectionHistoryLeg.values()) {
             if (nonNull(matchProtection(exchangeOperationsClient.getMaterializedProtectionHistory(
                     accountInternalId, externalInstrumentId, leg), internalId))) {
@@ -298,13 +317,6 @@ public class RefreshOrderExecutor implements CommandExecutor {
             }
         }
         return null;
-    }
-
-    /** Ветвь потерянного покрытия: разбор истории на ней не запускается. */
-    private boolean analysisSkipped(DealTranche tranche) {
-        return nonNull(tranche)
-                && tranche.exposure().signum() > 0
-                && isFalse(tranche.hasStandaloneProtection());
     }
 
     /** Транш заявки из графа прохода; пусто — заявка транша не несёт. */

@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -185,6 +186,21 @@ public class AnomalyReportService {
             return null;
         }
         return create(dealContext, signal, AnomalyReport.Status.COMPLETED, subjectExternalId, operands);
+    }
+
+    /**
+     * Тот же отчёт о происшествии, чей момент задан предметом, — СВОЕЙ
+     * транзакцией. Вызывающий — исполнитель ребра, чья транзакция ещё не
+     * закоммичена: отказ записи отчёта её не откатывает, а откат ребра не
+     * отменяет отчёта — факт, о котором он сообщает, записан раньше ребра.
+     * Повтор ребра второго отчёта не заводит: ключ предмета тот же.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AnomalyReport journalOnceApart(DealContext dealContext, HoldSignal signal, String subjectExternalId) {
+        if (isTrue(dataService.existsForSubject(signal.getCode(), subjectExternalId))) {
+            return null;
+        }
+        return create(dealContext, signal, AnomalyReport.Status.COMPLETED, subjectExternalId, Map.of());
     }
 
     /**

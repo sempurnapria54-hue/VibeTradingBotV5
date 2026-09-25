@@ -21,6 +21,12 @@ refresh/search/history. Если refresh/history показывает друго
 `docs/rules/ack-not-runtime-truth.md`); общая семантика `CANCEL_*` —
 `docs/components/ServiceCommandExecutor.md`.
 
+**Строка исполнения встаёт в `SUBMITTED` вместе с целью** — снимаемой
+заявкой. Следующая стадия действия — добыча исхода — идёт по цели строки
+(`docs/components/CancelAlgoOrderActionExecutor.md`); строка без цели
+отправила бы её по пустому идентификатору, и снятие не подтвердилось бы
+ничем.
+
 ## CancelAlgoOrderCommandPayload
 
 `algoOrderId`, `cancelReason`.

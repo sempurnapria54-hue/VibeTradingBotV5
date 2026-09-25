@@ -1,5 +1,6 @@
 package com.example.bff.unit.domain;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -265,9 +266,18 @@ class MembershipCacheTest {
         return (Map<String, Object>) ReflectionTestUtils.getField(cache, "entries");
     }
 
-    /** Дождаться момента: часов предмет операндом не принимает. */
+    /**
+     * Дождаться, пока момент СТРОГО пройдёт: часов предмет операндом не
+     * принимает.
+     *
+     * <p><b>Строго, а не «не раньше».</b> Срок записи — момент её постановки
+     * плюс длительность, а вытеснение берёт только записи, чей срок строго
+     * раньше текущего момента. Ожидание, вышедшее на самом моменте, на грубых
+     * часах отдаёт вытеснению тот же момент — и запись на границе
+     * остаётся: клетка краснела бы по разрешению часов, а не по предмету.
+     */
     private void waitPast(Instant moment) {
-        while (Instant.now().isBefore(moment)) {
+        while (isFalse(Instant.now().isAfter(moment))) {
             Thread.onSpinWait();
         }
     }

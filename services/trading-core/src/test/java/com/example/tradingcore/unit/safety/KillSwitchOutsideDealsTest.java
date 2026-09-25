@@ -20,6 +20,10 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.config.KillSwitchProperties;
+import com.example.tradingcore.domain.command.executor.CancelAlgoOrderExecutor;
+import com.example.tradingcore.domain.command.executor.CancelAttachedProtectionExecutor;
+import com.example.tradingcore.domain.command.executor.CancelOrderExecutor;
+import com.example.tradingcore.domain.command.executor.ClosePositionExecutor;
 import com.example.tradingcore.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.safety.KillSwitchExecutor;
@@ -61,7 +65,9 @@ class KillSwitchOutsideDealsTest {
     @BeforeEach
     void setUp() {
         executor = new KillSwitchExecutor(exchange, mock(ServiceCommandExecutor.class),
-                mock(DealContextService.class), accounts, instruments, properties);
+                mock(DealContextService.class), accounts, instruments, properties,
+                mock(CancelOrderExecutor.class), mock(ClosePositionExecutor.class),
+                mock(CancelAlgoOrderExecutor.class), mock(CancelAttachedProtectionExecutor.class));
         properties.setMaxTeardownAttempts(2);
         when(accounts.getRequiredById(ACCOUNT_ID)).thenReturn(account());
         when(instruments.findExternalIdsByIds(any())).thenReturn(new HashSet<>());

@@ -173,7 +173,7 @@ grep -rn 'CROSSED_ABOVE' docs/ --include=*.md --include=*.json
 | `NO_ACTIVE_DEAL` — ложь **с записью лога**, прочие неисполнимые формы — ложь без неё | `#evaluateRule`, ветвь `default` (единственная пишущая) и `#resolveScalar`, ветвь `default` (молчащая) | `docs/rules/strategy-condition-contract.md` §«Источник истины — объектная модель настроек» — что дома у типа нет |
 | порог хода читается **только** константным операндом | `#declaredPercents` | `docs/spec/deal-condition.json`, операнд `declaredPercents`, объявляет порог, но не форму его записи в правиле; форму объявляет контракт авторинга — находка F-1 |
 | ценовой операнд берёт единственный скаляр контекста при любом объявленном источнике | `#resolveScalar`, ветвь `PRICE`; поле `ConditionEvaluationContext.price` | `docs/models/domain/aggregate/Strategy.md` §Условия объявляет источник полем операнда — находка F-2. **Второго ДОКА у контекста оценки нет вовсе**: компонент-дока `ConditionEvaluationContext` в `docs/components/models/` не существует, хотя у соседа по артефакту (`CalculationContext.md`) он есть — пробел G7 |
-| селектор входной ноги транша: последняя не-reduce-only заявка **с идентификатором** | `DealTranche#entryOrder` | `docs/spec/deal-condition.json`, величина `entryOrderFinalized` и операнд `entryLegFilled`, объявляют предикат налива; селектор ноги — javadoc предиката и код |
+| селектор входной ноги транша: последняя не-reduce-only заявка **с идентификатором** | `DealTranche#entryOrder` | `docs/spec/deal-condition.json`, величина `entryOrderFinalized` и операнды `entryLegStatus`, `entryLegCloseReason`, `entryLegFillSize`, объявляют предикат налива; селектор ноги — javadoc предиката и код |
 
 **Девять предикатов фактов сделки и четыре величины фазы код не называют** —
 их строки удостоверяются спекой целиком: `positionOpened`, `noOpenPosition`,
@@ -449,6 +449,8 @@ grep -rn 'CROSSED_ABOVE' docs/ --include=*.md --include=*.json
 | U9.16 | встроенная защита есть, но её статус терминальный | `ATTACHED_STOP_LOSS_EXISTS` — ложь: предикат спрашивает **живую** защиту | там же | зелено 2026-09-19 |
 | U9.17 | отдельная защита жива, действующего уровня остановки убытка не несёт (тейк) | `MAIN_PROTECTION_EXISTS` — ложь: вопрос ровно в том, встала ли основная | `docs/spec/protection-coverage.json`, величина `carriesActiveStopLevel` | зелено 2026-09-19 |
 | U9.18 | оба типа правил, транша в контексте нет | оба ложны | `docs/rules/absent-value-semantics.md` | зелено 2026-09-19 |
+| U9.19 | тип правила `ENTRY_ORDER_FINALIZED`, входная нога `CANCELED` с наливом `2` | истина: снятая после частичного налива нога вход финализирует налитым объёмом | `docs/spec/deal-condition.json`, величина `entryOrderFinalized` | зелено 2026-09-25 (заход 168) |
+| U9.20 | тот же тип, та же нога, налив не добыт | ложь: пустота нулём не подменяется и финализацией не читается | там же, операнд `entryLegFillSize` | зелено 2026-09-25 (заход 168) |
 
 ## U10 — Пороги хода: знак, направление, граница
 

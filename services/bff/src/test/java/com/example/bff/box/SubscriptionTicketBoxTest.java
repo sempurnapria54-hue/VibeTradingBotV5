@@ -60,12 +60,12 @@ class SubscriptionTicketBoxTest extends SharedBffBox {
         String ticket = issuedTicket();
 
         try (Subscription stream = subscribe(ticket)) {
-            publishDealOpened(TENANT, "e-own-1");
-            publishDealOpened(SECOND_TENANT, "e-foreign");
+            publishDealOpened(tenant, "e-own-1");
+            publishDealOpened(secondTenant, "e-foreign");
             // Второе заведомо доезжающее событие — барьер: без него
             // «чужого факта нет» было бы зелено и у мёртвой раздачи
             // (.claude/tests/cases/bff.md §«Новая ось формы»).
-            publishDealOpened(TENANT, "e-own-2");
+            publishDealOpened(tenant, "e-own-2");
             stream.awaitFrames(2);
 
             assertThat(stream.carriesStream()).isTrue();
@@ -95,7 +95,7 @@ class SubscriptionTicketBoxTest extends SharedBffBox {
     @Test
     @DisplayName("B2.4 — Билет чужого секрета отвергается")
     void b2_4_aTicketOfAForeignSecretIsRejected() {
-        String foreign = Tickets.forge("another-replicas-secret", subject, TENANT,
+        String foreign = Tickets.forge("another-replicas-secret", subject, tenant,
                 Instant.now().plus(10, ChronoUnit.MINUTES));
 
         try (Subscription rejected = subscribe(foreign)) {
@@ -106,7 +106,7 @@ class SubscriptionTicketBoxTest extends SharedBffBox {
 
         // Обратная сторона того же свойства: билет, собранный НЕ этим
         // процессом, но ОБЩИМ секретом реплик, принимается.
-        String ofAnotherReplica = Tickets.forge(BffSubstrate.TICKET_SECRET, subject, TENANT,
+        String ofAnotherReplica = Tickets.forge(BffSubstrate.TICKET_SECRET, subject, tenant,
                 Instant.now().plus(10, ChronoUnit.MINUTES));
 
         try (Subscription accepted = openedStream(ofAnotherReplica, "e-of-another-replica")) {
@@ -120,7 +120,7 @@ class SubscriptionTicketBoxTest extends SharedBffBox {
     @DisplayName("B2.6 — Негодность наружу не различается")
     void b2_6_theKindOfInvalidityIsNotDistinguishableFromOutside() {
         authAnswersOneMembership();
-        String expired = Tickets.forge(BffSubstrate.TICKET_SECRET, subject, TENANT,
+        String expired = Tickets.forge(BffSubstrate.TICKET_SECRET, subject, tenant,
                 Instant.now().minus(1, ChronoUnit.MINUTES));
         String tampered = Tickets.tampered(issuedTicket());
 
@@ -160,7 +160,7 @@ class SubscriptionTicketBoxTest extends SharedBffBox {
     @Test
     @DisplayName("B2.9 — Роли билет не несёт")
     void b2_9_theTicketCarriesNoRole() {
-        authAnswers(Bodies.memberships(TENANT, "TRADER"));
+        authAnswers(Bodies.memberships(tenant, "TRADER"));
 
         List<String> fields = Tickets.fieldsOf(issuedTicket());
 
@@ -169,7 +169,7 @@ class SubscriptionTicketBoxTest extends SharedBffBox {
         // ушло находкой F-7 документа кейсов.
         assertThat(fields).hasSize(3);
         assertThat(fields.get(0)).isEqualTo(subject);
-        assertThat(fields.get(1)).isEqualTo(TENANT);
+        assertThat(fields.get(1)).isEqualTo(tenant);
         assertThat(Long.parseLong(fields.get(2))).isPositive();
         assertThat(fields).doesNotContain("TRADER");
     }

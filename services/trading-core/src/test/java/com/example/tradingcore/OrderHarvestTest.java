@@ -153,6 +153,38 @@ class OrderHarvestTest {
     }
 
     /**
+     * Исчерпанный цикл у НЕОТПРАВЛЕННОЙ ноги пропавшей её не делает: на
+     * площадке её не было, и терминал — «не дошла до площадки» без броска,
+     * то есть без биржевой ступени; встроенная защита уходит с ней, числа
+     * риска пересчитаны, исполнение доведено.
+     */
+    @Test
+    void exhaustedCycleWithdrawsAnUnsentOrderWithoutRaising() {
+        Order order = order(Order.Status.CREATED, null);
+        AttachedAlgoOrder protection = new AttachedAlgoOrder();
+        protection.setInternalId(PROTECTION_CLIENT_ID);
+        protection.setStatus(AttachedAlgoOrder.Status.CREATED);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(protection)));
+        Deal deal = dealWith(order);
+        DealActionState row = row();
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID)).thenReturn(null);
+        when(exchange.getPendingOrders(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+        when(exchange.getOrderHistory(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row, context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(result.getHoldSignals()).isEmpty();
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELED);
+        assertThat(order.getCloseReason()).isEqualTo(Order.CloseReason.NOT_PLACED);
+        assertThat(protection.getStatus()).isEqualTo(AttachedAlgoOrder.Status.CANCELED);
+        assertThat(protection.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.PARENT_ORDER_CANCELED);
+        assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.COMPLETED);
+        verify(riskNumbersService).recompute(any());
+    }
+
+    /**
      * Отказ резолва статуса приезжает броском ЧТЕНИЯ (словарь площадки
      * живёт у коннектора): сущность получает причину своей категории и
      * исключение уходит дальше нетронутым.
@@ -300,6 +332,59 @@ class OrderHarvestTest {
     }
 
     /**
+     * Живой риск транша без отдельной защиты и без нашего намерения снятия —
+     * покрытие потеряно: терминал сразу, и история не опрашивается вовсе.
+     */
+    @Test
+    void liveTrancheRiskWithoutAnIntentLosesTheProtectionWithoutAnalysis() {
+        Order order = order(Order.Status.COMPLETED, Order.CloseReason.FILLED);
+        AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.ACTIVE);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        order.setAccumulatedFillSize(new BigDecimal("1"));
+        Deal deal = dealWithLiveExposure(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.COMPLETED, "1"));
+        when(exchange.getPendingMaterializedProtections(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+
+        orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.ERROR);
+        assertThat(attached.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.PROTECTION_LOST);
+        verify(exchange, never()).getMaterializedProtectionHistory(any(), any(), any());
+    }
+
+    /**
+     * Защиту, которую сняли МЫ, пропавшей не читают, даже если экспозиция
+     * транша ещё стоит налитой — аварийное снятие закрыло позицию вне окна
+     * атрибуции. Её судьбу даёт разбор истории, а причина — стоящее
+     * намерение, write-once.
+     */
+    @Test
+    void aStandingKillSwitchIntentSendsTheProtectionToHistoryAnalysis() {
+        Order order = order(Order.Status.COMPLETED, Order.CloseReason.FILLED);
+        AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.ACTIVE);
+        attached.setCloseReason(AttachedAlgoOrder.CloseReason.KILL_SWITCH);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        order.setAccumulatedFillSize(new BigDecimal("1"));
+        Deal deal = dealWithLiveExposure(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.COMPLETED, "1"));
+        when(exchange.getPendingMaterializedProtections(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+        when(exchange.getMaterializedProtectionHistory(ACCOUNT, INSTRUMENT, ProtectionHistoryLeg.EFFECTIVE))
+                .thenReturn(List.of());
+        when(exchange.getMaterializedProtectionHistory(ACCOUNT, INSTRUMENT, ProtectionHistoryLeg.CANCELED))
+                .thenReturn(List.of(protection(null)));
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.CANCELED);
+        assertThat(attached.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.KILL_SWITCH);
+        assertThat(result.getHoldSignals()).isEmpty();
+    }
+
+    /**
      * Условная заявка: подтверждение прежнего статуса переходом не
      * является — граф переходов петель не содержит, а наблюдение живой
      * заявки идёт каждым тиком.
@@ -338,6 +423,31 @@ class OrderHarvestTest {
 
         assertThat(algoOrder.getStatus()).isEqualTo(AlgoOrder.Status.ERROR);
         assertThat(algoOrder.getCloseReason()).isEqualTo(AlgoOrder.CloseReason.MISSING_AFTER_REFRESH);
+    }
+
+    /**
+     * Неотправленная условная заявка, не найденная полным циклом, до площадки
+     * не дошла: терминал «не дошла до площадки» без броска и без ступени.
+     */
+    @Test
+    void anUnsentAlgoOrderMissingAfterTheFullCycleIsWithdrawnWithoutRaising() {
+        AlgoOrder algoOrder = algoOrder(AlgoOrder.Status.CREATED);
+        Deal deal = dealWithAlgo(algoOrder);
+        DealActionState row = row();
+        givenSaves();
+        when(exchange.getAlgoOrder(ACCOUNT, INSTRUMENT, null, ALGO_CLIENT_ID)).thenReturn(null);
+        when(exchange.getPendingAlgoOrders(ACCOUNT, INSTRUMENT, AlgoOrder.ConditionType.STOP_LOSS))
+                .thenReturn(List.of());
+        when(exchange.getAlgoOrderHistory(ACCOUNT, INSTRUMENT, AlgoOrder.ConditionType.STOP_LOSS, null))
+                .thenReturn(List.of());
+
+        ServiceCommandExecutionResult result = algoExecutor.execute(algoCommand(), row, context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(algoOrder.getStatus()).isEqualTo(AlgoOrder.Status.CANCELED);
+        assertThat(algoOrder.getCloseReason()).isEqualTo(AlgoOrder.CloseReason.NOT_PLACED);
+        assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.COMPLETED);
+        verify(riskNumbersService).recompute(any());
     }
 
     /**
@@ -426,6 +536,16 @@ class OrderHarvestTest {
         tranche.setOrders(new ArrayList<>(List.of(order)));
         tranche.setEntryFilled(new BigDecimal("1"));
         tranche.setProtectionClosed(new BigDecimal("1"));
+        return deal(tranche);
+    }
+
+    /** Транш с налитым входом и без закрытий: экспозиция положительна, отдельной защиты нет. */
+    private static Deal dealWithLiveExposure(Order order) {
+        DealTranche tranche = new DealTranche();
+        tranche.setId(TRANCHE_ID);
+        tranche.setDealId(DEAL_ID);
+        tranche.setOrders(new ArrayList<>(List.of(order)));
+        tranche.setEntryFilled(new BigDecimal("1"));
         return deal(tranche);
     }
 

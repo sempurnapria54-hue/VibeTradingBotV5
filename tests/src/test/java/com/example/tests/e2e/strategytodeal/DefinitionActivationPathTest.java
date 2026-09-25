@@ -32,13 +32,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * активация в той же теме иначе читалась бы как след кейса. След отбирается
  * идентичностью события либо определения, а не счётом строк таблицы.
  *
- * <p><b>Ассерты по копии у ядра стоят последними.</b> Кейсы группы красны
- * находкой {@code F6}: снимок несёт числовые ключи базы владельца, и копия
- * не заводится (.claude/work/backlog.md §«Снимок определения несёт числовые
- * ключи базы владельца, и копия у ядра не заводится»). Порядок ассертов
- * делает так, что красный прогон сперва проходит всё, что стык уже
- * держит, — владельца, тему, журнал и молчание прочих, — и падает ровно на
- * долге, а не раньше него.
+ * <p><b>Ассерты по копии у ядра стоят последними.</b> Пока снимок нёс
+ * числовые ключи базы владельца, копия не заводилась (находка {@code F6},
+ * закрыта кодом 2026-09-24); порядок ассертов сохранён — прогон сперва
+ * проходит всё, что стык держит у владельца, темы, журнала и молчания
+ * прочих, и только потом спрашивает копию.
  */
 @Tag("e2e")
 @DisplayName("E2 — Активация доезжает до копии у ядра")
@@ -70,7 +68,6 @@ class DefinitionActivationPathTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("E2.1 — Штатная активация: статус, outbox, публикация, копия, строка журнала")
     void e2_1_anOrdinaryActivationReachesTheCopyAndTheJournal() {
         trail.retireActiveDefinitions();
@@ -113,7 +110,6 @@ class DefinitionActivationPathTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("E2.2 — Имена конверта у публикатора и у обоих потребителей совпадают")
     void e2_2_envelopeNamesAgreeAcrossThePublisherAndBothConsumers() {
         trail.retireActiveDefinitions();
@@ -150,7 +146,6 @@ class DefinitionActivationPathTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("E2.3 — Повтор доставки: копия одна, строка журнала одна")
     void e2_3_aRedeliveryLeavesOneCopyAndOneJournalRow() {
         trail.retireActiveDefinitions();
@@ -183,7 +178,6 @@ class DefinitionActivationPathTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("E2.5 — Деактивация двигает только статус копии, дерево не переписывается")
     void e2_5_deactivationMovesOnlyTheCopyStatus() {
         trail.retireActiveDefinitions();
@@ -217,7 +211,6 @@ class DefinitionActivationPathTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("E2.6 — Факт о определении, копии которого у ядра не было, приём не роняет")
     void e2_6_aFactAboutAnUncopiedDefinitionDoesNotStopTheReception() {
         trail.retireActiveDefinitions();

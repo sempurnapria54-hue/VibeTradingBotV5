@@ -13,7 +13,6 @@
     "objectStatusBefore": "статус объекта блокировки до вызова; какие значения являются ступенью — зависит от радиуса (см. hardStanding / softStanding / onboardingStanding)",
     "objectInWorkingState": "объект в рабочем состоянии, то есть множество входа мягкой ступени выполнено; под стоящей ступенью — false",
     "nonTerminalDealWithLiveRiskOnScope": "на радиусе есть НЕтерминальная сделка с живым риском по предикату сделки (docs/lifecycles/Deal.md, §«Живой риск»; гейт riskProvenAbsent в docs/spec/deal-lifecycle.json)",
-    "terminalDealWithUnprovenRiskOnScope": "на радиусе есть ТЕРМИНАЛЬНАЯ сделка, у которой снятие риска не доказано тем же предикатом: каскад сворачивания увёл сделки в ERROR, а живая сущность на бирже могла остаться — ровно тропа неподтверждённого kill-switch",
     "onboardingIncomplete": "инструмент не завершил онбординг к моменту подъёма ступени (спецификация не синхронизирована либо свечи не догружены); на биржевом радиусе значения не имеет и всегда false",
     "consecutiveLossCountBefore": "ExchangeAccount.consecutiveLossCount до вызова; дом величины — docs/rules/loss-streak-halt.md"
   },
@@ -55,8 +54,8 @@
     },
     {
       "name": "liveRiskOnScope",
-      "note": "Выборка предусловия названа здесь и включает ТЕРМИНАЛЬНЫЕ сделки: к моменту вызова снятия каскад сворачивания уже увёл активные сделки радиуса в ERROR, и остаточный риск живёт после терминала (docs/lifecycles/Deal.md, §«Инварианты переходов»: живой риск после терминала — зона поиска нарушений). Выборка только по нетерминальным была бы пуста ровно на мотивирующей тропе, и энфорсер оказался бы декоративным. Полнота названа и ограничена: предикат покрывает 4 признака живого риска из 5; пятый — неизвестная живая сущность на бирже — операндом прохода не выражается по построению, его носитель инструмент-скоупный, биржевой формы у него нет (docs/lifecycles/Deal.md, §«У каждого признака свой носитель, и не все они — операнды прохода»).",
-      "expr": "nonTerminalDealWithLiveRiskOnScope || terminalDealWithUnprovenRiskOnScope"
+      "note": "Выборка предусловия — нетерминальные сделки радиуса целиком. Мотивирующая тропа — неподтверждённое снятие риска — держит сделку в ERROR, то есть в этой выборке: в аварийный терминал сделка уходит только по доказанному отсутствию риска. Терминальных выборка не берёт по построению: оба терминальных ребра гейтятся тем же предикатом riskProvenAbsent (docs/spec/deal-lifecycle.json), а терминальную сделку не ведёт ни одна тропа (docs/lifecycles/Deal.md, §«Инварианты переходов»), — терминальная сделка с недоказанным отсутствием риска недостижима. Полнота названа и ограничена: предикат покрывает 4 признака живого риска из 5; пятый — неизвестная живая сущность на бирже — операндом прохода не выражается по построению, его носитель инструмент-скоупный, биржевой формы у него нет (docs/lifecycles/Deal.md, §«У каждого признака свой носитель, и не все они — операнды прохода»).",
+      "expr": "nonTerminalDealWithLiveRiskOnScope"
     },
     {
       "name": "raiseRefused",
@@ -65,7 +64,7 @@
     },
     {
       "name": "clearanceRefused",
-      "note": "Отказ при запуске снятия, три основания. Недопустимая пара — как у постановки. Названа мягкая ступень, а стоит жёсткая — прыжка через ступень нет: прежде снимают сворачивание (docs/rules/exchange-hold.md, §«Снятие — вручную и только в HOLD»). Снятие сворачивания при непогашенном живом риске — предусловие машинное, а не заявляемое: реакция сворачивания best-effort по составу, kill-switch мог не подтвердиться, и снятие вернуло бы вход в торговлю поверх живого риска (разрешающая ошибка, П1 следствие 3). Отсюда клейм: пока на радиусе есть живой риск, сворачивание не снимается — носители клейма примеры отказа при живом риске нетерминальной сделки и при недоказанном снятии у терминальной.",
+      "note": "Отказ при запуске снятия, три основания. Недопустимая пара — как у постановки. Названа мягкая ступень, а стоит жёсткая — прыжка через ступень нет: прежде снимают сворачивание (docs/rules/exchange-hold.md, §«Снятие — вручную и только в HOLD»). Снятие сворачивания при непогашенном живом риске — предусловие машинное, а не заявляемое: реакция сворачивания best-effort по составу, kill-switch мог не подтвердиться, и снятие вернуло бы вход в торговлю поверх живого риска (разрешающая ошибка, П1 следствие 3). Отсюда клейм: пока на радиусе есть живой риск, сворачивание не снимается — носители клейма примеры отказа при живом риске нетерминальной сделки.",
       "expr": "isClear && (!validPair || (requestedClass != 'FULL' && hardStanding) || (requestedClass == 'FULL' && hardStanding && liveRiskOnScope))"
     },
     {
@@ -177,7 +176,6 @@
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -207,7 +205,6 @@
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 2
       },
@@ -236,7 +233,6 @@
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -262,7 +258,6 @@
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -287,7 +282,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": true,
         "consecutiveLossCountBefore": 0
       },
@@ -315,7 +309,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": true,
         "consecutiveLossCountBefore": 0
       },
@@ -342,7 +335,6 @@
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -371,7 +363,6 @@
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -396,7 +387,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 3
       },
@@ -423,7 +413,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -451,8 +440,7 @@
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
-        "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -479,8 +467,7 @@
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
-        "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -504,7 +491,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 4
       },
@@ -531,7 +517,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -559,7 +544,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -584,7 +568,6 @@
         "objectStatusBefore": "CLOSED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -609,7 +592,6 @@
         "objectStatusBefore": "ERROR",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -634,7 +616,6 @@
         "objectStatusBefore": "ENTRY_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -660,7 +641,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 3
       },
@@ -691,7 +671,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 3
       },
@@ -708,32 +687,6 @@
       }
     },
     {
-      "case": "снятие: каскад увёл сделки радиуса в терминал, но снятие риска не доказано — снятие отвергается тем же предусловием",
-      "state": {
-        "callOrigin": "HOLDER",
-        "standingRungRaisedManually": false,
-        "fullReactionRunningOnObject": false,
-        "operation": "CLEAR",
-        "requestedScope": "EXCHANGE_ACCOUNT",
-        "requestedClass": "FULL",
-        "objectStatusBefore": "TRADE_BLOCKED",
-        "objectInWorkingState": false,
-        "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": true,
-        "onboardingIncomplete": false,
-        "consecutiveLossCountBefore": 0
-      },
-      "expect": {
-        "liveRiskOnScope": true,
-        "clearanceRefused": true,
-        "launchRefused": true,
-        "clearanceApplied": false,
-        "clearanceTarget": null,
-        "statusAfter": "TRADE_BLOCKED",
-        "reportProduced": false
-      }
-    },
-    {
       "case": "снятие: мягкая биржевая ступень при погашенном риске возвращает рабочее состояние",
       "state": {
         "callOrigin": "HOLDER",
@@ -745,7 +698,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 5
       },
@@ -772,7 +724,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 3
       },
@@ -794,7 +745,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -818,7 +768,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 3
       },
@@ -843,7 +792,6 @@
         "objectStatusBefore": "ACTIVE",
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -867,7 +815,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -891,7 +838,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": true,
         "consecutiveLossCountBefore": 0
       },
@@ -915,7 +861,6 @@
         "objectStatusBefore": "ENTRY_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -939,7 +884,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -964,7 +908,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -986,8 +929,7 @@
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
-        "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -1013,7 +955,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -1036,8 +977,7 @@
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
-        "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -1062,8 +1002,7 @@
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
-        "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -1087,7 +1026,6 @@
         "standingRungRaisedManually": true,
         "fullReactionRunningOnObject": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 2
       },
@@ -1109,8 +1047,7 @@
         "objectInWorkingState": false,
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": true,
-        "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 3
       },
@@ -1138,7 +1075,6 @@
         "objectStatusBefore": "TRADE_BLOCKED",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },
@@ -1165,7 +1101,6 @@
         "objectStatusBefore": "HOLD",
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "terminalDealWithUnprovenRiskOnScope": false,
         "onboardingIncomplete": false,
         "consecutiveLossCountBefore": 0
       },

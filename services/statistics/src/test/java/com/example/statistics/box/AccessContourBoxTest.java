@@ -276,7 +276,7 @@ class AccessContourBoxTest extends SharedStatisticsBox {
     @Test
     @DisplayName("B11.5 — Съём рядов открыт, и это второе исключение")
     void theMetricsScrapeIsOpenAndThatIsTheSecondException() {
-        givenReceptionStateRows();
+        givenMeasuredLag();
         Facts.deal("E-11-5", TENANT, midnightDaysAgo(DAY));
         recompute();
 

@@ -235,6 +235,39 @@ class ReconciliationToleranceTest {
                 .isFalse();
     }
 
+    @Test
+    @DisplayName("U5.15 — исход «разошлась» в разведочном режиме: отчёт без ступени запрашивается")
+    void u5_15_aMismatchInExploratoryModeRequestsTheJournal() {
+        DealReconciliationCalculator exploratory =
+                new DealReconciliationCalculator(contourProperties(), workingTolerance());
+
+        assertThat(exploratory.journalOnlyRequested(liveContext(), Deal.ReconciliationStatus.MISMATCHED))
+                .as("разведочный режим заведён ради разбора: расхождение видно не одной колонкой сделки")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("U5.16 — исход «разошлась» в боевом режиме: отчёта без ступени нет — его заводит ступень")
+    void u5_16_aMismatchInLiveModeDoesNotRequestTheJournal() {
+        assertThat(liveMode().journalOnlyRequested(liveContext(), Deal.ReconciliationStatus.MISMATCHED))
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("U5.17 — пустой признак режима: отчёт запрашивается — ровно одна из двух реакций")
+    void u5_17_anEmptyExploratoryFlagRequestsTheJournal() {
+        ExchangeContourProperties properties = contourProperties();
+        properties.getExchanges().get(EXCHANGE).setReconciliationExploratory(null);
+        DealReconciliationCalculator calculator =
+                new DealReconciliationCalculator(properties, workingTolerance());
+
+        assertThat(calculator.journalOnlyRequested(liveContext(), Deal.ReconciliationStatus.MISMATCHED))
+                .as("ступени пустой режим не просит (U5.14), значит просит отчёта")
+                .isTrue();
+        assertThat(calculator.journalOnlyRequested(liveContext(), Deal.ReconciliationStatus.MATCHED))
+                .isFalse();
+    }
+
     /** Калькулятор с боевым (не разведочным) режимом допуска у контура площадки. */
     private static DealReconciliationCalculator liveMode() {
         ExchangeContourProperties properties = contourProperties();

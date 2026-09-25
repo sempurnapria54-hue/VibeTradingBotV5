@@ -216,7 +216,46 @@ class TrancheEntrySubmittedPassTest {
         assertThat(transition.hasObservations()).isFalse();
     }
 
+    @Test
+    @DisplayName("U18.15 — нога снята после частичного налива при живом эпизоде: команда звена консолидации")
+    void u18_15_aLegCancelledAfterAPartialFillIsConsolidated() {
+        harness.givenSystemCommand(SystemActionType.FINALIZE_DEAL_ENTRY_ACTION,
+                ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
+        givenFetches();
+        DealContext context = contextOf(Deal.Status.ACTIVE, partiallyFilledCancelledTranche());
+        context.getDeal().getPositions().add(livePosition("2"));
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(commandTypes(transition))
+                .containsExactly(ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
+        assertThat(transition.hasObservations()).isFalse();
+        assertThat(transition.movesStatus()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U18.16 — сделка сворачивается, нога снята после частичного налива: ребро в выход, не в терминал")
+    void u18_16_aCollapsingDealSendsAFilledTrancheToTheExit() {
+        DealContext context = contextOf(Deal.Status.EXIT_PENDING, partiallyFilledCancelledTranche());
+        context.getDeal().getPositions().add(livePosition("2"));
+        context.getDeal().setCloseReason(Deal.CloseReason.STOP_LOSS);
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.getNextStatus()).isEqualTo(DealTranche.Status.EXIT_PENDING);
+        assertThat(transition.getCloseReason()).isNull();
+    }
+
     // --- сборка ------------------------------------------------------------
+
+    /** Транш с входной ногой, снятой после частичного налива. */
+    private DealTranche partiallyFilledCancelledTranche() {
+        DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "2", "0");
+        Order leg = leg(30L, TRANCHE_ID, Order.Status.CANCELED, Boolean.FALSE, "2");
+        leg.setCloseReason(Order.CloseReason.CANCELED_BY_STRATEGY);
+        subject.getOrders().add(leg);
+        return subject;
+    }
 
     private void givenFetches() {
         harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);

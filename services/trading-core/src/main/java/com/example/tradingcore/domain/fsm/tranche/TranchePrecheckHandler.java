@@ -1,6 +1,7 @@
 package com.example.tradingcore.domain.fsm.tranche;
 
 import static java.util.Objects.isNull;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -94,6 +95,14 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
         TrancheTransition work = workPass.run(dealContext, tranche);
         if (isTrue(workPass.spoke(work))) {
             return exitCheck(work, tranche);
+        }
+        // Молчание при живой строке исполнения — не «условие ложно»: действие
+        // уже начато и ждёт отката повтора, а следующий проход его подберёт
+        // (docs/components/DealOrchestratorJob.md §«Цикл прохода»). Прочти его
+        // обработчик ложным условием — неотправленная нога несёт риск, и
+        // повторяемый отказ отправки уводил бы сделку в ошибку.
+        if (isNotEmpty(dealContext.liveStrategyActionStates(tranche))) {
+            return TrancheTransition.stay();
         }
         return conditionFalse(tranche);
     }

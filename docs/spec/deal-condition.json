@@ -8,7 +8,9 @@
     "marketPrice": "цена момента — последняя цена сделки инструмента. Пусто — операнд недоступен: площадка отказала либо цену никто не спрашивал",
     "dealDirection": "направление сделки: 'LONG' либо 'SHORT'",
     "declaredPercents": "порог в процентах, объявленный правилом шага. Знак положительный у обоих предикатов: убыточный порог объявляется величиной убытка, а не отрицательным числом",
-    "entryLegFilled": "входная нога транша исполнена целиком — статус завершён с причиной налива (docs/models/domain/core/Order.md)",
+    "entryLegStatus": "статус входной ноги транша (docs/lifecycles/Order.md). Пусто — входной ноги у транша нет",
+    "entryLegCloseReason": "причина закрытия входной ноги: завершённая нога налита целиком только с причиной налива (docs/models/domain/core/Order.md)",
+    "entryLegFillSize": "накопленный налив входной ноги. ПУСТО достижимо — налив не добыт — и нулём не подменяется: снятая нога с недобытым наливом вход не финализирует",
     "trancheHasAttachedProtection": "у транша есть живая ВСТРОЕННАЯ защита — защита внутри его входной заявки",
     "trancheHasStandaloneProtection": "у транша есть живая ОТДЕЛЬНАЯ защита, несущая действующий уровень остановки убытка (docs/spec/protection-coverage.json)"
   },
@@ -25,8 +27,8 @@
     },
     {
       "name": "entryOrderFinalized",
-      "note": "Предикат ENTRY_ORDER_FINALIZED: входная нога транша исполнена целиком. Частичный налив финализацией не является — экспозиция ещё меняется, и шаг, объявленный от завершённого входа, сработал бы на неокончательном размере.",
-      "expr": "entryLegFilled"
+      "note": "Предикат ENTRY_ORDER_FINALIZED: налив входной ноги транша окончателен и непуст — нога налита целиком либо снята после частичного налива. Финализирует ТЕРМИНАЛ ноги, а не полнота налива: живая частично налитая нога ещё меняет экспозицию, и шаг, объявленный от завершённого входа, сработал бы на неокончательном размере; у снятой налив окончателен, а материализованная встроенная защита стоит ровно на налитый объём (docs/lifecycles/Order.md). Тем же предикатом гейтится консолидация входа (docs/components/TrancheEntrySubmittedHandler.md): разведённые порознь, они оставили бы транш с такой ногой в одном из двух дефектов: он либо не консолидировался бы никогда, либо консолидировался бы, а шаги подтверждённого входа не срабатывали бы.",
+      "expr": "(entryLegStatus == 'COMPLETED' && entryLegCloseReason == 'FILLED') || (entryLegStatus == 'CANCELED' && notNull(?entryLegFillSize) && entryLegFillSize > 0)"
     },
     {
       "name": "attachedStopLossExists",
@@ -72,12 +74,37 @@
     },
     {
       "case": "входная нога налита целиком — вход финализирован",
-      "state": {"entryLegFilled": true},
+      "state": {"entryLegStatus": "COMPLETED", "entryLegCloseReason": "FILLED", "entryLegFillSize": 5},
       "expect": {"entryOrderFinalized": true}
     },
     {
-      "case": "входная нога налита не целиком — вход не финализирован",
-      "state": {"entryLegFilled": false},
+      "case": "входная нога жива и налита частично — вход не финализирован: экспозиция ещё меняется",
+      "state": {"entryLegStatus": "PARTIALLY_COMPLETED", "entryLegFillSize": 2},
+      "expect": {"entryOrderFinalized": false}
+    },
+    {
+      "case": "входная нога снята после частичного налива — вход финализирован налитым объёмом",
+      "state": {"entryLegStatus": "CANCELED", "entryLegCloseReason": "CANCELED_BY_STRATEGY", "entryLegFillSize": 2},
+      "expect": {"entryOrderFinalized": true}
+    },
+    {
+      "case": "входная нога снята без налива — вход не финализирован",
+      "state": {"entryLegStatus": "CANCELED", "entryLegCloseReason": "CANCELED_BY_STRATEGY", "entryLegFillSize": 0},
+      "expect": {"entryOrderFinalized": false}
+    },
+    {
+      "case": "входная нога снята, налив не добыт — пустота нулём не подменяется, но и финализацией не читается",
+      "state": {"entryLegStatus": "CANCELED", "entryLegCloseReason": "CANCELED_BY_STRATEGY", "entryLegFillSize": null},
+      "expect": {"entryOrderFinalized": false}
+    },
+    {
+      "case": "завершённая нога без причины налива — вход не финализирован: нужна пара «статус, причина»",
+      "state": {"entryLegStatus": "COMPLETED", "entryLegCloseReason": "CANCELED_BY_STRATEGY", "entryLegFillSize": 5},
+      "expect": {"entryOrderFinalized": false}
+    },
+    {
+      "case": "входной ноги нет — вход не финализирован",
+      "state": {"entryLegStatus": null},
       "expect": {"entryOrderFinalized": false}
     },
     {

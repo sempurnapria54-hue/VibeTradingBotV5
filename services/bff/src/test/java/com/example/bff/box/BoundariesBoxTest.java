@@ -57,7 +57,7 @@ class BoundariesBoxTest extends SharedBffBox {
         Long published = fullCycle("TB2");
         // Отказы каждого рода: доступа, по праву резолва, соседа.
         getAnonymously(CONTEXT);
-        authAnswers(Bodies.membershipsOf(TENANT, SECOND_TENANT));
+        authAnswers(Bodies.membershipsOf(tenant, secondTenant));
         getWith(CONTEXT, identity.tokenFor(secondSubject));
         owners.failsTransport(OwnerStub.AUDIT);
         get("/api/v1/audit/journal");

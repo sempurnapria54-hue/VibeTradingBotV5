@@ -84,7 +84,7 @@ public class AttachedAlgoOrder extends Auditable {
     private static final Set<Status> ACTIVE_LIKE_STATUSES = EnumSet.of(Status.PENDING, Status.ACTIVE);
 
     private static final Map<Status, Set<Status>> ALLOWED_TRANSITIONS = Map.of(
-            Status.CREATED, EnumSet.of(Status.PENDING, Status.ERROR),
+            Status.CREATED, EnumSet.of(Status.PENDING, Status.CANCELED, Status.ERROR),
             Status.PENDING, EnumSet.of(Status.ACTIVE, Status.CANCELED, Status.ERROR),
             Status.ACTIVE, EnumSet.of(Status.COMPLETED, Status.CANCELED, Status.ERROR));
 
@@ -224,8 +224,10 @@ public class AttachedAlgoOrder extends Auditable {
 
         /**
          * Родитель отменён ПРИ НУЛЕВОМ НАЛИВЕ — защита ушла вместе с ним.
-         * Производитель один: исполнитель добычи родителя на исходе
-         * CANCEL_BY_PARENT. Исполненный родитель этого исхода не даёт.
+         * Производитель один — исполнитель добычи родителя, тропы две: исход
+         * CANCEL_BY_PARENT и неотправленный родитель, не найденный полным
+         * циклом (намерение защиты снимается с ним из CREATED). Исполненный
+         * родитель этого исхода не даёт.
          */
         PARENT_ORDER_CANCELED,
 

@@ -44,30 +44,30 @@ class MembershipCacheExpiryBoxTest extends BffBox {
     @Test
     @DisplayName("B1.8 — Просроченная запись перечитывается у владельца")
     void b1_8_anExpiredEntryIsReReadFromTheOwner() {
-        authAnswers(Bodies.memberships(TENANT, ROLE));
+        authAnswers(Bodies.memberships(tenant, ROLE));
 
         Answer first = get(CONTEXT);
-        authAnswers(Bodies.memberships(SECOND_TENANT, ROLE));
+        authAnswers(Bodies.memberships(secondTenant, ROLE));
         pause();
         Answer second = get(CONTEXT);
 
-        assertThat(first.asObject()).containsEntry("tenantId", TENANT);
-        assertThat(second.asObject()).containsEntry("tenantId", SECOND_TENANT);
+        assertThat(first.asObject()).containsEntry("tenantId", tenant);
+        assertThat(second.asObject()).containsEntry("tenantId", secondTenant);
         assertThat(owners.requests(OwnerStub.AUTH, OwnerStub.MEMBERSHIPS_PATH)).hasSize(2);
     }
 
     @Test
     @DisplayName("B1.9 — Ключ кэша — субъект, и ошибка направлена в разрешающую сторону")
     void b1_9_theCacheKeyIsTheSubject() {
-        authAnswers(Bodies.memberships(TENANT, ROLE));
+        authAnswers(Bodies.memberships(tenant, ROLE));
 
         Answer first = get(CONTEXT);
         // Членство «отозвано» у владельца: запись кэша об этом ещё не знает.
         authAnswers(Bodies.noMemberships());
         Answer withAnotherToken = getWith(CONTEXT, identity.anotherTokenFor(subject));
 
-        assertThat(first.asObject()).containsEntry("tenantId", TENANT);
-        assertThat(withAnotherToken.asObject()).containsEntry("tenantId", TENANT);
+        assertThat(first.asObject()).containsEntry("tenantId", tenant);
+        assertThat(withAnotherToken.asObject()).containsEntry("tenantId", tenant);
         assertThat(owners.requests(OwnerStub.AUTH, OwnerStub.MEMBERSHIPS_PATH)).hasSize(1);
 
         // По истечении срока отзыв становится виден: ошибка кэша

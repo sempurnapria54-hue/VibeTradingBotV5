@@ -85,7 +85,9 @@ AlgoOrder.size → sz`). База доли — экспозиция **транш
 
 `ExternalNotFoundException` — только после полного цикла per-source
 (см. подразделы). Пустой `data=[]` одного endpoint — не финал. После
-полного цикла без находки → `AlgoOrder.ERROR` + `MISSING_AFTER_REFRESH`.
+полного цикла без находки → `AlgoOrder.ERROR` + `MISSING_AFTER_REFRESH`;
+у неотправленной заявки → `AlgoOrder.CANCELED` + `NOT_PLACED` без каскада
+(`docs/lifecycles/AlgoOrder.md`).
 
 ### Exchange invariant checks (общая идея)
 

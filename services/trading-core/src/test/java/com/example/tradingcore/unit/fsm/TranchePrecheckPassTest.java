@@ -9,17 +9,20 @@ import static com.example.tradingcore.unit.fsm.FsmFixture.leg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.livePosition;
 import static com.example.tradingcore.unit.fsm.FsmFixture.minutesAgo;
+import static com.example.tradingcore.unit.fsm.FsmFixture.strategyRow;
 import static com.example.tradingcore.unit.fsm.FsmFixture.tranche;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +70,26 @@ class TranchePrecheckPassTest {
 
         assertThat(transition.getDealErrorRequested()).isTrue();
         assertThat(transition.movesStatus()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U17.16 — блок молчит при живой строке исполнения: транш ждёт, ошибочной тропы нет")
+    void u17_16_aSilentBlockWithALiveExecutionRowWaits() {
+        DealTranche candidate = precheckTranche();
+        candidate.getOrders().add(leg(30L, TRANCHE_ID, Order.Status.CREATED, Boolean.FALSE, "0"));
+        DealContext context = contextBuilder(deal(Deal.Status.ACTIVE, candidate))
+                .balanceContainer(balance(minutesAgo(0)))
+                .actionStates(new ArrayList<>(List.of(
+                        strategyRow(5L, TRANCHE_ID, 1, DealActionStateStatus.RETRY_PENDING))))
+                .build();
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.getDealErrorRequested())
+                .as("неотправленная нога ждёт отката повтора — это не ложное условие входа")
+                .isNotEqualTo(Boolean.TRUE);
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.hasCommands()).isFalse();
     }
 
     @Test

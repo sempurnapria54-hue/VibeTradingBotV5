@@ -178,9 +178,12 @@ public class MarkDealClosedExecutor implements CommandExecutor {
             dealActionStateDataService.save(actionState);
         }
         List<HoldSignal> requested = new ArrayList<>();
-        if (isTrue(reconciliationCalculator.rungRequested(dealContext,
-                dealContext.getDeal().getReconciliationStatus()))) {
+        Deal.ReconciliationStatus reconciliation = dealContext.getDeal().getReconciliationStatus();
+        if (isTrue(reconciliationCalculator.rungRequested(dealContext, reconciliation))) {
             requested.add(HoldSignal.exchangeAccountSoft(Constants.Hold.PNL_RECONCILIATION_MISMATCH));
+        }
+        if (isTrue(reconciliationCalculator.journalOnlyRequested(dealContext, reconciliation))) {
+            journalExploratoryMismatch(dealContext);
         }
         if (isTrue(haltTriggered)) {
             requested.add(HoldSignal.exchangeAccountSoft(Constants.Hold.LOSS_STREAK_LIMIT_REACHED));
@@ -199,6 +202,23 @@ public class MarkDealClosedExecutor implements CommandExecutor {
     private Boolean terminalAllowed(Deal deal, Boolean graphComplete) {
         return isTrue(deal.allTranchesTerminal())
                 && isTrue(terminalGate.riskProvenAbsent(deal, deal.getTranches(), graphComplete));
+    }
+
+    /**
+     * Расхождение сверки в разведочном режиме — отчёт своим кодом, ступени
+     * нет (docs/rules/pnl-reconciliation.md §«Реакция на расхождение»).
+     * Отдельной транзакцией и один на сделку: терминал отчётом не
+     * блокируется, а повтор звена второго отчёта не заводит.
+     */
+    private void journalExploratoryMismatch(DealContext dealContext) {
+        Long dealId = dealContext.getDeal().getId();
+        try {
+            anomalyReportService.journalOnceApart(dealContext,
+                    HoldSignal.exchangeAccountJournal(Constants.Hold.PNL_RECONCILIATION_MISMATCH),
+                    Constants.Hold.PNL_RECONCILIATION_MISMATCH + ":" + dealId);
+        } catch (RuntimeException e) {
+            log.error("Journal {} failed dealId={}", Constants.Hold.PNL_RECONCILIATION_MISMATCH, dealId, e);
+        }
     }
 
     private Long anchorId(DealActionState actionState) {

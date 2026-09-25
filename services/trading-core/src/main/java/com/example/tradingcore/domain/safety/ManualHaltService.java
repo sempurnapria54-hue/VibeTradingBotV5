@@ -7,7 +7,6 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingcore.config.ManualHaltProperties;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.DealContextService;
@@ -17,6 +16,7 @@ import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.util.Constants;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -72,7 +72,6 @@ public class ManualHaltService {
     private final SafetyHoldCoordinator safetyHoldCoordinator;
     private final HoldService holdService;
     private final AnomalyReportService anomalyReportService;
-    private final ManualHaltProperties properties;
 
     /**
      * Постановка: поднять названную ступень названного радиуса.
@@ -322,6 +321,12 @@ public class ManualHaltService {
      * Живого риска на радиусе не осталось — предикат тот же, что гейтит
      * терминал сделки; своего поверхность не заводит.
      *
+     * <p><b>Выборка — нетерминальные сделки радиуса, и терминальных она не
+     * берёт по построению, а не по окну:</b> оба терминальных ребра гейтятся
+     * этим же предикатом, строк терминальной сделки не пишет ни одна тропа,
+     * а неподтверждённое снятие риска держит сделку в {@code ERROR} —
+     * то есть в этой выборке.
+     *
      * <p><b>Полнота названа и ограничена:</b> предикат покрывает четыре
      * признака живого риска из пяти; пятый — неизвестная живая сущность на
      * бирже — операндом прохода не выражается по построению, и его
@@ -329,9 +334,11 @@ public class ManualHaltService {
      * гейт терминала сделки.
      */
     private Boolean riskProvenAbsentOnScope(HoldScope scope, DealContext context) {
-        Long instrumentId = HoldScope.INSTRUMENT.equals(scope) ? context.getInstrument().getId() : null;
-        for (Deal deal : dealDataService.findRiskCandidatesOnScope(context.getExchangeAccount().getId(),
-                instrumentId, properties.getClearanceTerminalWindow())) {
+        Long exchangeAccountId = context.getExchangeAccount().getId();
+        List<Deal> deals = HoldScope.INSTRUMENT.equals(scope)
+                ? dealDataService.findNonTerminalOnPair(exchangeAccountId, context.getInstrument().getId())
+                : dealDataService.findNonTerminalByExchangeAccountId(exchangeAccountId);
+        for (Deal deal : deals) {
             DealContext dealContext = dealContextService.build(deal);
             if (isFalse(dealTerminalGate.riskProvenAbsent(deal, deal.getTranches(),
                     dealContext.getGraphComplete()))) {

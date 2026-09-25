@@ -1,15 +1,20 @@
 package com.example.tradingcore.box;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -48,7 +53,7 @@ import org.junit.jupiter.api.Test;
  * (.claude/tests/cases/trading-core.md §«Ожидание берётся из дома, даже
  * когда сегодня оно не исполнено»).
  */
-class DealRiskGateBoxTest extends SharedTradingCoreBox {
+class DealRiskGateBoxTest extends SharedLiveDealBox {
 
     /** Основа идентичности определения группы. */
     private static final String DEFINITION = "S-RISK";
@@ -83,6 +88,9 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
     /** Отсутствие ступени пары: рабочее состояние. */
     private static final String NO_PAIR_RUNG = "ACTIVE";
 
+    /** Код отказа преконтроля по незаданным числам риск-аппетита. */
+    private static final String APPETITE_NOT_CONFIGURED = "RISK_APPETITE_NOT_CONFIGURED";
+
     /** Мягкая ступень пары «счёт, инструмент». */
     private static final String ENTRY_BLOCKED = "ENTRY_BLOCKED";
 
@@ -105,6 +113,51 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
      * есть уровень на убыточной стороне, и то же действие исполняется.
      */
     private static final String SWING_LOW_BELOW_ANCHOR = "950";
+
+    /** Ключ действия добора на сопровождении. */
+    private static final String ADD_ON = "add-on";
+
+    /** Ключ уровня фиксации прибыли на сопровождении. */
+    private static final String TAKE_PROFIT = "take-profit";
+
+    /** Ключ первой отдельной защиты: её ставит первый шаг, снимает второй. */
+    private static final String FIRST_STOP = "first-stop";
+
+    /** Ключ снятия первой защиты во втором шаге. */
+    private static final String REMOVE_FIRST_STOP = "remove-first-stop";
+
+    /** Ключ второй отдельной защиты: она сменяет первую. */
+    private static final String SECOND_STOP = "second-stop";
+
+    /** Дистанция отдельной защиты, процент якоря: дальше встроенной. */
+    private static final String STOP_PERCENTS = "3";
+
+    /** Дистанция уровня фиксации прибыли, процент якоря. */
+    private static final String PROFIT_PERCENTS = "5";
+
+    /** Та же дистанция со знаком, уводящим уровень на убыточную сторону якоря. */
+    private static final String WRONG_SIDE_PROFIT_PERCENTS = "-5";
+
+    /**
+     * Множитель сделочного бюджета, при котором вход в него укладывается,
+     * а вход с добором — нет.
+     */
+    private static final String EXHAUSTED_BUDGET = "0.3";
+
+    /** Потолок проходов сопровождения, за который пакет из четырёх действий обязан исчерпаться. */
+    private static final Integer PACKAGE_PASS_LIMIT = 30;
+
+    /** Код блок-сета стоящей ступени. */
+    private static final String SAFETY_HOLD_CODE = "INSTRUMENT_SAFETY_HOLD";
+
+    /** След реакции преконтроля: блок-сет ступени, действие пропущено. */
+    private static final String SAFETY_HOLD_SKIPPED = "type=SKIP_ACTION code=" + SAFETY_HOLD_CODE;
+
+    /** След реакции преконтроля: исчерпанный бюджет сделки, действие пропущено. */
+    private static final String CUMULATIVE_SKIPPED = "type=SKIP_ACTION code=RISK_PER_DEAL_CUMULATIVE_EXCEEDED";
+
+    /** След реакции преконтроля: код вне карв-аута при живом риске — увод в ошибку. */
+    private static final String WRONG_SIDE_ESCALATED = "type=MOVE_DEAL_TO_ERROR code=TAKE_PROFIT_INVALID_SIDE";
 
     @Test
     @DisplayName("B4.1 — преконтроль спрашивается у создающего риск действия")
@@ -153,6 +206,35 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
 
         assertThat(rows.count("orders")).isZero();
         assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B4.2 — преконтроль не спрашивается у добычи, выхода, дочистки и safety")
+    void thePrecheckIsNotAskedOnTheExitPath() {
+        openLiveDeal();
+        // Числа риск-аппетита сняты ПОСЛЕ входа: пустая строка чисел есть
+        // отказ всякого действия, которое преконтроль спрашивает, и выход
+        // проходит ровно тогда, когда его не спрашивают.
+        assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("null", "null", "null")).status())
+                .isEqualTo(200);
+        standExchangeFollowingCommands("-5");
+        Integer mark = AppLog.mark();
+
+        exitByDeletion(workingDefinition());
+        passesUntilDealTerminal();
+
+        // Выход исполнен целиком: позиция закрыта, защита снята, сделка в
+        // штатном терминале.
+        assertThat(connector.requests(closurePath(ACCOUNT))).hasSize(1);
+        assertThat(connector.requests(attachedCancellationPath(ACCOUNT))).hasSize(1);
+        assertThat(dealStatus()).isEqualTo("CLOSED");
+        // Отказа по незаданным числам на этой тропе нет ни в одном
+        // носителе: ни в строках исполнения, ни в журнале происшествий, ни
+        // в журнале приложения.
+        assertThat(rows.all("deal_strategy_action_states").toString()).doesNotContain(APPETITE_NOT_CONFIGURED);
+        assertThat(rows.all("deal_system_action_states").toString()).doesNotContain(APPETITE_NOT_CONFIGURED);
+        assertThat(rows.count("anomaly_reports")).isZero();
+        assertThat(AppLog.since(mark)).doesNotContain(APPETITE_NOT_CONFIGURED);
     }
 
     @Test
@@ -206,6 +288,34 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
         assertThat(dealStatus()).isEqualTo("CLOSED");
         assertThat(dealRow().get("result_profit")).isNotNull();
         assertThat(new BigDecimal(String.valueOf(dealRow().get("result_profit"))).signum()).isZero();
+    }
+
+    @Test
+    @DisplayName("B4.8 — неполный граф — не вердикт риск-политики")
+    void theIncompleteGraphIsNotARiskPolicyVerdict() {
+        // Определение — то же, что у B4.4: на полном графе его вход даёт
+        // бессрочный вердикт и терминал транша с причиной RISK_CONTROL.
+        // Разница с B4.4 одна — граф, и потому клетка различает «риск не
+        // позволил» от «контекст не загрузился» на единственной стадии, где
+        // схема реакции вообще ставит эту причину.
+        assignRiskAppetite();
+        openGatedDeal(tightStopDefinition());
+        // Граф неполон по конъюнкту ног: нижняя граница окна линковки
+        // движений стоит, а ни одной ноги у сделки нет
+        // (docs/spec/deal-context-load.json, graphComplete). Сочетание
+        // ПРЯМОЙ записью, и довод в том, что писателя у него нет: граница
+        // пишется наблюдением ноги, а ноги сервис не удаляет — неполнота
+        // графа есть отказ предъявления, а не состояние, которое тропа
+        // производит.
+        rows.put("update deals set bills_window_begin = now()");
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        assertThat(dealStatus()).isEqualTo("ERROR");
+        assertThat(trancheRow().get("close_reason")).isNotEqualTo("RISK_CONTROL");
+        assertThat(trancheStatus()).isNotEqualTo("CLOSED");
+        assertThat(rows.count("orders")).isZero();
+        assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
     }
 
     @Test
@@ -360,6 +470,180 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
         assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
     }
 
+    @Test
+    @DisplayName("B4.6 — код карв-аута на стадии с живым риском в аварию не уводит")
+    void theCarveOutCodeWithLiveRiskDoesNotLeadToTheEmergency() {
+        Strategy definition = Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT, PHASE,
+                List.of(Definitions.managingStep(StrategyStepType.GRID_ENTRY, Definitions.addOnEntry(ADD_ON))));
+        // Бюджет сделки ЗАНИЖЕН так, что вход в него укладывается, а добор
+        // — уже нет: риск акта входа около 210 при потолке 1000 × 0.3 = 300,
+        // вход с добором — около 420. Прочие потолки остаются штатными, и
+        // вердикт несёт ровно один код.
+        definition.getDetails().getFirst().setCumulativeRiskPerDealMultiplier(new BigDecimal(EXHAUSTED_BUDGET));
+        openLiveDeal(definition);
+        Integer mark = AppLog.mark();
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+        Integer refusalsAfterFirst = occurrences(AppLog.since(mark), CUMULATIVE_SKIPPED);
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        // Действие отвергнуто кодом исчерпанного бюджета сделки, реакция —
+        // пропуск действия, а не увод в ошибку.
+        assertThat(refusalsAfterFirst).isEqualTo(1);
+        // Следующий тик пробует снова: отказ повторился, а не погас.
+        assertThat(occurrences(AppLog.since(mark), CUMULATIVE_SKIPPED)).isEqualTo(2);
+        // Действие не исполнено: второй ноги нет, к площадке не ушло ничего.
+        assertThat(ordersOfDeal()).hasSize(1);
+        assertThat(commandCalls()).isEmpty();
+        // Сделка и транш в своих статусах, живой риск не снимался, ступеней
+        // не поднято ни одного радиуса.
+        assertThat(dealStatus()).isEqualTo("ACTIVE");
+        assertThat(trancheStatus()).isEqualTo("MANAGING");
+        assertThat(accountRung()).isEqualTo(NO_ACCOUNT_RUNG);
+        assertThat(pairRung()).isEqualTo(NO_PAIR_RUNG);
+    }
+
+    @Test
+    @DisplayName("B4.7 — код вне карв-аута на стадии с живым риском уводит сделку в ошибку")
+    void theCodeOutsideTheCarveOutWithLiveRiskLeadsToError() {
+        // Код рассогласования учёта средств (BALANCE_INVALID) на стадии с
+        // живым риском недостижим: база риска заморожена на сделке при
+        // входе (DealContext#riskBase). Предмет клетки — реакция на код ВНЕ
+        // карв-аута, и она у всех таких кодов одна; вход — уровень фиксации
+        // прибыли на убыточной стороне якоря.
+        openLiveDeal(Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT, PHASE,
+                List.of(Definitions.managingStep(StrategyStepType.PARTIAL_EXIT,
+                        Definitions.takeProfitAlgo(TAKE_PROFIT, WRONG_SIDE_PROFIT_PERCENTS)))));
+        Integer mark = AppLog.mark();
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        assertThat(AppLog.since(mark)).contains(WRONG_SIDE_ESCALATED);
+        // Сделка — в ошибке, и причина остановки ПУСТА: ребро решением
+        // обработчика её не пишет.
+        assertThat(dealStatus()).isEqualTo("ERROR");
+        assertThat(dealRow().get("shutdown_reason")).isNull();
+        // Действие не исполнено: условной заявки у площадки не ставилось.
+        assertThat(connector.requests(algoPlacementPath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B4.10 (добор) — стоящая мягкая ступень пары блокирует создание риска")
+    void theStandingPairRungBlocksTheAddOn() {
+        openLiveDeal(Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT, PHASE,
+                        List.of(Definitions.managingStep(StrategyStepType.GRID_ENTRY,
+                                Definitions.addOnEntry(ADD_ON)))),
+                this::standPairEntryBlock);
+        Integer mark = AppLog.mark();
+
+        ticks(Tick.DEAL_ORCHESTRATOR, 2);
+
+        // Добор отвергнут кодом стоящей ступени пары, и реакция — пропуск
+        // действия: сделка остаётся в статусе.
+        assertThat(AppLog.since(mark)).contains(SAFETY_HOLD_SKIPPED);
+        assertThat(ordersOfDeal()).hasSize(1);
+        assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
+        assertThat(dealStatus()).isEqualTo("ACTIVE");
+        assertThat(trancheStatus()).isEqualTo("MANAGING");
+        assertThat(pairRung()).isEqualTo(ENTRY_BLOCKED);
+    }
+
+    @Test
+    @DisplayName("B4.10 (фиксация прибыли) — стоящая мягкая ступень пары фиксации прибыли не блокирует")
+    void theStandingPairRungDoesNotBlockTheTakeProfit() {
+        openLiveDeal(Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT, PHASE,
+                        List.of(Definitions.managingStep(StrategyStepType.PARTIAL_EXIT,
+                                Definitions.takeProfitAlgo(TAKE_PROFIT, PROFIT_PERCENTS)))),
+                this::standPairEntryBlock);
+        standAlgoOrdersFollowingCommands(1);
+        Integer mark = AppLog.mark();
+
+        passesUntil(() -> connector.count(algoPlacementPath(ACCOUNT)) > 0);
+
+        // Постановка уровня фиксации прибыли прошла: риска она не создаёт и
+        // контроля не ослабляет, и блок-сет мягкой ступени её не накрывает.
+        assertThat(algoOrdersOfDeal()).hasSize(1);
+        assertThat(algoOrdersOfDeal().getFirst().get("condition_type")).isEqualTo("TAKE_PROFIT");
+        assertThat(AppLog.since(mark)).doesNotContain(SAFETY_HOLD_CODE);
+        assertThat(pairRung()).isEqualTo(ENTRY_BLOCKED);
+        assertThat(dealStatus()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("B4.12 — за проход исполняется одно действие пакета шага")
+    void onePackageActionRunsPerPass() {
+        List<List<String>> commandsByPass = runTwoStepPackage();
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+        ticks(Tick.DEAL_ORCHESTRATOR, 2);
+
+        // На каждом проходе к площадке уходит не больше ОДНОЙ команды.
+        assertThat(commandsByPass).allMatch(commands -> commands.size() <= 1);
+        // Порядок: три постановки, снятие — последним, хотя объявлено
+        // первым; устанавливающие защиту идут раньше снимающих.
+        assertThat(commandsByPass.stream().flatMap(List::stream).toList()).containsExactly(
+                algoPlacementPath(ACCOUNT), algoPlacementPath(ACCOUNT), algoPlacementPath(ACCOUNT),
+                algoCancellationPath(ACCOUNT));
+        List<Map<String, Object>> algos = algoOrdersOfDeal();
+        assertThat(algos).extracting(row -> row.get("condition_type"))
+                .containsExactly("STOP_LOSS", "STOP_LOSS", "TAKE_PROFIT");
+        // Снимающее адресовало ПЕРВУЮ защиту, а вторая им не тронута: оно
+        // ушло после устанавливающего, и окна без защиты не было.
+        assertThat(algos.getFirst().get("close_reason")).isEqualTo("CANCELED_BY_STRATEGY");
+        assertThat(algos.get(1).get("close_reason")).isNull();
+        // После третьего действия второго шага команд нет.
+        assertThat(commandCalls()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B4.12 (исчерпание) — после третьего действия пакет исчерпан")
+    void thePackageIsExhaustedAfterItsThirdAction() {
+        runTwoStepPackage();
+        ticks(Tick.DEAL_ORCHESTRATOR, 2);
+
+        // Пакет исчерпан — каждое его действие доведено до завершения, и
+        // снятая защита подтверждена снятой фактом площадки
+        // (docs/rules/ack-not-runtime-truth.md).
+        assertThat(packageExhausted())
+                .as("B4.12: пакет не исчерпан; строки исполнения %s", strategyActionStates())
+                .isTrue();
+        assertThat(algoOrdersOfDeal().getFirst().get("status")).isEqualTo("CANCELED");
+    }
+
+    /**
+     * Живая сделка с пакетом шага сопровождения и проходы до его снимающего
+     * действия.
+     *
+     * <p>Первый шаг ставит защиту, которую снимает второй; второй несёт три
+     * исполнимых действия, и снимающее объявлено ПЕРВЫМ — иначе порядок
+     * исполнения совпадал бы с порядком объявления, и клетка не отличала бы
+     * упорядочивание от его отсутствия.
+     *
+     * @return команды площадке, ушедшие на каждом проходе, по проходам
+     */
+    private List<List<String>> runTwoStepPackage() {
+        openLiveDeal(Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT, PHASE, List.of(
+                Definitions.managingStep(StrategyStepType.MAIN_PROTECTION,
+                        Definitions.stopLossAlgo(FIRST_STOP, STOP_PERCENTS)),
+                Definitions.managingStep(StrategyStepType.PROTECTION_ADJUSTMENT,
+                        Definitions.cancelStopLossAlgo(REMOVE_FIRST_STOP, FIRST_STOP),
+                        Definitions.stopLossAlgo(SECOND_STOP, STOP_PERCENTS),
+                        Definitions.takeProfitAlgo(TAKE_PROFIT, PROFIT_PERCENTS)))));
+        standAlgoOrdersFollowingCommands(3);
+        List<List<String>> commandsByPass = new ArrayList<>();
+        for (int pass = 0; pass < PACKAGE_PASS_LIMIT && isFalse(cancellationSent(commandsByPass)); pass++) {
+            PeerStub.all().forEach(PeerStub::forgetRequests);
+            tick(Tick.DEAL_ORCHESTRATOR);
+            commandsByPass.add(commandCalls());
+        }
+        return commandsByPass;
+    }
+
+    /** Ушла ли уже команда снятия условной заявки. */
+    private Boolean cancellationSent(List<List<String>> commandsByPass) {
+        return commandsByPass.stream().flatMap(List::stream)
+                .anyMatch(path -> Objects.equals(algoCancellationPath(ACCOUNT), path));
+    }
+
     // ------------------------------------------------------------------
     // Предусловия группы
     // ------------------------------------------------------------------
@@ -375,11 +659,6 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
 
     /** Снимок средств старше толерантности прохода. */
     private static final Boolean STALE_BALANCE = Boolean.FALSE;
-
-    /** Определение, чей вход доходит до преконтроля и им разрешается. */
-    private Strategy workingDefinition() {
-        return Definitions.withEntryCommandOnPhase(DEFINITION, ACCOUNT, INSTRUMENT, PHASE);
-    }
 
     /** Определение, чей стоп стои́т ближе round-trip комиссии. */
     private Strategy tightStopDefinition() {
@@ -451,42 +730,26 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
         return Boolean.TRUE.equals(fresh) ? now : now.minus(STALE_BALANCE_AGE);
     }
 
-    /** Числа риск-аппетита тенанта: операнды преконтроля, своей поверхностью. */
-    private void assignRiskAppetite() {
-        assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("5", "10", "4")).status())
-                .isEqualTo(200);
+    /** Ставит мягкую ступень пары ручной поверхностью. */
+    private void standPairEntryBlock() {
+        assertThat(post(HALTS, Bodies.halt("SOFT", ACCOUNT, INSTRUMENT)).status()).isEqualTo(204);
     }
 
-    /** Ставка комиссии комиссионного уровня счёта: тиком её синка. */
-    private void syncFeeRate() {
-        connector.answers(feeRatePath(ACCOUNT), Feed.array(Feed.tradeFeeRate()));
-        tick(Tick.TRADE_FEE_RATES);
-        assertThat(rows.count("trade_fee_rates")).isEqualTo(1L);
+    /**
+     * Пакет второго шага исчерпан: строки всех четырёх объявленных
+     * действий сопровождения доведены до завершения.
+     */
+    private Boolean packageExhausted() {
+        List<Map<String, Object>> managing = rows.select("select s.* from deal_strategy_action_states s"
+                + " join strategy_actions a on a.id = s.strategy_action_id where a.key in (?, ?, ?, ?)",
+                FIRST_STOP, REMOVE_FIRST_STOP, SECOND_STOP, TAKE_PROFIT);
+        return managing.size() == 4
+                && managing.stream().allMatch(row -> Objects.equals("COMPLETED", row.get("status")));
     }
 
-    /** Путь чтения связки фич момента у владельца рыночных данных. */
-    private String featuresPath(String instrumentInternalId) {
-        return PEER_INSTRUMENTS + "/" + instrumentInternalId + "/features";
-    }
-
-    /** Корень путей счёта у коннектора. */
-    private String accountPath(String accountInternalId) {
-        return "/api/v1/accounts/" + accountInternalId;
-    }
-
-    /** Путь чтения снимка средств у коннектора. */
-    private String balancePath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/balance";
-    }
-
-    /** Путь приватного чтения ставок комиссии у коннектора. */
-    private String feeRatePath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/trade-fee-rates";
-    }
-
-    /** Путь размещения обычной заявки у коннектора. */
-    private String placementPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/orders";
+    /** Сколько раз фрагмент встречается в тексте журнала. */
+    private Integer occurrences(String text, String fragment) {
+        return text.split(Pattern.quote(fragment), -1).length - 1;
     }
 
     /** Строки исполнения ОБЪЯВЛЕННЫХ действий; системные лежат своей таблицей. */
@@ -497,26 +760,6 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
     /** Числовой ключ объявленного действия по его авторскому ключу. */
     private Object actionId(String actionKey) {
         return rows.row("strategy_actions", "key", actionKey).get("id");
-    }
-
-    /** Единственный транш сделки. */
-    private Map<String, Object> trancheRow() {
-        return rows.all("deal_tranches").getFirst();
-    }
-
-    /** Статус единственного транша. */
-    private String trancheStatus() {
-        return String.valueOf(trancheRow().get("status"));
-    }
-
-    /** Единственная сделка. */
-    private Map<String, Object> dealRow() {
-        return rows.all("deals").getFirst();
-    }
-
-    /** Статус единственной сделки. */
-    private String dealStatus() {
-        return String.valueOf(dealRow().get("status"));
     }
 
     /**
@@ -531,11 +774,6 @@ class DealRiskGateBoxTest extends SharedTradingCoreBox {
         Map<String, Object> found = rows.row("account_instrument_states", "instrument_id",
                 instrumentId(INSTRUMENT));
         return found.isEmpty() ? NO_PAIR_RUNG : String.valueOf(found.get("safety_rung"));
-    }
-
-    /** Ступень биржевого счёта, как её видит база. */
-    private String accountRung() {
-        return String.valueOf(rows.row("exchange_accounts", "internal_id", ACCOUNT).get("safety_rung"));
     }
 
     /**

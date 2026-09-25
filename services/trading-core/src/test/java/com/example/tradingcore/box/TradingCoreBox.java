@@ -460,6 +460,26 @@ abstract class TradingCoreBox {
     }
 
     /**
+     * Подаёт тик фасадом ДРУГОГО процесса ядра и ждёт его конца.
+     *
+     * <p>Вход тот же, что у {@link #tick(Tick)}, — ручной фасад под
+     * сервисным токеном; меняется только процесс, который его принимает
+     * ({@link CoreReplica}).
+     *
+     * @param processPort порт поверхности процесса
+     * @param tick        какой из семи проходов подаётся
+     * @return ответ фасада на запуск
+     */
+    protected Answer tickAt(Integer processPort, Tick tick) {
+        Integer mark = AppLog.mark();
+        Answer answer = send(authorized(request(processPort, tick.path()))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("")));
+        awaitFinished(tick, mark, 1);
+        return answer;
+    }
+
+    /**
      * Подаёт тик и ждёт его конца НАЗВАННЫМ потолком.
      *
      * <p><b>Свой потолок — у тика, чья цена названа снаружи.</b> Тик
@@ -633,8 +653,12 @@ abstract class TradingCoreBox {
     }
 
     private HttpRequest.Builder request(String path) {
+        return request(port, path);
+    }
+
+    private static HttpRequest.Builder request(Integer processPort, String path) {
         return HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:" + port + path))
+                .uri(URI.create("http://localhost:" + processPort + path))
                 .timeout(Duration.ofSeconds(60));
     }
 

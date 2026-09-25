@@ -264,7 +264,9 @@ class ManualHaltRaiseTest {
     /** Одна сделка радиуса риска не доказала — предусловие не выполнено. */
     private void liveRiskRemains() {
         Deal deal = SafetyFixture.dealWithLiveRisk(71L);
-        when(harness.deals.findRiskCandidatesOnScope(anyLong(), any(), any()))
+        when(harness.deals.findNonTerminalByExchangeAccountId(anyLong()))
+                .thenReturn(List.of(deal));
+        when(harness.deals.findNonTerminalOnPair(anyLong(), anyLong()))
                 .thenReturn(List.of(deal));
         when(harness.contexts.build(deal)).thenReturn(DealContext.builder().deal(deal).build());
         when(harness.terminalGate.riskProvenAbsent(any(), any(), any())).thenReturn(false);

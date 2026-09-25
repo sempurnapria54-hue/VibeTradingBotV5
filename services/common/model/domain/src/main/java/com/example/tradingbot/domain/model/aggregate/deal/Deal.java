@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.model.aggregate.deal;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -492,6 +493,36 @@ public class Deal extends Auditable {
     public Boolean positionObserved() {
         return EntryReason.RECOVERY == entryReason
                 || emptyIfNull(tranches).stream().anyMatch(tranche -> isTrue(tranche.hasEntryFill()));
+    }
+
+    /**
+     * Граф сделки предъявлен целиком (docs/spec/deal-context-load.json,
+     * graphComplete). Загрузка идёт одним заходом на коллекцию, поэтому
+     * «предъявлено» решается не пометкой на строке, а НАЛИЧИЕМ коллекции
+     * там, где она обязана быть: транши — у всякой сделки, эпизод — если
+     * позиция наблюдалась, ноги — если входная заявка отправлялась.
+     *
+     * <p><b>Удостоверители у эпизодов и ног разные, и это счётно.</b>
+     * Уровень «вход отправлялся» ошибается для эпизодов в обе стороны: у
+     * восстановленной сделки заявки не было, а эпизод есть; у сделки со
+     * снятым до налива входом заявка была, а эпизода нет. Поэтому у
+     * эпизодов удостоверитель — «позиция наблюдалась», у ног —
+     * durable-колонка нижней границы окна линковки движений.
+     *
+     * <p><b>Ноги берутся обходом траншей</b> — тем же, которым их читают
+     * числа риска: предъявленность меряется у того множества, по которому
+     * считают.
+     *
+     * <p>Предикат живёт на модели, потому что читателей у него два: сборка
+     * контекста прохода и писатель чисел риска, чья собственная правка
+     * могла граф дополнить.
+     */
+    public Boolean graphComplete() {
+        boolean tranchesComplete = isNotEmpty(tranches);
+        boolean episodesComplete = isNotEmpty(positions) || isFalse(positionObserved());
+        boolean legsComplete = emptyIfNull(tranches).stream().anyMatch(tranche -> isNotEmpty(tranche.getOrders()))
+                || isNull(billsWindowBegin);
+        return tranchesComplete && episodesComplete && legsComplete;
     }
 
     /**

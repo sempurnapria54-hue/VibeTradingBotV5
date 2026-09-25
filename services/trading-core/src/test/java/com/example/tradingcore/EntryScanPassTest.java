@@ -238,6 +238,26 @@ class EntryScanPassTest {
                 eq(StrategyTradeDirection.LONG), eq(MarketPhase.Type.BULL_TREND), eq(serverTime));
     }
 
+    /**
+     * Входных объявлений у детали два, и условие выполнено у ВТОРОГО: отбор
+     * читает шаги всех входных объявлений (docs/components/EntryScannerJob.md,
+     * шаг 7), а не одного, оказавшегося первым.
+     */
+    @Test
+    void aSatisfiedStepOfTheSecondEntryDeclarationOpensTheDeal() {
+        StrategyDetail detail = detail(MarketPhase.Type.BULL_TREND, phaseStep(MarketPhase.Type.RANGE));
+        detail.getTranches().add(declaration(32L, "second", phaseStep()));
+        stubPair(strategyWith(detail), features(MarketPhase.Type.BULL_TREND));
+        when(exchangeOperationsClient.getServerTime()).thenReturn(OffsetDateTime.now(ZoneOffset.UTC));
+        when(dealOpeningService.openDeal(any(), any(), any(), any(), any(), any()))
+                .thenReturn(Optional.of(new Deal()));
+
+        job().tick();
+
+        verify(dealOpeningService).openDeal(any(), any(), eq(detail),
+                eq(StrategyTradeDirection.LONG), eq(MarketPhase.Type.BULL_TREND), any());
+    }
+
     /** Условие не выполнено — сделки нет, и биржевой момент не запрашивается. */
     @Test
     void anUnsatisfiedEntryConditionOpensNothing() {
@@ -362,18 +382,23 @@ class EntryScanPassTest {
     }
 
     private StrategyDetail detail(MarketPhase.Type phaseType, StrategyStep entryStep) {
-        StrategyTranche declaration = new StrategyTranche();
-        declaration.setId(31L);
-        declaration.setKey("entry");
-        Map<DealTranche.Status, List<StrategyStep>> steps = new LinkedHashMap<>();
-        steps.put(DealTranche.Status.PRECHECK, new ArrayList<>(List.of(entryStep)));
-        declaration.setStepsByStatus(steps);
         StrategyDetail detail = new StrategyDetail();
         detail.setId(21L);
         detail.setMarketPhaseType(phaseType);
         detail.setPhaseEntryPolicy(policyFor(phaseType));
-        detail.setTranches(new ArrayList<>(List.of(declaration)));
+        detail.setTranches(new ArrayList<>(List.of(declaration(31L, "entry", entryStep))));
         return detail;
+    }
+
+    /** Входное объявление транша с одним входным шагом. */
+    private StrategyTranche declaration(Long id, String key, StrategyStep entryStep) {
+        StrategyTranche declaration = new StrategyTranche();
+        declaration.setId(id);
+        declaration.setKey(key);
+        Map<DealTranche.Status, List<StrategyStep>> steps = new LinkedHashMap<>();
+        steps.put(DealTranche.Status.PRECHECK, new ArrayList<>(List.of(entryStep)));
+        declaration.setStepsByStatus(steps);
+        return declaration;
     }
 
     /** Политика, допускающая вход в этой фазе, — иначе деталь не торгуется. */
@@ -383,10 +408,15 @@ class EntryScanPassTest {
 
     /** Входной шаг с условием фазы: истинен ровно в бычьем тренде. */
     private StrategyStep phaseStep() {
+        return phaseStep(MarketPhase.Type.BULL_TREND);
+    }
+
+    /** Входной шаг с условием фазы: истинен ровно в названной фазе. */
+    private StrategyStep phaseStep(MarketPhase.Type phaseType) {
         StrategyConditionOperand declared = new StrategyConditionOperand();
         declared.setSourceType(StrategyConditionSourceType.CONSTANT);
         declared.setValueType(ConstantValueType.ENUM);
-        declared.setValue(MarketPhase.Type.BULL_TREND.name());
+        declared.setValue(phaseType.name());
         StrategyConditionRule rule = new StrategyConditionRule();
         rule.setRuleType(StrategyConditionRuleType.MARKET_PHASE_IS);
         rule.setRightOperand(declared);

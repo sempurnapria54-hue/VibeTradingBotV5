@@ -134,13 +134,12 @@ class StrategyTreeTest {
     }
 
     @Test
-    @DisplayName("U15.13 — у детали ровно одно объявление с входными шагами")
+    @DisplayName("U15.13 — у детали одно объявление с входными шагами")
     void u15_13_theSingleEntryDeclarationIsNamed() {
         StrategyStep entry = step(StrategyStepType.ENTRY);
         StrategyTranche declaration = declaration(1L, "d1", Map.of(DealTranche.Status.PRECHECK, List.of(entry)));
         StrategyDetail subject = detailWith(List.of(declaration, declaration(2L, "d2", Map.of())));
 
-        assertThat(subject.entryTranche()).isSameAs(declaration);
         assertThat(subject.entrySteps()).containsExactly(entry);
     }
 
@@ -150,21 +149,20 @@ class StrategyTreeTest {
     void u15_14_noEntryDeclarationGivesEmptyLists() {
         StrategyDetail subject = detailWith(List.of(declaration(1L, "d1", Map.of())));
 
-        assertThat(subject.entryTranche()).isNull();
         assertThat(subject.entrySteps()).isEmpty();
     }
 
-    /** Охрана второго рубежа: такая конфигурация до рантайма не доезжает. */
+    /** Создание допускает несколько входных объявлений — отбор читает все. */
     @Test
-    @DisplayName("U15.15 — два объявления с входными шагами")
-    void u15_15_theFirstEntryDeclarationWins() {
-        StrategyTranche first = declaration(1L, "d1",
-                Map.of(DealTranche.Status.PRECHECK, List.of(step(StrategyStepType.ENTRY))));
-        StrategyTranche second = declaration(2L, "d2",
-                Map.of(DealTranche.Status.PRECHECK, List.of(step(StrategyStepType.GRID_ENTRY))));
+    @DisplayName("U15.15 — два объявления с входными шагами: отданы шаги обоих в порядке объявлений")
+    void u15_15_everyEntryDeclarationGivesItsSteps() {
+        StrategyStep firstEntry = step(StrategyStepType.ENTRY);
+        StrategyStep secondEntry = step(StrategyStepType.GRID_ENTRY);
+        StrategyTranche first = declaration(1L, "d1", Map.of(DealTranche.Status.PRECHECK, List.of(firstEntry)));
+        StrategyTranche second = declaration(2L, "d2", Map.of(DealTranche.Status.PRECHECK, List.of(secondEntry)));
         StrategyDetail subject = detailWith(List.of(first, second));
 
-        assertThat(subject.entryTranche()).isSameAs(first);
+        assertThat(subject.entrySteps()).containsExactly(firstEntry, secondEntry);
     }
 
     @Test

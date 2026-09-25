@@ -2,11 +2,15 @@ package com.example.tradingcore.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -27,36 +31,34 @@ import org.junit.jupiter.api.Test;
  * ({@code fullHalt}, {@code freeze}). Который из двух — называет вход
  * кейса; прямой записи в предусловиях группы нет ни одной.
  *
- * <p><b>Живой экспозиции у клеток этой части группы НЕТ, и это не
- * упрощение предусловия.</b> Тропа до налива входной ноги в дереве кода
- * обрывается: на статусе отправленного входа живую ногу не опрашивает
- * никто, и наблюдённого налива не появляется ни за какое число проходов
- * (находка {@code F-13} захода, .claude/work/backlog.md §«Налив входной
- * ноги на отправленном входе не наблюдается ничем»). Клетки, которым
- * экспозиция нужна предметно — порядок снятия риска, ограниченный цикл
- * подтверждения, неприкосновенность живой сделки под мягкой ступенью, —
- * ждут её закрытия и здесь не написаны: поставить их предусловие нечем.
+ * <p><b>Живая экспозиция ставится общей сборкой</b> ({@link LiveDealBox}):
+ * вход налит целиком, эпизод позиции жив, встроенная защита
+ * материализована. Клетки, которым экспозиция нужна предметно, — состав
+ * и порядок снятия риска, ограниченный цикл его подтверждения, — стоят на
+ * ней; клетки, чей предмет ступень, отчёт и каскад, обходятся активной
+ * сделкой без заявок ({@link #openActiveDeal}).
+ *
+ * <p><b>Площадка меняет ответ ПОСЛЕ команды, и это вход клетки.</b> Снятие
+ * риска подтверждается перечиткой фактов (docs/components/KillSwitchExecutor.md
+ * §Подтверждение), поэтому стаб отдаёт закрытую позицию и снятую защиту
+ * ровно с того чтения, которое следует за командой
+ * ({@link #standConfirmedTeardown}); стаб, не меняющий ответа, ставит
+ * НЕподтверждение — предмет {@code B5.4}.
  *
  * <p><b>Сделка радиуса ставится тиком отбора входа</b>
  * ({@link #openActiveDeal}): каскаду нужна активная сделка счёта, и
  * наблюдается он её статусом и причиной остановки.
  */
-class DealSafetyRungBoxTest extends SharedTradingCoreBox {
+class DealSafetyRungBoxTest extends SharedLiveDealBox {
+
+    /** Причина снятия, которой ступень метит снимаемые сущности. */
+    private static final String KILL_SWITCH = "KILL_SWITCH";
 
     /** Основа идентичности определения группы. */
     private static final String DEFINITION = "S-SAFE";
 
-    /** Биржевой момент, который отдаёт коннектор. */
-    private static final String EXCHANGE_MOMENT = "2026-09-20T10:00:00Z";
-
-    /** Последняя цена момента. */
-    private static final String LAST_PRICE = "100";
-
     /** Биржевой момент открытия чужого эпизода: половина его адреса. */
     private static final String POSITION_MOMENT = "2026-09-20T10:00:05Z";
-
-    /** Жёсткая ступень: сворачивание радиуса. */
-    private static final String TRADE_BLOCKED = "TRADE_BLOCKED";
 
     /** Мягкая ступень счёта. */
     private static final String HOLD = "HOLD";
@@ -77,8 +79,23 @@ class DealSafetyRungBoxTest extends SharedTradingCoreBox {
     /** Машинный код ручной постановки: ни одна автоматика его не поднимает. */
     private static final String MANUAL_HALT_REQUESTED = "MANUAL_HALT_REQUESTED";
 
-    /** Отсутствие ступени: рабочее состояние радиуса. */
-    private static final String NO_RUNG = "ACTIVE";
+    /** Код отчёта расхождения сверки результата сделки. */
+    private static final String RECONCILIATION_MISMATCH = "PNL_RECONCILIATION_MISMATCH";
+
+    /** Предел серии убыточных закрытий, назначаемый клетками о серии. */
+    private static final String STREAK_LIMIT = "2";
+
+    /** Код отчёта о достигнутом пределе серии. */
+    private static final String LOSS_STREAK_LIMIT_REACHED = "LOSS_STREAK_LIMIT_REACHED";
+
+    /** Реализованный результат эпизода: убыток. */
+    private static final String LOSS = "-5";
+
+    /** Реализованный результат эпизода: прибыль. */
+    private static final String PROFIT = "5";
+
+    /** Реализованный результат эпизода: ноль. */
+    private static final String ZERO = "0";
 
     /** Машинный код хвостов заявок, не объяснимых живой сделкой. */
     private static final String ORPHAN_ORDERS = "INSTRUMENT_ORPHAN_ORDERS";
@@ -88,6 +105,286 @@ class DealSafetyRungBoxTest extends SharedTradingCoreBox {
      * ({@code InternalIdFactory#isOurs}).
      */
     private static final String OUR_CLIENT_ID = "vtbboxsafetyone";
+
+    /** Ключ отдельной условной защиты, поставленной шагом сопровождения. */
+    private static final String SEPARATE_STOP = "separate-stop";
+
+    /** Дистанция отдельной защиты, процент якоря: дальше встроенной. */
+    private static final String SEPARATE_STOP_PERCENTS = "3";
+
+    /** Ключ трейлинга на сопровождении. */
+    private static final String TRAILING = "trailing";
+
+    /** Откат трейлинга от экстремума, процент. */
+    private static final String TRAILING_CALLBACK_PERCENTS = "1";
+
+    /** Определение, которым проверяется отбор входа после закрытия сделки. */
+    private static final String NEXT_DEFINITION = "S-SAFE-NEXT";
+
+    @Test
+    @DisplayName("B5.1 — порядок полной реакции: статус, отчёт, снятие риска, терминал отчёта, каскад")
+    void theFullReactionRunsStatusReportTeardownReportTerminalAndCascadeInOrder() {
+        openLiveDeal();
+        standConfirmedTeardown();
+
+        tick(Tick.ANOMALY_DETECTION);
+
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(countEvents(HOLD_RAISED)).isEqualTo(1L);
+        Map<String, Object> report = rows.row("anomaly_reports", "code", FOREIGN_INSTRUMENT_RISK);
+        // Снятие риска ушло к площадке: и закрытие позиции, и снятие
+        // живой защиты — у налитого входа живых входных заявок нет.
+        List<LoggedRequest> closures = connector.requests(closurePath(ACCOUNT));
+        List<LoggedRequest> protectionCancels = connector.requests(attachedCancellationPath(ACCOUNT));
+        assertThat(closures).isNotEmpty();
+        assertThat(protectionCancels).isNotEmpty();
+        // Отчёт заведён ДО снятия риска и несёт снимок «до»: момент его
+        // заведения раньше первой команды площадке.
+        assertThat(report.get("internal_before")).isNotNull();
+        assertThat(momentOf(report.get("created_at")))
+                .isBefore(closures.getFirst().getLoggedDate().toInstant());
+        // Отчёт завершён снимком «после», и завершён ПОСЛЕ последней
+        // команды снятия.
+        assertThat(report.get("status")).isEqualTo("COMPLETED");
+        assertThat(report.get("internal_after")).isNotNull();
+        assertThat(momentOf(report.get("modified_at")))
+                .isAfter(protectionCancels.getLast().getLoggedDate().toInstant());
+        // Каскад увёл активную сделку радиуса в ошибку с причиной ступени.
+        assertThat(dealStatus()).isEqualTo("ERROR");
+        assertThat(dealRow().get("shutdown_reason")).isEqualTo("EXCHANGE_HOLD");
+    }
+
+    @Test
+    @DisplayName("B5.2 — защита снимается последней и только после подтверждённого закрытия позиции")
+    void theProtectionIsRemovedLastAndOnlyAfterTheConfirmedPositionClosure() {
+        // Вход налит половиной: у сделки живая входная нога, живая позиция её
+        // наливом и живая встроенная защита — все три носителя риска сразу.
+        openPartiallyFilledDeal();
+        standExchangeFollowingCommands(LOSS, LOSS, partialFill());
+
+        fullHalt(ACCOUNT);
+
+        // Порядок команд площадке: отмена входной ноги, закрытие позиции,
+        // снятие защиты — и ни одной сверх.
+        assertThat(commandCalls()).containsExactly(cancellationPath(ACCOUNT), closurePath(ACCOUNT),
+                attachedCancellationPath(ACCOUNT));
+        // Между закрытием и снятием защиты позиция перечитана: снятие идёт на
+        // подтверждённом ФАКТЕ закрытия, а не на приёме команды.
+        List<String> calls = connector.paths();
+        Integer closure = calls.indexOf(closurePath(ACCOUNT));
+        Integer protectionCancel = calls.indexOf(attachedCancellationPath(ACCOUNT));
+        assertThat(calls.subList(closure, protectionCancel)).contains(positionPath(ACCOUNT));
+        // Живых сущностей радиуса после хода не осталось, и снятие метит
+        // причину ступени.
+        assertThat(entryStatus()).isEqualTo("CANCELED");
+        assertThat(entryRow().get("close_reason")).isEqualTo(KILL_SWITCH);
+        assertThat(protectionRow().get("status")).isEqualTo("CANCELED");
+        assertThat(protectionRow().get("close_reason")).isEqualTo(KILL_SWITCH);
+        assertThat(rows.row("anomaly_reports", "code", MANUAL_HALT_REQUESTED).get("status"))
+                .isEqualTo("COMPLETED");
+    }
+
+    @Test
+    @DisplayName("B5.4 — неподтверждённое снятие риска повторяется ограниченно и кончается отказом")
+    void theUnconfirmedTeardownRepeatsBoundedlyAndEndsInRefusal() {
+        openLiveDeal();
+        String ours = livePositionOf(entrySize());
+        // Площадка закрытие ПРИНИМАЕТ, а позицию продолжает отдавать живой:
+        // ни одно чтение после команды снятия риска не подтверждает.
+        connector.answersInTurn(positionsPath(ACCOUNT), Feed.array(ours, foreignPosition()), Feed.array(ours));
+        connector.answers(pendingOrdersPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(pendingAlgoOrdersPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(closurePath(ACCOUNT), Feed.ack("ex-close-1", "close-1"));
+        connector.answers(attachedCancellationPath(ACCOUNT), Feed.ack(protectionExternalId(), protectionClientId()));
+
+        tick(Tick.ANOMALY_DETECTION);
+
+        // Попыток ровно три — предел kill-switch.max-teardown-attempts.
+        assertThat(connector.requests(closurePath(ACCOUNT))).hasSize(3);
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        // Отчёт НЕ закрыт: снимка «после» нет, терминала нет.
+        Map<String, Object> report = rows.row("anomaly_reports", "code", FOREIGN_INSTRUMENT_RISK);
+        assertThat(report.get("status")).isNotEqualTo("COMPLETED");
+        assertThat(report.get("internal_after")).isNull();
+
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+        tick(Tick.ANOMALY_DETECTION);
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        // Автоматических повторов сверх предела нет: ни тик детекции, ни
+        // проход сопровождения закрытия больше не шлют — анкер стоящей
+        // ступени поглощает повтор, и выход даёт только доведение по
+        // вызову держателя.
+        assertThat(connector.requests(closurePath(ACCOUNT))).isEmpty();
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(rows.row("anomaly_reports", "code", FOREIGN_INSTRUMENT_RISK).get("status"))
+                .isNotEqualTo("COMPLETED");
+    }
+
+    @Test
+    @DisplayName("B5.3 — встроенная защита родителя снимается наравне с отдельной")
+    void theParentsEmbeddedProtectionIsRemovedAlongWithTheSeparateOne() {
+        // Родитель налит и терминален, его встроенная защита материализована
+        // источником в самостоятельную условную заявку; рядом — отдельная
+        // условная защита, поставленная шагом сопровождения.
+        openLiveDeal(Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT, MarketPhase.Type.BULL_TREND,
+                List.of(Definitions.managingStep(StrategyStepType.MAIN_PROTECTION,
+                        Definitions.stopLossAlgo(SEPARATE_STOP, SEPARATE_STOP_PERCENTS)))));
+        standAlgoOrdersFollowingCommands(1);
+        passesUntil(() -> algoOrdersOfDeal().size() == 1
+                && Objects.equals("ACTIVE", algoOrdersOfDeal().getFirst().get("status")));
+        assertThat(entryStatus()).isEqualTo("COMPLETED");
+        standExchangeFollowingCommands(LOSS);
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+
+        fullHalt(ACCOUNT);
+
+        // Снятие ушло к площадке по ОБЕИМ защитам: и по отдельной условной
+        // заявке, и по материализованной встроенной.
+        List<LoggedRequest> separateCancels = connector.requests(algoCancellationPath(ACCOUNT));
+        List<LoggedRequest> embeddedCancels = connector.requests(attachedCancellationPath(ACCOUNT));
+        assertThat(separateCancels).isNotEmpty();
+        assertThat(embeddedCancels).isNotEmpty();
+        // Живых сущностей радиуса после хода не осталось: площадка сняла
+        // обе, и обе сняты С ПРИЧИНОЙ ступени — снятие метит намерение
+        // (docs/components/KillSwitchExecutor.md §Порядок). Встроенная не
+        // читается потерянной, хотя экспозиция транша вне окна атрибуции
+        // остаётся налитой: стоящее намерение закрывает ветвь потерянного
+        // покрытия, и терминал даёт нога разбора истории
+        // (docs/lifecycles/Order.md §«Исход ненайденности — вторая ступень»).
+        assertThat(algoOrdersOfDeal().getFirst().get("status")).isEqualTo("CANCELED");
+        assertThat(algoOrdersOfDeal().getFirst().get("close_reason")).isEqualTo(KILL_SWITCH);
+        assertThat(protectionRow().get("status")).isEqualTo("CANCELED");
+        assertThat(protectionRow().get("close_reason")).isEqualTo(KILL_SWITCH);
+        // «Риск снят» объявлен только ПОСЛЕ снятия встроенной: отчёт
+        // закрыт снимком «после» позже последней команды по ней —
+        // живую встроенную защиту предикат не пропустил.
+        Map<String, Object> report = rows.row("anomaly_reports", "code", MANUAL_HALT_REQUESTED);
+        assertThat(report.get("status")).isEqualTo("COMPLETED");
+        assertThat(momentOf(report.get("modified_at")))
+                .isAfter(embeddedCancels.getLast().getLoggedDate().toInstant())
+                .isAfter(separateCancels.getLast().getLoggedDate().toInstant());
+    }
+
+    @Test
+    @DisplayName("B5.10 — мягкая ступень живых сделок не трогает")
+    void theSoftRungLeavesLiveDealsAlone() {
+        Strategy definition = Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT,
+                MarketPhase.Type.BULL_TREND, List.of(Definitions.managingStep(StrategyStepType.PROTECTION_ADJUSTMENT,
+                        Definitions.trailingAlgo(TRAILING, TRAILING_CALLBACK_PERCENTS))));
+        openLiveDeal(definition, () -> assertThat(freeze(ACCOUNT).status()).isEqualTo(204));
+        assertThat(accountRung()).isEqualTo(HOLD);
+        standAlgoOrdersFollowingCommands(1);
+
+        passesUntil(() -> connector.count(algoPlacementPath(ACCOUNT)) > 0);
+
+        // Трейлинг под мягкой ступенью исполнился: условная заявка поставлена.
+        assertThat(algoOrdersOfDeal()).extracting(row -> row.get("condition_type"))
+                .containsExactly("TRAILING_PERCENTS");
+        // Сделка активна, стоп не заморожен и не снят: ни одной команды
+        // снятия или закрытия ступень не произвела.
+        assertThat(dealStatus()).isEqualTo("ACTIVE");
+        assertThat(connector.requests(attachedCancellationPath(ACCOUNT))).isEmpty();
+        assertThat(connector.requests(closurePath(ACCOUNT))).isEmpty();
+        assertThat(protectionRow().get("close_reason")).isNull();
+
+        standExchangeFollowingCommands(PROFIT);
+        exitByDeletion(definition);
+        passesUntilDealTerminal();
+
+        // Выход под мягкой ступенью исполнился штатно.
+        assertThat(dealStatus()).isEqualTo("CLOSED");
+        assertThat(accountRung()).isEqualTo(HOLD);
+        // Новых сделок отбор входа не заводит: счёт выпал из выборки. Слот
+        // счёта свободен — прежняя сделка закрыта, — и отказ принадлежит
+        // ступени, а не занятому контуру.
+        Long dealsBefore = rows.count("deals");
+        activate(Definitions.withEntryCommandOnPhase(NEXT_DEFINITION, ACCOUNT, INSTRUMENT,
+                MarketPhase.Type.BULL_TREND));
+        tick(Tick.ENTRY_SCANNER);
+        assertThat(rows.count("deals")).isEqualTo(dealsBefore);
+    }
+
+    @Test
+    @DisplayName("B5.11 — серия убыточных закрытий доводит счёт до мягкой ступени")
+    void theLosingStreakBringsTheAccountToTheSoftRung() {
+        consecutiveLossLimit = STREAK_LIMIT;
+
+        closeLiveDealWith("S-STREAK-1", LOSS);
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        // Прибыльное закрытие до предела счётчик обнуляет: следующий убыток
+        // считается первым, и предела не достигает.
+        closeLiveDealWith("S-STREAK-2", PROFIT);
+        closeLiveDealWith("S-STREAK-3", LOSS);
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        // Нулевой результат счётчика не двигает — ни в убыток, ни в сброс.
+        closeLiveDealWith("S-STREAK-4", ZERO);
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        // Недоступный результат не двигает тоже: сделка кончается аварийным
+        // терминалом без числа.
+        closeLiveDealWithoutResult("S-STREAK-5");
+        assertThat(dealRow().get("result_profit")).isNull();
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        Long raisedBefore = countEvents(HOLD_RAISED);
+
+        closeLiveDealWith("S-STREAK-6", LOSS);
+
+        // Сделка, доводящая серию до предела: мягкая ступень счёта, отчёт
+        // своим кодом, факт подъёма в outbox.
+        assertThat(accountRung()).isEqualTo(HOLD);
+        assertThat(codesOfReports()).contains(LOSS_STREAK_LIMIT_REACHED);
+        assertThat(countEvents(HOLD_RAISED)).isEqualTo(raisedBefore + 1);
+        // Живой риск не снимается: у мягкой ступени снятия в составе нет, и
+        // к площадке не ушло ничего сверх собственного выхода сделки.
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+        tick(Tick.DEAL_ORCHESTRATOR);
+        tick(Tick.ANOMALY_DETECTION);
+        assertThat(connector.requests(closurePath(ACCOUNT))).isEmpty();
+        assertThat(connector.requests(cancellationPath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B5.12 — снятие ступени счётчик серии не обнуляет")
+    void clearingTheRungDoesNotResetTheStreak() {
+        consecutiveLossLimit = STREAK_LIMIT;
+        closeLiveDealWith("S-CLEAR-1", LOSS);
+        closeLiveDealWith("S-CLEAR-2", LOSS);
+        assertThat(accountRung()).isEqualTo(HOLD);
+
+        assertThat(post(HALT_CLEARANCES, Bodies.halt("FREEZE", ACCOUNT)).status()).isEqualTo(204);
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        closeLiveDealWith("S-CLEAR-3", LOSS);
+
+        // Следующее убыточное закрытие снова доводит до предела: счётчик
+        // снятием не тронут. Обнули его снятие — это закрытие было бы
+        // первым в серии, и ступени не было бы.
+        assertThat(accountRung()).isEqualTo(HOLD);
+    }
+
+    @Test
+    @DisplayName("B5.13 — расхождение сверки в разведочном режиме лестницу не триггерит")
+    void theReconciliationMismatchInTheExploratoryModeDoesNotTriggerTheLadder() {
+        openLiveDeal();
+        // Запись закрытия и движение закрытия расходятся на два — сверх
+        // пола допуска при любом обороте этой сделки.
+        standExchangeFollowingCommands("-7", "-5");
+
+        exitByDeletion(workingDefinition());
+        passesUntilDealTerminal();
+
+        // Признак расхождения на сделке проставлен, отчёт заведён, а
+        // счёт остаётся в рабочем состоянии: режим допуска штатно
+        // разведочный. Вторая половина кейса — тот же вход при
+        // выключенном разведочном режиме — живёт своим контекстом
+        // (StrictReconciliationBoxTest).
+        assertThat(dealStatus()).isEqualTo("CLOSED");
+        assertThat(dealRow().get("reconciliation_status")).isEqualTo("MISMATCHED");
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        assertThat(countEvents(HOLD_RAISED)).isZero();
+        // Отчёт заводит исполнитель терминального ребра сам, без сигнала
+        // ступени (docs/rules/pnl-reconciliation.md §«Реакция на расхождение»).
+        assertThat(codesOfReports()).containsExactly(RECONCILIATION_MISMATCH);
+    }
 
     @Test
     @DisplayName("B5.5 — повторный сигнал по стоящей ступени реакции не гоняет")
@@ -298,6 +595,70 @@ class DealSafetyRungBoxTest extends SharedTradingCoreBox {
     }
 
     /**
+     * Срез счёта с признаком жёсткой ступени поверх ЖИВОЙ сделки и
+     * площадка, подтверждающая снятие риска фактами.
+     *
+     * <p><b>Каждое чтение после команды видит её исход:</b> позиции сделки
+     * по инструменту больше нет, запись её закрытия добыта, материализованной
+     * защиты среди живых нет, а срез счёта отдаёт чужую позицию, пока её не
+     * закрыл шаг вне графа сделок, и пустоту после. Иначе снятие риска не
+     * подтвердилось бы, и клетка наблюдала бы исчерпание предела
+     * ({@code B5.4}) вместо полной реакции.
+     */
+    private void standConfirmedTeardown() {
+        String ours = livePositionOf(entrySize());
+        connector.answersInTurn(positionsPath(ACCOUNT), Feed.array(ours, foreignPosition()),
+                Feed.array(foreignPosition()), Feed.emptyArray());
+        connector.answers(pendingOrdersPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(pendingAlgoOrdersPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(closurePath(ACCOUNT), Feed.ack("ex-close-1", "close-1"));
+        connector.answers(attachedCancellationPath(ACCOUNT), Feed.ack(protectionExternalId(), protectionClientId()));
+        connector.answers(positionPath(ACCOUNT), Feed.absent());
+        connector.answers(closedPositionsPath(ACCOUNT), Feed.array(Feed.closedPosition(positionExternalId(),
+                POSITION_CREATED_AT, "2026-09-20T11:00:00Z", "-5")));
+        connector.answers(pendingProtectionsPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(protectionHistoryPath(ACCOUNT), Feed.emptyArray());
+        // Снятая защита видна разбором истории ногой снятых: без этой записи
+        // судьба защиты под намерением снятия не определена, и «риск снят»
+        // не подтверждается (docs/lifecycles/Order.md §«Пустой разбор истории»).
+        connector.answersWhen(protectionHistoryPath(ACCOUNT), "leg", "CANCELED", Feed.array(
+                Feed.materializedProtection(protectionClientId(), protectionExternalId(), entrySize(),
+                        protectionTrigger())));
+    }
+
+    /**
+     * Живая сделка, закрытая выходом БЕЗ числа: площадка записи закрытия
+     * не отдаёт, бюджет добычи исчерпывается, и сделка кончается
+     * аварийным терминалом, у которого результата нет.
+     *
+     * <p><b>Мягкая ступень пары, поднятая исчерпанием, снимается ручным
+     * снятием</b> — иначе следующая сделка серии на этом инструменте не
+     * открылась бы: ступень пары выбывает из отбора входа.
+     */
+    private void closeLiveDealWithoutResult(String definitionId) {
+        Strategy definition = Definitions.withEntryCommandOnPhase(definitionId, ACCOUNT, INSTRUMENT,
+                MarketPhase.Type.BULL_TREND);
+        openLiveDeal(definition);
+        standExchangeFollowingCommands(LOSS);
+        connector.answers(closedPositionsPath(ACCOUNT), Feed.emptyArray());
+        exitByDeletion(definition);
+        passesUntilDealTerminal();
+        assertThat(dealStatus()).isEqualTo("EMERGENCY_CLOSED");
+        assertThat(post(HALT_CLEARANCES, Bodies.halt("SOFT", ACCOUNT, INSTRUMENT)).status()).isEqualTo(204);
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+    }
+
+    /** Живая позиция по инструменту вне контура: признак жёсткой ступени. */
+    private String foreignPosition() {
+        return Feed.livePosition("ex-foreign-1", FOREIGN_INSTRUMENT, "1", LAST_PRICE, POSITION_MOMENT);
+    }
+
+    /** Момент базы как мгновение: колонки аудита приезжают временем со смещением. */
+    private Instant momentOf(Object column) {
+        return ((OffsetDateTime) column).toInstant();
+    }
+
+    /**
      * Срез счёта с ХВОСТОМ заявок: позиции по инструменту нет, живая
      * заявка есть, живой сделки на паре нет — признак инструментного
      * радиуса ({@code AccountingDetectors#orphanOrders}).
@@ -310,128 +671,5 @@ class DealSafetyRungBoxTest extends SharedTradingCoreBox {
         connector.answers(pendingOrdersPath(ACCOUNT),
                 Feed.array(Feed.pendingOrder("ex-orphan-1", OUR_CLIENT_ID, EXTERNAL_INSTRUMENT)));
         connector.answers(pendingAlgoOrdersPath(ACCOUNT), Feed.emptyArray());
-    }
-
-    /**
-     * Отодвигает НАЗАД момент стоящих наблюдательных строк: единственная
-     * прямая правка базы в предусловиях, и строк она не заводит.
-     *
-     * <p>Признак с гистерезисом подтверждается строкой, заведённой не
-     * позже, чем разрешает минимальный возраст подтверждения; без правки
-     * второй тик обязан был бы отстоять от первого на тридцать секунд
-     * стенных часов. Дом довода — шапка {@link ProactiveDetectionBoxTest}.
-     */
-    private void ageObservations() {
-        rows.put("update anomaly_reports set created_at = created_at - interval '2 minutes'");
-    }
-
-    /** Ступень пары «счёт, инструмент»; строки пары нет — рабочее состояние. */
-    private String pairRung(String instrumentInternalId) {
-        List<Map<String, Object>> found = rows.select("select * from account_instrument_states"
-                        + " where exchange_account_id = ? and instrument_id = ?",
-                accountId(ACCOUNT), instrumentId(instrumentInternalId));
-        return found.isEmpty() ? NO_RUNG : String.valueOf(found.getFirst().get("safety_rung"));
-    }
-
-    /** Путь снятия обычной заявки: первый ход снятия живого риска. */
-    private String cancellationPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/orders/cancellations";
-    }
-
-    /** Рыночное закрытие позиции: второй ход снятия живого риска. */
-    private String closurePath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/positions/closures";
-    }
-
-    /** Строка биржевого счёта, как её видит база. */
-    private Map<String, Object> accountRow() {
-        return rows.row("exchange_accounts", "internal_id", ACCOUNT);
-    }
-
-    /** Ступень счёта, как её видит база. */
-    private String accountRung() {
-        return String.valueOf(accountRow().get("safety_rung"));
-    }
-
-    /** Единственная сделка. */
-    private Map<String, Object> dealRow() {
-        return rows.all("deals").getFirst();
-    }
-
-    /** Машинные коды заведённых отчётов в порядке записи. */
-    private List<String> codesOfReports() {
-        return rows.allOrderedBy("anomaly_reports", "id").stream()
-                .map(row -> String.valueOf(row.get("code")))
-                .toList();
-    }
-
-    /** Сколько строк outbox несёт названный класс. */
-    private Long countEvents(String eventType) {
-        return rows.all("outbox_events").stream()
-                .filter(row -> eventType.equals(String.valueOf(row.get("event_type"))))
-                .count();
-    }
-
-    /** Путь чтения связки фич момента у владельца рыночных данных. */
-    private String featuresPath(String instrumentInternalId) {
-        return PEER_INSTRUMENTS + "/" + instrumentInternalId + "/features";
-    }
-
-    /** Корень путей счёта у коннектора. */
-    private String accountPath(String accountInternalId) {
-        return "/api/v1/accounts/" + accountInternalId;
-    }
-
-    /** Путь чтения снимка средств у коннектора. */
-    private String balancePath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/balance";
-    }
-
-    /** Живые заявки счёта целиком: первый срез проактивной детекции. */
-    private String pendingOrdersPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/orders/pending";
-    }
-
-    /** Живые отдельные условные заявки счёта целиком: второй срез. */
-    private String pendingAlgoOrdersPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/algo-orders/pending";
-    }
-
-    /** Живые позиции счёта целиком: третий срез. */
-    private String positionsPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/positions";
-    }
-
-    /** Живой эпизод позиции по инструменту: след хода снятия риска. */
-    private String positionPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/positions/instrument";
-    }
-
-    /** История закрытых эпизодов: нога 2 добычи позиции. */
-    private String closedPositionsPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/positions/closed";
-    }
-
-    /** Снимок средств моментом прогона: возраст ставится В ДАННЫХ. */
-    private String balanceBody() {
-        String moment = OffsetDateTime.now(ZoneOffset.UTC).toString();
-        return """
-                {
-                  "externalUpdatedAt": "%s",
-                  "externalTotalEquity": "100000",
-                  "externalAdjustedEquity": "100000",
-                  "externalAvailableEquity": "100000",
-                  "balances": [
-                    {
-                      "externalCurrency": "USDT",
-                      "externalUpdatedAt": "%s",
-                      "externalEquity": "100000",
-                      "externalCashBalance": "100000",
-                      "externalAvailableBalance": "100000",
-                      "externalFrozenBalance": "0"
-                    }
-                  ]
-                }
-                """.formatted(moment, moment);
     }
 }

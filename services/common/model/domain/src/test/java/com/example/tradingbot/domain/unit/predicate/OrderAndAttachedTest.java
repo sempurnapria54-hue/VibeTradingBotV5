@@ -148,6 +148,40 @@ class OrderAndAttachedTest {
                 .isEqualByComparingTo("-2");
     }
 
+    @Test
+    @DisplayName("U9.16 — нога налита целиком: налив окончателен")
+    void u9_16_aFilledLegHasAFinalFill() {
+        assertThat(finalized(Order.Status.COMPLETED, Order.CloseReason.FILLED).hasFinalFill()).isTrue();
+    }
+
+    /** Финализирует терминал, а не полнота налива. */
+    @Test
+    @DisplayName("U9.17 — нога снята после частичного налива: налив окончателен")
+    void u9_17_aLegCancelledAfterAPartialFillHasAFinalFill() {
+        Order subject = order(1L, Order.Status.CANCELED, "2", false);
+        subject.setCloseReason(Order.CloseReason.CANCELED_BY_STRATEGY);
+
+        assertThat(subject.hasFinalFill()).isTrue();
+    }
+
+    /** Недобытый налив нулём не подменяется и финализацией не читается. */
+    @Test
+    @DisplayName("U9.18 — нога снята, налив нулевой либо не добыт: налива нет")
+    void u9_18_aCancelledLegWithoutAKnownFillHasNoFinalFill() {
+        Order empty = order(1L, Order.Status.CANCELED, "0", false);
+        Order unknown = order(2L, Order.Status.CANCELED, null, false);
+
+        assertThat(empty.hasFinalFill()).isFalse();
+        assertThat(unknown.hasFinalFill()).isFalse();
+    }
+
+    /** Живая частично налитая нога ещё меняет экспозицию. */
+    @Test
+    @DisplayName("U9.19 — нога жива и налита частично: налив не окончателен")
+    void u9_19_aLivePartiallyFilledLegHasNoFinalFill() {
+        assertThat(order(1L, Order.Status.PARTIALLY_COMPLETED, "2", false).hasFinalFill()).isFalse();
+    }
+
     private static Order finalized(Order.Status status, Order.CloseReason reason) {
         Order subject = order(1L, status, "10", false);
         subject.setCloseReason(reason);

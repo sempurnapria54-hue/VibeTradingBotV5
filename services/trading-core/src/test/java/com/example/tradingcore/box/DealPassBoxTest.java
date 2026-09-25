@@ -5,12 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -56,7 +58,7 @@ import org.junit.jupiter.api.Test;
  * Живая заявка ставится прямой записью ({@link #putLiveEntryOrder}): её
  * пишет команда площадке — предмет группы {@code B3}.
  */
-class DealPassBoxTest extends SharedTradingCoreBox {
+class DealPassBoxTest extends SharedLiveDealBox {
 
     /** Основа идентичности определения: у каждой пары своё. */
     private static final String DEFINITION = "S";
@@ -286,6 +288,75 @@ class DealPassBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
+    @DisplayName("B2.11 — координированный выход FSM траншей гоняет")
+    void theCoordinatedExitRunsTheTrancheStateMachine() {
+        openTwoTrancheLiveDeal();
+        standExchangeFollowingCommands("-5");
+        exitByDeletion(Definitions.withEntryCommandLevelsOnPhase(LiveDealBox.DEFINITION, ACCOUNT, INSTRUMENT,
+                MarketPhase.Type.BULL_TREND, 2));
+
+        passesUntilDealTerminal();
+
+        // Каждый транш прошёл свой выход до терминала, и только после
+        // терминальности всех и доказанного отсутствия живого риска сделка
+        // встала в свой: без прогона FSM траншей выходная проверка сделки
+        // не наступила бы никогда.
+        assertThat(tranchesOfDeal()).hasSize(2)
+                .allMatch(row -> Objects.equals("CLOSED", row.get("status")));
+        assertThat(dealStatus()).isEqualTo("CLOSED");
+        assertThat(connector.requests(closurePath(ACCOUNT))).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("B2.15 — диспетчеризация прерывается на первом неуспехе")
+    void theDispatchStopsAtTheFirstFailure() {
+        openCommandDeal(Definitions.withEntryCommandLevelsOnPhase(LiveDealBox.DEFINITION, ACCOUNT, INSTRUMENT,
+                MarketPhase.Type.BULL_TREND, 2));
+        if (ordersOfDeal().isEmpty()) {
+            tick(Tick.DEAL_ORCHESTRATOR);
+        }
+        List<Map<String, Object>> legs = ordersOfDeal();
+        assertThat(legs).hasSize(2);
+        // Площадка отказывает команде ПЕРВОГО транша повторяемым классом и
+        // принимает всё, что придёт после. Второй к ней уходит нога ВТОРОГО
+        // транша: первый ждёт отката повтора, второй — нет.
+        connector.answersInTurn(placementPath(ACCOUNT), List.of(502, 200, 200), List.of(
+                Feed.peerFailure("EXCHANGE_UNREACHABLE"),
+                Feed.ack(legExternalId(1), String.valueOf(legs.get(1).get("internal_id"))),
+                Feed.ack(legExternalId(0), String.valueOf(legs.get(0).get("internal_id")))));
+        // Поиск без биржевого идентификатора — восстановление повторной
+        // отправки — не находит ничего: первая отправка до площадки не дошла.
+        // Принятая нога находится живой.
+        connector.answers(lookupPath(ACCOUNT), Feed.absent());
+        for (int index = 0; index < legs.size(); index++) {
+            connector.answersWhen(lookupPath(ACCOUNT), "externalId", legExternalId(index),
+                    Feed.order(legExternalId(index), String.valueOf(legs.get(index).get("internal_id")), "ACTIVE"));
+        }
+        connector.answers(pendingPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(historyPath(ACCOUNT), Feed.emptyArray());
+        // Налива нет, позиции тоже: добыча отправленного входа наблюдает её
+        // каждым проходом и идёт до работы.
+        connector.answers(positionPath(ACCOUNT), Feed.absent());
+        List<Object> statusesBefore = tranchesOfDeal().stream().map(row -> row.get("status")).toList();
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        // Команда второго транша в этом проходе не уходила: к площадке одна
+        // отправка — отказанная. Переход не применён, статусы прежние.
+        assertThat(connector.requests(placementPath(ACCOUNT))).hasSize(1);
+        assertThat(tranchesOfDeal().stream().map(row -> row.get("status")).toList())
+                .isEqualTo(statusesBefore);
+
+        // Следующие проходы подбирают оба транша: обе ноги уходят к
+        // площадке, сделка остаётся в штатном ведении
+        // (docs/components/DealOrchestratorJob.md §«Цикл прохода»).
+        passesUntil(() -> connector.requests(placementPath(ACCOUNT)).size() >= 3
+                || Objects.equals("ERROR", dealStatus()));
+        assertThat(dealStatus()).isEqualTo("ACTIVE");
+        assertThat(connector.requests(placementPath(ACCOUNT))).hasSize(3);
+    }
+
+    @Test
     @DisplayName("B2.12 — отказ одной сделки проход по остальным не отменяет")
     void aFailureOnOneDealDoesNotCancelThePassOverTheOthers() {
         List<String> instruments = pairs(2);
@@ -362,6 +433,65 @@ class DealPassBoxTest extends SharedTradingCoreBox {
         assertThat(deal.get("status")).isEqualTo("ERROR");
         assertThat(deal.get("shutdown_reason")).isEqualTo("EXCHANGE_HOLD");
         assertThat(shutdownEvents()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("B2.18 — частичное применение перехода наблюдаемо и рёбра траншей не откатывает")
+    void aPartiallyAppliedTransitionKeepsItsTrancheEdges() {
+        List<String> instruments = pairs(1);
+        String account = accountOf(1);
+        String instrument = instruments.getFirst();
+        marketData.answers(featuresPath(instrument), Feed.features(MarketPhase.Type.BULL_TREND.name()));
+        connector.answers(balancePath(account), balanceBody());
+        connector.answers(PEER_SERVER_TIME, Feed.serverTime(EXCHANGE_MOMENT));
+        activate(Definitions.withPhaseAndGracefullyExpiringDeclarations(DEFINITION, account, instrument,
+                MarketPhase.Type.BULL_TREND));
+        tick(Tick.ENTRY_SCANNER);
+        assertThat(rows.count("deal_tranches")).isEqualTo(2L);
+        // Первый тик снимает снимок средств; ко второму фаза уже другая, и
+        // тем же проходом первый транш закрывается, а второй просит выхода.
+        tick(Tick.DEAL_ORCHESTRATOR);
+        marketData.answers(featuresPath(instrument), Feed.features(MarketPhase.Type.RANGE.name()));
+        Integer mark = AppLog.mark();
+        // Роняется ФАКТ ребра, а не строка сделки — довод тот же, что у
+        // B2.14: ребро и факт идут одной транзакцией, и отказ факта
+        // откатывает ребро целиком.
+        rows.refuse("outbox_events", "insert");
+        List<Map<String, Object>> afterFirstPass;
+        try {
+            tick(Tick.DEAL_ORCHESTRATOR);
+            afterFirstPass = rows.allOrderedBy("deal_tranches", "id");
+            // Рёбра траншей применены своей транзакцией и откатом ребра
+            // сделки не задеты: закрыт транш объявления, чей шаг молчит, а
+            // просивший выхода остался в предвходовой проверке.
+            assertThat(afterFirstPass).extracting(row -> row.get("status") + "/" + row.get("close_reason"))
+                    .containsExactlyInAnyOrder("CLOSED/ENTRY_CONDITION_EXPIRED", "PRECHECK/null");
+            assertThat(rows.all("deals").getFirst().get("status")).isEqualTo("ACTIVE");
+            assertThat(rows.all("deals").getFirst().get("shutdown_reason")).isNull();
+            assertThat(shutdownEvents()).isEmpty();
+
+            tick(Tick.DEAL_ORCHESTRATOR);
+        } finally {
+            rows.allow("outbox_events", "insert");
+        }
+
+        // Строка журнала — на каждом тике, пока причина стои́т; второй
+        // проход считал уже другой граф — закрытый транш каскад не трогал.
+        assertThat(occurrences(AppLog.since(mark), EDGE_FAILED)).isEqualTo(2);
+        assertThat(rows.allOrderedBy("deal_tranches", "id")).isEqualTo(afterFirstPass);
+        assertThat(rows.all("deals").getFirst().get("status")).isEqualTo("ACTIVE");
+        assertThat(shutdownEvents()).isEmpty();
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        // Причина снята — ребро сделки применяется, а причина закрытия
+        // транша, уже записанная частичным применением, не переписана.
+        Map<String, Object> deal = rows.all("deals").getFirst();
+        assertThat(deal.get("status")).isEqualTo("EXIT_PENDING");
+        assertThat(deal.get("shutdown_reason")).isEqualTo("MARKET_DATA_EXPIRED");
+        assertThat(shutdownEvents()).hasSize(1);
+        assertThat(rows.allOrderedBy("deal_tranches", "id")).extracting(row -> row.get("close_reason"))
+                .contains("ENTRY_CONDITION_EXPIRED");
     }
 
     @Test
@@ -529,50 +659,12 @@ class DealPassBoxTest extends SharedTradingCoreBox {
         PeerStub.all().forEach(PeerStub::forgetRequests);
     }
 
-    /** Путь чтения связки фич момента у владельца рыночных данных. */
-    private String featuresPath(String instrumentInternalId) {
-        return PEER_INSTRUMENTS + "/" + instrumentInternalId + "/features";
-    }
-
-    /** Корень путей счёта у коннектора. */
-    private String accountPath(String accountInternalId) {
-        return "/api/v1/accounts/" + accountInternalId;
-    }
-
-    /** Путь чтения снимка средств у коннектора. */
-    private String balancePath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/balance";
-    }
-
     /** Обращения к коннектору, которые размещают сущность на площадке. */
     private List<String> placementCalls() {
         return connector.paths().stream()
                 .filter(path -> path.endsWith("/orders") || path.endsWith("/algo-orders")
                         || path.endsWith("/attached-protections"))
                 .toList();
-    }
-
-    /** Снимок средств моментом прогона: возраст ставится В ДАННЫХ. */
-    private String balanceBody() {
-        String moment = OffsetDateTime.now(ZoneOffset.UTC).toString();
-        return """
-                {
-                  "externalUpdatedAt": "%s",
-                  "externalTotalEquity": "100000",
-                  "externalAdjustedEquity": "100000",
-                  "externalAvailableEquity": "100000",
-                  "balances": [
-                    {
-                      "externalCurrency": "USDT",
-                      "externalUpdatedAt": "%s",
-                      "externalEquity": "100000",
-                      "externalCashBalance": "100000",
-                      "externalAvailableBalance": "100000",
-                      "externalFrozenBalance": "0"
-                    }
-                  ]
-                }
-                """.formatted(moment, moment);
     }
 
     /**
@@ -620,11 +712,9 @@ class DealPassBoxTest extends SharedTradingCoreBox {
         rows.put("update deals set status = ? where id = ?", status, dealId);
     }
 
-    /** Классы событий строк outbox в порядке записи. */
-    private List<String> eventTypes() {
-        return rows.all("outbox_events").stream()
-                .map(row -> String.valueOf(row.get("event_type")))
-                .toList();
+    /** Сколько раз фрагмент встречается в тексте журнала. */
+    private Integer occurrences(String text, String fragment) {
+        return text.split(Pattern.quote(fragment), -1).length - 1;
     }
 
     /** Строки outbox класса «остановка штатного ведения». */

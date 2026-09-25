@@ -3,8 +3,6 @@ package com.example.tradingcore.domain.deal;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static java.util.stream.Collectors.groupingBy;
-import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
-import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -79,7 +77,7 @@ public class DealContextService {
         reloadRuntimeGraph(deal);
         Integer limit = properties.getCashFlowWindowLimit();
         List<DealCashFlow> cashFlows = dealCashFlowDataService.findByDealWindow(deal.getId(), limit);
-        Boolean graphComplete = graphComplete(deal);
+        Boolean graphComplete = deal.graphComplete();
         Boolean cashFlowsComplete = cashFlowsComplete(cashFlows, limit);
         Instrument instrument = instrumentDataService.getRequiredById(deal.getInstrumentId());
         StrategyDetail pinnedDetail = pinnedDetail(deal);
@@ -127,36 +125,6 @@ public class DealContextService {
         // целиком каждой сборкой графа: колонки налива на строке транша не
         // пишет никто, и прочитанные оттуда слагаемые были бы пусты всегда.
         deal.deriveTrancheExposures();
-    }
-
-    /**
-     * Граф сделки предъявлен целиком
-     * (docs/spec/deal-context-load.json §graphComplete). Загрузка идёт
-     * одним заходом на коллекцию, поэтому «загружено» решается не
-     * пометкой на строке, а НАЛИЧИЕМ коллекции там, где она обязана быть:
-     *
-     * <ul>
-     *   <li>транши обязаны быть у всякой сделки — их материализует
-     *       создание, и удостоверителя у их пустоты нет ни одного;</li>
-     *   <li>эпизод обязан быть, если позиция по сделке наблюдалась;</li>
-     *   <li>ноги обязаны быть, если входная заявка отправлялась.</li>
-     * </ul>
-     *
-     * <p><b>Удостоверители у эпизодов и ног разные, и это счётно.</b>
-     * Уровень «вход отправлялся» ошибается для эпизодов в обе стороны: у
-     * восстановленной сделки заявки не было, а эпизод есть; у сделки со
-     * снятым до налива входом заявка была, а эпизода нет. Поэтому у
-     * эпизодов удостоверитель — «позиция наблюдалась», у ног —
-     * durable-колонка нижней границы окна линковки движений.
-     *
-     * <p>Встроенные защиты и отдельные условные заявки грузятся вместе со
-     * своими носителями и отдельного конъюнкта не требуют.
-     */
-    private Boolean graphComplete(Deal deal) {
-        boolean tranchesComplete = isNotEmpty(deal.getTranches());
-        boolean episodesComplete = isNotEmpty(deal.getPositions()) || isFalse(deal.positionObserved());
-        boolean legsComplete = isNotEmpty(deal.getOrders()) || isNull(deal.getBillsWindowBegin());
-        return tranchesComplete && episodesComplete && legsComplete;
     }
 
     /**

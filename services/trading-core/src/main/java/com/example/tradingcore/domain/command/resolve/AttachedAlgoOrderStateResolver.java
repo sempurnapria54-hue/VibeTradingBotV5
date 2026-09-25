@@ -3,6 +3,7 @@ package com.example.tradingcore.domain.command.resolve;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -55,6 +56,30 @@ public class AttachedAlgoOrderStateResolver {
             return false;
         }
         return runsSearchCycle(parentClass(parentStatus, parentAccumulatedFillSize));
+    }
+
+    /**
+     * Потеряно ли покрытие, когда живой записи защиты нет: живой риск транша
+     * без отдельной защиты того же транша, и исчезновение защиты не
+     * объяснено НАШИМ намерением снятия. Предикат публичен по той же
+     * причине, что гейт цикла: добытчик фактов пропускает разбор истории
+     * ровно на этой ветви и своей копии предиката не заводит.
+     *
+     * <p><b>Стоящее намерение ветвь закрывает:</b> защиту, которую сняли мы,
+     * пропавшей не читают — её судьбу даёт разбор истории. Экспозиция транша
+     * при этом может ещё стоять налитой: закрытие позиции вне окна
+     * атрибуции траншу не приписано (docs/lifecycles/Order.md §«Исход
+     * ненайденности — вторая ступень»).
+     *
+     * <p>Пустой признак намерения читается ОТСУТСТВИЕМ намерения: пустота
+     * не открывает ветви, которая снимает тревогу.
+     */
+    public Boolean coverageLost(BigDecimal trancheExposure, Boolean standaloneProtectionExists,
+                                Boolean cancelIntentStanding) {
+        return nonNull(trancheExposure)
+                && trancheExposure.signum() > 0
+                && isFalse(standaloneProtectionExists)
+                && isNotTrue(cancelIntentStanding);
     }
 
     /** Состояние защиты по предъявленным фактам. */
@@ -156,23 +181,12 @@ public class AttachedAlgoOrderStateResolver {
         if (isTrue(facts.getStandaloneRecordFound())) {
             return AttachedProtectionResolution.of(AttachedAlgoOrder.Status.ACTIVE, null);
         }
-        if (isTrue(protectionLost(facts))) {
+        if (isTrue(coverageLost(facts.getTrancheExposure(), facts.getStandaloneProtectionExists(),
+                facts.getCancelIntentStanding()))) {
             return AttachedProtectionResolution.of(AttachedAlgoOrder.Status.ERROR,
                     AttachedAlgoOrder.CloseReason.PROTECTION_LOST);
         }
         return AttachedProtectionResolution.undetermined();
-    }
-
-    /**
-     * Вторая ступень: ОБЕ стороны предиката траншевые. Живой риск транша
-     * без покрытия — терминал сразу, разбор истории не ждётся: любой её
-     * факт на этой ветви оставляет покрытие потерянным. Иначе — разбор
-     * истории, и терминал даёт найденный факт либо пустой разбор.
-     */
-    private Boolean protectionLost(AttachedProtectionFacts facts) {
-        return nonNull(facts.getTrancheExposure())
-                && facts.getTrancheExposure().signum() > 0
-                && isFalse(facts.getStandaloneProtectionExists());
     }
 
     /** Исход кодирует НОГА, нашедшая запись; сырой статус записи — диагностика. */

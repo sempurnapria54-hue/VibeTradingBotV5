@@ -10,7 +10,6 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
-import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
@@ -19,8 +18,18 @@ import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.RuntimeErrorCode;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandExecutionResult;
+import com.example.tradingcore.domain.command.ServiceCommandPayload;
 import com.example.tradingcore.domain.command.ServiceCommandType;
+import com.example.tradingcore.domain.command.executor.CancelAlgoOrderExecutor;
+import com.example.tradingcore.domain.command.executor.CancelAttachedProtectionExecutor;
+import com.example.tradingcore.domain.command.executor.CancelOrderExecutor;
+import com.example.tradingcore.domain.command.executor.ClosePositionExecutor;
+import com.example.tradingcore.domain.command.executor.CommandExecutor;
 import com.example.tradingcore.domain.command.executor.ServiceCommandExecutor;
+import com.example.tradingcore.domain.command.payload.CancelAlgoOrderCommandPayload;
+import com.example.tradingcore.domain.command.payload.CancelAttachedProtectionCommandPayload;
+import com.example.tradingcore.domain.command.payload.CancelOrderCommandPayload;
+import com.example.tradingcore.domain.command.payload.ClosePositionCommandPayload;
 import com.example.tradingcore.domain.command.payload.RefreshAlgoOrderCommandPayload;
 import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.deal.DealContextService;
@@ -36,7 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Снимает живой риск сделки прямыми вызовами границы интеграции и
+ * Снимает живой риск сделки исполнителями команд снятия и
  * подтверждает снятие фактами (docs/components/KillSwitchExecutor.md).
  *
  * <p><b>Вне реестра команд:</b> по типу команды не диспетчеризуется,
@@ -72,6 +81,10 @@ public class KillSwitchExecutor {
     private final ExchangeAccountDataService exchangeAccountDataService;
     private final InstrumentDataService instrumentDataService;
     private final KillSwitchProperties properties;
+    private final CancelOrderExecutor cancelOrderExecutor;
+    private final ClosePositionExecutor closePositionExecutor;
+    private final CancelAlgoOrderExecutor cancelAlgoOrderExecutor;
+    private final CancelAttachedProtectionExecutor cancelAttachedProtectionExecutor;
 
     /**
      * Снять живой риск сделки и подтвердить снятие фактами.
@@ -191,22 +204,23 @@ public class KillSwitchExecutor {
      * (docs/models/domain/aggregate/Deal.md §Структура).
      */
     private void cancelLiveLegs(DealContext dealContext) {
-        String accountInternalId = accountInternalId(dealContext);
-        String externalInstrumentId = dealContext.getInstrument().getExternalId();
-        for (Order leg : liveLegs(dealContext.getDeal())) {
-            callSafely("cancel-order", leg.getId(),
-                    () -> exchangeOperationsClient.cancelOrder(accountInternalId, leg, externalInstrumentId));
+        Deal deal = dealContext.getDeal();
+        for (Order leg : liveLegs(deal)) {
+            dispatchSafely("cancel-order", leg.getId(), cancelOrderExecutor, dealContext, command(deal,
+                    ServiceCommandType.CANCEL_ORDER_COMMAND,
+                    new CancelOrderCommandPayload(leg.getId(), Order.CloseReason.KILL_SWITCH)));
         }
     }
 
     private void closePositionIfLive(DealContext dealContext) {
-        if (isFalse(dealContext.getDeal().hasLivePositionRisk())) {
+        Deal deal = dealContext.getDeal();
+        Position live = deal.livePosition();
+        if (isFalse(deal.hasLivePositionRisk()) || isNull(live)) {
             return;
         }
-        Instrument instrument = dealContext.getInstrument();
-        callSafely("close-position", dealContext.getDeal().getId(),
-                () -> exchangeOperationsClient.closePosition(accountInternalId(dealContext),
-                        instrument.getExternalId(), instrument.getExternalSettlementCurrency()));
+        dispatchSafely("close-position", deal.getId(), closePositionExecutor, dealContext, command(deal,
+                ServiceCommandType.CLOSE_POSITION_COMMAND,
+                new ClosePositionCommandPayload(live.getId(), Position.CloseReason.KILL_SWITCH)));
     }
 
     /**
@@ -215,16 +229,23 @@ public class KillSwitchExecutor {
      * оставила бы позицию без покрытия на время её закрытия.
      */
     private void cancelProtection(DealContext dealContext) {
-        String accountInternalId = accountInternalId(dealContext);
-        String externalInstrumentId = dealContext.getInstrument().getExternalId();
-        for (AlgoOrder algoOrder : liveAlgoOrders(dealContext.getDeal())) {
-            callSafely("cancel-algo-order", algoOrder.getId(), () -> exchangeOperationsClient
-                    .cancelAlgoOrder(accountInternalId, algoOrder, externalInstrumentId));
+        Deal deal = dealContext.getDeal();
+        for (AlgoOrder algoOrder : liveAlgoOrders(deal)) {
+            dispatchSafely("cancel-algo-order", algoOrder.getId(), cancelAlgoOrderExecutor, dealContext, command(deal,
+                    ServiceCommandType.CANCEL_ALGO_ORDER_COMMAND,
+                    new CancelAlgoOrderCommandPayload(algoOrder.getId(), AlgoOrder.CloseReason.KILL_SWITCH)));
         }
-        for (AttachedAlgoOrder protection : liveAttachedProtections(dealContext.getDeal())) {
-            callSafely("cancel-attached-protection", protection.getId(), () -> exchangeOperationsClient
-                    .cancelAttachedProtection(accountInternalId, protection, externalInstrumentId));
+        for (AttachedAlgoOrder protection : liveAttachedProtections(deal)) {
+            dispatchSafely("cancel-attached-protection", protection.getId(), cancelAttachedProtectionExecutor,
+                    dealContext, command(deal,
+                    ServiceCommandType.CANCEL_ATTACHED_PROTECTION_COMMAND,
+                    new CancelAttachedProtectionCommandPayload(protection.getId(),
+                            AttachedAlgoOrder.CloseReason.KILL_SWITCH)));
         }
+        // Намерение снятия записано в перечитанные сущности, а добыча
+        // подтверждения читает граф прохода: без перечитки она терминализовала
+        // бы защиту по графу без намерения — потерянной, а не снятой.
+        runSafely("reload-after-protection-cancel", () -> dealContextService.reloadRuntimeGraph(deal));
     }
 
     /**
@@ -308,6 +329,20 @@ public class KillSwitchExecutor {
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * Команда снятия без анкера: у аварийного хода строки исполнения нет, а
+     * исполнитель команды пишет намерение снятия с причиной {@code KILL_SWITCH}
+     * write-once — по нему добыча и терминализует сущность снятой, а не
+     * потерянной (docs/components/KillSwitchExecutor.md §Порядок).
+     */
+    private ServiceCommand command(Deal deal, ServiceCommandType type, ServiceCommandPayload payload) {
+        return ServiceCommand.builder()
+                .type(type)
+                .dealId(deal.getId())
+                .payload(payload)
+                .build();
+    }
+
     private ServiceCommand refreshPositionCommand(Deal deal) {
         return ServiceCommand.builder()
                 .type(ServiceCommandType.REFRESH_POSITION_COMMAND)
@@ -346,6 +381,23 @@ public class KillSwitchExecutor {
     }
 
     /**
+     * Снятие best-effort ИСПОЛНИТЕЛЕМ команды, мимо диспетчера: исполнитель
+     * пишет намерение снятия, а учёт отказа без анкера — механизм прохода, у
+     * которого повтор ведёт сам проход (docs/components/ServiceCommandExecutor.md
+     * §«Отказ команды без анкера — происшествие, а не бюджет»); у аварийного
+     * хода повтор и отчёт свои. Отказ одного снятия остальных не отменяет.
+     */
+    private void dispatchSafely(String operation, Long subjectId, CommandExecutor executor,
+                                DealContext dealContext, ServiceCommand command) {
+        callSafely(operation, subjectId, () -> {
+            ServiceCommandExecutionResult result = executor.execute(command, null, dealContext);
+            if (isFalse(result.getSuccess())) {
+                log.warn("Kill-switch {} refused subjectId={}: {}", operation, subjectId, result.getMessage());
+            }
+        });
+    }
+
+    /**
      * Ход добычи best-effort; {@code false} — факты этой попыткой не
      * добыты, то есть подтверждать нечем.
      */
@@ -357,10 +409,6 @@ public class KillSwitchExecutor {
             log.warn("Kill-switch {} failed: {}", operation, e.getMessage());
             return false;
         }
-    }
-
-    private static String accountInternalId(DealContext dealContext) {
-        return dealContext.getExchangeAccount().getInternalId();
     }
 
     private Integer teardownAttempts() {

@@ -11,10 +11,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -175,20 +175,23 @@ class ManualHaltClearTest {
         verify(harness.accounts, never()).applyLossStreak(anyLong(), any());
     }
 
-    /** Выборка предусловия идёт по радиусу. */
+    /**
+     * Выборка предусловия идёт по радиусу и берёт только нетерминальные
+     * сделки: терминальная сделка с недоказанным отсутствием риска
+     * недостижима — оба терминальных ребра гейтятся тем же предикатом.
+     */
     @Test
-    @DisplayName("U13.12 — предусловие живого риска: выборка по радиусу, терминальные — недавним окном")
+    @DisplayName("U13.12 — предусловие живого риска: выборка по радиусу, только нетерминальные сделки")
     void u13_12_thePreconditionSelectionIsPerScope() {
         harness.accountStands(ExchangeAccount.SafetyRung.TRADE_BLOCKED, ExchangeAccount.Status.ACTIVE);
 
         harness.manualHalt.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, null);
-        verify(harness.deals).findRiskCandidatesOnScope(eq(ACCOUNT_ID), isNull(),
-                eq(harness.properties.getClearanceTerminalWindow()));
+        verify(harness.deals).findNonTerminalByExchangeAccountId(ACCOUNT_ID);
 
         harness.instrumentStands(Instrument.SafetyRung.TRADE_BLOCKED, Instrument.Status.ACTIVE);
         harness.manualHalt.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
-        verify(harness.deals).findRiskCandidatesOnScope(eq(ACCOUNT_ID), eq(INSTRUMENT_ID),
-                eq(harness.properties.getClearanceTerminalWindow()));
+        verify(harness.deals).findNonTerminalOnPair(ACCOUNT_ID, INSTRUMENT_ID);
+        verifyNoMoreInteractions(harness.deals);
     }
 
     /** Первый неподтверждённый решает: обход остальных не нужен. */
@@ -198,7 +201,9 @@ class ManualHaltClearTest {
         harness.accountStands(ExchangeAccount.SafetyRung.TRADE_BLOCKED, ExchangeAccount.Status.ACTIVE);
         Deal first = dealWithLiveRisk(81L);
         Deal second = dealWithLiveRisk(82L);
-        when(harness.deals.findRiskCandidatesOnScope(anyLong(), any(), any()))
+        when(harness.deals.findNonTerminalByExchangeAccountId(anyLong()))
+                .thenReturn(List.of(first, second));
+        when(harness.deals.findNonTerminalOnPair(anyLong(), anyLong()))
                 .thenReturn(List.of(first, second));
         when(harness.contexts.build(any())).thenReturn(DealContext.builder().deal(first).build());
         when(harness.terminalGate.riskProvenAbsent(any(), any(), any())).thenReturn(false);
@@ -259,7 +264,9 @@ class ManualHaltClearTest {
 
     private void liveRiskRemains() {
         Deal deal = dealWithLiveRisk(83L);
-        when(harness.deals.findRiskCandidatesOnScope(anyLong(), any(), any()))
+        when(harness.deals.findNonTerminalByExchangeAccountId(anyLong()))
+                .thenReturn(List.of(deal));
+        when(harness.deals.findNonTerminalOnPair(anyLong(), anyLong()))
                 .thenReturn(List.of(deal));
         when(harness.contexts.build(deal)).thenReturn(DealContext.builder().deal(deal).build());
         when(harness.terminalGate.riskProvenAbsent(any(), any(), any())).thenReturn(false);

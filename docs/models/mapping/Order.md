@@ -88,7 +88,8 @@ FSM раз не использует raw status (`external-status-resolution.md`
 evidence-cycle (специфика per-source — см. подразделы). Пустой ответ
 одного endpoint не даёт `MISSING_AFTER_REFRESH`. После полного цикла
 без находки → `Order.ERROR` + `MISSING_AFTER_REFRESH` → safety-каскад
-(`external-status-resolution.md`).
+(`external-status-resolution.md`); у **неотправленной** заявки →
+`Order.CANCELED` + `NOT_PLACED` без каскада (`docs/lifecycles/Order.md`).
 
 ### `AttachedAlgoOrder` (attached protection)
 
@@ -217,7 +218,8 @@ write-once для причины закрытия —
 | 4 | `GET /api/v5/trade/orders-history-archive` | то же (если history не покрывает период) | там же |
 
 Поиск: есть `externalId` → по `ordId`; нет → по `clOrdId = internalId`.
-Терминал исчерпанного цикла — `MISSING_AFTER_REFRESH`.
+Терминал исчерпанного цикла — `MISSING_AFTER_REFRESH`; у неотправленной
+заявки — `NOT_PLACED`.
 
 ### OKX: цикл добычи материализованной защиты
 

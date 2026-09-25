@@ -80,6 +80,18 @@ class DealActiveInputChecksTest {
     }
 
     @Test
+    @DisplayName("U7.11 — расхождение на неполном графе: позиция добывается первой, живая нога после")
+    void u7_11_onAnIncompleteGraphThePositionIsObservedFirst() {
+        DealTranche tranche = exposedTranche("1");
+        tranche.getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
+        Deal active = deal(Deal.Status.ACTIVE, tranche);
+        DealContext context = contextBuilder(active).graphComplete(Boolean.FALSE).build();
+
+        assertReobserved(context, ServiceCommandType.REFRESH_POSITION_COMMAND,
+                ServiceCommandType.REFRESH_ORDER_COMMAND);
+    }
+
+    @Test
     @DisplayName("U7.4 — живых эпизодов два: ошибочная тропа звеном аварийной финализации")
     void u7_4_twoLiveEpisodesTakeTheErrorPath() {
         DealContext context = contextOf(exposedTranche("2"), livePosition("2"));

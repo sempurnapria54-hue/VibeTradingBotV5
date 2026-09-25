@@ -267,6 +267,31 @@ class PlacementExecutorTest {
     }
 
     /**
+     * Нога, которую добыча сняла как не дошедшую до площадки, повтором
+     * отправки не уходит: на площадке встала бы заявка, которой в графе нет
+     * живой. Исполнение доведено фактом терминала.
+     */
+    @Test
+    void aWithdrawnUnsentLegIsNotSentByARetry() {
+        Order entry = stored(new Order(), 100L);
+        entry.setDealId(DEAL);
+        entry.setStatus(Order.Status.CREATED);
+        entry.toNotPlaced();
+        when(orderDataService.getRequiredById(100L)).thenReturn(entry);
+
+        DealActionState retried = row();
+        retried.setAttemptCount(1);
+        ServiceCommandExecutionResult result = submitOrderExecutor()
+                .execute(submitCommand(retried), retried, context(deal()));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(retried.getStatus()).isEqualTo(DealActionStateStatus.COMPLETED);
+        verify(exchange, never()).getOrder(any(), any(), any(), any());
+        verify(exchange, never()).setLeverage(any(), any(), any());
+        verify(exchange, never()).placeOrder(any(), any(), any());
+    }
+
+    /**
      * Отказ постановки рабочего плеча останавливает вход броском, а не
      * тихой отправкой заявки без плеча: значение применяется к моменту
      * входа, и без него размер уехал бы под чужим плечом.
@@ -497,6 +522,30 @@ class PlacementExecutorTest {
     }
 
     /**
+     * Условная заявка, которую добыча сняла как не дошедшую до площадки,
+     * повтором отправки не уходит — тот же довод, что у обычной.
+     */
+    @Test
+    void aWithdrawnUnsentAlgoOrderIsNotSentByARetry() {
+        AlgoOrder protection = new AlgoOrder();
+        protection.setId(60L);
+        protection.setStatus(AlgoOrder.Status.CREATED);
+        protection.toNotPlaced();
+        when(algoOrderDataService.getRequiredById(60L)).thenReturn(protection);
+
+        DealActionState retried = row();
+        retried.setAttemptCount(1);
+        ServiceCommandExecutionResult result = submitAlgoOrderExecutor().execute(command(
+                ServiceCommandType.SUBMIT_ALGO_ORDER_COMMAND, retried, new SubmitAlgoOrderCommandPayload(60L)),
+                retried, context(deal()));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(retried.getStatus()).isEqualTo(DealActionStateStatus.COMPLETED);
+        verify(exchange, never()).getAlgoOrder(any(), any(), any(), any());
+        verify(exchange, never()).placeAlgoOrder(any(), any(), any());
+    }
+
+    /**
      * Повторная отправка условной заявки ищет её по стабильному
      * клиентскому идентификатору и второй раз не ставит: постановка могла
      * пройти, а ответ потеряться.
@@ -542,6 +591,29 @@ class PlacementExecutorTest {
 
         assertThat(protection.getStatus()).isEqualTo(AlgoOrder.Status.ACTIVE);
         assertThat(protection.getCloseReason()).isEqualTo(AlgoOrder.CloseReason.CANCELED_BY_STRATEGY);
+    }
+
+    /**
+     * Строка снятия встаёт в «отправлено» ВМЕСТЕ с целью: исход подтверждает
+     * добыча по цели строки, и без неё следующая стадия шла бы по пустому
+     * идентификатору.
+     */
+    @Test
+    void cancellingAProtectionNamesItsTargetOnTheRow() {
+        AlgoOrder protection = new AlgoOrder();
+        protection.setId(60L);
+        protection.setStatus(AlgoOrder.Status.ACTIVE);
+        when(algoOrderDataService.getRequiredById(60L)).thenReturn(protection);
+        when(exchange.cancelAlgoOrder(eq(ACCOUNT), any(), eq(INSTRUMENT))).thenReturn(ack(true, null, null));
+
+        DealActionState row = row();
+        cancelAlgoOrderExecutor().execute(command(ServiceCommandType.CANCEL_ALGO_ORDER_COMMAND, row,
+                        new CancelAlgoOrderCommandPayload(60L, AlgoOrder.CloseReason.CANCELED_BY_STRATEGY)),
+                row, context(deal()));
+
+        assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.SUBMITTED);
+        assertThat(row.getTargetEntityType()).isEqualTo(TargetEntityType.ALGO_ORDER);
+        assertThat(row.getTargetEntityId()).isEqualTo(60L);
     }
 
     private static ServiceCommand createAlgoCommand(DealActionState row) {

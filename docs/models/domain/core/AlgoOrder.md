@@ -72,7 +72,8 @@ runtime-сущность» живёт в строке исполнения, по
 | `CANCELED_BY_STRATEGY` | исполнитель отмены условной заявки по объявленному действию |
 | `REPLACED_BY_STRATEGY` | исполнитель замещения — на снимаемом звене цепочки (`docs/rules/replace-not-amend.md`) |
 | `KILL_SWITCH` | исполнитель снятия живого риска (`docs/components/KillSwitchExecutor.md`) |
-| `MISSING_AFTER_REFRESH` | исполнитель добычи условной заявки, исчерпавший цикл источников |
+| `MISSING_AFTER_REFRESH` | исполнитель добычи условной заявки, исчерпавший цикл источников у **отправленной** заявки |
+| `NOT_PLACED` | он же у **неотправленной**: до площадки она не дошла — терминал штатный, без биржевой ступени (`docs/lifecycles/AlgoOrder.md`) |
 | `ORDER_FAILED` | резолвер внешнего статуса: биржа отвергла постановку целиком |
 | `PARTIALLY_FAILED` | он же: часть пакета встала, часть отвергнута |
 | `UNKNOWN_EXTERNAL_STATUS` | резолвер внешнего статуса, ветвь `REFUSED` в `docs/spec/external-status-resolution.json` |

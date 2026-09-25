@@ -83,7 +83,7 @@ class ProxyBoxTest extends SharedBffBox {
         assertThat(subjectHeaders(forwarded)).containsOnlyKeys(
                 "authorization", "x-tenant-id", "x-tenant-role", "content-type");
         assertThat(forwarded.getHeader("Authorization")).isEqualTo("Bearer " + presented);
-        assertThat(forwarded.getHeader("X-Tenant-Id")).isEqualTo(TENANT);
+        assertThat(forwarded.getHeader("X-Tenant-Id")).isEqualTo(tenant);
         assertThat(forwarded.getHeader("X-Tenant-Role")).isEqualTo(ROLE);
         assertThat(forwarded.getHeader("Content-Type")).startsWith("application/json");
         // Хост — адрес владельца, а не исходного соединения.
@@ -99,7 +99,7 @@ class ProxyBoxTest extends SharedBffBox {
         getWith(DEALS, token(), Map.of(TENANT_HEADER, "T9", ROLE_HEADER, "OWNER"));
 
         LoggedRequest forwarded = owners.single(OwnerStub.TRADING_CORE, DEALS);
-        assertThat(forwarded.header(TENANT_HEADER).values()).containsExactly(TENANT);
+        assertThat(forwarded.header(TENANT_HEADER).values()).containsExactly(tenant);
         assertThat(forwarded.header(ROLE_HEADER).values()).containsExactly(ROLE);
         assertThat(forwarded.getHeaders().all()).noneMatch(header -> header.values().contains("T9"));
     }
@@ -313,7 +313,7 @@ class ProxyBoxTest extends SharedBffBox {
     @Test
     @DisplayName("B8.15 — Отказ резолва контекста владельца не тревожит")
     void b8_15_aContextResolutionRefusalDoesNotReachTheOwner() {
-        authAnswers(Bodies.membershipsOf(TENANT, SECOND_TENANT));
+        authAnswers(Bodies.membershipsOf(tenant, secondTenant));
         owners.answersAnything(OwnerStub.TRADING_CORE, 200, "{}");
 
         Answer answer = get(DEALS);

@@ -4,6 +4,7 @@ import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.at;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.attached;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.dec;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.order;
+import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.orderWith;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.standaloneStop;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -53,7 +54,8 @@ class StatusEdgeTest {
 
     /** Матрица рёбер отдельной условной заявки — docs/spec/algo-order-lifecycle.json. */
     private static final Map<AlgoOrder.Status, Set<AlgoOrder.Status>> ALGO_MATRIX = Map.of(
-            AlgoOrder.Status.CREATED, EnumSet.of(AlgoOrder.Status.PENDING, AlgoOrder.Status.ERROR),
+            AlgoOrder.Status.CREATED, EnumSet.of(AlgoOrder.Status.PENDING, AlgoOrder.Status.CANCELED,
+                    AlgoOrder.Status.ERROR),
             AlgoOrder.Status.PENDING, EnumSet.of(AlgoOrder.Status.ACTIVE, AlgoOrder.Status.COMPLETED,
                     AlgoOrder.Status.CANCELED, AlgoOrder.Status.ERROR),
             AlgoOrder.Status.ACTIVE, EnumSet.of(AlgoOrder.Status.PARTIALLY_COMPLETED,
@@ -64,7 +66,7 @@ class StatusEdgeTest {
     /** Матрица рёбер встроенной защиты — docs/spec/order-lifecycle.json. */
     private static final Map<AttachedAlgoOrder.Status, Set<AttachedAlgoOrder.Status>> ATTACHED_MATRIX = Map.of(
             AttachedAlgoOrder.Status.CREATED, EnumSet.of(AttachedAlgoOrder.Status.PENDING,
-                    AttachedAlgoOrder.Status.ERROR),
+                    AttachedAlgoOrder.Status.CANCELED, AttachedAlgoOrder.Status.ERROR),
             AttachedAlgoOrder.Status.PENDING, EnumSet.of(AttachedAlgoOrder.Status.ACTIVE,
                     AttachedAlgoOrder.Status.CANCELED, AttachedAlgoOrder.Status.ERROR),
             AttachedAlgoOrder.Status.ACTIVE, EnumSet.of(AttachedAlgoOrder.Status.COMPLETED,
@@ -256,12 +258,12 @@ class StatusEdgeTest {
     @DisplayName("U11.16 — обычная заявка: причина уже стои́т, ставится вторая")
     void u11_16_theOrderCloseReasonIsWriteOnce() {
         Order subject = order(1L, Order.Status.ACTIVE, "10", false);
-        subject.setCloseReason(Order.CloseReason.CONDITION_EXPIRED);
+        subject.setCloseReason(Order.CloseReason.CANCELED_BY_STRATEGY);
 
         subject.toCancel(Order.CloseReason.KILL_SWITCH);
 
         assertThat(subject.getStatus()).isEqualTo(Order.Status.CANCELED);
-        assertThat(subject.getCloseReason()).isEqualTo(Order.CloseReason.CONDITION_EXPIRED);
+        assertThat(subject.getCloseReason()).isEqualTo(Order.CloseReason.CANCELED_BY_STRATEGY);
     }
 
     /**
@@ -419,12 +421,77 @@ class StatusEdgeTest {
     @DisplayName("U11.29 — обычная заявка: ошибка при уже проставленной причине")
     void u11_29_theOrderErrorReasonIsWriteOnceToo() {
         Order subject = order(1L, Order.Status.ACTIVE, "10", false);
-        subject.setCloseReason(Order.CloseReason.CONDITION_EXPIRED);
+        subject.setCloseReason(Order.CloseReason.CANCELED_BY_STRATEGY);
 
         subject.toError(Order.CloseReason.UNKNOWN_EXTERNAL_STATUS);
 
         assertThat(subject.getStatus()).isEqualTo(Order.Status.ERROR);
-        assertThat(subject.getCloseReason()).isEqualTo(Order.CloseReason.CONDITION_EXPIRED);
+        assertThat(subject.getCloseReason()).isEqualTo(Order.CloseReason.CANCELED_BY_STRATEGY);
+    }
+
+    /**
+     * Неотправленная нога, не найденная полным циклом добычи: снята штатно,
+     * и встроенная защита уходит с ней из созданного — отдельного ребра
+     * через отправленный у неё нет (docs/lifecycles/Order.md §«Неотправленная
+     * нога, не найденная добычей»).
+     */
+    @Test
+    @DisplayName("U11.30 — обычная заявка: неотправленная не дошла до площадки")
+    void u11_30_anUnsentOrderIsWithdrawnWithItsProtection() {
+        AttachedAlgoOrder protection = attached(AttachedAlgoOrder.Status.CREATED, "5", "90");
+        Order subject = orderWith(order(1L, Order.Status.CREATED, null, false), protection);
+
+        subject.toNotPlaced();
+
+        assertThat(subject.getStatus()).isEqualTo(Order.Status.CANCELED);
+        assertThat(subject.getCloseReason()).isEqualTo(Order.CloseReason.NOT_PLACED);
+        assertThat(subject.isLive()).isFalse();
+        assertThat(protection.getStatus()).isEqualTo(AttachedAlgoOrder.Status.CANCELED);
+        assertThat(protection.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.PARENT_ORDER_CANCELED);
+    }
+
+    /** Стоящее намерение снятия не перетирается: причина write-once. */
+    @Test
+    @DisplayName("U11.31 — обычная заявка: неотправленная при стоящем намерении снятия")
+    void u11_31_aStandingIntentSurvivesTheWithdrawal() {
+        Order subject = order(1L, Order.Status.CREATED, null, false);
+        subject.setCloseReason(Order.CloseReason.KILL_SWITCH);
+
+        subject.toNotPlaced();
+
+        assertThat(subject.getStatus()).isEqualTo(Order.Status.CANCELED);
+        assertThat(subject.getCloseReason()).isEqualTo(Order.CloseReason.KILL_SWITCH);
+    }
+
+    /** Признак неотправленной — только созданный статус: отправленная несёт биржевой идентификатор. */
+    @Test
+    @DisplayName("U11.32 — обычная заявка: признак неотправленной")
+    void u11_32_onlyACreatedOrderIsNotSubmitted() {
+        assertThat(EnumSet.allOf(Order.Status.class).stream()
+                .filter(status -> order(1L, status, null, false).isNotSubmitted()))
+                .containsExactly(Order.Status.CREATED);
+    }
+
+    /** Неотправленная условная заявка снимается ребром из созданного, минуя отправленный. */
+    @Test
+    @DisplayName("U11.33 — условная заявка: неотправленная не дошла до площадки")
+    void u11_33_anUnsentAlgoOrderIsWithdrawn() {
+        AlgoOrder subject = standaloneStop(1L, AlgoOrder.Status.CREATED, "10", "90");
+
+        subject.toNotPlaced();
+
+        assertThat(subject.getStatus()).isEqualTo(AlgoOrder.Status.CANCELED);
+        assertThat(subject.getCloseReason()).isEqualTo(AlgoOrder.CloseReason.NOT_PLACED);
+        assertThat(subject.isLive()).isFalse();
+    }
+
+    /** Отправленная условная заявка этим ребром не снимается: её ненайденность — пропажа. */
+    @Test
+    @DisplayName("U11.34 — условная заявка: признак неотправленной")
+    void u11_34_onlyACreatedAlgoOrderIsNotSubmitted() {
+        assertThat(EnumSet.allOf(AlgoOrder.Status.class).stream()
+                .filter(status -> standaloneStop(1L, status, "10", "90").isNotSubmitted()))
+                .containsExactly(AlgoOrder.Status.CREATED);
     }
 
     private static Stream<Arguments> allowedAlgoEdges() {

@@ -179,13 +179,26 @@ class RiskNumbersCurrentAndWriteTest {
     @Test
     @DisplayName("U28.12 — пересчёт при неполном графе: числа не тронуты, звено не завершается")
     void u28_12_anIncompleteGraphLeavesTheNumbersUntouched() {
-        assertUntouched(context(dealWithPreviousNumbers(), false));
+        assertUntouched(context(dealWithoutEpisode(), false));
     }
 
     @Test
     @DisplayName("U28.13 — пересчёт при пустом признаке полноты графа: то же, что у неполного")
     void u28_13_anEmptyGraphFlagReadsAsNotPresented() {
-        assertUntouched(context(dealWithPreviousNumbers(), null));
+        assertUntouched(context(dealWithoutEpisode(), null));
+    }
+
+    @Test
+    @DisplayName("U28.15 — граф неполон при сборке, а правка писателя его дополнила: пересчёт идёт")
+    void u28_15_aWriterThatCompletedTheGraphRecomputes() {
+        Deal deal = dealWithPreviousNumbers();
+
+        assertThat(service.recompute(context(deal, false)))
+                .as("эпизод заведён самим писателем: признак сборки снят до него")
+                .isTrue();
+
+        assertThat(deal.getPlannedRiskAmount()).isEqualByComparingTo(RISK_AT_BASE_RATE);
+        verify(dealDataService).applyRiskNumbers(deal);
     }
 
     @Test
@@ -217,6 +230,18 @@ class RiskNumbersCurrentAndWriteTest {
         Deal deal = dealOf(List.of(leg(RISK_AT_BASE_RATE, "100", "100", LIVE_EPISODE_ID)),
                 List.of(protection(70L, TRANCHE_ID, "2910", "100")), liveEpisode("100"));
         deal.setPlannedRiskAmount(new BigDecimal("777"));
+        return deal;
+    }
+
+    /**
+     * Та же сделка, чей налив наблюдён, а эпизода в графе нет: граф неполон
+     * и при сборке, и после правки писателя. Экспозиция транша выводится
+     * сборкой графа — ею же и здесь, иначе налив не был бы наблюдён.
+     */
+    private static Deal dealWithoutEpisode() {
+        Deal deal = dealWithPreviousNumbers();
+        deal.setPositions(List.of());
+        deal.deriveTrancheExposures();
         return deal;
     }
 

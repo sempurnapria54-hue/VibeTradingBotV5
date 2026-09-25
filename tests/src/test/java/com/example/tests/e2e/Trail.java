@@ -1,6 +1,7 @@
 package com.example.tests.e2e;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -9,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -18,6 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +40,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.awaitility.Awaitility;
 import org.testcontainers.kafka.KafkaContainer;
+import tools.jackson.databind.JsonNode;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
@@ -89,6 +94,24 @@ public final class Trail implements AutoCloseable {
 
     public static final String EXCHANGE_TIME = "/api/v5/public/time";
 
+    public static final String PEER_FEATURES = PEER_INSTRUMENTS + "/" + INSTRUMENT + "/features";
+
+    public static final String EXCHANGE_BALANCE = "/api/v5/account/balance";
+
+    public static final String EXCHANGE_LEVERAGE = "/api/v5/account/set-leverage";
+
+    public static final String EXCHANGE_ORDER = "/api/v5/trade/order";
+
+    public static final String EXCHANGE_ALGO_PENDING = "/api/v5/trade/orders-algo-pending";
+
+    public static final String EXCHANGE_POSITIONS = "/api/v5/account/positions";
+
+    public static final String EXTERNAL_ORDER = "okx-order-1";
+
+    public static final String EXTERNAL_PROTECTION = "okx-algo-1";
+
+    public static final String ENTRY_PRICE = "2000";
+
     private static final String NEVER = "0 0 0 1 1 *";
 
     private static final Integer OWNER_PORT = 8080;
@@ -98,6 +121,8 @@ public final class Trail implements AutoCloseable {
     private static final String MARKET_DATA_ADDRESS = "127.0.0.40";
 
     private static final Duration TICK_WAIT = Duration.ofSeconds(90);
+
+    private static final List<String> TERMINAL_DEAL = List.of("CLOSED", "EMERGENCY_CLOSED");
 
     private static final String REFERENCE_DEFINITION =
             "services/strategies/src/test/resources/strategy-examples/trend-following-ema.json";
@@ -121,6 +146,8 @@ public final class Trail implements AutoCloseable {
     private Boolean riskAppetiteSet = Boolean.FALSE;
     private Boolean leverageAssigned = Boolean.FALSE;
     private Boolean feeRatesSynced = Boolean.FALSE;
+    private String tenant = TENANT;
+    private String account = ACCOUNT;
 
     private Trail(String name, Layout layout) {
         this.name = name;
@@ -245,6 +272,33 @@ public final class Trail implements AutoCloseable {
     // ---------------------------------------------------------------- предусловия
 
     /**
+     * Ходы тропы идут под названными тенантом и счётом.
+     *
+     * <p>У тропы сделки оба постоянны — счёт отдаёт стаб владельца реестра.
+     * У тропы периметра владелец реестра — сторона: тенанта заводит первый
+     * ход самой тропы, а идентичность счёта выдаёт его регистрация, и
+     * пролог идёт под ними (.claude/tests/cases/e2e-perimeter-read.md
+     * §«Предусловия тропы — что лежит до первого хода»).
+     *
+     * @param tenantInternalId  тенант ходов
+     * @param accountInternalId биржевой счёт ходов
+     */
+    public void under(String tenantInternalId, String accountInternalId) {
+        this.tenant = tenantInternalId;
+        this.account = accountInternalId;
+    }
+
+    /** Тенант ходов тропы. */
+    public String tenant() {
+        return tenant;
+    }
+
+    /** Биржевой счёт ходов тропы. */
+    public String account() {
+        return account;
+    }
+
+    /**
      * Проекций у ядра нет: синк не подавался либо ядро поднято заново.
      *
      * <p>Синк необратим — снять проекции нечем, — поэтому кейс, которому
@@ -265,6 +319,37 @@ public final class Trail implements AutoCloseable {
         }
     }
 
+    /**
+     * Сделок у ядра нет: ядро их не заводило либо поднято заново.
+     *
+     * <p>Сделку на паре снять нечем, кроме её собственного терминала, а
+     * терминал — предмет другой тропы; поэтому кейс, которому нужна пара
+     * без сделки после чужой, получает свежее развёртывание ядра тем же
+     * способом, что {@link #withoutProjections()}. Общие предусловия после
+     * этого ставятся заново.
+     */
+    public void withoutDeals() {
+        if (isFalse(database(Party.TRADING_CORE).query("select id from deals").isEmpty())) {
+            renew(Party.TRADING_CORE);
+        }
+        commonPreconditions();
+    }
+
+    /**
+     * Статистика поднята заново с названным расписанием пересчёта агрегатов.
+     *
+     * <p>Фасада у пересчёта нет намеренно, и такт подаётся расписанием,
+     * сокращённым конфигурацией процесса; до подъёма с ним расписание не бьёт
+     * (.claude/skills/test-code.md §«Уровень 3 — сквозной набор»).
+     *
+     * @param cron расписание пересчёта
+     */
+    public void statisticsRecomputes(String cron) {
+        stop(Party.STATISTICS);
+        side(Party.STATISTICS).set("jobs.aggregate-recompute.cron", cron);
+        start(Party.STATISTICS);
+    }
+
     /** Проекции счёта и инструмента у ядра сняты тиком синка. */
     public void projectionsSynced() {
         if (isTrue(projectionsSynced)) {
@@ -279,7 +364,7 @@ public final class Trail implements AutoCloseable {
         if (isTrue(riskAppetiteSet)) {
             return;
         }
-        Answer answer = call(Party.TRADING_CORE, "PUT", CORE + "/risk-appetites/" + TENANT, null, """
+        Answer answer = call(Party.TRADING_CORE, "PUT", CORE + "/risk-appetites/" + tenant, null, """
                 {
                   "globalSimultaneousRiskPerDealPercent": 5,
                   "globalCatastrophicRiskPerDealMultiplier": 100,
@@ -304,7 +389,7 @@ public final class Trail implements AutoCloseable {
             return;
         }
         projectionsSynced();
-        Answer answer = call(Party.TRADING_CORE, "PUT", CORE + "/pair-settings/" + ACCOUNT + "/" + INSTRUMENT,
+        Answer answer = call(Party.TRADING_CORE, "PUT", CORE + "/pair-settings/" + account + "/" + INSTRUMENT,
                 null, """
                 {"leverage": 10}
                 """);
@@ -467,7 +552,8 @@ public final class Trail implements AutoCloseable {
      * @return идентичность определения
      */
     public String createDefinition() {
-        Answer answer = call(Party.STRATEGIES, "POST", STRATEGIES, TENANT, referenceDefinition());
+        Answer answer = call(Party.STRATEGIES, "POST", STRATEGIES, tenant,
+                referenceDefinition().replace("\"" + ACCOUNT + "\"", "\"" + account + "\""));
         if (answer.status() != 201) {
             throw new IllegalStateException("Предусловие не поставлено: создание определения — "
                     + answer.status() + " " + answer.body());
@@ -482,7 +568,7 @@ public final class Trail implements AutoCloseable {
      * @param status     целевой статус
      */
     public Answer moveDefinition(String internalId, String status) {
-        return call(Party.STRATEGIES, "PUT", STRATEGIES + "/" + internalId + "/status", TENANT,
+        return call(Party.STRATEGIES, "PUT", STRATEGIES + "/" + internalId + "/status", tenant,
                 "{\"status\": \"" + status + "\"}");
     }
 
@@ -494,7 +580,7 @@ public final class Trail implements AutoCloseable {
      * переходом. Снимается оно ходом владельца, а не записью в базу.
      */
     public void retireActiveDefinitions() {
-        Answer listed = call(Party.STRATEGIES, "GET", STRATEGIES, TENANT, null);
+        Answer listed = call(Party.STRATEGIES, "GET", STRATEGIES, tenant, null);
         List<String> active = new ArrayList<>();
         Json.tree(listed.body()).forEach(definition -> {
             if (Objects.equals("ACTIVE", definition.path("status").asString())) {
@@ -516,6 +602,217 @@ public final class Trail implements AutoCloseable {
     /** Тик реле ядра его фасадом. */
     public void relayCore() {
         tick(Party.TRADING_CORE, "/outbox-relay", "Manual OutboxRelayJob trigger finished");
+    }
+
+    /** Тик сканера входа ядра его фасадом. */
+    public void scanEntries() {
+        tick(Party.TRADING_CORE, "/entry-scanner", "Manual EntryScannerJob trigger finished");
+    }
+
+    /** Тик прохода оркестратора ядра его фасадом. */
+    public void orchestrate() {
+        tick(Party.TRADING_CORE, "/deal-orchestrator", "Manual DealOrchestratorJob trigger finished");
+    }
+
+    /**
+     * Активное определение с копией у ядра — ходами тропы: создание,
+     * активация, тик реле владельца, ожидание копии.
+     *
+     * <p>Прочие активные определения тенанта сняты тем же ходом: на паре
+     * активным бывает одно.
+     *
+     * @return идентичность определения
+     */
+    public String activeDefinition() {
+        retireActiveDefinitions();
+        String definition = createDefinition();
+        Answer moved = moveDefinition(definition, "ACTIVE");
+        if (moved.status() != 200) {
+            throw new IllegalStateException("Предусловие не поставлено: активация — " + moved.status() + " "
+                    + moved.body());
+        }
+        relayOwner();
+        await("копия определения " + definition + " у ядра", () -> database(Party.TRADING_CORE)
+                .query("select id from strategies where internal_id = ? and status = 'ACTIVE'", definition)
+                .size() == 1);
+        return definition;
+    }
+
+    /**
+     * Стаб владельца рыночных данных отдаёт раскладку фич, на которой
+     * входное условие бычьей детали эталона истинно.
+     */
+    public void marketFavoursEntry() {
+        marketData.answersPost(PEER_FEATURES, entryFeaturesBody());
+    }
+
+    /**
+     * Стаб площадки принимает команды тропы: отдаёт свежий снимок средств,
+     * подтверждает плечо и постановку, а заявку, которой ещё не наливал,
+     * не знает.
+     *
+     * <p>Это общее предусловие тропы; кейс, перекрывший ответ своим (отказ
+     * постановки), возвращает его этим же ходом.
+     */
+    public void exchangeAcceptsCommands() {
+        exchange.answersTemplated(EXCHANGE_BALANCE, """
+                {"code": "0", "msg": "", "data": [{"uTime": "{{now format='epoch'}}", "totalEq": "10000",
+                  "adjEq": "10000", "availEq": "10000", "details": [{"ccy": "USDT",
+                  "uTime": "{{now format='epoch'}}", "eq": "10000",
+                  "cashBal": "10000", "availBal": "10000", "frozenBal": "0"}]}]}
+                """);
+        exchange.answersPost(EXCHANGE_LEVERAGE, """
+                {"code": "0", "msg": "", "data": [{"lever": "10", "mgnMode": "isolated", "instId": "%s",
+                  "posSide": "net"}]}
+                """.formatted(EXTERNAL_INSTRUMENT));
+        exchange.answersPostTemplated(EXCHANGE_ORDER, """
+                {"code": "0", "msg": "", "data": [{"ordId": "%s", "clOrdId": "{{jsonPath request.body '$.clOrdId'}}",
+                  "sCode": "0", "sMsg": "", "ts": "1758240000000"}]}
+                """.formatted(EXTERNAL_ORDER));
+        exchange.answers(EXCHANGE_ORDER, """
+                {"code": "0", "msg": "", "data": []}
+                """);
+        exchange.answers(EXCHANGE_POSITIONS, """
+                {"code": "0", "msg": "", "data": []}
+                """);
+    }
+
+    /**
+     * Ряд фактов зерна начат прошлыми сутками: первый факт положен в тему ядра
+     * так, как положил бы производитель, — моментом происшествия в конверте.
+     *
+     * <p><b>Без него сутки тропы не пересчитываются вовсе:</b> проход пишет
+     * сутки, только если они начались не раньше первого факта ряда
+     * (docs/spec/statistics-aggregates.json, {@code dayRecomputable}), а на
+     * свежей тропе ряд начинается посреди сегодняшних суток. Часы процессов
+     * при этом не двигаются — возраст стоит в данных.
+     */
+    public void factSeriesStartedYesterday() {
+        OffsetDateTime yesterday = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("eventId", UUID.randomUUID().toString());
+        headers.put("eventType", "DEAL_OPENED");
+        headers.put("occurredAt", yesterday.toString());
+        headers.put("version", "1");
+        produce(Substrate.CORE_TOPIC, tenant, """
+                {"dealInternalId": "%s", "exchangeAccountInternalId": "%s", "instrumentInternalId": "%s",
+                 "strategyInternalId": "%s", "entryReason": "STRATEGY", "direction": "LONG",
+                 "entryMarketPhase": "BULL_TREND"}
+                """.formatted(UUID.randomUUID(), account, INSTRUMENT, UUID.randomUUID()), headers);
+    }
+
+    /**
+     * Площадка отвергает постановку заявки кодом своего словаря — эхом
+     * клиентского идентификатора и без биржевого.
+     */
+    public void exchangeRejectsPlacement() {
+        exchange.answersPostTemplated(EXCHANGE_ORDER, """
+                {"code": "1", "msg": "All operations failed", "data": [{"ordId": "",
+                  "clOrdId": "{{jsonPath request.body '$.clOrdId'}}", "sCode": "51008",
+                  "sMsg": "Order failed. Insufficient USDT balance in account.", "ts": "1758240000000"}]}
+                """);
+    }
+
+    /** Площадка отвергает команду плеча кодом своего словаря. */
+    public void exchangeRejectsLeverage() {
+        exchange.answersPost(EXCHANGE_LEVERAGE, """
+                {"code": "59000", "msg": "Setting failed. Cancel any open orders, close positions, and stop trading bots first.",
+                  "data": []}
+                """);
+    }
+
+    /**
+     * Сделка по копии заведена тиком сканера на раскладке, на которой вход
+     * истинен, — ходом тропы, а не записью.
+     *
+     * @return идентичность сделки
+     */
+    public String openDeal() {
+        marketFavoursEntry();
+        scanEntries();
+        List<JsonNode> opened = deals().stream()
+                .filter(deal -> isFalse(TERMINAL_DEAL.contains(deal.path("status").asString())))
+                .toList();
+        if (opened.size() != 1) {
+            throw new IllegalStateException("Предусловие не поставлено: сделка на паре — " + opened);
+        }
+        return opened.getFirst().path("internalId").asString();
+    }
+
+    /**
+     * Подаёт проходы оркестратора, пока условие о следе не станет истинным.
+     *
+     * <p><b>Проход дробит работу по звену за раз</b> — снимок средств,
+     * заведение заявки, её отправка, — и число проходов до состояния есть
+     * свойство тропы, а не кейса. Потолок — время, а не счёт: повтор
+     * упавшей команды ждёт своей паузы, и проходы до неё пусты.
+     *
+     * @param label   что ждётся — в сообщение отказа
+     * @param outcome условие
+     */
+    public void passUntil(String label, Callable<Boolean> outcome) {
+        long deadline = System.currentTimeMillis() + TICK_WAIT.toMillis();
+        while (isFalse(evaluate(outcome))) {
+            if (System.currentTimeMillis() > deadline) {
+                throw new IllegalStateException("Состояние не достигнуто проходами за " + TICK_WAIT + ": " + label);
+            }
+            orchestrate();
+        }
+    }
+
+    /**
+     * Входная заявка сделки отправлена: площадка подтвердила постановку, у
+     * зеркала ядра — её внешний идентификатор.
+     */
+    public void entrySubmitted() {
+        passUntil("входная заявка отправлена", () -> isFalse(database(Party.TRADING_CORE)
+                .query("select id from orders where external_id is not null").isEmpty()));
+    }
+
+    /**
+     * Площадка отдаёт отправленную входную заявку налитой целиком, а её
+     * встроенную защиту — материализованной условной заявкой.
+     *
+     * <p><b>Идентичности берутся у зеркала ядра</b>, потому что их выпускает
+     * ядро: клиентский идентификатор заявки и защиты площадка возвращает
+     * эхом, а не придумывает.
+     */
+    public void exchangeFillsEntry() {
+        Database core = database(Party.TRADING_CORE);
+        Map<String, Object> order = core.query(
+                "select internal_id, size from orders where external_id is not null").getFirst();
+        Map<String, Object> protection = core.query(
+                "select internal_id, size, stop_loss_trigger_price from attached_algo_orders").getFirst();
+        exchange.answers(EXCHANGE_ORDER, """
+                {"code": "0", "msg": "", "data": [{"instId": "%s", "ordId": "%s", "clOrdId": "%s",
+                  "ordType": "market", "side": "buy", "posSide": "net", "state": "filled", "px": "",
+                  "sz": "%s", "accFillSz": "%s", "avgPx": "%s", "fee": "-0.1", "feeCcy": "USDT",
+                  "cTime": "1758240000000", "uTime": "1758240001000"}]}
+                """.formatted(EXTERNAL_INSTRUMENT, EXTERNAL_ORDER, order.get("internal_id"),
+                plain(order.get("size")), plain(order.get("size")), ENTRY_PRICE));
+        exchange.answers(EXCHANGE_ALGO_PENDING, """
+                {"code": "0", "msg": "", "data": [{"instId": "%s", "algoId": "%s", "algoClOrdId": "%s",
+                  "ordType": "conditional", "side": "sell", "posSide": "net", "state": "live", "sz": "%s",
+                  "slTriggerPx": "%s", "slTriggerPxType": "mark", "slOrdPx": "-1",
+                  "cTime": "1758240000000", "uTime": "1758240001000"}]}
+                """.formatted(EXTERNAL_INSTRUMENT, EXTERNAL_PROTECTION, protection.get("internal_id"),
+                plain(protection.get("size")), plain(protection.get("stop_loss_trigger_price"))));
+    }
+
+    /**
+     * Сделки ядра на паре тропы — его поверхностью.
+     *
+     * @return перечень сделок счёта тропы
+     */
+    public List<JsonNode> deals() {
+        Answer answer = call(Party.TRADING_CORE, "GET", CORE + "/deals?exchangeAccountInternalId=" + account,
+                tenant, null);
+        if (answer.status() != 200) {
+            throw new IllegalStateException("Чтение сделок ядра — " + answer.status() + " " + answer.body());
+        }
+        List<JsonNode> deals = new ArrayList<>();
+        Json.tree(answer.body()).forEach(deals::add);
+        return deals;
     }
 
     /**
@@ -618,6 +915,19 @@ public final class Trail implements AutoCloseable {
         exchange.answers(EXCHANGE_TIME, """
                 {"code": "0", "msg": "", "data": [{"ts": "%d"}]}
                 """.formatted(System.currentTimeMillis()));
+        exchangeAcceptsCommands();
+    }
+
+    private static Boolean evaluate(Callable<Boolean> outcome) {
+        try {
+            return outcome.call();
+        } catch (Exception failure) {
+            throw new IllegalStateException("Условие о следе не вычислилось", failure);
+        }
+    }
+
+    private static String plain(Object number) {
+        return ((BigDecimal) number).stripTrailingZeros().toPlainString();
     }
 
     private static String accountsBody(String accountInternalId) {
@@ -672,6 +982,41 @@ public final class Trail implements AutoCloseable {
                   "externalState": "live"
                 }
                 """.formatted(externalInstrumentId, externalInstrumentId.split("-")[0]);
+    }
+
+    /**
+     * Раскладка фич момента, на которой входной шаг бычьей детали эталона
+     * истинен: фаза — бычий тренд, быстрая средняя выше медленной, осциллятор
+     * не ниже порога; плюс волатильность под стоп и цены момента под расчёт
+     * заявки.
+     *
+     * <p><b>Раскладка ключуется авторскими именами операндов эталона</b> —
+     * так её отдаёт владелец данных (форму соседа мерит его ящик), и имя вне
+     * эталона гасило бы условие молча, как отсутствующий операнд.
+     */
+    private static String entryFeaturesBody() {
+        String candle = OffsetDateTime.now(ZoneOffset.UTC).withSecond(0).withNano(0).toString();
+        return """
+                {
+                  "latestIndicators": {
+                    "ema_fast_15m": {"indicatorType": "EMA", "candleTimestamp": "%1$s", "ema": "2010"},
+                    "ema_slow_15m": {"indicatorType": "EMA", "candleTimestamp": "%1$s", "ema": "2000"},
+                    "rsi_5m": {"indicatorType": "RSI", "candleTimestamp": "%1$s", "rsi": "60"},
+                    "atr_15m": {"indicatorType": "ATR", "candleTimestamp": "%1$s", "atr": "20"}
+                  },
+                  "previousIndicators": {},
+                  "structures": {},
+                  "marketPhase": {"type": "BULL_TREND"},
+                  "marketPriceData": {
+                    "externalLastPrice": "%2$s",
+                    "externalBidPrice": "1999.9",
+                    "externalAskPrice": "2000.1",
+                    "externalBidSize": "500",
+                    "externalAskSize": "500",
+                    "externalTimestamp": "%1$s"
+                  }
+                }
+                """.formatted(candle, ENTRY_PRICE);
     }
 
     private Map<String, String> settingsOf(Party party) {

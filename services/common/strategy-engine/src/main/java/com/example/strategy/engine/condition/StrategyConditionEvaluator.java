@@ -219,10 +219,10 @@ public class StrategyConditionEvaluator {
         return nonNull(position) && isTrue(position.hasLiveRisk());
     }
 
-    /** Входная нога транша налита целиком ({@code entryOrderFinalized}). */
+    /** Налив входной ноги транша окончателен и непуст ({@code entryOrderFinalized}). */
     private boolean evaluateEntryOrderFinalized(ConditionEvaluationContext context) {
         Order entryOrder = isNull(context.getTranche()) ? null : context.getTranche().entryOrder();
-        return nonNull(entryOrder) && isTrue(entryOrder.isFilled());
+        return nonNull(entryOrder) && isTrue(entryOrder.hasFinalFill());
     }
 
     /** У транша живёт ВСТРОЕННАЯ защита ({@code attachedStopLossExists}). */

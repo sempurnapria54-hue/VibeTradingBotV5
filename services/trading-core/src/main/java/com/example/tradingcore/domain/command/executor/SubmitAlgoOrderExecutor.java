@@ -50,6 +50,9 @@ public class SubmitAlgoOrderExecutor implements CommandExecutor {
                                                  DealContext dealContext) {
         SubmitAlgoOrderCommandPayload payload = (SubmitAlgoOrderCommandPayload) command.getPayload();
         AlgoOrder algoOrder = algoOrderDataService.getRequiredById(payload.getAlgoOrderId());
+        if (isFalse(algoOrder.isLive())) {
+            return settledBeforeSending(actionState);
+        }
         String accountInternalId = dealContext.getExchangeAccount().getInternalId();
         String externalInstrumentId = dealContext.getInstrument().getExternalId();
         if (isBlank(algoOrder.getExternalId())
@@ -62,6 +65,18 @@ public class SubmitAlgoOrderExecutor implements CommandExecutor {
             applySubmitted(algoOrder, ack.getExternalId());
         }
         actionState.setStatus(DealActionStateStatus.SUBMITTED);
+        dealActionStateDataService.save(actionState);
+        return ServiceCommandExecutionResult.ok();
+    }
+
+    /**
+     * Заявка терминальна раньше, чем ушла: добыча, исчерпавшая цикл, сняла
+     * неотправленную заявку как не дошедшую до площадки. Отправка поставила
+     * бы на площадку заявку, которой в графе нет живой; исполнение доведено
+     * фактом терминала (docs/components/SubmitAlgoOrderExecutor.md).
+     */
+    private ServiceCommandExecutionResult settledBeforeSending(DealActionState actionState) {
+        actionState.setStatus(DealActionStateStatus.COMPLETED);
         dealActionStateDataService.save(actionState);
         return ServiceCommandExecutionResult.ok();
     }

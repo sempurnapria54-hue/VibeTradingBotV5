@@ -13,6 +13,7 @@ import com.example.tradingcore.domain.command.RuntimeErrorCode;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingcore.domain.command.ServiceCommandType;
+import com.example.tradingcore.domain.command.TargetEntityType;
 import com.example.tradingcore.domain.command.payload.CancelAlgoOrderCommandPayload;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.persistence.service.AlgoOrderDataService;
@@ -64,7 +65,7 @@ public class CancelAlgoOrderExecutor implements CommandExecutor {
             return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR, ack.getMessage());
         }
         applyIntent(algoOrder, payload.getCancelReason());
-        markSubmitted(actionState);
+        markSubmitted(actionState, algoOrder);
         return ServiceCommandExecutionResult.ok();
     }
 
@@ -76,8 +77,14 @@ public class CancelAlgoOrderExecutor implements CommandExecutor {
         }
     }
 
-    private void markSubmitted(DealActionState actionState) {
+    /**
+     * Строка встаёт в «отправлено» ВМЕСТЕ с целью: следующая стадия — добыча
+     * исхода — идёт по цели строки, и без неё подтверждать было бы нечего
+     * (docs/rules/ack-not-runtime-truth.md).
+     */
+    private void markSubmitted(DealActionState actionState, AlgoOrder algoOrder) {
         if (nonNull(actionState)) {
+            actionState.targetAt(TargetEntityType.ALGO_ORDER, algoOrder.getId());
             actionState.setStatus(DealActionStateStatus.SUBMITTED);
             dealActionStateDataService.save(actionState);
         }

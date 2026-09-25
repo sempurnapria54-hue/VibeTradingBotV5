@@ -14,7 +14,6 @@ import com.example.tradingbot.domain.event.CoreEventType;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingcore.config.ManualHaltProperties;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.DealContextService;
@@ -76,8 +75,7 @@ class ManualHaltSurfaceTest {
             new HoldRungEdgeService(pairStates, accounts, new ActorProvider(), coreEventWriter));
 
     private final ManualHaltService service = new ManualHaltService(accounts, instruments, pairStates,
-            deals, contexts, new DealTerminalGate(), coordinator, holdService, reports,
-            new ManualHaltProperties());
+            deals, contexts, new DealTerminalGate(), coordinator, holdService, reports);
 
     @BeforeEach
     void givenWorkingObjects() {
@@ -85,7 +83,8 @@ class ManualHaltSurfaceTest {
         when(instruments.getRequiredByInternalId(INSTRUMENT_INTERNAL_ID)).thenReturn(instrument);
         when(pairStates.getRequiredByPair(ACCOUNT_ID, INSTRUMENT_ID))
                 .thenReturn(pairState(Instrument.SafetyRung.ACTIVE));
-        when(deals.findRiskCandidatesOnScope(anyLong(), any(), any())).thenReturn(List.of());
+        when(deals.findNonTerminalByExchangeAccountId(anyLong())).thenReturn(List.of());
+        when(deals.findNonTerminalOnPair(anyLong(), anyLong())).thenReturn(List.of());
     }
 
     // --- допустимые пары ---------------------------------------------------
@@ -277,7 +276,9 @@ class ManualHaltSurfaceTest {
         deal.setId(7L);
         deal.setStatus(Deal.Status.ERROR);
         deal.setTranches(new ArrayList<>());
-        when(deals.findRiskCandidatesOnScope(anyLong(), any(), any()))
+        when(deals.findNonTerminalByExchangeAccountId(anyLong()))
+                .thenReturn(new ArrayList<>(List.of(deal)));
+        when(deals.findNonTerminalOnPair(anyLong(), anyLong()))
                 .thenReturn(new ArrayList<>(List.of(deal)));
         when(contexts.build(deal)).thenReturn(DealContext.builder()
                 .deal(deal)

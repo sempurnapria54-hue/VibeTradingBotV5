@@ -201,6 +201,47 @@ class AttachedLivenessAndHistoryTest {
     }
 
     @Test
+    @DisplayName("U11.19 — живой риск транша без покрытия, но наше намерение снятия стои́т: не потерянное покрытие")
+    void u11_19_aStandingCancelIntentClosesTheLostCoverageBranch() {
+        AttachedProtectionResolution resolution = resolver.resolve(afterSearchCycle()
+                .trancheExposure(fill("1"))
+                .standaloneProtectionExists(false)
+                .cancelIntentStanding(true)
+                .build());
+
+        assertThat(resolution.getOutcomeUndetermined())
+                .as("защиту, которую сняли мы, пропавшей не читают: судьбу даёт разбор истории")
+                .isTrue();
+        assertThat(resolution.getStatus()).isNull();
+    }
+
+    @Test
+    @DisplayName("U11.20 — та же сборка, разбор нашёл ногу снятой: терминал по ноге, а не потерянное покрытие")
+    void u11_20_aStandingCancelIntentTakesTheTerminalFromTheHistoryLeg() {
+        AttachedProtectionResolution resolution = resolver.resolve(afterSearchCycle()
+                .trancheExposure(fill("1"))
+                .standaloneProtectionExists(false)
+                .cancelIntentStanding(true)
+                .historyLegFound(ProtectionHistoryLeg.CANCELED)
+                .build());
+
+        assertThat(resolution.getStatus()).isEqualTo(AttachedAlgoOrder.Status.CANCELED);
+    }
+
+    @Test
+    @DisplayName("U11.21 — предикат потерянного покрытия публичен и читает намерение: гейт разбора у добытчика тот же")
+    void u11_21_theCoverageLostPredicateReadsTheStandingIntent() {
+        assertThat(resolver.coverageLost(fill("1"), false, false)).isTrue();
+        assertThat(resolver.coverageLost(fill("1"), false, null))
+                .as("пустой признак намерения — отсутствие намерения")
+                .isTrue();
+        assertThat(resolver.coverageLost(fill("1"), false, true)).isFalse();
+        assertThat(resolver.coverageLost(fill("1"), true, false)).isFalse();
+        assertThat(resolver.coverageLost(fill("0"), false, false)).isFalse();
+        assertThat(resolver.coverageLost(null, false, false)).isFalse();
+    }
+
+    @Test
     @DisplayName("U11.13 — отдельная защита транша есть: исход не определён, терминал не ставится")
     void u11_13_anExistingStandaloneProtectionLeavesTheOutcomeUndetermined() {
         AttachedProtectionResolution resolution = resolver.resolve(afterSearchCycle()

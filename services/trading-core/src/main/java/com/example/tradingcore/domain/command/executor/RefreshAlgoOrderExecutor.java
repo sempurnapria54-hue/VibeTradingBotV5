@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
@@ -41,6 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
  * уходит в ошибочное состояние с причиной «не найдена после добычи», и
  * дальше идёт контролируемое исключение. Пустой ответ одного источника
  * основанием не является (docs/rules/controlled-exchange-exceptions.md).
+ * У НЕОТПРАВЛЕННОЙ заявки исчерпанный цикл терминал другой — «не дошла до
+ * площадки», без броска и без биржевой ступени
+ * (docs/lifecycles/AlgoOrder.md).
  *
  * <p><b>Сырой статус резолвит коннектор, и отказ приезжает броском
  * ЧТЕНИЯ.</b> Неизвестный либо проблемный статус роняет вызов целиком, а
@@ -79,8 +83,12 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
         RefreshAlgoOrderCommandPayload payload = (RefreshAlgoOrderCommandPayload) command.getPayload();
         AlgoOrder algoOrder = target(payload.getAlgoOrderId(), dealContext);
         AlgoOrder fetched = fetchOrFail(algoOrder, dealContext);
-        algoOrderMapper.updateFromFetched(fetched, algoOrder);
-        applyStatus(algoOrder, fetched);
+        if (isNull(fetched)) {
+            algoOrder.toNotPlaced();
+        } else {
+            algoOrderMapper.updateFromFetched(fetched, algoOrder);
+            applyStatus(algoOrder, fetched);
+        }
         algoOrderDataService.save(algoOrder);
         if (isFalse(dealRiskNumbersService.recompute(dealContext))) {
             return ServiceCommandExecutionResult.notCompleted(
@@ -108,6 +116,9 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
      * Цикл добычи; исчерпан без находки — сущность в ошибочное состояние и
      * бросок. Контролируемое исключение чтения помечает сущность своей
      * причиной и уходит дальше нетронутым.
+     *
+     * <p><b>Пусто — только у неотправленной заявки:</b> исчерпанный цикл
+     * доказывает, что на площадке её нет, и терминал ей ставит вызывающий.
      */
     private AlgoOrder fetchOrFail(AlgoOrder algoOrder, DealContext dealContext) {
         AlgoOrder fetched;
@@ -116,6 +127,9 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
         } catch (ExternalStatusException e) {
             failWith(algoOrder, toCloseReason(e.getReasonCode()));
             throw e;
+        }
+        if (isNull(fetched) && isTrue(algoOrder.isNotSubmitted())) {
+            return null;
         }
         if (isNull(fetched)) {
             failWith(algoOrder, AlgoOrder.CloseReason.MISSING_AFTER_REFRESH);

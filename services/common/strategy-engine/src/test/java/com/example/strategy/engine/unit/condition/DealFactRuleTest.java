@@ -209,6 +209,28 @@ class DealFactRuleTest {
                 .isFalse();
     }
 
+    /** Финализирует терминал ноги, а не полнота налива: у снятой налив окончателен. */
+    @Test
+    @DisplayName("U9.19 — ENTRY_ORDER_FINALIZED, входная нога снята после частичного налива: истина")
+    void u9_19_aLegCancelledAfterAPartialFillFinalizesTheEntry() {
+        Order cancelled = order(800L, Order.Status.CANCELED, Order.CloseReason.CANCELED_BY_STRATEGY, false);
+        cancelled.setAccumulatedFillSize(new BigDecimal("2"));
+
+        assertThat(evaluate(StrategyConditionRuleType.ENTRY_ORDER_FINALIZED, livePosition("100"),
+                trancheWithOrders(cancelled))).isTrue();
+    }
+
+    /** Недобытый налив нулём не подменяется и финализацией не читается. */
+    @Test
+    @DisplayName("U9.20 — та же нога, налив не добыт: ложь")
+    void u9_20_aCancelledLegWithAnUnknownFillIsNotAFinalization() {
+        Order cancelled = order(800L, Order.Status.CANCELED, Order.CloseReason.CANCELED_BY_STRATEGY, false);
+        cancelled.setAccumulatedFillSize(null);
+
+        assertThat(evaluate(StrategyConditionRuleType.ENTRY_ORDER_FINALIZED, livePosition("100"),
+                trancheWithOrders(cancelled))).isFalse();
+    }
+
     private Boolean evaluate(StrategyConditionRuleType type, Position position, DealTranche dealTranche) {
         ConditionEvaluationContext context = base()
                 .activePosition(position)

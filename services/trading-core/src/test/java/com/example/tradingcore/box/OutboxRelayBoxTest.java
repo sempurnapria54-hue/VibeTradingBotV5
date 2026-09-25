@@ -28,9 +28,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Клетка {@code B9.9} здесь не живёт.</b> Она требует прогона по
  * тропам ВСЕХ классов ядра — решения о заявке, открытия и закрытия сделки,
- * — а базовых сборок сделки и транша у ящика ещё нет; её дом — единица,
- * которая строит группы {@code B1}-{@code B7}
- * (.claude/tests/cases/trading-core.md §«Кейсы, не прогоняемые сегодня»).
+ * — то есть сборки живой сделки, чей контекст — ветвь
+ * {@link SharedLiveDealBox}; её класс — {@link PublishedClassesBoxTest}.
  */
 class OutboxRelayBoxTest extends SharedTradingCoreBox {
 

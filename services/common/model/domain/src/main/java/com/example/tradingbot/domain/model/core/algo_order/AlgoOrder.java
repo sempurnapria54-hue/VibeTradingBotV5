@@ -119,7 +119,7 @@ public class AlgoOrder extends Auditable {
             EnumSet.of(ConditionType.TRAILING_PERCENTS, ConditionType.TRAILING_VALUE);
 
     private static final Map<Status, Set<Status>> ALLOWED_TRANSITIONS = Map.of(
-            Status.CREATED, EnumSet.of(Status.PENDING, Status.ERROR),
+            Status.CREATED, EnumSet.of(Status.PENDING, Status.CANCELED, Status.ERROR),
             Status.PENDING, EnumSet.of(Status.ACTIVE, Status.COMPLETED, Status.CANCELED, Status.ERROR),
             Status.ACTIVE, EnumSet.of(Status.PARTIALLY_COMPLETED, Status.COMPLETED, Status.CANCELED, Status.ERROR),
             Status.PARTIALLY_COMPLETED, EnumSet.of(Status.COMPLETED, Status.CANCELED, Status.ERROR));
@@ -131,7 +131,7 @@ public class AlgoOrder extends Auditable {
 
     /**
      * Заявка стои́т на бирже. Множество у́же {@link #isLive()} ровно на
-     * {@code CREATED}: локально созданная заявка на биржу не отправлена и
+     * {@code CREATED}: у локально созданной заявки приём не подтверждён, и она
      * не покрывает ничего, — поэтому покрытие считается по этому
      * предикату, а не по живости (docs/spec/protection-coverage.json,
      * величина {@code isLive} носителя STANDALONE).
@@ -217,6 +217,26 @@ public class AlgoOrder extends Auditable {
         applyCloseReason(CloseReason.TRIGGERED);
     }
 
+    /**
+     * Приём заявки площадкой не подтверждён: отправки не было либо её ответ
+     * потерян. Биржевого идентификатора у такой заявки нет, и найти её можно
+     * только по клиентскому (docs/lifecycles/AlgoOrder.md).
+     */
+    public Boolean isNotSubmitted() {
+        return Status.CREATED.equals(status);
+    }
+
+    /**
+     * Неотправленная заявка, которую полный цикл добычи не нашёл, до площадки
+     * не дошла: снята локально, ребром из созданного. Причина — стоящее
+     * намерение, иначе {@code NOT_PLACED} (write-once). Контролируемого
+     * исключения нет: пропавшей сущностью заявка, которой на площадке не
+     * было, не является (docs/rules/controlled-exchange-exceptions.md).
+     */
+    public void toNotPlaced() {
+        toCancel(CloseReason.NOT_PLACED);
+    }
+
     /** Отменён: требует ненулевой reason. */
     public void toCancel(CloseReason reason) {
         requireReason(reason);
@@ -274,7 +294,7 @@ public class AlgoOrder extends Auditable {
     /** Доменный статус algo-order. Значения и переходы — docs/lifecycles/AlgoOrder.md. */
     public enum Status {
 
-        /** Локальная сущность создана, на биржу не отправлена. */
+        /** Локальная сущность создана, приём площадкой не подтверждён: отправки не было либо ответ потерян. */
         CREATED,
 
         /** Отправлен на биржу, факт не подтверждён. */
@@ -311,8 +331,14 @@ public class AlgoOrder extends Auditable {
         /** Аварийный safety-flow / kill-switch. */
         KILL_SWITCH,
 
-        /** Не найден после refresh/search/history цикла. */
+        /** Отправленный не найден после refresh/search/history цикла. */
         MISSING_AFTER_REFRESH,
+
+        /**
+         * Не дошёл до площадки: приём не подтверждён, и полный цикл добычи
+         * его не нашёл. Штатный терминал, не ошибка интеграции.
+         */
+        NOT_PLACED,
 
         /** Постановка ордера на бирже не удалась. */
         ORDER_FAILED,

@@ -185,7 +185,7 @@ class AccessContourBoxTest extends SharedBffBox {
     @Test
     @DisplayName("B9.9 — Пер-операционных проверок права у периметра нет")
     void b9_9_thePerimeterHasNoPerOperationRightChecks() {
-        authAnswers(Bodies.memberships(TENANT, "VIEWER"));
+        authAnswers(Bodies.memberships(tenant, "VIEWER"));
         owners.answers(OwnerStub.STRATEGIES, "/api/v1/strategies/definitions", "{\"accepted\": true}");
 
         Answer answer = post("/api/v1/strategies/definitions", "{\"name\": \"b9-9\"}");

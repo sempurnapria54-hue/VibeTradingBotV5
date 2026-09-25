@@ -100,39 +100,6 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
                                          Pageable pageable);
 
     /**
-     * ТЕРМИНАЛЬНЫЕ сделки счёта недавним окном — вторая половина популяции
-     * предусловия снятия холда (docs/rules/manual-halt.md §«Выборка и
-     * производитель предусловия названы»).
-     *
-     * <p><b>Выборка только по нетерминальным была бы пуста ровно на
-     * мотивирующей тропе:</b> остаточный риск живёт и после терминала —
-     * снятие риска у сворачивания best-effort, и подтверждения могло не
-     * прийти.
-     *
-     * <p>Окно обязательно и упорядочено от новых: риск, вернувшийся после
-     * терминала, живёт на недавно закрытой сделке, а история счёта растёт
-     * без предела.
-     */
-    @Query("""
-            select d from DealEntity d
-            where d.exchangeAccountId = :exchangeAccountId and d.status in :statuses
-            order by d.id desc""")
-    List<DealEntity> findRecentTerminalOnAccount(@Param("exchangeAccountId") Long exchangeAccountId,
-                                                 @Param("statuses") Collection<String> statuses,
-                                                 Pageable pageable);
-
-    /** Та же половина радиусом пары «счёт, инструмент». */
-    @Query("""
-            select d from DealEntity d
-            where d.exchangeAccountId = :exchangeAccountId and d.instrumentId = :instrumentId
-              and d.status in :statuses
-            order by d.id desc""")
-    List<DealEntity> findRecentTerminalOnPair(@Param("exchangeAccountId") Long exchangeAccountId,
-                                              @Param("instrumentId") Long instrumentId,
-                                              @Param("statuses") Collection<String> statuses,
-                                              Pageable pageable);
-
-    /**
      * Сделки счёта, которые уводит жёсткая ступень биржевого радиуса, —
      * популяция <b>первого хода энфорсмента</b>
      * (docs/rules/error-handling-policy.md §«Жёсткая ступень энфорсится

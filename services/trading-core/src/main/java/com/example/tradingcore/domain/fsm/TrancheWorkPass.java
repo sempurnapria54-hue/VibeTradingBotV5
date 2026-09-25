@@ -49,7 +49,7 @@ public class TrancheWorkPass {
         }
         StepSelection selection = stepSelector.selectTrancheStep(dealContext, tranche);
         if (isTrue(selection.hasEscalation())) {
-            return expiredData(selection.getEscalation(), tranche);
+            return expiredData(selection.getEscalation(), dealContext.getDeal(), tranche);
         }
         if (isFalse(selection.hasStep())) {
             return TrancheTransition.stay();
@@ -71,12 +71,28 @@ public class TrancheWorkPass {
                 || nonNull(transition.getHoldSignal());
     }
 
-    private TrancheTransition expiredData(MarketDataExpiredAction reaction, DealTranche tranche) {
-        log.warn("Step data expired, reaction applied trancheId={} reaction={}", tranche.getId(), reaction);
+    /**
+     * Реакция на устаревание данных шага.
+     *
+     * <p><b>Просьба о сворачивании у сворачивающейся сделки уже исполнена</b>
+     * и прохода не занимает: сказав её снова, транш каждым тиком запирал бы
+     * свою выходную проверку, а подтверждённый вход идёт к выходу только
+     * через неё (docs/rules/exit-teardown-order.md §«Окно сворачивания:
+     * нового риска не берёт ни один транш»). Жёсткая ступень исполненной не
+     * бывает — её затребование остаётся и под сворачиванием.
+     */
+    private TrancheTransition expiredData(MarketDataExpiredAction reaction, Deal deal, DealTranche tranche) {
         if (isTrue(reaction.isKillSwitch())) {
+            log.warn("Step data expired, reaction applied trancheId={} reaction={}", tranche.getId(), reaction);
             return TrancheTransition.requestRung(
                     HoldSignal.instrument(Constants.Hold.INSTRUMENT_MARKET_DATA_EXPIRED));
         }
+        if (isTrue(deal.isCollapsing())) {
+            log.debug("Step data expired on a collapsing deal, shutdown already under way trancheId={}",
+                    tranche.getId());
+            return TrancheTransition.stay();
+        }
+        log.warn("Step data expired, reaction applied trancheId={} reaction={}", tranche.getId(), reaction);
         return TrancheTransition.requestShutdown(Deal.ShutdownReason.MARKET_DATA_EXPIRED);
     }
 }

@@ -3,6 +3,7 @@ package com.example.tradingcore.box;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.util.List;
@@ -55,6 +56,9 @@ final class PeerStub {
 
     private static final PeerStub MARKET_DATA = new PeerStub("market-data");
 
+    /** Начальное состояние всякого сценария стаба. */
+    static final String INITIAL = Scenario.STARTED;
+
     private final String name;
     private final WireMockServer server;
 
@@ -99,6 +103,17 @@ final class PeerStub {
     /** Забывает и заготовки ответов, и записи запросов. */
     void reset() {
         server.resetAll();
+    }
+
+    /**
+     * Возвращает все сценарии стаба в начальное состояние; заготовки и
+     * записи остаются.
+     *
+     * <p>Им открывается следующая сделка той же клетки: площадка, закрывшая
+     * позицию прошлой сделки, для новой снова отдаёт живую.
+     */
+    void resetScenarios() {
+        server.resetScenarios();
     }
 
     /**
@@ -175,7 +190,7 @@ final class PeerStub {
     void answersInTurn(String path, String... bodies) {
         String scenario = name + ":" + path;
         for (int index = 0; index < bodies.length; index++) {
-            String from = index == 0 ? com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED
+            String from = index == 0 ? Scenario.STARTED
                     : "turn-" + index;
             String to = index == bodies.length - 1 ? from : "turn-" + (index + 1);
             server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
@@ -187,6 +202,94 @@ final class PeerStub {
                             .withHeader("Content-Type", "application/json")
                             .withBody(bodies[index])));
         }
+    }
+
+    /**
+     * Ответы по очереди с НАЗВАННЫМИ кодами: вход клеток, где один путь
+     * сперва отказывает, а потом принимает — отказ повторяемого класса
+     * откладывает команду, не отменяя её.
+     *
+     * @param path     путь
+     * @param statuses коды ответов в порядке вызовов; последний держится
+     * @param bodies   тела ответов в том же порядке
+     */
+    void answersInTurn(String path, List<Integer> statuses, List<String> bodies) {
+        String scenario = name + ":" + path + ":statuses";
+        for (int index = 0; index < bodies.size(); index++) {
+            String from = index == 0 ? Scenario.STARTED : "turn-" + index;
+            String to = index == bodies.size() - 1 ? from : "turn-" + (index + 1);
+            server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
+                    .inScenario(scenario)
+                    .whenScenarioStateIs(from)
+                    .willSetStateTo(to)
+                    .willReturn(WireMock.aResponse()
+                            .withStatus(statuses.get(index))
+                            .withHeader("Content-Type", "application/json")
+                            .withBody(bodies.get(index))));
+        }
+    }
+
+    /**
+     * Команда, ПЕРЕКЛЮЧАЮЩАЯ состояние площадки: ответ {@code 200} с
+     * заданным телом в любом состоянии сценария, и сценарий переходит в
+     * названное.
+     *
+     * <p><b>Состояние площадки меняет команда, а не счёт обращений.</b>
+     * Очередь ответов ({@link #answersInTurn}) знает, СКОЛЬКО раз путь
+     * спросили, но не знает, ушла ли уже команда; число чтений до команды
+     * есть свойство нарезки прохода, и клетка, пиньнувшая его, мерила бы
+     * нарезку. Сценарий отвечает на вопрос, который задаёт и сама
+     * площадка: исполнена ли команда.
+     *
+     * @param scenario имя сценария — одно на сущность площадки
+     * @param path     путь команды
+     * @param body     тело подтверждения
+     * @param newState состояние сценария после команды
+     */
+    void flipsOn(String scenario, String path, String body, String newState) {
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
+                .inScenario(scenario)
+                .willSetStateTo(newState)
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+    }
+
+    /**
+     * Чтение, чей ответ зависит от состояния сценария: до команды — одно
+     * тело, после — другое ({@link #flipsOn}).
+     *
+     * @param scenario имя сценария
+     * @param path     путь чтения
+     * @param state    состояние, в котором действует этот ответ;
+     *                 начальное — {@link #INITIAL}
+     * @param body     тело ответа в этом состоянии
+     */
+    void answersInState(String scenario, String path, String state, String body) {
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
+                .inScenario(scenario)
+                .whenScenarioStateIs(state)
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+    }
+
+    /**
+     * То же чтение с условием на query-параметр: им разводятся ноги
+     * разбора истории, которые площадка отдаёт одним путём.
+     */
+    void answersInStateWhen(String scenario, String path, String state, String parameter, String value,
+                            String body) {
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
+                .inScenario(scenario)
+                .whenScenarioStateIs(state)
+                .withQueryParam(parameter, WireMock.equalTo(value))
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
     }
 
     /**

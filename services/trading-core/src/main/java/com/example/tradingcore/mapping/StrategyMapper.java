@@ -283,6 +283,23 @@ public interface StrategyMapper {
                 .collect(toList());
     }
 
+    /**
+     * Объявления траншей детали из базы в список, упорядоченный КЛЮЧОМ
+     * объявления: коллекция строк порядка не несёт, а по порядку объявлений
+     * отбор входа перебирает входные шаги и заводит транши сделки. Ключ
+     * уникален в пределах детали и задан автором — ответ стабилен между
+     * проходами и между копиями одного определения.
+     */
+    default List<StrategyTranche> tranchesPersistenceToDomain(Set<StrategyTrancheEntity> tranches) {
+        if (isNull(tranches)) {
+            return null;
+        }
+        return tranches.stream()
+                .sorted(comparing(StrategyTrancheEntity::getKey))
+                .map(this::persistenceToDomain)
+                .collect(toList());
+    }
+
     /** Строки шагов транша в карту: ключи в порядке статусной модели, списки по индексу. */
     default Map<DealTranche.Status, List<StrategyStep>> trancheStepsPersistenceToDomain(
             Set<StrategyStepEntity> steps) {

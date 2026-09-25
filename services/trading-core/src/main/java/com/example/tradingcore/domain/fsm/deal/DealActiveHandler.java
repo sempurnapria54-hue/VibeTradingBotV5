@@ -131,9 +131,21 @@ public class DealActiveHandler implements DealHandler {
      * гистерезисом в два тика, и ступень у него та же — биржевая ступень 2
      * (docs/models/domain/aggregate/Deal.md §«Экспозиция сделки и сверка с
      * биржей»).
+     *
+     * <p><b>На неполном графе позиция добывается ПЕРВОЙ.</b> Налив,
+     * наблюдённый без эпизода, делает граф неполным, а на неполном графе
+     * звено добычи ноги не завершается: числа риска пересчитывать нельзя.
+     * Диспетчер останавливается на первом незавершённом звене, и позиция,
+     * стоящая за ногой, не добывалась бы никогда — сделка исчерпала бы
+     * бюджет повторов той же добычи. Эпизод заводит только добыча позиции,
+     * поэтому на этой ветви она идёт до ног.
      */
     private DealTransition reobserveExposure(DealContext dealContext) {
         List<ServiceCommand> observations = new ArrayList<>();
+        Boolean positionFirst = isFalse(dealContext.getGraphComplete());
+        if (isTrue(positionFirst)) {
+            fetch(dealContext, ServiceCommandType.REFRESH_POSITION_COMMAND, null).ifPresent(observations::add);
+        }
         for (DealTranche tranche : emptyIfNull(dealContext.getDeal().getTranches())) {
             tranche.liveOrders().forEach(order -> fetch(dealContext, ServiceCommandType.REFRESH_ORDER_COMMAND,
                     new RefreshOrderCommandPayload(order.getId())).ifPresent(observations::add));
@@ -141,7 +153,9 @@ public class DealActiveHandler implements DealHandler {
                     ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND,
                     new RefreshAlgoOrderCommandPayload(algo.getId())).ifPresent(observations::add));
         }
-        fetch(dealContext, ServiceCommandType.REFRESH_POSITION_COMMAND, null).ifPresent(observations::add);
+        if (isFalse(positionFirst)) {
+            fetch(dealContext, ServiceCommandType.REFRESH_POSITION_COMMAND, null).ifPresent(observations::add);
+        }
         return DealTransition.commands(observations);
     }
 

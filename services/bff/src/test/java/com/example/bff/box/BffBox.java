@@ -52,6 +52,16 @@ import org.springframework.boot.test.web.server.LocalServerPort;
  * из имени клетки, а значение {@code S1} документа кейсов остаётся его
  * приставкой.
  *
+ * <p><b>Тенант у каждой клетки тоже СВОЙ — по той же причине, но на
+ * проводе.</b> Раздача адресует запись по тенанту, а брокер и слушатель
+ * у общего контекста одни на все его клетки: запись, положенная клеткой
+ * и не дождавшаяся её же подписки (отрицание, отвергнутая подписка),
+ * доезжает до слушателя с задержкой опроса либо повторной доставкой
+ * (находка F-14) — и попадает в подписку СЛЕДУЮЩЕЙ клетки того же
+ * тенанта. Клетка, ждущая в проводе ровно свои записи, краснела бы тогда
+ * по порядку прогона, а не по предмету. Значения {@code T1} и {@code T2}
+ * документа кейсов остаются приставками.
+ *
  * <p><b>Свойств контекста здесь не объявлено ни одного, и это
  * несущее.</b> Перечень свойств задаёт КАЖДЫЙ класс кейсов своим методом
  * {@code @DynamicPropertySource}: положение осей конфигурации есть ВХОД
@@ -79,11 +89,11 @@ abstract class BffBox {
     /** Проба живости: единственная открытая точка контура доступа. */
     protected static final String HEALTH = "/actuator/health";
 
-    /** Тенант, которым ходит большинство клеток. */
-    protected static final String TENANT = "T1";
+    /** Приставка тенанта клетки: значение {@code T1} документа кейсов. */
+    private static final String TENANT_PREFIX = "T1";
 
-    /** Второй тенант: им наблюдается радиус потока и пересылки. */
-    protected static final String SECOND_TENANT = "T2";
+    /** Приставка второго тенанта клетки: значение {@code T2} документа кейсов. */
+    private static final String SECOND_TENANT_PREFIX = "T2";
 
     /** Роль, которую владелец членств отдаёт единственному субъекту. */
     protected static final String ROLE = "OWNER";
@@ -144,6 +154,12 @@ abstract class BffBox {
     /** Второй субъект этой клетки: им наблюдается, что ключ кэша — субъект. */
     protected String secondSubject;
 
+    /** Тенант, которым ходит клетка: свой у каждой — см. шапку класса. */
+    protected String tenant;
+
+    /** Второй тенант клетки: им наблюдается радиус потока и пересылки. */
+    protected String secondTenant;
+
     /**
      * Сколько записей лежало во всех темах брокера до этой клетки.
      *
@@ -153,13 +169,15 @@ abstract class BffBox {
      */
     protected Long recordsBefore;
 
-    /** Перед каждой клеткой: слушатель раздаёт, стаб забыл, субъект свой. */
+    /** Перед каждой клеткой: слушатель раздаёт, стаб забыл, субъект и тенант свои. */
     @BeforeEach
     void resetSubstrate(TestInfo about) {
         String cell = about.getTestClass().orElseThrow().getSimpleName()
                 + "-" + about.getTestMethod().orElseThrow().getName();
         subject = IdentityStub.SUBJECT + "-" + cell;
         secondSubject = IdentityStub.SECOND_SUBJECT + "-" + cell;
+        tenant = TENANT_PREFIX + "-" + cell;
+        secondTenant = SECOND_TENANT_PREFIX + "-" + cell;
         if (isTrue(awaitsDelivery())) {
             awaitDelivery();
         }
@@ -294,7 +312,7 @@ abstract class BffBox {
      * говорили бы о нашей вставке, а не о поведении периметра.
      */
     protected void authAnswersOneMembership() {
-        authAnswers(Bodies.memberships(TENANT, ROLE));
+        authAnswers(Bodies.memberships(tenant, ROLE));
     }
 
     /** Ставит названный ответ владельца членств. */
@@ -590,7 +608,7 @@ abstract class BffBox {
      * @return открытая подписка с одной пришедшей записью
      */
     protected Subscription openedStream(String ticket, String eventId) {
-        return openedStreamOf(TENANT, ticket, eventId);
+        return openedStreamOf(tenant, ticket, eventId);
     }
 
     /** Адрес поверхности ящика: им ходит и подписка на поток. */

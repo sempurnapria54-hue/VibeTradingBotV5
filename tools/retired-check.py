@@ -3312,6 +3312,53 @@ RETIRED = [
              r'JWKS-стаб[а-яё]*\s+провайдера\s+идентичности'),
         ),
     },
+    {
+        'name': 'преконтроль окна сворачивания обоснован добором транша в сопровождении',
+        # Снято заходом 167 шага 12 фазы 2 (находка F-24, Д2152): транш в
+        # сопровождении под сворачиванием уходит в выход раньше шага, и довод
+        # называл тропу, которой нет. Что действует теперь — объявляет ключ
+        # `arrived` у каждого носителя популяции.
+        'pattern': r'замещение\s+с\s+увеличением\s+(?:у\s+транша\s+)?в\s+сопровождении'
+                   r'|транш\s+в\s+сопровождении\s+несёт\s+объявленный\s+шаг\s+добора'
+                   r'|Ветвь\s+достижима\s+у\s+транша\s+в\s+сопровождении',
+        'arrived': r'перенос[а-яё]*\s+строки\s+исполнения',
+        'date': '2026-09-25',
+        'source': 'заход 167 шага 12 фазы 2 (F-24, Д2152)',
+        'allowed': ('.claude/work/decision-digest.md',),
+        'population': (
+            ('docs/rules/exit-teardown-order.md', None),
+            ('docs/processes/risk-evaluation.md', None),
+            ('docs/spec/risk-limits.json', None),
+            ('docs/components/TranchePrecheckHandler.md', r'тропу\s+называет\s+дом'),
+            ('services/trading-core/src/main/java/com/example/tradingcore/domain/command/risk/RiskValidator.java',
+             r'перенесённая\s+через\s*\n?\s*\*?\s*проход\s+сворачивания'),
+        ),
+    },
+    {
+        'name': 'финализация входа читается полным наливом ноги',
+        # Снято заходом 168 шага 12 фазы 2 (Д2153): нога, снятая после
+        # частичного налива, вход не финализировала, и транш добывал её
+        # каждым проходом бессрочно. Что действует теперь — объявляет ключ
+        # `arrived` у каждого носителя популяции.
+        'pattern': r'entryLegFilled'
+                   r'|ENTRY_ORDER_FINALIZED:\s*входная\s+нога\s+транша\s+исполнена\s+целиком'
+                   r'|Входная\s+нога\s+транша\s+налита\s+целиком'
+                   r'|Входная\s+нога\s+налита\s+целиком,\s+и\s+живой\s+эпизод',
+        'arrived': r'[Нн]алив[а-яё]*\s+(?:(?:входной\s+)?ноги\s+(?:транша\s+)?)?окончател',
+        'date': '2026-09-25',
+        'source': 'заход 168 шага 12 фазы 2 (Д2153)',
+        'allowed': ('.claude/work/decision-digest.md',),
+        'population': (
+            ('docs/spec/deal-condition.json', None),
+            ('docs/components/TrancheEntrySubmittedHandler.md', None),
+            ('services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/core/order/Order.java',
+             None),
+            ('services/common/strategy-engine/src/main/java/com/example/strategy/engine/condition/StrategyConditionEvaluator.java',
+             None),
+            ('services/trading-core/src/main/java/com/example/tradingcore/domain/fsm/tranche/TrancheEntrySubmittedHandler.java',
+             None),
+        ),
+    },
 ]
 
 

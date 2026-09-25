@@ -14,7 +14,6 @@ import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingcore.config.ManualHaltProperties;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
@@ -67,17 +66,15 @@ final class ManualHaltHarness {
     /** Сервис журнала: строка операции. */
     final AnomalyReportService reports = mock(AnomalyReportService.class);
 
-    /** Объявленные числа поверхности. */
-    final ManualHaltProperties properties = new ManualHaltProperties();
-
     /** Предмет групп. */
     final ManualHaltService manualHalt = new ManualHaltService(accounts, instruments, pairStates,
-            deals, contexts, terminalGate, coordinator, holdService, reports, properties);
+            deals, contexts, terminalGate, coordinator, holdService, reports);
 
     ManualHaltHarness() {
         accountStands(ExchangeAccount.SafetyRung.ACTIVE, ExchangeAccount.Status.ACTIVE);
         instrumentStands(Instrument.SafetyRung.ACTIVE, Instrument.Status.ACTIVE);
-        when(deals.findRiskCandidatesOnScope(anyLong(), any(), any())).thenReturn(List.of());
+        when(deals.findNonTerminalByExchangeAccountId(anyLong())).thenReturn(List.of());
+        when(deals.findNonTerminalOnPair(anyLong(), anyLong())).thenReturn(List.of());
         when(terminalGate.riskProvenAbsent(any(), any(), any())).thenReturn(true);
         when(accounts.clearRung(anyLong(), any(), any())).thenReturn(true);
         when(pairStates.clearRung(anyLong(), anyLong(), any(), any())).thenReturn(true);

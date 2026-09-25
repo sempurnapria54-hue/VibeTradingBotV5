@@ -249,10 +249,44 @@ class TrancheWorkPassTest {
         assertThat(workPass.spoke(TrancheTransition.stay())).isFalse();
     }
 
+    @Test
+    @DisplayName("U22.18 — «управляемое сворачивание» у сворачивающейся сделки: просьба исполнена, блок молчит")
+    void u22_18_aGracefulCloseEscalationOnACollapsingDealIsSilent() {
+        when(stepSelector.selectTrancheStep(any(), any()))
+                .thenReturn(StepSelection.escalated(MarketDataExpiredAction.GRACEFUL_CLOSE));
+
+        TrancheTransition transition = runOnCollapsingDeal();
+
+        assertEmpty(transition);
+        assertThat(workPass.spoke(transition)).isFalse();
+    }
+
+    @Test
+    @DisplayName("U22.19 — «аварийное снятие риска» у сворачивающейся сделки: жёсткая ступень остаётся")
+    void u22_19_aKillSwitchEscalationOnACollapsingDealStillRequestsTheRung() {
+        when(stepSelector.selectTrancheStep(any(), any()))
+                .thenReturn(StepSelection.escalated(MarketDataExpiredAction.KILL_SWITCH));
+
+        TrancheTransition transition = runOnCollapsingDeal();
+
+        HoldSignal rung = transition.getHoldSignal();
+        assertThat(rung.getScope()).isEqualTo(HoldScope.INSTRUMENT);
+        assertThat(rung.getRung()).isEqualTo(HoldRung.HARD);
+        assertThat(rung.getCode()).isEqualTo(Constants.Hold.INSTRUMENT_MARKET_DATA_EXPIRED);
+        assertThat(transition.getShutdownRequested()).isNull();
+    }
+
     // --- сборка ------------------------------------------------------------
 
     private TrancheTransition run() {
         DealContext context = context();
+        return workPass.run(context, context.getDeal().getTranches().getFirst());
+    }
+
+    /** Сделка в координированном выходе, транш на подтверждённом входе. */
+    private TrancheTransition runOnCollapsingDeal() {
+        DealContext context = contextBuilder(deal(Deal.Status.EXIT_PENDING,
+                tranche(TRANCHE_ID, DealTranche.Status.ENTRY_FINALIZED))).build();
         return workPass.run(context, context.getDeal().getTranches().getFirst());
     }
 

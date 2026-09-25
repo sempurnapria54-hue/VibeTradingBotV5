@@ -53,7 +53,7 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
         String ticket = issuedTicket();
 
         try (Subscription stream = subscribe(ticket)) {
-            wire.publish(Wire.CORE_TOPIC, TENANT, "e-b3-1", "DEAL_OPENED", OCCURRED_AT,
+            wire.publish(Wire.CORE_TOPIC, tenant, "e-b3-1", "DEAL_OPENED", OCCURRED_AT,
                     Bodies.dealOpened("D-e-b3-1"));
             stream.awaitFrames(1);
 
@@ -90,11 +90,11 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
         String ticket = issuedTicket();
 
         try (Subscription stream = subscribe(ticket)) {
-            publishDealOpened(SECOND_TENANT, "e-b3-2-foreign");
+            publishDealOpened(secondTenant, "e-b3-2-foreign");
             // Вторая запись предъявлена НАМЕРЕННО: без неё «чужого факта
             // нет» было бы зелено и у мёртвого провода
             // (.claude/tests/cases/bff.md §«Новая ось формы»).
-            publishDealOpened(TENANT, "e-b3-2-own");
+            publishDealOpened(tenant, "e-b3-2-own");
             stream.awaitFrames(1);
 
             assertThat(stream.ids()).containsExactly("e-b3-2-own");
@@ -115,7 +115,7 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
             // Соединение не удерживается открытым, и последующая запись в
             // него не уходит: отказ есть законченный документ.
             assertThat(refused.isOpen()).isFalse();
-            publishDealOpened(TENANT, "e-b3-3");
+            publishDealOpened(tenant, "e-b3-3");
             assertThat(refused.frames()).isEmpty();
         }
     }

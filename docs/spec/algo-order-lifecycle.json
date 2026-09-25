@@ -30,7 +30,8 @@
     },
     {
       "name": "algoTransitionAllowed",
-      "expr": "(isNull(from) && to == 'CREATED') || (from == 'CREATED' && in(to, 'PENDING', 'ERROR')) || (from == 'PENDING' && in(to, 'ACTIVE', 'COMPLETED', 'CANCELED', 'ERROR')) || (from == 'ACTIVE' && in(to, 'PARTIALLY_COMPLETED', 'COMPLETED', 'CANCELED', 'ERROR')) || (from == 'PARTIALLY_COMPLETED' && in(to, 'COMPLETED', 'CANCELED', 'ERROR'))"
+      "note": "Из созданной в отменённую — только тропой «не дошла до площадки»: исчерпанный цикл добычи у неотправленной заявки (docs/lifecycles/AlgoOrder.md).",
+      "expr": "(isNull(from) && to == 'CREATED') || (from == 'CREATED' && in(to, 'PENDING', 'CANCELED', 'ERROR')) || (from == 'PENDING' && in(to, 'ACTIVE', 'COMPLETED', 'CANCELED', 'ERROR')) || (from == 'ACTIVE' && in(to, 'PARTIALLY_COMPLETED', 'COMPLETED', 'CANCELED', 'ERROR')) || (from == 'PARTIALLY_COMPLETED' && in(to, 'COMPLETED', 'CANCELED', 'ERROR'))"
     },
     {
       "name": "reasonRequired",
@@ -58,6 +59,11 @@
       "case": "из созданной сразу в активную нельзя — сперва отправка",
       "state": { "from": "CREATED", "to": "ACTIVE", "closeReason": null },
       "expect": { "algoTransitionAllowed": false }
+    },
+    {
+      "case": "неотправленная заявка, не найденная циклом, снимается из созданной — не дошла до площадки",
+      "state": { "from": "CREATED", "to": "CANCELED", "closeReason": "NOT_PLACED" },
+      "expect": { "algoTransitionAllowed": true }
     },
     {
       "case": "частичное срабатывание достижимо только из активной",

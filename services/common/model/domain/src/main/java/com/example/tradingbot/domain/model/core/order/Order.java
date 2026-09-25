@@ -1,6 +1,8 @@
 package com.example.tradingbot.domain.model.core.order;
 
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -164,22 +166,58 @@ public class Order extends Auditable {
         return LIVE_STATUSES.contains(status);
     }
 
-    /**
-     * Нога налита целиком: завершена с причиной налива.
-     *
-     * <p><b>Частичный налив финализацией не является.</b> Экспозиция такой
-     * ноги ещё меняется, и шаг, объявленный от завершённого входа, сработал
-     * бы на неокончательном размере (docs/spec/deal-condition.json,
-     * величина {@code entryOrderFinalized}).
-     */
+    /** Нога налита целиком: завершена с причиной налива. */
     public Boolean isFilled() {
         return Status.COMPLETED.equals(status) && CloseReason.FILLED.equals(closeReason);
+    }
+
+    /**
+     * Налив ноги окончателен и непуст: она налита целиком либо снята после
+     * частичного налива (docs/spec/deal-condition.json, величина
+     * {@code entryOrderFinalized}).
+     *
+     * <p><b>Финализирует терминал, а не полнота налива.</b> Живая частично
+     * налитая нога ещё меняет экспозицию; снятая — нет, и её налив есть
+     * окончательный размер входа. Недобытый налив снятой ноги нулём не
+     * подменяется и финализацией не читается.
+     */
+    public Boolean hasFinalFill() {
+        return isTrue(isFilled())
+                || (Status.CANCELED.equals(status) && nonNull(accumulatedFillSize)
+                        && accumulatedFillSize.signum() > 0);
     }
 
     /** Есть хотя бы одна active-like (PENDING/ACTIVE) attached-защита. */
     public Boolean hasActiveAttachedProtection() {
         return isNotEmpty(attachedAlgoOrders)
                 && attachedAlgoOrders.stream().anyMatch(protection -> isTrue(protection.isActiveLike()));
+    }
+
+    /**
+     * Приём ноги площадкой не подтверждён: отправки не было либо её ответ
+     * потерян. Биржевого идентификатора у такой ноги нет, и найти её можно
+     * только по клиентскому (docs/lifecycles/Order.md).
+     */
+    public Boolean isNotSubmitted() {
+        return Status.CREATED.equals(status);
+    }
+
+    /**
+     * Неотправленная нога, которую полный цикл добычи не нашёл, до площадки
+     * не дошла: снята локально, и её встроенная защита — намерение, ушедшее
+     * бы вместе с ней, — снимается тем же ходом.
+     *
+     * <p><b>Причина — стоящее намерение, иначе {@code NOT_PLACED}</b>:
+     * причина write-once, и снятие, заказанное до добычи, не перетирается.
+     * Контролируемого исключения здесь нет: пропавшей сущностью нога,
+     * которой на площадке не было, не является
+     * (docs/rules/controlled-exchange-exceptions.md).
+     */
+    public void toNotPlaced() {
+        toCancel(CloseReason.NOT_PLACED);
+        emptyIfNull(attachedAlgoOrders).stream()
+                .filter(protection -> isTrue(protection.canTransitionTo(AttachedAlgoOrder.Status.CANCELED)))
+                .forEach(protection -> protection.toCancel(AttachedAlgoOrder.CloseReason.PARENT_ORDER_CANCELED));
     }
 
     /** Полностью исполнен: COMPLETED + closeReason FILLED (write-once). */
@@ -252,7 +290,7 @@ public class Order extends Auditable {
     /** Доменный статус ordinary order. Значения и переходы — docs/lifecycles/Order.md. */
     public enum Status {
 
-        /** Локальная сущность создана, на биржу не отправлена. */
+        /** Локальная сущность создана, приём площадкой не подтверждён: отправки не было либо ответ потерян. */
         CREATED,
 
         /** Отправлен на биржу, факт постановки не подтверждён. */
@@ -289,11 +327,14 @@ public class Order extends Auditable {
         /** Аварийный safety-flow / kill-switch. */
         KILL_SWITCH,
 
-        /** Условие создания/ожидания ордера больше неактуально (штатно, не ошибка). */
-        CONDITION_EXPIRED,
-
-        /** Не найден после refresh/search/history цикла. */
+        /** Отправленный не найден после refresh/search/history цикла. */
         MISSING_AFTER_REFRESH,
+
+        /**
+         * Не дошёл до площадки: приём не подтверждён, и полный цикл добычи
+         * его не нашёл. Штатный терминал, не ошибка интеграции.
+         */
+        NOT_PLACED,
 
         /** Неизвестный внешний статус. */
         UNKNOWN_EXTERNAL_STATUS,

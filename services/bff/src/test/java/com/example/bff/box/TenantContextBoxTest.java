@@ -40,7 +40,7 @@ class TenantContextBoxTest extends SharedBffBox {
 
         assertThat(answer.status()).isEqualTo(200);
         assertThat(answer.asObject())
-                .containsEntry("tenantId", TENANT)
+                .containsEntry("tenantId", tenant)
                 .containsEntry("role", ROLE)
                 .containsOnlyKeys("tenantId", "role");
         LoggedRequest resolve = owners.single(OwnerStub.AUTH, OwnerStub.MEMBERSHIPS_PATH);
@@ -68,7 +68,7 @@ class TenantContextBoxTest extends SharedBffBox {
     @Test
     @DisplayName("B1.3 — Больше одного членства — отказ, а не молчаливый выбор")
     void b1_3_moreThanOneMembershipIsRefused() {
-        authAnswers(Bodies.membershipsOf(TENANT, SECOND_TENANT));
+        authAnswers(Bodies.membershipsOf(tenant, secondTenant));
 
         Answer answer = get(CONTEXT);
 
@@ -79,7 +79,7 @@ class TenantContextBoxTest extends SharedBffBox {
         // и «T2» часом суток, и отрицание по всему телу краснело бы по
         // часам прогона, а не по тенантам (ловушка TC-141).
         assertThat(answer.body().replace(String.valueOf(answer.asObject().get("occurredAt")), ""))
-                .doesNotContain(TENANT).doesNotContain(SECOND_TENANT);
+                .doesNotContain(tenant).doesNotContain(secondTenant);
 
         // Отказ не кэшируется: следующий запрос того же субъекта снова
         // зовёт владельца — иначе промах решался бы однажды и навсегда.
@@ -141,7 +141,7 @@ class TenantContextBoxTest extends SharedBffBox {
                 Map.of(TENANT_HEADER, sent, ROLE_HEADER, ROLE));
 
         assertThat(answer.status()).isEqualTo(200);
-        assertThat(answer.asObject()).containsEntry("tenantId", TENANT);
+        assertThat(answer.asObject()).containsEntry("tenantId", tenant);
         assertThat(answer.body()).doesNotContain(sent);
         LoggedRequest resolve = owners.single(OwnerStub.AUTH, OwnerStub.MEMBERSHIPS_PATH);
         assertThat(resolve.getUrl()).doesNotContain(sent);

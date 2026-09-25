@@ -140,7 +140,7 @@ public final class Side {
         command.add("--server.tomcat.accesslog.prefix=" + ACCESS_PREFIX);
         command.add("--server.tomcat.accesslog.suffix=" + ACCESS_SUFFIX);
         command.add("--server.tomcat.accesslog.buffered=false");
-        command.add("--server.tomcat.accesslog.pattern=%m %U%q %s %{X-Tenant-Id}i %{Authorization}i");
+        command.add("--server.tomcat.accesslog.pattern=%m %U%q %s %{X-Tenant-Id}i %{X-Tenant-Role}i %{Authorization}i");
         try {
             process = new ProcessBuilder(command)
                     .redirectErrorStream(true)
@@ -345,14 +345,16 @@ public final class Side {
      * @param uri           путь с запросом
      * @param status        код ответа
      * @param tenant        значение заголовка контекста тенанта; {@code -} — заголовка не было
+     * @param role          значение заголовка роли в контексте тенанта; {@code -} — заголовка не было
      * @param authorization значение заголовка {@code Authorization}; {@code -} — заголовка не было
      */
-    public record Access(String method, String uri, Integer status, String tenant, String authorization) {
+    public record Access(String method, String uri, Integer status, String tenant, String role,
+                         String authorization) {
 
         static Access parse(String line) {
-            String[] parts = line.split(" ", 5);
-            return new Access(parts[0], parts[1], Integer.valueOf(parts[2]), parts[3],
-                    parts.length > 4 ? parts[4] : "-");
+            String[] parts = line.split(" ", 6);
+            return new Access(parts[0], parts[1], Integer.valueOf(parts[2]), parts[3], parts[4],
+                    parts.length > 5 ? parts[5] : "-");
         }
 
         /** Путь без запроса. */

@@ -108,18 +108,6 @@ public class StrategyDetail extends Auditable {
     }
 
     /**
-     * Единственное входное объявление детали — то, чьи PRECHECK-шаги
-     * несут вход. Их у торгуемой детали ровно одно
-     * (docs/rules/strategy-validation.md); пусто — детали входа нет.
-     */
-    public StrategyTranche entryTranche() {
-        return emptyIfNull(tranches).stream()
-                .filter(tranche -> isTrue(tranche.isEntryDeclaration()))
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
      * Объявление по его идентификатору — резолв «транш сделки → его
      * объявление». Пусто, если объявления нет: так у восстановленного
      * транша, и это факт его тропы, а не недогруженное дерево.
@@ -135,12 +123,20 @@ public class StrategyDetail extends Auditable {
     }
 
     /**
-     * Entry-шаги детали — шаги входного объявления; пусто, если входного
-     * объявления нет.
+     * Входные шаги детали — шаги ВСЕХ её входных объявлений, в порядке
+     * объявлений; пусто, если входного объявления нет.
+     *
+     * <p><b>Объявлений со входом у детали может быть несколько</b>: создание
+     * требует хотя бы одного (docs/rules/strategy-validation.md, траншевое), и
+     * отбор входа находит шаг входа любого транша детали
+     * (docs/components/EntryScannerJob.md). Шаги одного объявления на месте
+     * всех давали бы вход по произвольному из них — тому, что оказался первым.
      */
     public List<StrategyStep> entrySteps() {
-        StrategyTranche entry = entryTranche();
-        return isNull(entry) ? List.of() : entry.entrySteps();
+        return emptyIfNull(tranches).stream()
+                .filter(tranche -> isTrue(tranche.isEntryDeclaration()))
+                .flatMap(tranche -> tranche.entrySteps().stream())
+                .collect(Collectors.toList());
     }
 
     /**

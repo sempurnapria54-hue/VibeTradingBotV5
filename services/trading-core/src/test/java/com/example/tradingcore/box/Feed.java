@@ -1,5 +1,7 @@
 package com.example.tradingcore.box;
 
+import static java.util.Objects.isNull;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -381,6 +383,56 @@ final class Feed {
     }
 
     /**
+     * Добытая нога, налитая ЧАСТЬЮ: налив меньше размера, а встроенная
+     * защита стоит в её теле.
+     *
+     * <p><b>Защита в теле подаётся, и это несущее.</b> У живого родителя
+     * цикла добычи материализованной записи нет, и живость защиты
+     * резолвится по предъявлению в теле плюс наливу
+     * ({@code AttachedAlgoOrderStateResolver}): тело без элемента оставило
+     * бы защиту неподтверждённой, и покрытие частично налитого входа не
+     * сошлось бы.
+     *
+     * @param externalId           биржевой идентификатор ноги
+     * @param internalId           её клиентский идентификатор
+     * @param status               доменный статус: живой частичный налив либо снятая нога
+     * @param size                 размер ноги в контрактах
+     * @param filled               налитый размер — меньше размера
+     * @param protectionInternalId клиентский идентификатор встроенной защиты
+     * @param stopTrigger          цена срабатывания её стопа
+     */
+    static String partiallyFilledOrder(String externalId, String internalId, String status, String size,
+                                       String filled, String protectionInternalId, String stopTrigger) {
+        return """
+                {
+                  "internalId": "%s",
+                  "externalId": "%s",
+                  "status": "%s",
+                  "type": "ENTRY_ATTACHED_STOP_LOSS",
+                  "side": "BUY",
+                  "externalStatus": "%s",
+                  "size": "%s",
+                  "accumulatedFillSize": "%s",
+                  "averagePrice": "100",
+                  "fee": "-0.05",
+                  "attachedAlgoOrders": [
+                    {
+                      "internalId": "%s",
+                      "type": "ATTACHED_STOP_LOSS",
+                      "size": "%s",
+                      "stopLossTriggerPrice": "%s",
+                      "triggerPriceType": "LAST"
+                    }
+                  ],
+                  "externalCreatedAt": "2026-09-20T10:00:01Z",
+                  "externalModifiedAt": "2026-09-20T10:00:03Z"
+                }
+                """.formatted(internalId, externalId, status,
+                "CANCELED".equals(status) ? "canceled" : "partially_filled", size, filled,
+                protectionInternalId, size, stopTrigger);
+    }
+
+    /**
      * Встроенная защита, развёрнутая источником в САМОСТОЯТЕЛЬНУЮ живую
      * условную заявку: форма, которой коннектор отвечает на перечень живых
      * материализованных защит инструмента.
@@ -407,6 +459,27 @@ final class Feed {
                   "triggerPriceType": "LAST"
                 }
                 """.formatted(internalId, externalId, size, stopTrigger);
+    }
+
+    /**
+     * Добытая ОТДЕЛЬНАЯ условная заявка: форма доменной условной заявки,
+     * которой коннектор отвечает на её поиск.
+     *
+     * <p><b>Тело несёт только наблюдённое состояние, и это несущее.</b>
+     * Перенос добытого в нашу строку пропускает пустые поля
+     * ({@code AlgoOrderMapper#updateFromFetched}), а один ответ стаба
+     * получают все заявки клетки: род условия или биржевой идентификатор в
+     * нём переписали бы их у каждой заявки на один и тот же.
+     *
+     * @param status доменный статус, наблюдённый у источника
+     */
+    static String algoOrderInStatus(String status) {
+        return """
+                {
+                  "status": "%s",
+                  "externalStatus": "%s"
+                }
+                """.formatted(status, "CANCELED".equals(status) ? "canceled" : "live");
     }
 
     /**
@@ -442,6 +515,74 @@ final class Feed {
                 }
                 """.formatted(externalId, externalInstrumentId, size, entryPrice, entryPrice,
                 createdAt, createdAt);
+    }
+
+    /**
+     * Запись закрытия эпизода позиции: форма, которой коннектор отвечает на
+     * перечень закрытых эпизодов окном.
+     *
+     * <p><b>Реализованный результат и есть признак добытой записи</b>
+     * ({@code Position#closeRecordFetched}): эпизод, закрытый без него,
+     * ждёт своей записи, и добыча, её не нашедшая, звена не завершает.
+     *
+     * @param externalId     биржевой идентификатор эпизода — половина его адреса
+     * @param createdAt      биржевой момент открытия — вторая половина
+     * @param closedAt       биржевой момент закрытия
+     * @param realizedProfit реализованный результат эпизода
+     */
+    static String closedPosition(String externalId, String createdAt, String closedAt, String realizedProfit) {
+        return """
+                {
+                  "externalId": "%s",
+                  "externalInstrumentId": "BTC-USDT-SWAP",
+                  "status": "CLOSED",
+                  "direction": "LONG",
+                  "externalSize": "0",
+                  "externalRealizedProfit": "%s",
+                  "externalRealizedProfitGross": "%s",
+                  "externalResultCurrency": "USDT",
+                  "externalCloseAveragePrice": "100",
+                  "externalCloseType": "2",
+                  "externalFee": "0",
+                  "externalFundingCost": "0",
+                  "externalCreatedAt": "%s",
+                  "externalModifiedAt": "%s"
+                }
+                """.formatted(externalId, realizedProfit, realizedProfit, createdAt, closedAt);
+    }
+
+    /**
+     * Движение средств счёта: форма, которой коннектор отвечает на перечень
+     * движений окном.
+     *
+     * <p><b>Категории у движения на проводе нет</b> — её выводит ядро из
+     * сырого типа и подтипа по отображению контура (ключ
+     * {@code exchange-contour} конфигурации): тип вне отображения садится в
+     * принимающую корзину, и это предмет клетки {@code B13.6}.
+     *
+     * @param billId  биржевой идентификатор движения
+     * @param type    сырой тип движения у площадки
+     * @param subType сырой подтип; пусто — подтипа нет
+     * @param amount  сумма движения в валюте расчёта
+     * @param orderId биржевой идентификатор заявки, породившей движение
+     * @param moment  биржевой момент движения
+     */
+    static String bill(String billId, String type, String subType, String amount, String orderId, String moment) {
+        return """
+                {
+                  "externalBillId": "%s",
+                  "externalType": "%s",
+                  "externalSubType": %s,
+                  "amount": "%s",
+                  "positionBalanceChange": "0",
+                  "externalFee": "0",
+                  "ccy": "USDT",
+                  "externalInstrumentId": "BTC-USDT-SWAP",
+                  "externalOrderId": "%s",
+                  "externalCreatedAt": "%s"
+                }
+                """.formatted(billId, type, isNull(subType) ? "null" : "\"" + subType + "\"", amount,
+                orderId, moment);
     }
 
     /**

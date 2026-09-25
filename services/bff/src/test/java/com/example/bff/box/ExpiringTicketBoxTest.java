@@ -66,7 +66,7 @@ class ExpiringTicketBoxTest extends BffBox {
             // ДОЕХАВШЕЙ записью, а не признаком живости соединения:
             // открытый сокет сам по себе о раздаче не говорит ничего.
             assertThat(established.isOpen()).isTrue();
-            publishDealOpened(TENANT, "e-after-expiry");
+            publishDealOpened(tenant, "e-after-expiry");
             established.awaitFrames(2);
 
             assertThat(established.ids()).containsExactly("e-before-expiry", "e-after-expiry");
@@ -81,7 +81,7 @@ class ExpiringTicketBoxTest extends BffBox {
 
         try (Subscription established = openedStream(ticket, "e-b3-11-before")) {
             pause();
-            publishDealOpened(TENANT, "e-b3-11-after");
+            publishDealOpened(tenant, "e-b3-11-after");
             established.awaitFrames(2);
 
             // Открытая подписка запись получает: проверка стои́т на

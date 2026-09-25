@@ -4,7 +4,11 @@ import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
+import com.example.tests.e2e.Json;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,16 +34,12 @@ import static org.assertj.core.api.Assertions.tuple;
  * (.claude/tests/cases/e2e-strategy-to-deal.md §«E6 — Журнал и полнота приёма
  * обеих durable-групп»).
  *
- * <p><b>Кейс {@code E6.1} здесь не живёт:</b> его предусловие — тропа,
- * доведённая до отправки заявки, — стоит за копией определения у ядра и
- * гейтится находкой {@code F6} (§«Кейсы, не прогоняемые сегодня» документа).
- *
- * <p><b>Порядок методов несущий, и он единственный в наборе:</b>
+ * <p><b>Порядок методов несущий:</b>
  * {@code E6.2} останавливает приём журнала по паре с темой владельца
  * определений, и остановка переживает кейс — снимает её только правка
  * производителя (docs/rules/durable-consumer-reception.md). Поэтому
  * {@code E6.2} идёт последним, а {@code E6.3}, которому нужен неостановленный
- * приём, — первым.
+ * приём, — первым, а {@code E6.1}, которому нужен приём обеих тем, — вторым.
  */
 @Tag("e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -106,7 +106,57 @@ class JournalReceptionPathTest {
 
     @Test
     @Order(2)
-    @Tag("debt")
+    @DisplayName("E6.1 — Классы обеих тем тропы ложатся строками одной группы журнала")
+    void e6_1_theClassesOfBothTopicsLandAsRowsOfOneJournalGroup() {
+        String definition = trail.activeDefinition();
+        String dealId = trail.openDeal();
+        trail.entrySubmitted();
+        trail.relayCore();
+        Long coreOutbox = trail.database(Party.TRADING_CORE).count("outbox_events");
+        Long ownerOutbox = trail.database(Party.STRATEGIES).count("outbox_events");
+        trail.forgetTraces();
+
+        Database audit = trail.database(Party.AUDIT);
+        Trail.await("E6.1: журнал принял классы обоих производителей", () -> audit.query(
+                "select id from audit_records where strategy_internal_id = ? or deal_internal_id = ?",
+                definition, dealId).size() >= 3);
+
+        List<Map<String, Object>> rows = audit.query(
+                "select event_id, event_type, occurred_at, content from audit_records"
+                        + " where (strategy_internal_id = ? and event_type = 'STRATEGY_ACTIVATED')"
+                        + " or deal_internal_id = ?", definition, dealId);
+        assertThat(rows).as("E6.1: строки обоих производителей — классы владельца определений и ядра")
+                .extracting(row -> row.get("event_type"))
+                .containsExactlyInAnyOrder("STRATEGY_ACTIVATED", "DEAL_OPENED", "ORDER_DECIDED");
+        Map<String, ConsumerRecord<String, String>> published = new LinkedHashMap<>();
+        for (String topic : List.of(Substrate.STRATEGY_TOPIC, Substrate.CORE_TOPIC)) {
+            trail.records(topic).forEach(record -> published.put(headersOf(record).get("eventId"), record));
+        }
+        assertThat(rows).allSatisfy(row -> {
+            ConsumerRecord<String, String> record = published.get(String.valueOf(row.get("event_id")));
+            assertThat(record).as("E6.1: у строки есть запись темы").isNotNull();
+            assertThat(((Timestamp) row.get("occurred_at")).toInstant())
+                    .as("E6.1: момент происшествия — момент конверта, а не приёма")
+                    .isEqualTo(OffsetDateTime.parse(headersOf(record).get("occurredAt")).toInstant()
+                            .truncatedTo(ChronoUnit.MICROS));
+            assertThat(Json.tree(String.valueOf(row.get("content"))))
+                    .as("E6.1: содержимое доставлено как есть").isEqualTo(Json.tree(record.value()));
+        });
+        assertThat(trail.database(Party.STATISTICS).query(
+                "select event_id from incident_facts where event_type like 'STRATEGY%'"))
+                .as("E6.1: строк классов владельца определений у статистики нет").isEmpty();
+        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events"))
+                .as("E6.1: приём журнала ядру следствий не возвращает").isEqualTo(coreOutbox);
+        assertThat(trail.database(Party.STRATEGIES).count("outbox_events"))
+                .as("E6.1: приём журнала владельцу следствий не возвращает").isEqualTo(ownerOutbox);
+        for (Party party : List.of(Party.TRADING_CORE, Party.STRATEGIES, Party.CONNECTOR)) {
+            assertThat(trail.accesses(party)).as("E6.1: приём журнала к стороне " + party.module() + " не ходит")
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    @Order(3)
     @DisplayName("E6.2 — Неполный конверт от производителя останавливает приём журнала")
     void e6_2_anIncompleteEnvelopeHaltsTheJournalReception() {
         trail.retireActiveDefinitions();
@@ -119,6 +169,7 @@ class JournalReceptionPathTest {
         String incompleteId = UUID.randomUUID().toString();
         incomplete.put("eventId", incompleteId);
         Long incompleteOffset = trail.endOffset(Substrate.STRATEGY_TOPIC);
+        Long incidents = trail.database(Party.STATISTICS).count("incident_facts");
 
         trail.produce(Substrate.STRATEGY_TOPIC, activation.key(), activation.value(), incomplete);
         trail.moveDefinition(first, "INACTIVE");
@@ -136,7 +187,7 @@ class JournalReceptionPathTest {
                 second, "STRATEGY_ACTIVATED")).as("E6.2: строки следующей записи нет — приём по паре остановлен")
                 .isEmpty();
         assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E6.2: следа у статистики нет")
-                .isZero();
+                .isEqualTo(incidents);
         Trail.await("E6.2: ядро неполную запись пропустило и смещение продвинуло",
                 () -> trail.committedOffset(CORE_GROUP, Substrate.STRATEGY_TOPIC) > incompleteOffset);
 

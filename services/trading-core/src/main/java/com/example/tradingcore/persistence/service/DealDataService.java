@@ -1,7 +1,6 @@
 package com.example.tradingcore.persistence.service;
 
 import static com.example.tradingbot.domain.util.EnumNames.name;
-import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
@@ -12,7 +11,6 @@ import com.example.tradingcore.mapping.DealMapper;
 import com.example.tradingcore.persistence.repository.DealRepository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -104,7 +102,9 @@ public class DealDataService {
 
     /**
      * Нетерминальные сделки счёта — популяция каскадного снятия риска
-     * биржевого радиуса (docs/components/KillSwitchService.md).
+     * биржевого радиуса (docs/components/KillSwitchService.md) и предусловия
+     * снятия холда того же радиуса (docs/rules/manual-halt.md §«Выборка и
+     * производитель предусловия названы»).
      */
     @Transactional(readOnly = true)
     public List<Deal> findNonTerminalByExchangeAccountId(Long exchangeAccountId) {
@@ -115,9 +115,9 @@ public class DealDataService {
 
     /**
      * Нетерминальные сделки пары «счёт, инструмент» — популяция снятия риска
-     * инструментного радиуса (docs/components/KillSwitchService.md). Слот
-     * пары держит не больше одной незакрытой сделки, поэтому окна выборка не
-     * требует.
+     * инструментного радиуса (docs/components/KillSwitchService.md) и
+     * предусловия снятия холда того же радиуса. Слот пары держит не больше
+     * одной незакрытой сделки, поэтому окна выборка не требует.
      */
     @Transactional(readOnly = true)
     public List<Deal> findNonTerminalOnPair(Long exchangeAccountId, Long instrumentId) {
@@ -137,36 +137,6 @@ public class DealDataService {
         return repository.findRecentOnAccount(exchangeAccountId, PageRequest.of(0, limit)).stream()
                 .map(mapper::persistenceToDomain)
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * Сделки радиуса, по которым предусловие снятия холда проверяет живой
-     * риск: <b>нетерминальные целиком плюс терминальные недавним окном</b>
-     * (docs/rules/manual-halt.md §«Выборка и производитель предусловия
-     * названы»).
-     *
-     * <p>Нетерминальные окна не требуют: слот пары держит не больше одной
-     * незакрытой сделки, то есть их не больше, чем инструментов контура.
-     * Терминальные требуют — история счёта растёт без предела.
-     *
-     * @param instrumentId инструмент радиуса; пусто — радиус счёта целиком
-     */
-    @Transactional(readOnly = true)
-    public List<Deal> findRiskCandidatesOnScope(Long exchangeAccountId, Long instrumentId,
-                                                Integer terminalWindow) {
-        List<Deal> candidates = new ArrayList<>(isNull(instrumentId)
-                ? repository.findByExchangeAccountIdAndStatusNotIn(exchangeAccountId, TERMINAL_STATUSES)
-                        .stream().map(mapper::persistenceToDomain).collect(Collectors.toList())
-                : repository.findByExchangeAccountIdAndInstrumentIdAndStatusNotIn(exchangeAccountId,
-                                instrumentId, TERMINAL_STATUSES)
-                        .stream().map(mapper::persistenceToDomain).collect(Collectors.toList()));
-        PageRequest window = PageRequest.of(0, terminalWindow);
-        candidates.addAll((isNull(instrumentId)
-                ? repository.findRecentTerminalOnAccount(exchangeAccountId, TERMINAL_STATUSES, window)
-                : repository.findRecentTerminalOnPair(exchangeAccountId, instrumentId, TERMINAL_STATUSES,
-                        window))
-                .stream().map(mapper::persistenceToDomain).collect(Collectors.toList()));
-        return candidates;
     }
 
     /**

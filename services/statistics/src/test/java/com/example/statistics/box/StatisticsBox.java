@@ -1,5 +1,6 @@
 package com.example.statistics.box;
 
+import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.statistics.domain.jobs.AggregateRecomputeJob;
@@ -365,6 +366,33 @@ abstract class StatisticsBox {
                 .until(() -> {
                     receptionStateJob.tick();
                     return Objects.equals(rows.count(RECEPTION_TABLE), (long) subscription().size());
+                });
+    }
+
+    /**
+     * Подаёт такт тика приёма — до тех пор, пока клиент не отдал остаток
+     * непринятого по каждой паре подписки.
+     *
+     * <p><b>Строк приёма для этого мало, и довод — в писателе величины.</b>
+     * Строки тик пишет на самом назначении партиций, а ряд попартиционного
+     * лага у клиента появляется только после первой выборки из партиции
+     * ({@code ConsumerLagProvider}). Такт, поданный между двумя моментами,
+     * законно кладёт ряды возраста и порога без ряда остатка — и клетка,
+     * открывшаяся первой на свежем контексте либо на контексте, снятом с
+     * паузы кэша, попадает ровно в это окно.
+     *
+     * <p>Остаток читается выдачей под принципалом: анонимный съём остаётся
+     * входом клетки, а не её предусловием.
+     */
+    protected void givenMeasuredLag() {
+        givenReceptionStateRows();
+        Awaitility.await()
+                .atMost(RECEPTION_WAIT)
+                .pollInterval(POLL)
+                .until(() -> {
+                    receptionStateJob.tick();
+                    return subscription().stream()
+                            .allMatch(topic -> nonNull(metricRowOf(UNCONSUMED_ROW, topic)));
                 });
     }
 

@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -49,28 +47,16 @@ import org.junit.jupiter.api.Test;
  * классами:</b> выключатель тика — {@link DisabledDetectionBoxTest}, окно
  * выборки контура — {@link DetectionContourWindowBoxTest}.
  */
-class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
+class ProactiveDetectionBoxTest extends SharedLiveDealBox {
 
     /** Основа идентичности определения группы. */
     private static final String DEFINITION = "S-SCAN";
 
-    /** Биржевой момент, который отдаёт коннектор. */
-    private static final String EXCHANGE_MOMENT = "2026-09-20T10:00:00Z";
-
-    /** Последняя цена момента. */
-    private static final String LAST_PRICE = "100";
-
     /** Биржевой момент открытия наблюдённого эпизода: половина его адреса. */
     private static final String POSITION_MOMENT = "2026-09-20T10:00:05Z";
 
-    /** Отсутствие ступени: рабочее состояние радиуса. */
-    private static final String NO_RUNG = "ACTIVE";
-
     /** Мягкая ступень биржевого счёта. */
     private static final String HOLD = "HOLD";
-
-    /** Жёсткая ступень обоих радиусов: сворачивание. */
-    private static final String TRADE_BLOCKED = "TRADE_BLOCKED";
 
     /** Мягкая ступень инструментного радиуса: запрет входов. */
     private static final String ENTRY_BLOCKED = "ENTRY_BLOCKED";
@@ -98,6 +84,12 @@ class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
 
     /** Код локально терминальной сущности, живой на бирже. */
     private static final String TERMINAL_ALIVE = "LOCAL_TERMINAL_ALIVE_ON_EXCHANGE";
+
+    /** Код расхождения суммы экспозиций траншей с нетто-размером эпизода. */
+    private static final String EXPOSURE_MISMATCH = "EXCHANGE_EXPOSURE_MISMATCH";
+
+    /** Нетто-размер эпизода, заведомо не равный наливу входа. */
+    private static final String DIVERGED_NET_SIZE = "3";
 
     /** Код непроэнфорсенной жёсткой ступени радиуса. */
     private static final String RUNG_NOT_ENFORCED = "SAFETY_RUNG_NOT_ENFORCED";
@@ -310,6 +302,27 @@ class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
+    @DisplayName("B7.7 — расхождение суммы экспозиций с нетто-размером сворачивает счёт")
+    void theExposureSumDivergingFromTheNetSizeTearsTheAccountDown() {
+        standDivergedEpisode();
+        standScan(Feed.array(livePositionOf(DIVERGED_NET_SIZE)), Feed.emptyArray(), Feed.emptyArray());
+        connector.answers(closurePath(ACCOUNT), Feed.ack("ex-close-1", "close-1"));
+
+        tick(Tick.ANOMALY_DETECTION);
+        // Признак сравнивает базу с биржей и подтверждается следующим тиком:
+        // на первом ступени нет, есть наблюдательная строка.
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        assertThat(codesOfReports()).containsExactly(EXPOSURE_MISMATCH);
+        ageObservations();
+        tick(Tick.ANOMALY_DETECTION);
+
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(codesOfReports()).containsOnly(EXPOSURE_MISMATCH);
+        // Живой риск снимается: он есть, но ни одному траншу не приписан.
+        assertThat(connector.requests(closurePath(ACCOUNT))).isNotEmpty();
+    }
+
+    @Test
     @DisplayName("B7.8 — неполный срез заставляет прочие детекторы молчать")
     void theIncompleteSliceSilencesTheOtherDetectors() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
@@ -459,21 +472,6 @@ class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
     }
 
     /**
-     * Отодвигает назад момент СТОЯЩИХ наблюдательных строк, чтобы
-     * следующий тик читал их подтверждением признака.
-     *
-     * <p><b>Строк она не заводит и содержания их не трогает:</b> предмет
-     * правки — только возраст строки, которую завёл сам сервис. Второй тик
-     * иначе обязан был бы отстоять от первого на минимальный возраст
-     * подтверждения, то есть платить тридцать секунд стенных часов за
-     * каждую клетку с гистерезисом; подменять эту величину конфигурацией
-     * нельзя — ровно её мерит {@code B7.11}.
-     */
-    private void ageObservations() {
-        rows.put("update anomaly_reports set created_at = created_at - interval '2 minutes'");
-    }
-
-    /**
      * Активная сделка счёта: ею ставится операнд «пара объяснена живой
      * сделкой», без которого детекторы хвостов и непрошеной позиции
      * срабатывали бы на каждом штатном входе.
@@ -552,133 +550,32 @@ class ProactiveDetectionBoxTest extends SharedTradingCoreBox {
                 "2026-09-20T10:00:06Z");
     }
 
-    /** Строка биржевого счёта, как её видит база. */
-    private Map<String, Object> accountRow() {
-        return rows.row("exchange_accounts", "internal_id", ACCOUNT);
-    }
-
-    /** Ступень счёта, как её видит база. */
-    private String accountRung() {
-        return String.valueOf(accountRow().get("safety_rung"));
+    /**
+     * Сделка, чья сумма экспозиций траншей НЕ сходится с нетто-размером её
+     * живого эпизода: вход налит целиком, а площадка отдаёт эпизод меньшего
+     * размера.
+     *
+     * <p><b>Оба операнда поставлены ТРОПОЙ ЯЩИКА:</b> экспозиция транша —
+     * наливом, наблюдённым добычей ноги, нетто-размер — эпизодом, добытым
+     * следующим проходом (docs/models/domain/aggregate/Deal.md
+     * §«Экспозиция сделки и сверка с биржей»). Детектор читает эпизод из
+     * базы, а не срез площадки, поэтому расхождение обязано лечь в базу.
+     */
+    private void standDivergedEpisode() {
+        submitEntry(workingDefinition());
+        String size = entrySize();
+        connector.answers(lookupPath(ACCOUNT), Feed.filledOrder(entryExternalId(), entryClientId(), size, LAST_PRICE));
+        connector.answers(positionPath(ACCOUNT), livePositionOf(DIVERGED_NET_SIZE));
+        connector.answers(pendingProtectionsPath(ACCOUNT), Feed.array(Feed.materializedProtection(
+                protectionClientId(), protectionExternalId(), size, protectionTrigger())));
+        passesUntil(() -> rows.count("positions") == 1L);
+        assertThat(rows.all("positions").getFirst().get("external_size").toString())
+                .startsWith(DIVERGED_NET_SIZE + ".");
+        PeerStub.all().forEach(PeerStub::forgetRequests);
     }
 
     /** Счёт подряд идущих ненаблюдённых проходов на строке счёта. */
     private Integer blindPasses() {
         return ((Number) accountRow().get("blind_pass_count")).intValue();
-    }
-
-    /** Ступень пары «счёт, инструмент»; строки пары нет — рабочее состояние. */
-    private String pairRung(String instrumentInternalId) {
-        List<Map<String, Object>> found = rows.select("select * from account_instrument_states"
-                        + " where exchange_account_id = ? and instrument_id = ?",
-                accountId(ACCOUNT), instrumentId(instrumentInternalId));
-        return found.isEmpty() ? NO_RUNG : String.valueOf(found.getFirst().get("safety_rung"));
-    }
-
-    /** Машинные коды заведённых отчётов в порядке записи. */
-    private List<String> codesOfReports() {
-        return rows.allOrderedBy("anomaly_reports", "id").stream()
-                .map(row -> String.valueOf(row.get("code")))
-                .toList();
-    }
-
-    /** Классы событий строк outbox в порядке записи. */
-    private List<String> eventTypes() {
-        return rows.all("outbox_events").stream()
-                .map(row -> String.valueOf(row.get("event_type")))
-                .toList();
-    }
-
-    /** Сколько строк outbox несёт названный класс. */
-    private Long countEvents(String eventType) {
-        return eventTypes().stream().filter(eventType::equals).count();
-    }
-
-    /** Путь чтения связки фич момента у владельца рыночных данных. */
-    private String featuresPath(String instrumentInternalId) {
-        return PEER_INSTRUMENTS + "/" + instrumentInternalId + "/features";
-    }
-
-    /** Корень путей счёта у коннектора. */
-    private String accountPath(String accountInternalId) {
-        return "/api/v1/accounts/" + accountInternalId;
-    }
-
-    /** Путь чтения снимка средств у коннектора. */
-    private String balancePath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/balance";
-    }
-
-    /** Путь приватного чтения ставок комиссии у коннектора. */
-    private String feeRatePath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/trade-fee-rates";
-    }
-
-    /** Путь размещения обычной заявки у коннектора. */
-    private String placementPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/orders";
-    }
-
-    /** Первая нога лестницы добычи: поиск ноги по идентификатору. */
-    private String lookupPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/orders/lookup";
-    }
-
-    /** Путь снятия обычной заявки: первый ход снятия живого риска. */
-    private String cancellationPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/orders/cancellations";
-    }
-
-    /** Рыночное закрытие позиции: второй ход снятия живого риска. */
-    private String closurePath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/positions/closures";
-    }
-
-    /** Живой эпизод позиции по инструменту: след хода снятия риска. */
-    private String positionPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/positions/instrument";
-    }
-
-    /** История закрытых эпизодов: нога 2 добычи позиции. */
-    private String closedPositionsPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/positions/closed";
-    }
-
-    /** Живые заявки счёта целиком: первый срез проактивной детекции. */
-    private String pendingOrdersPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/orders/pending";
-    }
-
-    /** Живые отдельные условные заявки счёта целиком: второй срез. */
-    private String pendingAlgoOrdersPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/algo-orders/pending";
-    }
-
-    /** Живые позиции счёта целиком: третий срез. */
-    private String positionsPath(String accountInternalId) {
-        return accountPath(accountInternalId) + "/positions";
-    }
-
-    /** Снимок средств моментом прогона: возраст ставится В ДАННЫХ. */
-    private String balanceBody() {
-        String moment = OffsetDateTime.now(ZoneOffset.UTC).toString();
-        return """
-                {
-                  "externalUpdatedAt": "%s",
-                  "externalTotalEquity": "100000",
-                  "externalAdjustedEquity": "100000",
-                  "externalAvailableEquity": "100000",
-                  "balances": [
-                    {
-                      "externalCurrency": "USDT",
-                      "externalUpdatedAt": "%s",
-                      "externalEquity": "100000",
-                      "externalCashBalance": "100000",
-                      "externalAvailableBalance": "100000",
-                      "externalFrozenBalance": "0"
-                    }
-                  ]
-                }
-                """.formatted(moment, moment);
     }
 }

@@ -64,6 +64,9 @@ public class SubmitOrderExecutor implements CommandExecutor {
                                                  DealContext dealContext) {
         SubmitOrderCommandPayload payload = (SubmitOrderCommandPayload) command.getPayload();
         Order order = orderDataService.getRequiredById(payload.getOrderId());
+        if (isFalse(order.isLive())) {
+            return settledBeforeSending(actionState);
+        }
         String accountInternalId = dealContext.getExchangeAccount().getInternalId();
         Instrument instrument = dealContext.getInstrument();
         if (isBlank(order.getExternalId())
@@ -80,6 +83,19 @@ public class SubmitOrderExecutor implements CommandExecutor {
             applySubmitted(order, ack.getExternalId(), ack.getExternalCreatedAt());
         }
         actionState.setStatus(DealActionStateStatus.SUBMITTED);
+        dealActionStateDataService.save(actionState);
+        return ServiceCommandExecutionResult.ok();
+    }
+
+    /**
+     * Нога терминальна раньше, чем ушла: добыча, исчерпавшая цикл, сняла
+     * неотправленную ногу как не дошедшую до площадки. Отправка такой ноги
+     * поставила бы на площадку заявку, которой в графе нет живой, — риск
+     * вне учёта; исполнение доведено фактом терминала
+     * (docs/components/SubmitOrderExecutor.md).
+     */
+    private ServiceCommandExecutionResult settledBeforeSending(DealActionState actionState) {
+        actionState.setStatus(DealActionStateStatus.COMPLETED);
         dealActionStateDataService.save(actionState);
         return ServiceCommandExecutionResult.ok();
     }

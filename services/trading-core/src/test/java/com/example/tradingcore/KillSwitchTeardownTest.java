@@ -29,13 +29,21 @@ import com.example.tradingcore.domain.command.RuntimeErrorCode;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandExecutionResult;
 import com.example.tradingcore.domain.command.ServiceCommandType;
+import com.example.tradingcore.domain.command.executor.CancelAlgoOrderExecutor;
+import com.example.tradingcore.domain.command.executor.CancelAttachedProtectionExecutor;
+import com.example.tradingcore.domain.command.executor.CancelOrderExecutor;
+import com.example.tradingcore.domain.command.executor.ClosePositionExecutor;
 import com.example.tradingcore.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.safety.KillSwitchExecutor;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
+import com.example.tradingcore.persistence.service.AlgoOrderDataService;
+import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
+import com.example.tradingcore.persistence.service.OrderDataService;
+import com.example.tradingcore.persistence.service.PositionDataService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
@@ -67,13 +75,32 @@ class KillSwitchTeardownTest {
     private final ServiceCommandExecutor commands = mock(ServiceCommandExecutor.class);
     private final DealContextService contextService = mock(DealContextService.class);
     private final KillSwitchProperties properties = new KillSwitchProperties();
+    private final OrderDataService orders = mock(OrderDataService.class);
+    private final AlgoOrderDataService algoOrders = mock(AlgoOrderDataService.class);
+    private final PositionDataService positions = mock(PositionDataService.class);
+    private final DealActionStateDataService states = mock(DealActionStateDataService.class);
 
     private KillSwitchExecutor executor;
+
+    /**
+     * Граф сделки клетки: исполнители команд снятия читают сущность по
+     * идентификатору, и подменённое хранилище отвечает им из этого графа.
+     */
+    private Deal graph;
 
     @BeforeEach
     void setUp() {
         executor = new KillSwitchExecutor(exchange, commands, contextService,
-                mock(ExchangeAccountDataService.class), mock(InstrumentDataService.class), properties);
+                mock(ExchangeAccountDataService.class), mock(InstrumentDataService.class), properties,
+                new CancelOrderExecutor(orders, states, exchange),
+                new ClosePositionExecutor(positions, states, exchange),
+                new CancelAlgoOrderExecutor(algoOrders, states, exchange),
+                new CancelAttachedProtectionExecutor(orders, states, exchange));
+        when(orders.getRequiredById(any())).thenAnswer(invocation -> legOf(invocation.getArgument(0)));
+        when(orders.getRequiredAttachedById(any()))
+                .thenAnswer(invocation -> attachedOf(invocation.getArgument(0)));
+        when(algoOrders.getRequiredById(any())).thenAnswer(invocation -> algoOf(invocation.getArgument(0)));
+        when(positions.getRequiredById(any())).thenAnswer(invocation -> positionOf(invocation.getArgument(0)));
         properties.setMaxTeardownAttempts(1);
         when(commands.execute(any(), any())).thenReturn(ServiceCommandExecutionResult.ok());
         when(exchange.cancelOrder(anyString(), any(), anyString())).thenReturn(ack());
@@ -120,6 +147,32 @@ class KillSwitchTeardownTest {
 
         verify(exchange).cancelAlgoOrder(eq(ACCOUNT), eq(standalone), eq(INSTRUMENT));
         verify(exchange).cancelAttachedProtection(eq(ACCOUNT), eq(attached), eq(INSTRUMENT));
+    }
+
+    /**
+     * Снятие ступенью метит каждую снимаемую сущность причиной
+     * {@code KILL_SWITCH}: по намерению добыча терминализует её снятой, а не
+     * потерянной (docs/components/KillSwitchExecutor.md §Порядок).
+     */
+    @Test
+    void everyTeardownSubjectCarriesTheKillSwitchIntent() {
+        AttachedAlgoOrder attached = attached(31L, PARENT_LEG_ID, AttachedAlgoOrder.Status.ACTIVE);
+        Order parent = leg(PARENT_LEG_ID, Order.Status.COMPLETED, List.of(attached));
+        AlgoOrder standalone = algo(41L, AlgoOrder.Status.ACTIVE);
+        Order live = leg(11L, Order.Status.ACTIVE, List.of());
+        DealTranche tranche = tranche(parent, standalone);
+        tranche.setOrders(List.of(parent, live));
+        Position position = livePosition();
+        Deal deal = deal(tranche, position);
+        DealContext dealContext = context(deal);
+        onGraphReload(deal, () -> deal.setPositions(List.of(closedPosition())));
+
+        executor.execute(dealContext);
+
+        assertThat(live.getCloseReason()).isEqualTo(Order.CloseReason.KILL_SWITCH);
+        assertThat(position.getCloseReason()).isEqualTo(Position.CloseReason.KILL_SWITCH);
+        assertThat(standalone.getCloseReason()).isEqualTo(AlgoOrder.CloseReason.KILL_SWITCH);
+        assertThat(attached.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.KILL_SWITCH);
     }
 
     @Test
@@ -259,7 +312,40 @@ class KillSwitchTeardownTest {
         return deal;
     }
 
-    private static DealContext context(Deal deal) {
+    private Order legOf(Long id) {
+        return graph.getTranches().stream()
+                .flatMap(tranche -> tranche.getOrders().stream())
+                .filter(leg -> Objects.equals(leg.getId(), id))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private AttachedAlgoOrder attachedOf(Long id) {
+        return graph.getTranches().stream()
+                .flatMap(tranche -> tranche.getOrders().stream())
+                .flatMap(leg -> leg.getAttachedAlgoOrders().stream())
+                .filter(protection -> Objects.equals(protection.getId(), id))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private AlgoOrder algoOf(Long id) {
+        return graph.getTranches().stream()
+                .flatMap(tranche -> tranche.getAlgoOrders().stream())
+                .filter(algoOrder -> Objects.equals(algoOrder.getId(), id))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private Position positionOf(Long id) {
+        return graph.getPositions().stream()
+                .filter(position -> Objects.equals(position.getId(), id))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private DealContext context(Deal deal) {
+        graph = deal;
         ExchangeAccount account = new ExchangeAccount();
         account.setId(4L);
         account.setInternalId(ACCOUNT);
