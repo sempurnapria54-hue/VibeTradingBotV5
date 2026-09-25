@@ -25,7 +25,16 @@ import java.util.Objects;
  */
 public final class Stub {
 
+    /** Начальное состояние всякого сценария площадки. */
+    public static final String STARTED = Scenario.STARTED;
+
     private static final String ANSWERING = "answering";
+
+    private static final String TEMPLATE = "response-template";
+
+    private static final Integer IN_STATE = 1;
+
+    private static final Integer WHERE = 2;
 
     private final String name;
     private final WireMockServer server;
@@ -106,6 +115,66 @@ public final class Stub {
     }
 
     /**
+     * Отвечает на {@code GET} по пути, когда параметр запроса равен
+     * значению, — раньше ответа пути без условия: площадка отдаёт каждую
+     * сущность по её идентификатору.
+     *
+     * @param path  путь
+     * @param param имя параметра запроса
+     * @param value значение параметра
+     * @param json  тело
+     */
+    public void answersWhere(String path, String param, String value, String json) {
+        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path))
+                .withQueryParam(param, WireMock.equalTo(value))
+                .atPriority(WHERE)
+                .willReturn(WireMock.okJson(json).withTransformers(TEMPLATE)));
+    }
+
+    /**
+     * Отвечает на {@code GET} по пути, пока сценарий площадки стои́т в
+     * названном состоянии, — раньше ответа по параметру и ответа пути:
+     * состояние сущности у площадки меняет принятая команда, а не тест.
+     *
+     * @param path     путь
+     * @param scenario имя сценария
+     * @param state    состояние сценария
+     * @param json     тело
+     */
+    public void answersInState(String path, String scenario, String state, String json) {
+        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path))
+                .inScenario(scenario)
+                .whenScenarioStateIs(state)
+                .atPriority(IN_STATE)
+                .willReturn(WireMock.okJson(json).withTransformers(TEMPLATE)));
+    }
+
+    /**
+     * Отвечает на {@code POST} по пути, чьё тело несёт значение по пути JSON,
+     * и переводит сценарий площадки из одного состояния в другое: принятая
+     * команда меняет то, что площадка отдаёт на чтения. В прочих состояниях
+     * команду принимает ответ пути без условия.
+     *
+     * @param path     путь
+     * @param jsonPath путь JSON в теле запроса
+     * @param value    значение по нему
+     * @param scenario имя сценария
+     * @param from     состояние, из которого сценарий переходит
+     * @param to       состояние, в которое сценарий переходит
+     * @param json     тело ответа — шаблоном по запросу
+     */
+    public void answersPostMoving(String path, String jsonPath, String value, String scenario, String from,
+                                  String to, String json) {
+        server.stubFor(WireMock.post(WireMock.urlPathEqualTo(path))
+                .withRequestBody(WireMock.matchingJsonPath(jsonPath, WireMock.equalTo(value)))
+                .inScenario(scenario)
+                .whenScenarioStateIs(from)
+                .willSetStateTo(to)
+                .atPriority(WHERE)
+                .willReturn(WireMock.okJson(json).withTransformers(TEMPLATE)));
+    }
+
+    /**
      * На первый {@code POST} по пути рвёт соединение, дальше отвечает прежним
      * ответом пути: команда, не дошедшая до ответа, после которой площадка
      * жива.
@@ -152,6 +221,11 @@ public final class Stub {
         return requests().stream()
                 .filter(request -> Objects.equals(path, request.getUrl().split("\\?")[0]))
                 .toList();
+    }
+
+    /** Возвращает все сценарии площадки в начальное состояние, не трогая ответов. */
+    public void forgetScenarios() {
+        server.resetScenarios();
     }
 
     /** Забывает журнал обращений, не трогая ответов. */
