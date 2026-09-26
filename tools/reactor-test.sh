@@ -38,7 +38,18 @@
 #   9) режим модулей: перечень изъятия несёт тесты прочих модулей и не несёт
 #      тестов названных;
 #  10) режим модулей: знаменатель оси 3 — без агрегатора, когда его нет в
-#      сборке (`-am` от листового модуля родителя-агрегатора не тянет).
+#      сборке (`-am` от листового модуля родителя-агрегатора не тянет);
+#  11) режим классов: названный класс не исполнил ни одного теста — отбор
+#      промахнулся по нему, и зелёным прогон не объявляется (ось 7 этого не
+#      видит: модуль, исполнивший ОДИН класс из двух названных, для неё зелен).
+#      Счёт — по отчётам surefire названных модулей, снесённым перед прогоном,
+#      а не по логу: строку класса surefire печатает по `@DisplayName`;
+#  12) режим классов: названное — не простое имя класса (шаблон пакета в
+#      `-Dtest` не отбирает ничего — ENV-005), класса нет в тестовых
+#      исходниках названных модулей либо у названного модуля нет ни одного
+#      названного класса — прогон не начинается;
+#  13) аргументы: `--classes` без `--modules`, аргумент без значения,
+#      неизвестный аргумент — прогон не начинается.
 #
 # РЕЖИМ МОДУЛЕЙ — `--modules <модуль>[,<модуль>…]`: закрывающий прогон сессии,
 # изменившей только тестовый код этих модулей
@@ -52,6 +63,25 @@
 # шаблон пакета в `-Dtest` не отбирает ничего и выглядит зелёным
 # (.claude/traps/environment-commands-traps.md ENV-005) — против этого же
 # стоит ось 7.
+#
+# РЕЖИМ КЛАССОВ — `--modules <модуль>[,…] --classes <Класс>[,…]`: закрывающий
+# прогон сессии тестера, изменившей только тестовый код, — тронутые классы, а
+# не модуль целиком (.claude/rules/session-work-unit.md §«Объём закрывающего
+# прогона»). Сборка та же, что в режиме модулей, и `test-compile` собирает
+# ВЕСЬ `src/test` названных модулей — компиляцию соседей прогон мерит, их
+# поведения не мерит. Отбор — `-Dtest=<Класс>,…` с
+# `-Dsurefire.failIfNoSpecifiedTests=false` поверх файла изъятия: модули
+# зависимостей без совпадений не падают. Классы называются простыми именами
+# и проверяются по файлам ДО сборки (ось 12), исполнение каждого — по отчёту
+# surefire ПОСЛЕ (ось 11). Класс, все клетки которого несут исключённую метку
+# (`debt`, `smoke`), исполняет ноль тестов и отказывается осью 11.
+#
+# ЛОГ — постоянный путь `target/reactor-test.log` от корня репозитория
+# (`target/` вне git): опустошается первым ходом прогона и остаётся после
+# него. Постоянный — ради ленты цикла: она показывает давность записи лога у
+# долгой команды, а временный файл в тексте команды не назван
+# (.claude/skills/session-chain.md §«Лента хода сессии в консоли»). Прогоны
+# обёртки поэтому не идут параллельно — второй опустошил бы лог первого.
 #
 # Каталоги `target/classes` и `target/test-classes` всех модулей реактора
 # СНОСЯТСЯ перед прогоном: плагин `clean` в офлайне не резолвится, а без
@@ -75,10 +105,13 @@
 # Запуск (из корня репозитория):
 #   bash tools/reactor-test.sh                                  # полный реактор
 #   bash tools/reactor-test.sh --modules services/bff,tests     # режим модулей
+#   bash tools/reactor-test.sh --modules tests --classes ExitOrderPathTest,ExitJournalPathTest
+#                                                               # режим классов
 # Код возврата: 0 — собранное скомпилировано целиком и тесты зелёные;
 # 1 — сборка или тесты упали; 2 — ПРОВЕРКА НЕ ПРОВОДИЛАСЬ (нет JDK, нет
 # maven, не отвечает демон Docker, прогон оказался вакуумным, названное — не
-# модуль реактора, названный модуль не исполнил ни одного теста).
+# модуль реактора либо не класс названных модулей, названный модуль или
+# класс не исполнил ни одного теста, аргументы не разобраны).
 #
 # Переопределяется окружением: REACTOR_JDK (JAVA_HOME сборки), REACTOR_MVN
 # (путь к mvn), REACTOR_MVN_ARGS (аргументы прогона), REACTOR_DOCKER
@@ -87,21 +120,46 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-MODULES=""
-case "${1:-}" in
-  "") ;;
-  --modules)
-    MODULES="${2:-}"
-    if [ -z "$MODULES" ] || [ $# -ne 2 ]; then
-      echo 'ПРОВЕРКА НЕ ПРОВОДИТСЯ: --modules требует один аргумент — модули через запятую'
-      exit 2
-    fi
-    ;;
-  *)
-    echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: неизвестный аргумент «$1» (допустим только --modules <модуль>[,<модуль>…])"
-    exit 2
-    ;;
-esac
+# --- разбор аргументов: чистая функция, на ней стои́т ось 13 --------------
+# Печатает `OK<TAB><модули><TAB><классы>` либо `ERR:<причина>`.
+parse_args() {
+  local modules="" classes=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --modules|--classes)
+        if [ -z "${2:-}" ]; then
+          echo "ERR:$1 требует значение — через запятую"
+          return
+        fi
+        if [ "$1" = "--modules" ]; then modules="$2"; else classes="$2"; fi
+        shift 2
+        ;;
+      *)
+        echo "ERR:неизвестный аргумент «$1» (допустимы --modules <модуль>[,…] и --classes <Класс>[,…])"
+        return
+        ;;
+    esac
+  done
+  if [ -n "$classes" ] && [ -z "$modules" ]; then
+    echo 'ERR:--classes требует --modules — классы ищутся в тестовых исходниках названных модулей'
+    return
+  fi
+  printf 'OK\t%s\t%s\n' "$modules" "$classes"
+}
+
+PARSED="$(parse_args "$@")"
+if [ "${PARSED%%:*}" = "ERR" ]; then
+  echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: ${PARSED#ERR:}"
+  exit 2
+fi
+MODULES="$(printf '%s' "$PARSED" | cut -f2)"
+CLASSES="$(printf '%s' "$PARSED" | cut -f3)"
+
+# Постоянный лог: опустошается первым ходом, чтобы давность его записи у ленты
+# цикла мерила этот прогон, а не прошлый.
+LOG="$REPO_ROOT/target/reactor-test.log"
+mkdir -p "$REPO_ROOT/target"
+: > "$LOG"
 
 # --- разбор лога: чистая функция, на ней же стои́т батарея ----------------
 # Печатает вердикт одной строкой: OK | VACUUM | EMPTY | SHORT:<есть>/<надо>.
@@ -209,6 +267,76 @@ module_tests_verdict() {
   echo "OK"
 }
 
+# --- режим классов: чистые функции, на них стоят оси 11-12 ---------------
+# Названные классы — простые имена тестовых классов названных модулей, и у
+# каждого модуля есть хоть один из них? Второй аргумент — модули через
+# запятую. Печатает OK | NOT_SIMPLE:<имя> | MISSING:<имя> | IDLE:<модуль>.
+classes_verdict() {
+  local root="$1" modules_csv="$2" class module found
+  local -a modules
+  shift 2
+  IFS=',' read -r -a modules <<< "$modules_csv"
+  for class in "$@"; do
+    if ! [[ "$class" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      echo "NOT_SIMPLE:$class"
+      return
+    fi
+    found=0
+    for module in "${modules[@]}"; do
+      [ -d "$root/${module%/}/src/test/java" ] || continue
+      if [ -n "$(find "$root/${module%/}/src/test/java" -name "$class.java" -print -quit)" ]; then
+        found=1
+      fi
+    done
+    if [ "$found" -eq 0 ]; then
+      echo "MISSING:$class"
+      return
+    fi
+  done
+  for module in "${modules[@]}"; do
+    found=0
+    for class in "$@"; do
+      if [ -d "$root/${module%/}/src/test/java" ] \
+          && [ -n "$(find "$root/${module%/}/src/test/java" -name "$class.java" -print -quit)" ]; then
+        found=1
+      fi
+    done
+    if [ "$found" -eq 0 ]; then
+      echo "IDLE:${module%/}"
+      return
+    fi
+  done
+  echo "OK"
+}
+
+# Исполнил ли каждый названный класс хоть один тест. Счёт — по отчёту
+# surefire `TEST-<пакет>.<Класс>.xml` названных модулей (атрибут `tests`
+# элемента `<testsuite>`), а НЕ по строке класса в логе: строку surefire
+# печатает по `@DisplayName`, а не по имени класса, и в кодировке консоли.
+# Отчёты названных модулей сносятся перед прогоном — прежние отчитали бы
+# класс, который этот прогон не исполнил. Печатает OK | UNTESTED_CLASS:<Класс>.
+class_tests_verdict() {
+  local root="$1" modules_csv="$2" class module report counted ran
+  local -a modules
+  shift 2
+  IFS=',' read -r -a modules <<< "$modules_csv"
+  for class in "$@"; do
+    counted=0
+    for module in "${modules[@]}"; do
+      for report in "$root/${module%/}/target/surefire-reports/TEST-"*".$class.xml"                     "$root/${module%/}/target/surefire-reports/TEST-$class.xml"; do
+        [ -f "$report" ] || continue
+        ran="$(grep -m1 '<testsuite' "$report" | grep -oE ' tests="[0-9]+"' | grep -oE '[0-9]+' | head -1)"
+        counted=$((counted + ${ran:-0}))
+      done
+    done
+    if [ "$counted" -eq 0 ]; then
+      echo "UNTESTED_CLASS:$class"
+      return
+    fi
+  done
+  echo "OK"
+}
+
 # Сводит вердикт лога и код возврата maven в исход прогона: чистая функция,
 # на ней стои́т ось 4. Печатает GREEN | RED | вердикт отказа.
 decide() {
@@ -286,6 +414,37 @@ battery() {
   printf '[INFO] Building a\n[INFO] Compiling 3 source files\n[INFO] Building b\n[INFO] Compiling 2 source files\n' > "$work/ok-noagg.log"
   report_axis '18. контроль: без агрегатора полный прогон — отказа нет' "$(analyze_log "$work/ok-noagg.log" 0)" OK || failed=1
 
+  # Режим классов. Отчёт класса — `TEST-<пакет>.<Класс>.xml`; имя из
+  # хвоста чужого класса (`XATest` против `ATest`) не засчитывается.
+  mkdir -p "$work/rep/m/target/surefire-reports"
+  printf '<?xml version="1.0"?>
+<testsuite name="p.ATest" tests="3" skipped="0">
+' > "$work/rep/m/target/surefire-reports/TEST-p.ATest.xml"
+  printf '<?xml version="1.0"?>
+<testsuite name="q.BTest" tests="2" failures="1">
+' > "$work/rep/m/target/surefire-reports/TEST-q.BTest.xml"
+  printf '<?xml version="1.0"?>
+<testsuite name="q.CTest" tests="0">
+' > "$work/rep/m/target/surefire-reports/TEST-q.CTest.xml"
+  printf '<?xml version="1.0"?>
+<testsuite name="q.XETest" tests="4">
+' > "$work/rep/m/target/surefire-reports/TEST-q.XETest.xml"
+  report_axis '19. названный класс без единого теста — отказ' "$(class_tests_verdict "$work/rep" m ATest CTest)" UNTESTED_CLASS:CTest || failed=1
+  report_axis '20. отчёта названного класса нет вовсе — отказ' "$(class_tests_verdict "$work/rep" m ATest DTest)" UNTESTED_CLASS:DTest || failed=1
+  report_axis '21. отчёт чужого класса с тем же хвостом не засчитан — отказ' "$(class_tests_verdict "$work/rep" m ETest)" UNTESTED_CLASS:ETest || failed=1
+  report_axis '22. контроль: классы исполнили тесты, красный тоже считан' "$(class_tests_verdict "$work/rep" m ATest BTest)" OK || failed=1
+
+  report_axis '23. имя с пакетом — отказ' "$(classes_verdict "$work/root" x p.XTest)" NOT_SIMPLE:p.XTest || failed=1
+  report_axis '24. класса нет в названных модулях — отказ' "$(classes_verdict "$work/root" x YTest)" MISSING:YTest || failed=1
+  report_axis '25. названный модуль без названного класса — отказ' "$(classes_verdict "$work/root" x,y XTest)" IDLE:y || failed=1
+  report_axis '26. контроль: классы названных модулей приняты' "$(classes_verdict "$work/root" x,y XTest YTest)" OK || failed=1
+
+  report_axis '27. --classes без --modules — отказ' "$(parse_args --classes XTest | cut -c1-4)" ERR: || failed=1
+  report_axis '28. аргумент без значения — отказ' "$(parse_args --modules | cut -c1-4)" ERR: || failed=1
+  report_axis '29. неизвестный аргумент — отказ' "$(parse_args --module x | cut -c1-4)" ERR: || failed=1
+  report_axis '30. контроль: модули и классы разобраны' "$(parse_args --modules x,y --classes XTest | tr '\t' '|')" 'OK|x,y|XTest' || failed=1
+  report_axis '31. контроль: без аргументов — полный реактор' "$(parse_args | tr '\t' '|')" 'OK||' || failed=1
+
   rm -rf "$work"
   return $failed
 }
@@ -351,7 +510,33 @@ if [ -n "$MODULES" ]; then
   done
 fi
 
-LOG="$(mktemp)"
+CLASS_LIST=()
+CLASS_ARGS=()
+if [ -n "$CLASSES" ]; then
+  IFS=',' read -r -a CLASS_LIST <<< "$CLASSES"
+  NAMED="$(classes_verdict "$REPO_ROOT" "$MODULES" "${CLASS_LIST[@]}")"
+  case "$NAMED" in
+    OK) ;;
+    NOT_SIMPLE:*)
+      echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: «${NAMED#NOT_SIMPLE:}» — не простое имя класса (шаблон пакета в -Dtest не отбирает ничего)"
+      exit 2
+      ;;
+    MISSING:*)
+      echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: класса «${NAMED#MISSING:}» нет в тестовых исходниках модулей ${MODULES}"
+      exit 2
+      ;;
+    IDLE:*)
+      echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: у модуля «${NAMED#IDLE:}» нет ни одного названного класса — он назван зря"
+      exit 2
+      ;;
+  esac
+  CLASS_ARGS=("-Dtest=$CLASSES" "-Dsurefire.failIfNoSpecifiedTests=false")
+  # Прежние отчёты отчитали бы класс, который этот прогон не исполнил (ось 11).
+  for module in "${TARGETS[@]}"; do
+    rm -rf "$REPO_ROOT/$module/target/surefire-reports"
+  done
+fi
+
 if [ -n "$MODULES" ]; then
   EXCLUDES="$(mktemp)"
   exclusion_list "$REPO_ROOT" "${TARGETS[@]}" > "$EXCLUDES"
@@ -359,7 +544,7 @@ if [ -n "$MODULES" ]; then
   EXCLUDES_ARG="$(cygpath -m "$EXCLUDES" 2>/dev/null || printf '%s' "$EXCLUDES")"
   JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-verify} \
       -am -pl "$(IFS=,; printf '%s' "${TARGETS[*]}")" "-Dsurefire.excludesFile=$EXCLUDES_ARG" \
-      -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
+      "${CLASS_ARGS[@]}" -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
   MVN_CODE=$?
   rm -f "$EXCLUDES"
   VERDICT="$(analyze_log "$LOG" "$(grep -cE '^\[INFO\] -+\[ pom \]-+$' "$LOG")")"
@@ -373,18 +558,15 @@ fi
 OUTCOME="$(decide "$VERDICT" "$MVN_CODE")"
 case "$OUTCOME" in
   VACUUM)
-    echo 'ПРОВЕРКА НЕ ПРОВОДИТСЯ: в логе есть «Nothing to compile» — часть дерева не компилировалась'
-    rm -f "$LOG"
+    echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: в логе есть «Nothing to compile» — часть дерева не компилировалась; лог: $LOG"
     exit 2
     ;;
   EMPTY)
-    echo 'ПРОВЕРКА НЕ ПРОВОДИТСЯ: не скомпилировано ни одного файла — измерять нечего'
-    rm -f "$LOG"
+    echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: не скомпилировано ни одного файла — измерять нечего; лог: $LOG"
     exit 2
     ;;
   SHORT:*)
-    echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: компилировавших модулей меньше объявленных — ${VERDICT#SHORT:}"
-    rm -f "$LOG"
+    echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: компилировавших модулей меньше объявленных — ${VERDICT#SHORT:}; лог: $LOG"
     exit 2
     ;;
 esac
@@ -407,11 +589,18 @@ if [ -n "$MODULES" ]; then
     echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: модуль ${TESTED#UNTESTED:} не исполнил ни одного теста — отбор промахнулся; лог: $LOG"
     exit 2
   fi
+  if [ -n "$CLASSES" ]; then
+    RAN="$(class_tests_verdict "$REPO_ROOT" "$MODULES" "${CLASS_LIST[@]}")"
+    if [ "$RAN" != "OK" ]; then
+      echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: класс ${RAN#UNTESTED_CLASS:} не исполнил ни одного теста — отбор промахнулся либо все его клетки под исключённой меткой; лог: $LOG"
+      exit 2
+    fi
+    echo "режим классов: ${MODULES} — ${CLASSES}; скомпилировано файлов: $SOURCES; тестов пройдено: $TESTS; ДЕФЕКТОВ: 0"
+    exit 0
+  fi
   echo "режим модулей: ${MODULES}; скомпилировано файлов: $SOURCES; тестов пройдено: $TESTS; ДЕФЕКТОВ: 0"
-  rm -f "$LOG"
   exit 0
 fi
 
 echo "скомпилировано файлов: $SOURCES; тестов пройдено: $TESTS; ДЕФЕКТОВ: 0"
-rm -f "$LOG"
 exit 0

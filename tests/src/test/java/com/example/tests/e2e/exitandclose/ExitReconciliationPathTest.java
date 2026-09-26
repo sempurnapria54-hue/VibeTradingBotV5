@@ -234,8 +234,8 @@ class ExitReconciliationPathTest {
      */
     private static void walkToTerminal(String secondAmount) {
         deal = walkToTerminalTranches(trail, String.join(", ",
-                        closeRecord(OPENED, CLOSED, "1.0", "-0.2", "0.8"),
-                        closeRecord(REOPENED, RECLOSED, "0.5", "-0.1", "0.4")),
+                        closeRecord(OPENED, CLOSED, "1.0", "-0.2", "0", "0.8"),
+                        closeRecord(REOPENED, RECLOSED, "0.5", "-0.1", "0", "0.4")),
                 SOURCE_TIME, LAST_BILL, String.join(", ",
                         bill("9004", Trail.EXTERNAL_INSTRUMENT, "2", "1", "USDT", "0.8", "-0.2", CLOSED),
                         bill(LAST_BILL, Trail.EXTERNAL_INSTRUMENT, "2", "1", "USDT", secondAmount, "-0.1", RECLOSED)));

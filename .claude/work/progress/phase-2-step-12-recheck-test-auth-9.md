@@ -257,7 +257,7 @@ if (notBefore != null) {
   внесена сюда находкой:** каталог `target/` в корне — то самое место, которое
   предписывает `.claude/rules/measurement-commands.md` для мутационных проб, —
   уводит `tools/retired-check.py` в код 2 с диагнозом «дерево вне объявленной
-  области». Дом — `.claude/work/backlog.md` §«Каталог проб `target/` в корне
+  области». Дом — `.claude/work/history/2026-09-26-e2e-run-cost.md` §«Каталог проб `target/` в корне
   уводит `retired-check.py` в код 2».
 
 ## Связи

@@ -31,6 +31,7 @@ import static com.example.tests.e2e.exitandclose.ExitTrail.exchangeHoldsSecondLe
 import static com.example.tests.e2e.exitandclose.ExitTrail.journalOf;
 import static com.example.tests.e2e.exitandclose.ExitTrail.passUntilLeaves;
 import static com.example.tests.e2e.exitandclose.ExitTrail.plain;
+import static com.example.tests.e2e.exitandclose.ExitTrail.walkToExposure;
 import static com.example.tests.e2e.exitandclose.ExitTrail.walkToScaledIn;
 import static com.example.tests.e2e.exitandclose.ExitTrail.walkToTwoTranches;
 import static java.util.Objects.nonNull;
@@ -318,6 +319,50 @@ class ExitCascadePathTest {
         assertThat(journalOf(trail, deal)).as("E2.6: и строки журнала о нём")
                 .filteredOn(row -> Objects.equals(ORDER_DECIDED, row.get("event_type")))
                 .hasSize(decided);
+    }
+
+    /**
+     * Красна по находке {@code F11} документа: действие, объявленное шагом
+     * {@code EXIT} уровня сделки, ядро не исполняет вовсе — выбранный шаг
+     * сделки становится ребром сворачивания, а закрытие шлёт обработчик
+     * координированного выхода и на этой форме (.claude/work/backlog.md
+     * §«Действие шага выхода уровня сделки не исполняется»). Ассерт строки
+     * исполнения действия стои́т последним: прочие ожидания клетки прогон с
+     * меткой проверяет до него.
+     */
+    @Test
+    @Order(7)
+    @Tag("debt")
+    @DisplayName("E2.7 — Выход, объявленный действием: закрытие одно, и шлёт его исполнитель действия")
+    void e2_7_aDeclaredExitActionSendsTheOnlyCloseItself() {
+        deal = walkToExposure(trail, Trail.referenceDefinition());
+        Integer decided = coreOutbox(trail, ORDER_DECIDED, deal).size();
+        trail.marketPhaseIs("BEAR_TREND");
+        trail.forgetTraces();
+
+        trail.passUntil("E2.7: сделка ушла в выход", () -> isFalse(Objects.equals("ACTIVE",
+                dealRead(trail, deal).path("status").asString())));
+        passUntilTranchesTerminal();
+        trail.relayCore();
+
+        assertThat(trail.exchange().requests(CLOSE_POSITION)).as("E2.7: закрытие позиции на всю сделку одно")
+                .hasSize(1);
+        assertThat(trail.exchange().requests(Trail.EXCHANGE_ORDER))
+                .as("E2.7: reduce-only заявок от транша нет ни одной")
+                .noneSatisfy(request -> assertThat(request.getMethod().getName()).isEqualTo("POST"));
+        assertThat(dealRead(trail, deal).path("tranches")).as("E2.7: транш терминален")
+                .allSatisfy(tranche -> assertThat(tranche.path("status").asString()).isEqualTo("CLOSED"));
+        assertThat(coreOutbox(trail, ORDER_DECIDED, deal)).as("E2.7: решений о создании заявки на отрезке нет")
+                .hasSize(decided);
+        assertThat(trail.database(Party.TRADING_CORE).query("select s.status, s.deal_tranche_id "
+                        + "from deal_strategy_action_states s join strategy_actions a on a.id = s.strategy_action_id "
+                        + "join deals d on d.id = s.deal_id where d.internal_id = ? and a.action_type = 'EXIT_ACTION'",
+                deal)).as("E2.7: закрытие шлёт исполнение объявленного действия выхода — одно, уровня сделки")
+                .hasSize(1)
+                .allSatisfy(row -> {
+                    assertThat(row.get("deal_tranche_id")).isNull();
+                    assertThat(row.get("status")).isIn("SUBMITTED", "COMPLETED");
+                });
     }
 
     // ---------------------------------------------------------------- ходы и чтения

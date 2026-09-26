@@ -61,6 +61,8 @@ import static org.assertj.core.api.Assertions.tuple;
  * называет {@code E3.7}, от этого не исчезает, а наступает позже.
  *
  * <p>{@code E3.7} идёт второй сделкой: курс там не приходит никогда.
+ * {@code E3.8} — третьей: площадка подтверждает её входную ногу вчерашним
+ * моментом, и нижняя граница окна моложе глубины свежего эндпоинта.
  */
 @Tag("e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -351,7 +353,7 @@ class ExitHarvestPathTest {
     @Order(7)
     @DisplayName("E3.7 — Курс не получен: итог недоступен, терминала нет, звено повторяется по бюджету")
     void e3_7_noRateMeansNoResultNoTerminalAndTheLinkRepeatsByBudget() {
-        walkToHarvest(closeRecord(OPENED, CLOSED, "1.0", "-0.2", "0.8"));
+        walkToHarvest(closeRecord(OPENED, CLOSED, "1.0", "-0.2", "0", "0.8"));
         trail.forgetTraces();
 
         trail.passUntil("E3.7: строка чужой валюты ждёт курса", () -> nonNull(foreignRow())
@@ -404,6 +406,49 @@ class ExitHarvestPathTest {
                 .query("select event_id from incident_facts where event_id = ?", reportEvent).size() == 1);
     }
 
+    @Test
+    @Order(8)
+    @DisplayName("E3.8 — Граница окна моложе глубины свежего эндпоинта: архив движений не спрашивается")
+    void e3_8_aYoungWindowBoundaryLeavesTheBillsArchiveUnasked() {
+        Long young = sourceTime - Duration.ofDays(1).toMillis();
+        Long closedAt = young + 5_000;
+        trail.exchangeAcknowledgesAt(young);
+        exchangeQuotesIndex(trail, FUNDED, null);
+        deal = walkToTerminalTranches(trail, closeRecord(OPENED, closedAt, "1.0", "-0.2", "0", "0.8"), sourceTime,
+                LAST_BILL, bill(LAST_BILL, Trail.EXTERNAL_INSTRUMENT, "2", "1", "USDT", "0.8", "-0.2", closedAt));
+        dealId = trail.database(Party.TRADING_CORE).query("select id from deals where internal_id = ?", deal)
+                .getFirst().get("id");
+        dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
+        incidentFacts = trail.database(Party.STATISTICS).count("incident_facts");
+        journalMark = journalOf(trail, deal).size();
+        trail.forgetTraces();
+
+        trail.passUntil("E3.8: движения добыты", () -> nonNull(dealRow().get("bills_fetched_through")));
+        trail.relayCore();
+
+        assertThat(trail.exchange().requests(BILLS_ARCHIVE)).as("E3.8: архивный эндпоинт не спрошен ни разу")
+                .isEmpty();
+        assertThat(windowBegin()).as("предусловие E3.8: нижняя граница — момент подтверждения входной ноги, "
+                        + "моложе глубины свежего эндпоинта")
+                .isEqualTo(young)
+                .isGreaterThan(sourceTime - Duration.ofDays(7).toMillis());
+        List<LoggedRequest> fresh = trail.exchange().requests(BILLS);
+        assertThat(fresh).as("E3.8: свежий эндпоинт спрошен окном сделки").isNotEmpty();
+        assertThat(param(fresh.getFirst(), "begin")).as("E3.8: нижняя граница — биржевая метка сделки")
+                .isEqualTo(String.valueOf(young));
+        assertThat(param(fresh.getFirst(), "end")).as("E3.8: верхняя — момент, который отдала площадка")
+                .isEqualTo(String.valueOf(sourceTime));
+        assertThat(trail.database(Party.TRADING_CORE).query("select external_bill_id, deal_id from deal_cash_flows "
+                        + "where external_bill_id = ?", LAST_BILL))
+                .as("E3.8: строка разбивки заведена и получила ссылку на сделку тем же проходом")
+                .extracting(row -> row.get("deal_id")).containsExactly(dealId);
+        assertThat(journalOf(trail, deal)).as("E3.8: у журнала следа нет").hasSize(journalMark);
+        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E3.8: у статистики следа нет")
+                .isEqualTo(dealFacts);
+        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E3.8: и фактов происшествий")
+                .isEqualTo(incidentFacts);
+    }
+
     // ---------------------------------------------------------------- ходы и чтения
 
     /**
@@ -434,8 +479,8 @@ class ExitHarvestPathTest {
      */
     private static void closeRecordsLanded() {
         exchangeKeepsCloseRecords(trail, String.join(", ",
-                closeRecord(OPENED, CLOSED, "1.0", "-0.2", "0.8"),
-                closeRecord(REOPENED, RECLOSED, "0.5", "-0.1", "0.4")));
+                closeRecord(OPENED, CLOSED, "1.0", "-0.2", "0", "0.8"),
+                closeRecord(REOPENED, RECLOSED, "0.5", "-0.1", "0", "0.4")));
         trail.forgetTraces();
         trail.passUntil("записи закрытия обоих эпизодов в зеркале", () -> trail.database(Party.TRADING_CORE)
                 .query("select id from positions where deal_id = ? and external_realized_profit is not null",

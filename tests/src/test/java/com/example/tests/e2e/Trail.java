@@ -153,6 +153,7 @@ public final class Trail implements AutoCloseable {
     private Boolean feeRatesSynced = Boolean.FALSE;
     private String tenant = TENANT;
     private String account = ACCOUNT;
+    private Long acknowledgedAt = 1758240000000L;
 
     private Trail(String name, Layout layout) {
         this.name = name;
@@ -705,14 +706,30 @@ public final class Trail implements AutoCloseable {
                 """.formatted(EXTERNAL_INSTRUMENT));
         exchange.answersPostTemplated(EXCHANGE_ORDER, """
                 {"code": "0", "msg": "", "data": [{"ordId": "%s", "clOrdId": "{{jsonPath request.body '$.clOrdId'}}",
-                  "sCode": "0", "sMsg": "", "ts": "1758240000000"}]}
-                """.formatted(EXTERNAL_ORDER));
+                  "sCode": "0", "sMsg": "", "ts": "%d"}]}
+                """.formatted(EXTERNAL_ORDER, acknowledgedAt));
         exchange.answers(EXCHANGE_ORDER, """
                 {"code": "0", "msg": "", "data": []}
                 """);
         exchange.answers(EXCHANGE_POSITIONS, """
                 {"code": "0", "msg": "", "data": []}
                 """);
+    }
+
+    /**
+     * Площадка подтверждает постановку заявки названным биржевым моментом — с
+     * этого хода и до конца тропы.
+     *
+     * <p>Момент подтверждения первой входной ноги есть нижняя граница окна
+     * движений сделки (docs/models/domain/aggregate/Deal.md,
+     * {@code billsWindowBegin}); умолчание тропы — год назад, то есть граница
+     * старше глубины свежего эндпоинта движений.
+     *
+     * @param moment биржевой момент подтверждения, мс
+     */
+    public void exchangeAcknowledgesAt(Long moment) {
+        acknowledgedAt = moment;
+        exchangeAcceptsCommands();
     }
 
     /**
@@ -724,19 +741,36 @@ public final class Trail implements AutoCloseable {
      * (docs/spec/statistics-aggregates.json, {@code dayRecomputable}), а на
      * свежей тропе ряд начинается посреди сегодняшних суток. Часы процессов
      * при этом не двигаются — возраст стоит в данных.
+     *
+     * <p>Этот ход начинает ряд <b>зерна происшествий</b> — фактом заведения
+     * сделки; ряд сделочного зерна свой и начинается фактом класса терминала
+     * ({@link #factSeriesStartedYesterday(String, String)}).
      */
     public void factSeriesStartedYesterday() {
-        OffsetDateTime yesterday = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
-        Map<String, String> headers = new LinkedHashMap<>();
-        headers.put("eventId", UUID.randomUUID().toString());
-        headers.put("eventType", "DEAL_OPENED");
-        headers.put("occurredAt", yesterday.toString());
-        headers.put("version", "1");
-        produce(Substrate.CORE_TOPIC, tenant, """
+        factSeriesStartedYesterday("DEAL_OPENED", """
                 {"dealInternalId": "%s", "exchangeAccountInternalId": "%s", "instrumentInternalId": "%s",
                  "strategyInternalId": "%s", "entryReason": "STRATEGY", "direction": "LONG",
                  "entryMarketPhase": "BULL_TREND"}
-                """.formatted(UUID.randomUUID(), account, INSTRUMENT, UUID.randomUUID()), headers);
+                """.formatted(UUID.randomUUID(), account, INSTRUMENT, UUID.randomUUID()));
+    }
+
+    /**
+     * Ряд фактов зерна начат прошлыми сутками фактом названного класса — тем
+     * же ходом, что {@link #factSeriesStartedYesterday()}: у каждого зерна
+     * статистики ряд свой, и начинает его факт того класса, который зерно
+     * несёт.
+     *
+     * @param eventType класс события
+     * @param payload   содержимое события
+     */
+    public void factSeriesStartedYesterday(String eventType, String payload) {
+        OffsetDateTime yesterday = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("eventId", UUID.randomUUID().toString());
+        headers.put("eventType", eventType);
+        headers.put("occurredAt", yesterday.toString());
+        headers.put("version", "1");
+        produce(Substrate.CORE_TOPIC, tenant, payload, headers);
     }
 
     /**

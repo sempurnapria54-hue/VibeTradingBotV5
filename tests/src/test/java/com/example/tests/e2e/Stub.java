@@ -150,6 +150,29 @@ public final class Stub {
     }
 
     /**
+     * Отвечает на {@code GET} по пути, когда параметр запроса равен значению и
+     * сценарий площадки стои́т в названном состоянии, — раньше всех прочих
+     * ответов пути: принятая команда меняет чтение ОДНОЙ сущности, а чтения
+     * соседних сущностей того же пути остаются прежними.
+     *
+     * @param path     путь
+     * @param param    имя параметра запроса
+     * @param value    значение параметра
+     * @param scenario имя сценария
+     * @param state    состояние сценария
+     * @param json     тело
+     */
+    public void answersWhereInState(String path, String param, String value, String scenario, String state,
+                                    String json) {
+        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path))
+                .withQueryParam(param, WireMock.equalTo(value))
+                .inScenario(scenario)
+                .whenScenarioStateIs(state)
+                .atPriority(IN_STATE)
+                .willReturn(WireMock.okJson(json).withTransformers(TEMPLATE)));
+    }
+
+    /**
      * Отвечает на {@code POST} по пути, чьё тело несёт значение по пути JSON,
      * и переводит сценарий площадки из одного состояния в другое: принятая
      * команда меняет то, что площадка отдаёт на чтения. В прочих состояниях
