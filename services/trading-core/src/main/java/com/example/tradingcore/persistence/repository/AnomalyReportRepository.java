@@ -7,7 +7,15 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Журнал происшествий (docs/models/domain/other/AnomalyReport.md). */
+/**
+ * Журнал происшествий (docs/models/domain/other/AnomalyReport.md).
+ *
+ * <p><b>Каждый точечный запрос сам ставит {@code modifiedAt} и
+ * {@code modifiedBy}:</b> мимо сущности слушатели аудита не проходят
+ * (docs/models/domain/other/Auditable.md §«Системные поля и точечная
+ * запись»); значения приходят от границы, часы и автор — те же, что у
+ * слушателя.
+ */
 public interface AnomalyReportRepository extends JpaRepository<AnomalyReportEntity, Long> {
 
     /**
