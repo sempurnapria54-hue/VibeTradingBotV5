@@ -7,6 +7,7 @@ import com.example.tests.e2e.Trail.Answer;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Objects;
+import java.util.UUID;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
@@ -20,6 +21,10 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
  * <p><b>Тенант заводится раньше пролога, и порядок несущий:</b> регистрация
  * счёта требует существующего тенанта, а заводит его первый ход самой тропы —
  * вывод контекста по браузерному токену.
+ *
+ * <p><b>Ключ API у каждой регистрации свой:</b> им площадка разводит счета
+ * ({@link Trail#under(String, String, String)}), и сделка счёта прежнего
+ * пролога на общем стенде ходила бы к площадке под областью нового.
  *
  * <p><b>Расписание пересчёта после пролога снова выключено:</b> строка суток
  * сложена, и кейсу, утверждающему «чтение такта не запускает», бьющее
@@ -51,7 +56,8 @@ final class Prologue {
         trail.relayCore();
         trail.exchangeFillsEntry();
         trail.passUntil("пролог: налив наблюдён", () -> isFalse(trail.database(Party.TRADING_CORE)
-                .query("select id from orders where external_status = 'filled'").isEmpty()));
+                .query("select id from orders where " + Trail.BY_DEAL + " and external_status = 'filled'",
+                        tenancy.account()).isEmpty()));
         trail.relayCore();
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         Trail.await("пролог: строка суток сложена с решением о заявке", () -> isFalse(trail
@@ -79,20 +85,21 @@ final class Prologue {
         Answer context = trail.callWith(token, Party.BFF, "GET", CONTEXT, null, null);
         require(context, 200, "контекст субъекта");
         String tenant = String.valueOf(Json.object(context.body()).get("tenantId"));
+        String key = "api-key-prologue-" + UUID.randomUUID();
         Answer registered = trail.call(Party.AUTH, "POST", REGISTER, null, """
                 {
                   "tenantInternalId": "%s",
                   "exchangeCode": "OKX",
                   "label": "e2e perimeter account",
                   "contour": "%s",
-                  "apiKey": "api-key-prologue",
+                  "apiKey": "%s",
                   "secret": "secret-prologue",
                   "passphrase": "passphrase-prologue"
                 }
-                """.formatted(tenant, Trail.CONTOUR));
+                """.formatted(tenant, Trail.CONTOUR, key));
         require(registered, 201, "регистрация биржевого счёта");
         String account = String.valueOf(Json.object(registered.body()).get("internalId"));
-        trail.under(tenant, account);
+        trail.under(tenant, account, key);
         trail.factSeriesStartedYesterday();
         trail.commonPreconditions();
         String definition = trail.activeDefinition();

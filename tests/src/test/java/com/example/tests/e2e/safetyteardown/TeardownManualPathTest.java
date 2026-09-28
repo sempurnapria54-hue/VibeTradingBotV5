@@ -1,6 +1,7 @@
 package com.example.tests.e2e.safetyteardown;
 
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
 import java.sql.Timestamp;
@@ -35,9 +36,11 @@ import static com.example.tests.e2e.safetyteardown.TeardownTrail.dealStatus;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.detect;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.exchangeAcknowledgesCloseWithoutEffect;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.exchangeConfirmsClose;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.halt;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.haltFully;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.incidents;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.outbox;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.pairRung;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.passUntilEmergencyClosed;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.payload;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.reports;
@@ -52,7 +55,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * снятие (.claude/tests/cases/e2e-safety-teardown.md §«E6 — Ручная пара:
  * постановка, доведение и снятие»).
  *
- * <p><b>Ядер три.</b> Первое — автоматическая жёсткая ступень счёта
+ * <p><b>Ядер пять.</b> Первое — автоматическая жёсткая ступень счёта
  * ({@code E1.2}) и снятие риска, подтверждённое площадкой: на нём ручной
  * повтор {@code E6.2} и прыжок {@code E6.8}; команды его снятия риска —
  * эталон состава, с которым сверяются ручные тропы. Второе — ручная полная
@@ -60,7 +63,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * снятие риска автоматикой не подтвердилось; на нём отказ снятия
  * {@code E6.5}, поглощённый автоматический сигнал {@code E6.4}, ручное
  * доведение {@code E6.3}, а после аварийного терминала сделки — снятие
- * {@code E6.6} и его повтор {@code E6.7}.
+ * {@code E6.6} и его повтор {@code E6.7}. Последними идут два ядра пары:
+ * мягкий запрет входов, поставленный и снятый ручной поверхностью
+ * ({@code E6.9}), и снятие полного класса на паре после аварийного терминала
+ * её сделки ({@code E6.10}); ступень пары читается прямым чтением базы
+ * ({@link TeardownTrail#pairRung}).
  *
  * <p><b>Журнал стороны догоняет тему по порядку:</b> события ядра едут с
  * ключом тенанта в одну партицию, и строка журнала последнего события
@@ -86,7 +93,7 @@ class TeardownManualPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("t6");
+        trail = SharedStand.dealPath(TeardownManualPathTest.class);
         trail.factSeriesStartedYesterday();
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.side(Party.TRADING_CORE).set(MIN_AGE, "0s");
@@ -97,7 +104,7 @@ class TeardownManualPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TeardownManualPathTest.class);
         }
     }
 
@@ -150,10 +157,10 @@ class TeardownManualPathTest {
     @Order(2)
     @DisplayName("E6.8 — Снятие мягкого класса под стоящей жёсткой ступенью — прыжок, и он отвергается")
     void e6_8_clearingTheSoftClassUnderAStandingHardRungIsAJumpAndIsRefused() {
-        Long outboxRows = trail.database(Party.TRADING_CORE).count("outbox_events");
-        Long reportRows = trail.database(Party.TRADING_CORE).count("anomaly_reports");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long reportRows = trail.rows(Party.TRADING_CORE, "anomaly_reports");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
 
         Answer answer = clear(trail, "FREEZE", null);
         trail.relayCore();
@@ -161,13 +168,13 @@ class TeardownManualPathTest {
         assertThat(answer.status()).as("E6.8: синхронный отказ — " + answer.body()).isEqualTo(400);
         assertThat(safetyState(trail).path("accountSafetyRung").asString()).as("E6.8: ступень счёта не изменилась")
                 .isEqualTo("TRADE_BLOCKED");
-        assertThat(trail.database(Party.TRADING_CORE).count("anomaly_reports")).as("E6.8: строки отчёта нет")
+        assertThat(trail.rows(Party.TRADING_CORE, "anomaly_reports")).as("E6.8: строки отчёта нет")
                 .isEqualTo(reportRows);
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events")).as("E6.8: строк outbox не прибавилось")
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E6.8: строк outbox не прибавилось")
                 .isEqualTo(outboxRows);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E6.8: строк журнала нет")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E6.8: строк журнала нет")
                 .isEqualTo(journal);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E6.8: фактов статистики нет")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E6.8: фактов статистики нет")
                 .isEqualTo(facts);
     }
 
@@ -190,7 +197,8 @@ class TeardownManualPathTest {
         assertThat(content.path("code").asString()).as("E6.1: код причины — ручной").isEqualTo(MANUAL_REQUESTED);
         assertThat(content.path("rung").asString()).as("E6.1: ступень жёсткая").isEqualTo("HARD");
         Map<String, Object> report = trail.database(Party.TRADING_CORE).query("select severity, status, created_at, "
-                + "modified_at from anomaly_reports where code = ?", MANUAL_REQUESTED).getFirst();
+                + "modified_at from anomaly_reports where "
+                        + Trail.BY_ACCOUNT + " and code = ?", trail.account(), MANUAL_REQUESTED).getFirst();
         assertThat(report.get("severity")).as("E6.1: отчёт критичный").isEqualTo("CRITICAL");
         assertThat(report.get("status")).as("E6.1: снятие подтверждено — терминал отчёта").isEqualTo("COMPLETED");
         List<String> manualCommands = commands(trail);
@@ -246,12 +254,13 @@ class TeardownManualPathTest {
         assertThat(automaticReport().get("status")).as("предусловие E6.5: состояние E4.5 — отчёт не закрыт")
                 .isIn(INTERMEDIATE.toArray());
         awaitJournalRow(trail, trail.database(Party.TRADING_CORE)
-                .query("select event_id from outbox_events order by id").getLast().get("event_id"));
+                .query("select event_id from outbox_events where "
+                        + Trail.BY_TENANT + " order by id", trail.tenant()).getLast().get("event_id"));
         incidents(trail);
-        Long outboxRows = trail.database(Party.TRADING_CORE).count("outbox_events");
-        Long reportRows = trail.database(Party.TRADING_CORE).count("anomaly_reports");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long reportRows = trail.rows(Party.TRADING_CORE, "anomaly_reports");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
         trail.forgetTraces();
 
         Answer answer = clear(trail, "FULL", null);
@@ -260,14 +269,14 @@ class TeardownManualPathTest {
         assertThat(answer.status()).as("E6.5: синхронный отказ поверхности — " + answer.body()).isEqualTo(400);
         assertThat(safetyState(trail).path("accountSafetyRung").asString()).as("E6.5: ступень счёта не изменилась")
                 .isEqualTo("TRADE_BLOCKED");
-        assertThat(trail.database(Party.TRADING_CORE).count("anomaly_reports"))
+        assertThat(trail.rows(Party.TRADING_CORE, "anomaly_reports"))
                 .as("E6.5: отказ при запуске строки отчёта не заводит").isEqualTo(reportRows);
         assertThat(trail.exchange().requests()).as("E6.5: к стабу площадки не ушло ни одного запроса").isEmpty();
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events")).as("E6.5: строк outbox не прибавилось")
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E6.5: строк outbox не прибавилось")
                 .isEqualTo(outboxRows);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E6.5: строк журнала нет")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E6.5: строк журнала нет")
                 .isEqualTo(journal);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E6.5: фактов статистики нет")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E6.5: фактов статистики нет")
                 .isEqualTo(facts);
     }
 
@@ -275,7 +284,7 @@ class TeardownManualPathTest {
     @Order(5)
     @DisplayName("E6.4 — Автоматический сигнал права на доведение не имеет")
     void e6_4_anAutomaticSignalHasNoRightToFinishTheTeardown() {
-        Long outboxRows = trail.database(Party.TRADING_CORE).count("outbox_events");
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
         trail.forgetTraces();
 
         detect(trail);
@@ -285,7 +294,7 @@ class TeardownManualPathTest {
                 .isEmpty();
         assertThat(safetyState(trail).path("accountSafetyRung").asString()).as("E6.4: ступень стои́т")
                 .isEqualTo("TRADE_BLOCKED");
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events")).as("E6.4: строк outbox не прибавилось")
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E6.4: строк outbox не прибавилось")
                 .isEqualTo(outboxRows);
         assertThat(automaticReport().get("status")).as("E6.4: отчёт остался незакрытым")
                 .isIn(INTERMEDIATE.toArray());
@@ -330,7 +339,7 @@ class TeardownManualPathTest {
                 .isEqualTo("EMERGENCY_CLOSED");
         Map<String, Object> before = incidents(trail);
         Integer raised = outbox(trail, HOLD_RAISED).size();
-        Long outboxRows = trail.database(Party.TRADING_CORE).count("outbox_events");
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
         trail.forgetTraces();
 
         Answer answer = clear(trail, "FULL", null);
@@ -344,8 +353,9 @@ class TeardownManualPathTest {
         assertThat(rows.getFirst().get("severity")).as("E6.6: некритичная").isEqualTo("NON_CRITICAL");
         assertThat(outbox(trail, HOLD_RAISED)).as("E6.6: строки подъёма нет").hasSize(raised);
         List<Map<String, Object>> fresh = trail.database(Party.TRADING_CORE)
-                .query("select event_id, event_type from outbox_events order by id")
-                .subList(outboxRows.intValue(), trail.database(Party.TRADING_CORE).count("outbox_events").intValue());
+                .query("select event_id, event_type from outbox_events where "
+                        + Trail.BY_TENANT + " order by id", trail.tenant())
+                .subList(outboxRows.intValue(), trail.rows(Party.TRADING_CORE, "outbox_events").intValue());
         assertThat(fresh).as("E6.6: прибавилась одна строка — отчёт; класса снятия нет").singleElement()
                 .satisfies(row -> assertThat(row.get("event_type")).isEqualTo(ANOMALY_REPORTED));
         assertThat(trail.exchange().requests()).as("E6.6: запросов к площадке нет ни одного").isEmpty();
@@ -364,9 +374,9 @@ class TeardownManualPathTest {
     @Order(8)
     @DisplayName("E6.7 — Второе снятие той же ступени холостое, и строки не даёт")
     void e6_7_aSecondClearanceOfTheSameRungIsANoOp() {
-        Long outboxRows = trail.database(Party.TRADING_CORE).count("outbox_events");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
 
         Answer answer = clear(trail, "FULL", null);
         trail.relayCore();
@@ -375,18 +385,115 @@ class TeardownManualPathTest {
         assertThat(safetyState(trail).path("accountSafetyRung").asString())
                 .as("E6.7: ступень осталась мягкой — вниз по лестнице вызов не шагает").isEqualTo("HOLD");
         assertThat(reports(trail, MANUAL_CLEARED)).as("E6.7: второй строки отчёта нет").hasSize(1);
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events")).as("E6.7: строк outbox не прибавилось")
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E6.7: строк outbox не прибавилось")
                 .isEqualTo(outboxRows);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E6.7: строк журнала нет")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E6.7: строк журнала нет")
                 .isEqualTo(journal);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E6.7: фактов статистики нет")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E6.7: фактов статистики нет")
                 .isEqualTo(facts);
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("E6.9 — Мягкий запрет входов на паре ставится и снимается ручной поверхностью, и сделку пары он "
+            + "не уводит")
+    void e6_9_theSoftPairBanIsRaisedAndClearedWithoutMovingTheDealOfThePair() {
+        String pairDeal = walkToExposure(trail);
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
+        trail.forgetTraces();
+
+        Answer raise = halt(trail, "SOFT", Trail.INSTRUMENT);
+        trail.relayCore();
+
+        assertThat(raise.status()).as("E6.9: постановка применена синхронно — " + raise.body()).isEqualTo(204);
+        assertThat(pairRung(trail)).as("E6.9: ступень пары — мягкий запрет входов").isEqualTo("ENTRY_BLOCKED");
+        assertThat(safetyState(trail).path("accountSafetyRung").asString()).as("E6.9: ступени счёта нет")
+                .isEqualTo("ACTIVE");
+        List<Map<String, Object>> raised = outbox(trail, HOLD_RAISED);
+        assertThat(raised).as("E6.9: строка outbox класса подъёма одна").hasSize(1);
+        JsonNode content = payload(raised.getFirst());
+        assertThat(content.path("scope").asString()).as("E6.9: радиус пары").isEqualTo("INSTRUMENT");
+        assertThat(content.path("instrumentInternalId").asString()).as("E6.9: инструмент в содержимом")
+                .isEqualTo(Trail.INSTRUMENT);
+        assertThat(content.path("code").asString()).as("E6.9: код ручной постановки").isEqualTo(MANUAL_REQUESTED);
+        assertThat(content.path("rung").asString()).as("E6.9: ступень мягкая").isEqualTo("SOFT");
+        Map<String, Object> requested = reports(trail, MANUAL_REQUESTED).getFirst();
+        assertThat(requested.get("severity")).as("E6.9: отчёт постановки некритичный").isEqualTo("NON_CRITICAL");
+        assertThat(requested.get("scope")).as("E6.9: отчёт постановки — радиуса пары").isEqualTo("INSTRUMENT");
+        assertThat(dealStatus(trail, pairDeal)).as("E6.9: сделка пары осталась активной").isEqualTo("ACTIVE");
+
+        Answer cleared = clear(trail, "SOFT", Trail.INSTRUMENT);
+        trail.relayCore();
+
+        assertThat(cleared.status()).as("E6.9: снятие применено синхронно — " + cleared.body()).isEqualTo(204);
+        assertThat(pairRung(trail)).as("E6.9: ступень пары — рабочее состояние").isEqualTo("ACTIVE");
+        List<Map<String, Object>> clearedRows = reports(trail, MANUAL_CLEARED);
+        assertThat(clearedRows).as("E6.9: строка отчёта снятия одна").hasSize(1);
+        assertThat(clearedRows.getFirst().get("severity")).as("E6.9: отчёт снятия некритичный")
+                .isEqualTo("NON_CRITICAL");
+        assertThat(clearedRows.getFirst().get("scope")).as("E6.9: отчёт снятия — радиуса пары")
+                .isEqualTo("INSTRUMENT");
+        assertThat(outbox(trail, HOLD_RAISED)).as("E6.9: строк класса подъёма не прибавилось").hasSize(1);
+        assertThat(commands(trail)).as("E6.9: команд у стаба нет ни на постановке, ни на снятии").isEmpty();
+        List<Map<String, Object>> fresh = trail.database(Party.TRADING_CORE)
+                .query("select event_id, event_type from outbox_events where "
+                        + Trail.BY_TENANT + " order by id offset ?", trail.tenant(), outboxRows);
+        assertThat(fresh).as("E6.9: у операций — подъём и два отчёта").extracting(row -> row.get("event_type"))
+                .containsExactlyInAnyOrder(HOLD_RAISED, ANOMALY_REPORTED, ANOMALY_REPORTED);
+        fresh.forEach(row -> awaitJournalRow(trail, row.get("event_id")));
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("E6.10 — Снятие полного класса на паре при погашенном риске ведёт пару в рабочее состояние одним "
+            + "ходом")
+    void e6_10_clearingTheFullClassOnThePairOverClearedRiskMovesThePairToWorkInOneMove() {
+        String pairDeal = walkToExposure(trail);
+        Answer raised = haltFully(trail, Trail.INSTRUMENT);
+        trail.relayCore();
+        assertThat(raised.status()).as("предусловие E6.10: постановка на паре принята — " + raised.body())
+                .isEqualTo(202);
+        assertThat(pairRung(trail)).as("предусловие E6.10: ступень пары — сворачивание").isEqualTo("TRADE_BLOCKED");
+        passUntilEmergencyClosed(trail, pairDeal);
+        assertThat(dealStatus(trail, pairDeal)).as("предусловие E6.10: сделка пары терминальна")
+                .isEqualTo("EMERGENCY_CLOSED");
+        assertThat(safetyState(trail).path("accountSafetyRung").asString())
+                .as("предусловие E6.10: ступень счёта не поднималась").isEqualTo("ACTIVE");
+        Integer raisedRows = outbox(trail, HOLD_RAISED).size();
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
+        trail.forgetTraces();
+
+        Answer answer = clear(trail, "FULL", Trail.INSTRUMENT);
+        trail.relayCore();
+
+        assertThat(answer.status()).as("E6.10: снятие применено синхронно — " + answer.body()).isEqualTo(204);
+        assertThat(pairRung(trail)).as("E6.10: ступень пары — рабочее состояние, а не мягкий запрет входов")
+                .isEqualTo("ACTIVE");
+        assertThat(safetyState(trail).path("accountSafetyRung").asString()).as("E6.10: ступень счёта не тронута")
+                .isEqualTo("ACTIVE");
+        List<Map<String, Object>> rows = reports(trail, MANUAL_CLEARED);
+        assertThat(rows).as("E6.10: строка отчёта снятия одна").hasSize(1);
+        assertThat(rows.getFirst().get("severity")).as("E6.10: некритичная").isEqualTo("NON_CRITICAL");
+        assertThat(rows.getFirst().get("scope")).as("E6.10: радиуса пары").isEqualTo("INSTRUMENT");
+        assertThat(outbox(trail, HOLD_RAISED)).as("E6.10: строк класса подъёма не прибавилось").hasSize(raisedRows);
+        assertThat(commands(trail)).as("E6.10: команд у стаба нет ни одной").isEmpty();
+        assertThat(trail.exchange().requests()).as("E6.10: чтения — только по инструменту пары")
+                .allSatisfy(request -> assertThat(request.getUrl()).contains("instId=" + Trail.EXTERNAL_INSTRUMENT));
+        List<Map<String, Object>> fresh = trail.database(Party.TRADING_CORE)
+                .query("select event_id, event_type from outbox_events where "
+                        + Trail.BY_TENANT + " order by id offset ?", trail.tenant(), outboxRows);
+        assertThat(fresh).as("E6.10: прибавилась одна строка — отчёт снятия").singleElement()
+                .satisfies(row -> assertThat(row.get("event_type")).isEqualTo(ANOMALY_REPORTED));
+        assertThat(awaitJournalRow(trail, fresh.getFirst().get("event_id")).get("content").toString())
+                .as("E6.10: строка журнала об отчёте снятия").contains(MANUAL_CLEARED);
     }
 
     /** Критичная строка отчёта автоматической тропы — кодом чужой заявки. */
     private static Map<String, Object> automaticReport() {
         return trail.database(Party.TRADING_CORE).query("select status from anomaly_reports "
-                + "where code = ? and severity = 'CRITICAL' order by id", FOREIGN_ORDER).getLast();
+                + "where " + Trail.BY_ACCOUNT
+                + " and code = ? and severity = 'CRITICAL' order by id",
+                        trail.account(), FOREIGN_ORDER).getLast();
     }
 
     private static Instant moment(Object column) {

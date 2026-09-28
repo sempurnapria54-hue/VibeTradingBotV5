@@ -1,6 +1,7 @@
 package com.example.tests.e2e.strategytodeal;
 
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -46,21 +47,19 @@ class DefinitionIntakePathTest {
 
     private static final String PAIR_CHECKS = Trail.CORE + "/pair-checks";
 
-    private static final String RISK_APPETITE = Trail.CORE + "/risk-appetites/" + Trail.TENANT;
-
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private static Trail trail;
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("e1");
+        trail = SharedStand.dealPath(DefinitionIntakePathTest.class);
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(DefinitionIntakePathTest.class);
         }
     }
 
@@ -79,14 +78,14 @@ class DefinitionIntakePathTest {
         assertThat(errorCodeOf(answer)).isEqualTo("STRATEGY_REQUEST_REJECTED");
         assertThat(errorMessageOf(answer)).as("E1.4: сверять объявленное не с чем — числа не назначены")
                 .contains("STRATEGY_RISK_APPETITE_NOT_CONFIGURED");
-        assertThat(trail.database(Party.STRATEGIES).count("strategies")).as("E1.4: строки определения нет").isZero();
+        assertThat(trail.rows(Party.STRATEGIES, "strategies")).as("E1.4: строки определения нет").isZero();
         List<Side.Access> core = trail.accesses(Party.TRADING_CORE);
         assertThat(core).as("E1.4: оба чтения пришли к ядру, пара — первой")
                 .extracting(Side.Access::path, Side.Access::status)
-                .containsExactly(tuple(PAIR_CHECKS, 200), tuple(RISK_APPETITE, 200));
+                .containsExactly(tuple(PAIR_CHECKS, 200), tuple(riskAppetite(), 200));
         assertIssuedToken(core, "E1.4");
         assertNoTraceBeyondOwnerAndCore("E1.4");
-        Map<String, Object> numbers = object(trail.call(Party.TRADING_CORE, "GET", RISK_APPETITE, null, null));
+        Map<String, Object> numbers = object(trail.call(Party.TRADING_CORE, "GET", riskAppetite(), null, null));
         assertThat(numbers.get("globalSimultaneousRiskPerDealPercent"))
                 .as("E1.4: строка тенанта у ядра есть — её заводит синк проекций, — а чисел в ней нет").isNull();
         assertThat(numbers.get("globalCatastrophicRiskPerDealMultiplier")).isNull();
@@ -99,7 +98,7 @@ class DefinitionIntakePathTest {
         assertThat(again.status()).as("E1.4: повтор после простановки чисел проходит").isEqualTo(201);
         assertThat(trail.accesses(Party.TRADING_CORE)).as("E1.4: проекции чисел у владельца нет — он снова идёт к ядру")
                 .extracting(Side.Access::path, Side.Access::status)
-                .contains(tuple(RISK_APPETITE, 200));
+                .contains(tuple(riskAppetite(), 200));
     }
 
     @Test
@@ -107,7 +106,7 @@ class DefinitionIntakePathTest {
     @DisplayName("E1.1 — Создание определения спрашивает у ядра пару и числа риск-аппетита")
     void e1_1_creationAsksTheCoreForThePairAndTheRiskAppetite() {
         trail.commonPreconditions();
-        Long outboxBefore = trail.database(Party.TRADING_CORE).count("outbox_events");
+        Long outboxBefore = trail.rows(Party.TRADING_CORE, "outbox_events");
         trail.forgetTraces();
 
         Answer answer = create();
@@ -117,24 +116,24 @@ class DefinitionIntakePathTest {
         assertThat(created.get("status")).as("E1.1: статус черновика").isEqualTo("CREATED");
         String internalId = String.valueOf(created.get("internalId"));
         assertThat(internalId).as("E1.1: идентичность определения отдана").isNotBlank();
-        Answer listed = trail.call(Party.STRATEGIES, "GET", Trail.STRATEGIES, Trail.TENANT, null);
+        Answer listed = trail.call(Party.STRATEGIES, "GET", Trail.STRATEGIES, trail.tenant(), null);
         assertThat(listed.body()).as("E1.1: определение читается перечнем владельца").contains(internalId);
 
         List<Side.Access> core = trail.accesses(Party.TRADING_CORE);
         assertThat(core).as("E1.1: к ядру пришли ровно чтение пары и чтение чисел")
                 .extracting(Side.Access::path, Side.Access::status)
                 .containsExactly(tuple(PAIR_CHECKS, 200),
-                        tuple(RISK_APPETITE, 200));
+                        tuple(riskAppetite(), 200));
         assertIssuedToken(core, "E1.1");
         assertThat(core.get(0).uri()).as("E1.1: пара спрошена в контексте тенанта и по ссылкам определения")
-                .contains("tenantInternalId=" + Trail.TENANT)
-                .contains("exchangeAccountInternalId=" + Trail.ACCOUNT)
+                .contains("tenantInternalId=" + trail.tenant())
+                .contains("exchangeAccountInternalId=" + trail.account())
                 .contains("instrumentInternalId=" + Trail.INSTRUMENT);
         Answer deals = trail.call(Party.TRADING_CORE, "GET",
-                Trail.CORE + "/deals?exchangeAccountInternalId=" + Trail.ACCOUNT, null, null);
+                Trail.CORE + "/deals?exchangeAccountInternalId=" + trail.account(), null, null);
         assertThat(deals.status()).isEqualTo(200);
         assertThat(JSON.readTree(deals.body()).size()).as("E1.1: своей записи ядро не делает — сделок нет").isZero();
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events")).as("E1.1: строк outbox у ядра не прибавилось")
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E1.1: строк outbox у ядра не прибавилось")
                 .isEqualTo(outboxBefore);
         assertNoTraceBeyondOwnerAndCore("E1.1");
     }
@@ -152,7 +151,7 @@ class DefinitionIntakePathTest {
     @DisplayName("E1.3 — Сторона-сосед недостижима: создание отвергается, а не проходит непроверенным")
     void e1_3_anUnreachableCoreRejectsTheCreation() {
         trail.commonPreconditions();
-        Long definitionsBefore = trail.database(Party.STRATEGIES).count("strategies");
+        Long definitionsBefore = trail.rows(Party.STRATEGIES, "strategies");
         trail.stop(Party.TRADING_CORE);
         trail.forgetTraces();
         Long logMark = trail.side(Party.STRATEGIES).logMark();
@@ -163,7 +162,7 @@ class DefinitionIntakePathTest {
             assertThat(answer.status()).as("E1.3: создание отвергнуто — ответ " + answer.body()).isEqualTo(503);
             assertThat(errorCodeOf(answer)).as("E1.3: операнд не добыт — класс недоступности соседа")
                     .isEqualTo("PEER_UNAVAILABLE");
-            assertThat(trail.database(Party.STRATEGIES).count("strategies"))
+            assertThat(trail.rows(Party.STRATEGIES, "strategies"))
                     .as("E1.3: непроверенным вход не проходит — строки не прибавилось").isEqualTo(definitionsBefore);
             assertNoTraceBeyondOwnerAndCore("E1.3");
             assertThat(trail.side(Party.STRATEGIES).logSince(logMark))
@@ -178,7 +177,7 @@ class DefinitionIntakePathTest {
 
         assertThat(again.status()).as("E1.3: отказ не кэширован — повтор после подъёма ядра проходит").isEqualTo(201);
         assertThat(trail.accesses(Party.TRADING_CORE)).extracting(Side.Access::path)
-                .as("E1.3: повтор снова спросил ядро").containsExactly(PAIR_CHECKS, RISK_APPETITE);
+                .as("E1.3: повтор снова спросил ядро").containsExactly(PAIR_CHECKS, riskAppetite());
     }
 
     @Test
@@ -187,7 +186,7 @@ class DefinitionIntakePathTest {
     void e1_2_withoutProjectionsTheCreationIsRejected() {
         trail.withoutProjections();
         trail.riskAppetiteSet();
-        Long definitionsBefore = trail.database(Party.STRATEGIES).count("strategies");
+        Long definitionsBefore = trail.rows(Party.STRATEGIES, "strategies");
         trail.forgetTraces();
 
         Answer answer = create();
@@ -197,7 +196,7 @@ class DefinitionIntakePathTest {
         assertThat(errorMessageOf(answer)).as("E1.2: обе ссылки не разрешены ядром")
                 .contains("STRATEGY_ACCOUNT_NOT_FOUND")
                 .contains("STRATEGY_INSTRUMENT_NOT_FOUND");
-        assertThat(trail.database(Party.STRATEGIES).count("strategies")).as("E1.2: строки определения нет")
+        assertThat(trail.rows(Party.STRATEGIES, "strategies")).as("E1.2: строки определения нет")
                 .isEqualTo(definitionsBefore);
         List<Side.Access> core = trail.accesses(Party.TRADING_CORE);
         assertThat(core).as("E1.2: пришло чтение пары, а чтения чисел — ни одного: ссылки проверяются первыми")
@@ -208,7 +207,8 @@ class DefinitionIntakePathTest {
     }
 
     private static Answer create() {
-        return trail.call(Party.STRATEGIES, "POST", Trail.STRATEGIES, Trail.TENANT, Trail.referenceDefinition());
+        return trail.call(Party.STRATEGIES, "POST", Trail.STRATEGIES, trail.tenant(),
+                trail.onPair(Trail.referenceDefinition()));
     }
 
     /** Вызовы владельца к ядру несут токен, выданный стабом провайдера на {@code client_credentials}. */
@@ -227,11 +227,17 @@ class DefinitionIntakePathTest {
     private static void assertNoTraceBeyondOwnerAndCore(String label) {
         assertThat(trail.accesses(Party.CONNECTOR)).as(label + ": к коннектору обращений нет").isEmpty();
         assertThat(trail.exchange().requests()).as(label + ": к стабу площадки обращений нет").isEmpty();
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as(label + ": строк журнала нет").isZero();
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as(label + ": фактов статистики нет")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as(label + ": строк журнала нет").isZero();
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as(label + ": фактов статистики нет")
                 .isZero();
-        assertThat(trail.records(Substrate.STRATEGY_TOPIC)).as(label + ": тема владельца определений пуста").isEmpty();
-        assertThat(trail.records(Substrate.CORE_TOPIC)).as(label + ": тема ядра пуста").isEmpty();
+        assertThat(trail.published(Substrate.STRATEGY_TOPIC)).as(label + ": в тему владельца определений не легло ничего")
+                .isEmpty();
+        assertThat(trail.published(Substrate.CORE_TOPIC)).as(label + ": в тему ядра — тоже").isEmpty();
+    }
+
+    /** Числа риск-аппетита тенанта ходов у ядра — путь его поверхности: тенант у каждого класса свой. */
+    private static String riskAppetite() {
+        return Trail.CORE + "/risk-appetites/" + trail.tenant();
     }
 
     @SuppressWarnings("unchecked")

@@ -3,6 +3,7 @@ package com.example.tests.e2e.perimeterread;
 import com.example.tests.e2e.IdentityStub;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
 import java.util.List;
@@ -42,13 +43,13 @@ class PerimeterRefusalPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.openPerimeter("p7");
+        trail = SharedStand.perimeter(PerimeterRefusalPathTest.class);
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(PerimeterRefusalPathTest.class);
         }
     }
 
@@ -57,7 +58,8 @@ class PerimeterRefusalPathTest {
     @DisplayName("E7.4 — Отказ доступа на периметре строки не оставляет нигде")
     void e7_4_aPerimeterRefusalLeavesNoRowAnywhere() {
         IdentityStub foreign = new IdentityStub();
-        String owner = trail.identity().browserToken("subject-s1", "Trader One");
+        String subject = Subjects.fresh("subject-s1");
+        String owner = trail.identity().browserToken(subject, "Trader One");
         assertThat(trail.callWith(owner, Party.BFF, "GET", "/api/v1/bff/context", null, null).status())
                 .as("предусловие — состояние E1.1").isEqualTo(200);
         Long auditDenials = trail.database(Party.AUDIT).count("access_denials");
@@ -66,7 +68,7 @@ class PerimeterRefusalPathTest {
         trail.forgetTraces();
 
         Answer anonymous = trail.callWith("", Party.BFF, "GET", JOURNAL, null, null);
-        Answer forged = trail.callWith(foreign.browserToken("subject-s1", "Trader One"), Party.BFF, "GET", JOURNAL,
+        Answer forged = trail.callWith(foreign.browserToken(subject, "Trader One"), Party.BFF, "GET", JOURNAL,
                 null, null);
         Answer forgedTicket = trail.callWith(owner, Party.BFF, "GET", "/api/v1/bff/stream?ticket=forged-ticket",
                 null, null);

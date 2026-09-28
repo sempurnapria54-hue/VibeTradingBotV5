@@ -3,6 +3,7 @@ package com.example.tradingbot.domain.model.aggregate.deal;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -384,6 +385,18 @@ public class Deal extends Auditable {
                 .anyMatch(id -> isFalse(attributed.contains(id)));
     }
 
+    /**
+     * Сторона заявки, уменьшающей позицию сделки: у длинной — продажа, у
+     * короткой — покупка (docs/models/domain/core/Order.md). Пусто — у
+     * сделки нет торгового направления.
+     */
+    public Order.Side reducingSide() {
+        if (isNull(direction)) {
+            return null;
+        }
+        return StrategyTradeDirection.LONG.equals(direction) ? Order.Side.SELL : Order.Side.BUY;
+    }
+
     /** Живой эпизод позиции сделки либо пусто. */
     public Position livePosition() {
         return emptyIfNull(positions).stream()
@@ -412,8 +425,9 @@ public class Deal extends Auditable {
      * §«Правило сопоставления закрывающего исполнения уровня сделки»).
      *
      * <p><b>Окно атрибуции</b> — координированный выход безусловно,
-     * ошибочное состояние только при плоской позиции; вне окна приписанное
-     * ноль, и сокращение нетто-размера остаётся расхождением сверки.
+     * ошибочное и терминальные состояния только при плоской позиции; вне
+     * окна приписанное ноль, и сокращение нетто-размера остаётся
+     * расхождением сверки.
      * Нетто-размер берётся у живого эпизода: закрытый эпизод несёт
      * необнулённый размер, и читать его значило бы приписывать закрытое
      * заново.
@@ -437,10 +451,16 @@ public class Deal extends Auditable {
         }
     }
 
-    /** Окно атрибуции закрытия уровня сделки (величина {@code dealInTeardown}). */
+    /**
+     * Окно атрибуции закрытия уровня сделки (величина {@code dealInTeardown}).
+     * Терминал входит в окно наравне с ошибочным состоянием: сворачивание,
+     * после которого сделка закрылась, состоялось, и закрытое им остаётся
+     * приписанным — иначе экспозиция закрытого транша возвращалась бы к
+     * налитому объёму на всяком чтении после терминала.
+     */
     private Boolean inAttributionWindow(BigDecimal netSize) {
         return Objects.equals(Status.EXIT_PENDING, status)
-                || (Objects.equals(Status.ERROR, status) && netSize.signum() == 0);
+                || ((Objects.equals(Status.ERROR, status) || isTrue(isTerminal())) && netSize.signum() == 0);
     }
 
     /** Приписанное траншу: {@code max(0, min(gross, gross + младшие − нетто))}. */
@@ -496,6 +516,21 @@ public class Deal extends Auditable {
     }
 
     /**
+     * Позиция по сделке наблюдалась, а строки эпизода в зеркале нет ни
+     * одной — эпизодная половина неполного графа.
+     *
+     * <p><b>Это не нулевая сторона сверки, а ненаблюдённая.</b> Эпизод
+     * заводит только добыча позиции, и пока её не было, сумма экспозиций
+     * сверяется с нулём, которого на бирже может не быть: у восстановленной
+     * сделки заявок нет, и обе стороны сверки нулевые при любом живом
+     * риске. Читатель — входные проверки прохода активной сделки
+     * (docs/components/DealActiveHandler.md §«Входные проверки»).
+     */
+    public Boolean episodeNotPresented() {
+        return isEmpty(positions) && isTrue(positionObserved());
+    }
+
+    /**
      * Граф сделки предъявлен целиком (docs/spec/deal-context-load.json,
      * graphComplete). Загрузка идёт одним заходом на коллекцию, поэтому
      * «предъявлено» решается не пометкой на строке, а НАЛИЧИЕМ коллекции
@@ -519,7 +554,7 @@ public class Deal extends Auditable {
      */
     public Boolean graphComplete() {
         boolean tranchesComplete = isNotEmpty(tranches);
-        boolean episodesComplete = isNotEmpty(positions) || isFalse(positionObserved());
+        boolean episodesComplete = isFalse(episodeNotPresented());
         boolean legsComplete = emptyIfNull(tranches).stream().anyMatch(tranche -> isNotEmpty(tranche.getOrders()))
                 || isNull(billsWindowBegin);
         return tranchesComplete && episodesComplete && legsComplete;

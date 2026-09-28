@@ -26,6 +26,10 @@ import org.springframework.stereotype.Service;
  * объектом радиуса. Популяцию сделок радиуса сервис читает сам, поэтому
  * ручной вызов, у которого триггерной сделки нет, снимает тот же риск, что
  * и автоматический.
+ *
+ * <p><b>Сверх двух радиусов реакции — одна сделка:</b> та, которую шаг
+ * прохода увёл под стоящей жёсткой ступенью; её затребует проход, а не
+ * реакция.
  */
 @Slf4j
 @Service
@@ -67,6 +71,27 @@ public class KillSwitchService {
         boolean dealsConfirmed = fireDeals(population, null, exchangeAccountId);
         return isTrue(killSwitchExecutor.closePositionsOutsideDeals(exchangeAccountId, null, population))
                 && dealsConfirmed;
+    }
+
+    /**
+     * Радиус одной сделки: снятие риска сделки, которую шаг прохода увёл в
+     * ошибочное состояние под стоящей жёсткой ступенью. Каскад реакции такую
+     * сделку не видит — она стала активной после него, — а повтор реакции
+     * поглощает анкер (docs/rules/error-handling-policy.md §«Жёсткая ступень
+     * энфорсится непрерывно, а не одним ходом»).
+     *
+     * <p>Best-effort, как и обход радиусов: сбой логируется и читается
+     * неподтверждённым снятием, а не отказом прохода.
+     *
+     * @param dealContext контекст, в котором сделку держит проход
+     */
+    public Boolean fireDeal(DealContext dealContext) {
+        try {
+            return isTrue(execute(dealContext));
+        } catch (RuntimeException e) {
+            log.error("Kill-switch failed on a deal dealId={}", dealContext.getDeal().getId(), e);
+            return false;
+        }
     }
 
     /**

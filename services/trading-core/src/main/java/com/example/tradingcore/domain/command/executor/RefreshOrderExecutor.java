@@ -255,9 +255,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
         BigDecimal trancheExposure = isNull(tranche) ? null : tranche.exposure();
         Boolean standaloneProtectionExists = nonNull(tranche) && isTrue(tranche.hasStandaloneProtection());
         Boolean cancelIntentStanding = nonNull(attached.getCloseReason());
-        boolean analysisRuns = isNull(live) && searchCycle && isFalse(attachedStateResolver.coverageLost(
-                trancheExposure, standaloneProtectionExists, cancelIntentStanding));
-        ProtectionHistoryLeg leg = analysisRuns
+        ProtectionHistoryLeg leg = isNull(live) && searchCycle
                 ? findInHistory(attached.getInternalId(), accountInternalId, externalInstrumentId)
                 : null;
         AttachedProtectionFacts facts = AttachedProtectionFacts.builder()
@@ -284,10 +282,11 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * ведёт снятие риска тем же диспетчером, который зовёт это звено, и
      * прямая зависимость замкнулась бы в цикл.
      *
-     * <p><b>Ступень мягкая.</b> Ветвь разбора достижима, только когда риск
-     * транша либо отсутствует, либо покрыт ОТДЕЛЬНОЙ защитой: принятый
-     * риск покрыт, рвать его нечем, и жёсткая форма была бы платой
-     * рыночной цены без основания (docs/rules/instrument-hold.md).
+     * <p><b>Ступень мягкая.</b> Неопределённый исход достижим, только когда
+     * риск транша либо отсутствует, либо покрыт ОТДЕЛЬНОЙ защитой, либо
+     * исчезновение объяснено нашим намерением: на ветви потерянного покрытия
+     * пустой разбор терминализует защиту потерянной, и сигнал там не нужен
+     * (docs/rules/instrument-hold.md).
      */
     private HoldSignal emptyAnalysisRung(AttachedProtectionResolution resolution, boolean searchCycle,
                                          ProtectionHistoryLeg leg) {
@@ -301,12 +300,13 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * Ноги разбора истории — по одной на терминальное состояние контракта;
      * обрыв на первой нашедшей.
      *
-     * <p>Разбор идёт только на ветви, где покрытие ещё может быть
-     * объяснено: на ветви потерянного покрытия
-     * ({@link AttachedAlgoOrderStateResolver#coverageLost}) вторая ступень
-     * терминализует защиту потерянной, и любой факт истории этого не
-     * меняет — опрашивать её значило бы платить источнику за ответ, на
-     * который решение не смотрит.
+     * <p><b>Разбор идёт на обеих ветвях второй ступени</b>, и на ветви
+     * потерянного покрытия тоже: защита,
+     * сработавшая у площадки, из живых уходит так же, как пропавшая, а
+     * экспозиция транша до наблюдения срабатывания стоит налитой. Без
+     * разбора сработавший стоп читался бы потерянным покрытием — защита и
+     * сделка в ошибочном состоянии по факту, который закрыл риск
+     * (docs/lifecycles/Order.md §«Исход ненайденности — вторая ступень»).
      */
     private ProtectionHistoryLeg findInHistory(String internalId, String accountInternalId,
                                                String externalInstrumentId) {

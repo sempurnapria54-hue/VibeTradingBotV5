@@ -6,6 +6,7 @@ import static com.example.strategies.unit.validation.ValidationFixture.decimal;
 import static com.example.strategies.unit.validation.ValidationFixture.exitStep;
 import static com.example.strategies.unit.validation.ValidationFixture.matching;
 import static com.example.strategies.unit.validation.ValidationFixture.newAlgo;
+import static com.example.strategies.unit.validation.ValidationFixture.newOrder;
 import static com.example.strategies.unit.validation.ValidationFixture.newPositionAction;
 import static com.example.strategies.unit.validation.ValidationFixture.newStep;
 import static com.example.strategies.unit.validation.ValidationFixture.reference;
@@ -16,6 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.api.model.strategy.StrategyAlgoOrderActionApiModel;
+import com.example.strategies.api.model.strategy.StrategyOrderActionApiModel;
+import com.example.strategies.api.model.strategy.StrategyPositionActionApiModel;
 import com.example.strategies.api.model.strategy.StrategyStepApiModel;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +43,7 @@ import org.junit.jupiter.api.Test;
 class DealLevelStepScopeTest {
 
     private static final String OUT_OF_SCOPE = "STRATEGY_DEAL_LEVEL_STEP_OUT_OF_SCOPE";
+    private static final String ACTION_OUT_OF_SCOPE = "STRATEGY_DEAL_LEVEL_ACTION_OUT_OF_SCOPE";
 
     @Test
     @DisplayName("U14.1 — базовая сборка: на уровне сделки объявлен только шаг выхода")
@@ -135,6 +139,58 @@ class DealLevelStepScopeTest {
                 "details[0].tranches[bull_main].stepsByStatus key: unknown value ACTIVE"))
                 .as("пересечение статусных моделей — два значения, и оно взято вне его")
                 .hasSize(1);
+    }
+
+    @Test
+    @DisplayName("U14.9 — шаг выхода сделки несёт действие над условной заявкой: его никто не исполнит")
+    void u14_9_anAlgoActionInADealLevelPackageIsOutOfScope() {
+        CreateStrategyApiRequest request = reference();
+        exitStep(bull(request)).getActions().add(newAlgo("deal_cancel", "CANCEL_ACTION", "STOP_LOSS"));
+
+        assertThat(matching(violations(request), ACTION_OUT_OF_SCOPE))
+                .singleElement()
+                .asString()
+                .contains("details[0].stepsByStatus[ACTIVE][0].actions[1] " + ACTION_OUT_OF_SCOPE)
+                .contains("объявлено CANCEL_ACTION вне вида POSITION");
+    }
+
+    @Test
+    @DisplayName("U14.10 — тип выхода на действии-заявке: вид решает наравне с типом")
+    void u14_10_anExitTypeOnAnOrderKindIsOutOfScope() {
+        CreateStrategyApiRequest request = reference();
+        StrategyOrderActionApiModel order = newOrder("deal_order_exit", "MARKET", "LONG", "100");
+        order.setActionType("EXIT_ACTION");
+        exitStep(bull(request)).getActions().add(order);
+
+        assertThat(matching(violations(request), ACTION_OUT_OF_SCOPE))
+                .singleElement()
+                .asString()
+                .contains("объявлено EXIT_ACTION вне вида POSITION");
+    }
+
+    @Test
+    @DisplayName("U14.11 — действие выхода позиции с чужим типом: вид верен, тип — нет")
+    void u14_11_aPositionKindWithANonExitTypeIsOutOfScope() {
+        CreateStrategyApiRequest request = reference();
+        StrategyPositionActionApiModel position = newPositionAction("deal_fail_safe");
+        position.setActionType("CREATE_ACTION");
+        dealStepsByStatus(bull(request)).put("EXIT_PENDING", List.of(newStep("FAIL_SAFE", position)));
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("details[0].stepsByStatus[EXIT_PENDING][0].actions[0] " + ACTION_OUT_OF_SCOPE)
+                .endsWith("объявлено CREATE_ACTION");
+    }
+
+    @Test
+    @DisplayName("U14.12 — то же действие над условной заявкой на ТРАНШЕ: узость — свойство уровня")
+    void u14_12_theSameAlgoActionIsLegalOnATranche() {
+        CreateStrategyApiRequest request = reference();
+        stepsByStatus(tranche(bull(request))).put("PROTECTION_SWITCHED",
+                List.of(newStep("MAIN_PROTECTION", fullProtection("switched_protection"))));
+
+        assertThat(matching(violations(request), ACTION_OUT_OF_SCOPE)).isEmpty();
     }
 
     /** Защитное создание полного покрытия — шаг первичной защиты его требует. */

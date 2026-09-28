@@ -2,6 +2,7 @@ package com.example.tests.e2e.exitandclose;
 
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.math.BigDecimal;
@@ -81,7 +82,7 @@ class ExitReconciliationPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("x4");
+        trail = SharedStand.dealPath(ExitReconciliationPathTest.class);
         trail.side(Party.TRADING_CORE).set(EXPLORATORY, "false");
         trail.renew(Party.TRADING_CORE);
     }
@@ -89,7 +90,7 @@ class ExitReconciliationPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(ExitReconciliationPathTest.class);
         }
     }
 
@@ -106,7 +107,8 @@ class ExitReconciliationPathTest {
         assertThat(dealRead(trail, deal).path("status").asString()).as("E4.1: терминал штатный")
                 .isEqualTo("CLOSED");
         assertThat(accountRung()).as("E4.1: ступени биржевого радиуса не поднято").isEqualTo("ACTIVE");
-        assertThat(core.query("select code from anomaly_reports")).as("E4.1: отчёта о происшествии нет").isEmpty();
+        assertThat(core.query("select code from anomaly_reports where "
+                + Trail.BY_ACCOUNT, trail.account())).as("E4.1: отчёта о происшествии нет").isEmpty();
         assertThat(commands()).as("E4.1: новых команд площадке нет").isEmpty();
         assertThat(outbox("HOLD_RAISED")).as("E4.1: подъёма ступени ядро не публиковало").isEmpty();
         Map<String, Object> closed = single(outbox("DEAL_CLOSED"), "E4.1: терминал");
@@ -131,7 +133,8 @@ class ExitReconciliationPathTest {
                 .as("E4.3: терминал применён — финализация не заблокирована").isEqualTo("CLOSED");
         assertThat((BigDecimal) row.get("result_profit")).as("E4.3: число сделки суммой движений не подменено")
                 .isEqualByComparingTo("1.2");
-        assertThat(core.query("select code from anomaly_reports")).as("E4.3: отчёт с машинным кодом расхождения")
+        assertThat(core.query("select code from anomaly_reports where "
+                + Trail.BY_ACCOUNT, trail.account())).as("E4.3: отчёт с машинным кодом расхождения")
                 .extracting(report -> report.get("code")).contains(MISMATCH);
         assertThat(accountRung()).as("E4.3: поднята мягкая ступень биржевого радиуса").isEqualTo("HOLD");
         Map<String, Object> hold = single(outbox("HOLD_RAISED"), "E4.3: подъём ступени");
@@ -147,7 +150,7 @@ class ExitReconciliationPathTest {
         }
         awaitDealFact(closed);
         Database statistics = trail.database(Party.STATISTICS);
-        assertThat(statistics.count("deal_facts")).as("E4.3: сделочный факт один").isEqualTo(dealFacts + 1);
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E4.3: сделочный факт один").isEqualTo(dealFacts + 1);
         Trail.await("E4.3: факты отчёта и подъёма приняты", () -> statistics.query(
                 "select event_id from incident_facts where event_id in (?, ?)",
                 String.valueOf(reported.get("event_id")), String.valueOf(hold.get("event_id"))).size() == 2);
@@ -181,11 +184,12 @@ class ExitReconciliationPathTest {
                 .isAfter(instant(closedRow.get("occurred_at")));
         assertThat(trail.database(Party.STATISTICS).query("select event_id from deal_facts where event_id = ?",
                 String.valueOf(closed.get("event_id")))).as("E4.5: сделочный факт заведён").hasSize(1);
-        assertThat(trail.database(Party.TRADING_CORE).query("select id from deals where status not in "
-                        + "('CLOSED', 'EMERGENCY_CLOSED')"))
+        assertThat(trail.database(Party.TRADING_CORE).query("select id from deals where "
+                + Trail.BY_ACCOUNT + " and status not in "
+                        + "('CLOSED', 'EMERGENCY_CLOSED')", trail.account()))
                 .as("E4.5: сделки в нетерминальном статусе после коммита нет").isEmpty();
         Object stood = trail.database(Party.TRADING_CORE).query("select modified_at from exchange_accounts "
-                + "where safety_rung = 'HOLD'").getFirst().get("modified_at");
+                + "where internal_id = ? and safety_rung = 'HOLD'", trail.account()).getFirst().get("modified_at");
         assertThat(instant(stood)).as("E4.5: строка торгового состояния со ступенью — позже терминала")
                 .isAfter(terminal);
     }
@@ -195,12 +199,14 @@ class ExitReconciliationPathTest {
     @DisplayName("E4.4 — Разведочный режим: отчёт есть, ступени нет, события подъёма нет")
     void e4_4_theExploratoryModeReportsWithoutARung() {
         trail.side(Party.TRADING_CORE).set(EXPLORATORY, "true");
+        trail.renew(Party.TRADING_CORE);
         walkToTerminal("0.9");
 
         Database core = trail.database(Party.TRADING_CORE);
         assertThat(dealRow().get("reconciliation_status")).as("E4.4: признак сверки — «разошлось»")
                 .isEqualTo("MISMATCHED");
-        assertThat(core.query("select code from anomaly_reports")).as("E4.4: отчёт с тем же кодом заведён")
+        assertThat(core.query("select code from anomaly_reports where "
+                + Trail.BY_ACCOUNT, trail.account())).as("E4.4: отчёт с тем же кодом заведён")
                 .extracting(report -> report.get("code")).contains(MISMATCH);
         assertThat(accountRung()).as("E4.4: ступени не поднято ни одной").isEqualTo("ACTIVE");
         assertThat(outbox("HOLD_RAISED")).as("E4.4: строки outbox класса подъёма ступени нет").isEmpty();
@@ -244,7 +250,7 @@ class ExitReconciliationPathTest {
         trail.passUntil("движения добыты", () -> nonNull(dealRow().get("bills_fetched_through")));
         trail.relayCore();
         journalMark = journalOf("HOLD_RAISED").size();
-        dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
+        dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
         holdFacts = holdFacts();
         trail.forgetTraces();
 
@@ -260,11 +266,13 @@ class ExitReconciliationPathTest {
 
     private static Integer holdFacts() {
         return trail.database(Party.STATISTICS).query("select event_id from incident_facts "
-                + "where event_type = 'HOLD_RAISED'").size();
+                + "where " + Trail.BY_TENANT + " and event_type = 'HOLD_RAISED'", trail.tenant()).size();
     }
 
     private static Object accountRung() {
-        return trail.database(Party.TRADING_CORE).query("select safety_rung from exchange_accounts").getFirst()
+        return trail.database(Party.TRADING_CORE).query("select safety_rung from exchange_accounts"
+                + " where internal_id = ?",
+                trail.account()).getFirst()
                 .get("safety_rung");
     }
 
@@ -278,7 +286,8 @@ class ExitReconciliationPathTest {
 
     private static List<Map<String, Object>> outbox(String eventType) {
         return trail.database(Party.TRADING_CORE).query("select event_id, occurred_at, payload::text as payload "
-                + "from outbox_events where event_type = ? order by id", eventType);
+                + "from outbox_events where "
+                        + Trail.BY_TENANT + " and event_type = ? order by id", trail.tenant(), eventType);
     }
 
     private static Map<String, Object> single(List<Map<String, Object>> rows, String label) {
@@ -287,7 +296,8 @@ class ExitReconciliationPathTest {
     }
 
     private static List<Map<String, Object>> journalOf(String eventType) {
-        return trail.database(Party.AUDIT).query("select event_id from audit_records where event_type = ?",
+        return trail.database(Party.AUDIT).query("select event_id from audit_records where "
+                + Trail.BY_TENANT + " and event_type = ?", trail.tenant(),
                 eventType);
     }
 

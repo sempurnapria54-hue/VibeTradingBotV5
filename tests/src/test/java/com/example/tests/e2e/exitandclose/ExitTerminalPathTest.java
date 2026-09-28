@@ -3,6 +3,7 @@ package com.example.tests.e2e.exitandclose;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
@@ -128,7 +129,7 @@ class ExitTerminalPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("x5");
+        trail = SharedStand.dealPath(ExitTerminalPathTest.class);
         trail.factSeriesStartedYesterday();
         dealFactSeriesStartedYesterday(trail);
         trail.side(Party.TRADING_CORE).set(EXPLORATORY, "false");
@@ -138,7 +139,7 @@ class ExitTerminalPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(ExitTerminalPathTest.class);
         }
     }
 
@@ -187,7 +188,7 @@ class ExitTerminalPathTest {
         assertThat(recorded.path("strategyInternalId").asString()).as("E5.1: и с определением")
                 .isEqualTo(definition);
         awaitDealFact(closed);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E5.1: сделочный факт один")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E5.1: сделочный факт один")
                 .isEqualTo(dealFacts + 1);
     }
 
@@ -246,7 +247,7 @@ class ExitTerminalPathTest {
         Database core = trail.database(Party.TRADING_CORE);
         Integer systemRows = systemRows().size();
         Object streak = lossStreak();
-        Long facts = trail.database(Party.STATISTICS).count("deal_facts");
+        Long facts = trail.rows(Party.STATISTICS, "deal_facts");
         trail.forgetTraces();
 
         trail.orchestrate();
@@ -258,12 +259,13 @@ class ExitTerminalPathTest {
         assertThat(outbox(DEAL_CLOSED)).as("E5.5: второй строки outbox класса терминала нет").hasSize(1);
         assertThat(lossStreak()).as("E5.5: счётчик серии второй раз не двинулся").isEqualTo(streak);
         assertThat(commands()).as("E5.5: команд по этой сделке нет").isEmpty();
-        assertThat(core.query("select status from deals where id = ?", dealId).getFirst().get("status"))
+        assertThat(core.query("select status from deals where "
+                + Trail.BY_ACCOUNT + " and id = ?", trail.account(), dealId).getFirst().get("status"))
                 .as("E5.5: статус тот же").isEqualTo("CLOSED");
         assertThat(trail.database(Party.AUDIT).query("select id from audit_records where event_type = ? "
                 + "and deal_internal_id = ?", DEAL_CLOSED, deal)).as("E5.5: строка журнала о терминале одна")
                 .hasSize(1);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E5.5: сделочный факт один")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E5.5: сделочный факт один")
                 .isEqualTo(facts);
     }
 
@@ -283,14 +285,16 @@ class ExitTerminalPathTest {
         assertThat(dealRead(trail, deal).path("status").asString()).as("E5.4: терминал применён")
                 .isEqualTo("CLOSED");
         assertThat(lossStreak()).as("E5.4: счётчик серии вырос на единицу").isEqualTo(1);
-        assertThat(core.query("select safety_rung from exchange_accounts").getFirst().get("safety_rung"))
+        assertThat(core.query("select safety_rung from exchange_accounts where internal_id = ?",
+                trail.account()).getFirst().get("safety_rung"))
                 .as("E5.4: порог достигнут — поднята мягкая ступень счёта").isEqualTo("HOLD");
         Map<String, Object> terminal = single(outbox(DEAL_CLOSED), "E5.4: терминал");
         Map<String, Object> hold = single(outbox(HOLD_RAISED), "E5.4: подъём ступени");
         assertThat(hold.get("payload").toString()).as("E5.4: ступень — с машинным кодом серии").contains(LOSS_STREAK);
         assertThat(instant(hold.get("occurred_at"))).as("E5.4: ступень поднята после коммита терминала")
                 .isAfter(instant(terminal.get("occurred_at")));
-        assertThat(core.query("select code from anomaly_reports")).as("E5.4: заведён отчёт о происшествии")
+        assertThat(core.query("select code from anomaly_reports where "
+                + Trail.BY_ACCOUNT, trail.account())).as("E5.4: заведён отчёт о происшествии")
                 .extracting(report -> report.get("code")).contains(LOSS_STREAK);
         Map<String, Object> reported = outbox(ANOMALY_REPORTED).stream()
                 .filter(event -> event.get("payload").toString().contains(LOSS_STREAK))
@@ -302,7 +306,7 @@ class ExitTerminalPathTest {
         }
         awaitDealFact(terminal);
         Database statistics = trail.database(Party.STATISTICS);
-        assertThat(statistics.count("deal_facts")).as("E5.4: сделочный факт один").isEqualTo(dealFacts + 1);
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E5.4: сделочный факт один").isEqualTo(dealFacts + 1);
         Trail.await("E5.4: факты отчёта и подъёма приняты — счётчики выросли", () -> statistics.query(
                 "select event_id from incident_facts where event_id in (?, ?)",
                 String.valueOf(reported.get("event_id")), String.valueOf(hold.get("event_id"))).size() == 2);
@@ -342,7 +346,7 @@ class ExitTerminalPathTest {
         trail.passUntil("сделка в ошибочном состоянии", () -> Objects.equals("ERROR",
                 dealRead(trail, deal).path("status").asString()));
         trail.relayCore();
-        Long facts = trail.database(Party.STATISTICS).count("deal_facts");
+        Long facts = trail.rows(Party.STATISTICS, "deal_facts");
         trail.forgetTraces();
 
         trail.passUntil("аварийный терминал", () -> Objects.equals("EMERGENCY_CLOSED",
@@ -370,7 +374,7 @@ class ExitTerminalPathTest {
                 .isEqualTo("EMERGENCY_CLOSED");
         awaitDealFact(terminal);
         Database statistics = trail.database(Party.STATISTICS);
-        assertThat(statistics.count("deal_facts")).as("E5.3: сделочный факт один").isEqualTo(facts + 1);
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E5.3: сделочный факт один").isEqualTo(facts + 1);
         assertThat(statistics.query("select net_result from deal_facts where event_id = ?",
                 String.valueOf(terminal.get("event_id"))).getFirst().get("net_result"))
                 .as("E5.3: сделочный факт с пустым результатом").isNull();
@@ -441,17 +445,13 @@ class ExitTerminalPathTest {
     }
 
     /**
-     * Красна по находке {@code F12} документа: сработавшую у площадки защиту
-     * транша в сопровождении не наблюдает ни один проход — ни защиту, ни
-     * позицию сделка в штатном ведении не читает, экспозиция транша не
-     * схлопывается, и маршрут «все транши терминальны при состоявшемся
-     * входе» не наступает (.claude/work/backlog.md §«Сработавшую защиту
-     * транша в сопровождении не наблюдает ни один проход»). Предусловия
-     * клетки прогон с меткой проверяет до ожидания, на котором она красна.
+     * Сработавшую у площадки защиту транша наблюдает обработчик
+     * сопровождения: проход без работы добывает носителя защиты и позицию, а
+     * разбор истории отличает срабатывание от пропажи (находка {@code F12}
+     * документа закрыта кодом).
      */
     @Test
     @Order(7)
-    @Tag("debt")
     @DisplayName("E5.7 — Все транши терминальны при состоявшемся входе: сделка несёт старшую из их причин")
     void e5_7_allTranchesTerminalAfterEntryGiveTheDealTheSeniorReason() {
         trail.exchange().forgetScenarios();
@@ -498,17 +498,13 @@ class ExitTerminalPathTest {
     }
 
     /**
-     * Красна по находке {@code F13} документа: у восстановленной сделки
-     * позиция наблюдалась, а эпизода в зеркале нет, и граф сделки не
-     * предъявлен целиком никогда — матрица отвергает терминал её транша на
-     * каждом проходе, а добычи, которая дополнила бы граф, не эмитит никто
-     * (.claude/work/backlog.md §«Восстановленная сделка с позицией, закрытой
-     * до первого прохода, не доходит до терминала»). Предусловие клетки
-     * прогон с меткой проверяет до ожидания, на котором она красна.
+     * У восстановленной сделки позиция наблюдалась, а эпизода в зеркале нет:
+     * первый проход добывает позицию, добыча заводит закрытый эпизод по
+     * записи закрытия, и только на предъявленном графе матрица допускает
+     * терминал транша (находка {@code F13} документа закрыта кодом).
      */
     @Test
     @Order(8)
-    @Tag("debt")
     @DisplayName("E5.8 — Штатный терминал восстановленной сделки: идентичность определения едет отсутствующей")
     void e5_8_theCleanTerminalOfARecoveredDealCarriesNoDefinitionIdentity() {
         deal = walkToRecoveredDeal(trail, "31");
@@ -569,7 +565,7 @@ class ExitTerminalPathTest {
         trail.passUntil("движения добыты", () -> nonNull(dealRow().get("bills_fetched_through")));
         riskAppetiteIs(trail, "5", lossLimit);
         trail.relayCore();
-        dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
+        dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
         trail.forgetTraces();
 
         trail.passUntil("сделка ушла в терминал", () -> isFalse(Objects.equals("EXIT_PENDING",
@@ -579,7 +575,8 @@ class ExitTerminalPathTest {
 
     private static String activeDefinition() {
         return String.valueOf(trail.database(Party.STRATEGIES)
-                .query("select internal_id from strategies where status = 'ACTIVE'").getFirst().get("internal_id"));
+                .query("select internal_id from strategies where exchange_account_internal_id = ?"
+                        + " and status = 'ACTIVE'", trail.account()).getFirst().get("internal_id"));
     }
 
     private static Map<String, Object> dealRow() {
@@ -599,7 +596,9 @@ class ExitTerminalPathTest {
     }
 
     private static Object lossStreak() {
-        return trail.database(Party.TRADING_CORE).query("select consecutive_loss_count from exchange_accounts")
+        return trail.database(Party.TRADING_CORE).query("select consecutive_loss_count from exchange_accounts"
+                + " where internal_id = ?",
+                trail.account())
                 .getFirst().get("consecutive_loss_count");
     }
 
@@ -613,7 +612,8 @@ class ExitTerminalPathTest {
 
     private static List<Map<String, Object>> outbox(String eventType) {
         return trail.database(Party.TRADING_CORE).query("select event_id, occurred_at, payload::text as payload "
-                + "from outbox_events where event_type = ? order by id", eventType);
+                + "from outbox_events where "
+                        + Trail.BY_TENANT + " and event_type = ? order by id", trail.tenant(), eventType);
     }
 
     private static Map<String, Object> single(List<Map<String, Object>> rows, String label) {

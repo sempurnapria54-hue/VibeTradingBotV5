@@ -6,9 +6,12 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.ProtectionCoverageGate;
 import com.example.tradingcore.domain.fsm.DealTrancheHandler;
+import com.example.tradingcore.domain.fsm.TrancheActionDisposition;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
 import com.example.tradingcore.domain.fsm.TrancheWorkPass;
 import com.example.tradingcore.domain.safety.HoldSignal;
@@ -40,6 +43,7 @@ import org.springframework.stereotype.Component;
 public class TrancheManagingHandler implements DealTrancheHandler {
 
     private final TrancheWorkPass workPass;
+    private final TrancheActionDisposition disposition;
     private final ProtectionCoverageGate coverageGate;
 
     @Override
@@ -76,7 +80,34 @@ public class TrancheManagingHandler implements DealTrancheHandler {
                     HoldSignal.exchangeAccount(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED));
         }
         TrancheTransition work = workPass.run(dealContext, tranche);
-        return isTrue(workPass.spoke(work)) ? work : TrancheTransition.stay();
+        return isTrue(workPass.spoke(work)) ? work : observe(dealContext, tranche);
+    }
+
+    /**
+     * Сработавшую у площадки защиту транша наблюдает этот обработчик: без
+     * добычи её срабатывание не видит ни один проход, экспозиция стоит
+     * налитой, и транш в свой выход не уходит
+     * (docs/components/TrancheManagingHandler.md §«Наблюдение срабатывания
+     * защиты»).
+     *
+     * <p><b>Ноги и защиты первыми, позиция последней</b> — тот же порядок,
+     * что у добычи обеих сторон сверки: позиция, прочитанная плоской раньше
+     * сработавшей защиты, дала бы расхождение, которого на бирже нет.
+     * Добыча едет наблюдением: работу уровня сделки она не занимает
+     * (docs/processes/fsm-execution-layering.md §«Добыча не занимает
+     * проход»).
+     */
+    private TrancheTransition observe(DealContext dealContext, DealTranche tranche) {
+        TrancheTransition observation = TrancheTransition.stay();
+        for (Order order : tranche.observedOrders()) {
+            observation = observation.withObservation(
+                    disposition.orderFetch(dealContext, order.getId()).orElse(null));
+        }
+        for (AlgoOrder algoOrder : tranche.liveAlgoOrders()) {
+            observation = observation.withObservation(
+                    disposition.algoOrderFetch(dealContext, algoOrder.getId()).orElse(null));
+        }
+        return observation.withObservation(disposition.positionFetch(dealContext).orElse(null));
     }
 
     /**

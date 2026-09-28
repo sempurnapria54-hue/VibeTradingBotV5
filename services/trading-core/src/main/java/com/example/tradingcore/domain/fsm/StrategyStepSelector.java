@@ -68,8 +68,10 @@ public class StrategyStepSelector {
 
     /**
      * Шаг узкой агрегатной поверхности детали, применимый в текущем
-     * статусе сделки. Транша у такого шага нет ни одного, и область его
-     * признака применённости вырождается в саму сделку.
+     * статусе сделки. Строк исполнения такой шаг не заводит — он работает
+     * ребром сворачивания, — и однократность у него держит само ребро
+     * (docs/rules/strategy-step-once-per-episode.md §«Область признака —
+     * эпизод объекта шага»).
      */
     public StepSelection selectDealStep(DealContext dealContext) {
         if (isNull(dealContext.getStrategyDetail())) {

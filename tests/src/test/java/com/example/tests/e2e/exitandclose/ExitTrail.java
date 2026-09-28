@@ -43,7 +43,7 @@ public final class ExitTrail {
 
     static final String HALTS = Trail.CORE + "/safety/halts";
 
-    static final String EXTERNAL_POSITION = "okx-pos-1";
+    public static final String EXTERNAL_POSITION = "okx-pos-1";
 
     public static final String CANCEL_ORDER = "/api/v5/trade/cancel-order";
 
@@ -73,7 +73,8 @@ public final class ExitTrail {
 
     static final String EFFECTIVE = "effective";
 
-    private static final String POSITION_SCENARIO = "position";
+    /** Сценарий позиции тропы у площадки: принятое закрытие переводит его в {@link #FLAT}. */
+    public static final String POSITION_SCENARIO = "position";
 
     private static final String OCO_SCENARIO = "oco";
 
@@ -81,7 +82,8 @@ public final class ExitTrail {
 
     private static final String ENTRY_SCENARIO = "entry";
 
-    private static final String FLAT = "flat";
+    /** Состояние сценария позиции тропы: позиция закрыта. */
+    public static final String FLAT = "flat";
 
     private static final String FIRST = "first";
 
@@ -108,26 +110,31 @@ public final class ExitTrail {
      * @return идентичность сделки
      */
     public static String walkToScaledIn(Trail trail) {
+        trail.pairWithoutDeal();
         trail.exchangeAcceptsCommands();
         exchangeAcceptsTeardown(trail);
         trail.exchange().forgetScenarios();
-        trail.withoutDeals();
         trail.activeDefinition(scaleInDefinition());
         String deal = trail.openDeal();
         trail.entrySubmitted();
         trail.relayCore();
         trail.exchangeFillsEntry();
         String size = plain(trail.database(Party.TRADING_CORE)
-                .query("select size from orders where external_id = ?", Trail.EXTERNAL_ORDER).getFirst().get("size"));
+                .query("select size from orders where "
+                        + Trail.BY_DEAL + " and external_id = ?",
+                        trail.account(), Trail.EXTERNAL_ORDER).getFirst().get("size"));
         exchangeMirrorsProtection(trail, size);
         exchangeMirrorsClose(trail);
         exchangeHoldsSecondLeg(trail, size, "live");
         trail.passUntil("пролог: налив наблюдён", () -> isFalse(trail.database(Party.TRADING_CORE)
-                .query("select id from orders where external_status = 'filled'").isEmpty()));
+                .query("select id from orders where "
+                        + Trail.BY_DEAL + " and external_status = 'filled'", trail.account()).isEmpty()));
         trail.relayCore();
         exchangeHoldsPosition(trail, size);
         trail.passUntil("вторая входная нога добора отправлена", () -> isFalse(trail.database(Party.TRADING_CORE)
-                .query("select id from orders where external_id = ? and external_status = 'live'", SECOND_ORDER)
+                .query("select id from orders where "
+                        + Trail.BY_DEAL + " and external_id = ? and external_status = 'live'",
+                        trail.account(), SECOND_ORDER)
                 .isEmpty()));
         trail.relayCore();
         return deal;
@@ -137,29 +144,32 @@ public final class ExitTrail {
      * Пролог одного транша по названному определению: входная нога налилась,
      * площадка отражает отдельную защиту и закрытие позиции сценариями,
      * экспозиция транша наблюдена (.claude/tests/cases/e2e-exit-and-close.md
-     * §«E2.7 — Выход, объявленный действием: закрытие одно, и шлёт его
-     * исполнитель действия», предусловия).
+     * §«E2.7 — Выход, объявленный действием сделки: закрытие одно, и шлёт
+     * его сворачивание», предусловия).
      *
      * @param trail      тропа
      * @param definition тело определения
      * @return идентичность сделки
      */
     public static String walkToExposure(Trail trail, String definition) {
+        trail.pairWithoutDeal();
         trail.exchangeAcceptsCommands();
         exchangeAcceptsTeardown(trail);
         trail.exchange().forgetScenarios();
-        trail.withoutDeals();
         trail.activeDefinition(definition);
         String deal = trail.openDeal();
         trail.entrySubmitted();
         trail.relayCore();
         trail.exchangeFillsEntry();
         String size = plain(trail.database(Party.TRADING_CORE)
-                .query("select size from orders where external_id = ?", Trail.EXTERNAL_ORDER).getFirst().get("size"));
+                .query("select size from orders where "
+                        + Trail.BY_DEAL + " and external_id = ?",
+                        trail.account(), Trail.EXTERNAL_ORDER).getFirst().get("size"));
         exchangeMirrorsProtection(trail, size);
         exchangeMirrorsClose(trail);
         trail.passUntil("пролог: налив наблюдён", () -> isFalse(trail.database(Party.TRADING_CORE)
-                .query("select id from orders where external_status = 'filled'").isEmpty()));
+                .query("select id from orders where "
+                        + Trail.BY_DEAL + " and external_status = 'filled'", trail.account()).isEmpty()));
         trail.relayCore();
         standAtExposure(trail, deal);
         trail.relayCore();
@@ -210,14 +220,16 @@ public final class ExitTrail {
                 """.formatted(System.currentTimeMillis()));
         String deal = walkToScaledIn(trail);
         Database core = trail.database(Party.TRADING_CORE);
-        String size = plain(core.query("select size from orders where external_id = ?", SECOND_ORDER).getFirst()
+        String size = plain(core.query("select size from orders where "
+                + Trail.BY_DEAL + " and external_id = ?", trail.account(), SECOND_ORDER).getFirst()
                 .get("size"));
         exchangeKeepsCloseRecords(trail, records);
         exchangeKeepsBills(trail, sourceTime, lastBill, bills);
         initiative.run();
         passUntilLeaves(trail, deal, "ACTIVE");
         trail.passUntil("отмена второй ноги принята", () -> nonNull(core
-                .query("select close_reason from orders where external_id = ?", SECOND_ORDER).getFirst()
+                .query("select close_reason from orders where "
+                        + Trail.BY_DEAL + " and external_id = ?", trail.account(), SECOND_ORDER).getFirst()
                 .get("close_reason")));
         exchangeHoldsSecondLeg(trail, size, CANCELED);
         trail.passUntil("транши сделки терминальны", () -> {
@@ -241,12 +253,12 @@ public final class ExitTrail {
      * условием входа под сворачиванием заявки не выпускает», предусловия).
      *
      * <p><b>Второй транш удерживает его собственное действие, а не
-     * сосед:</b> соседа, решённого тем же проходом, проверка одновременного
-     * риска не видит (находка {@code F8} документа), и оба транша проходили
-     * бы её вместе. Удержанный — номинал его ноги выше катастрофического
-     * потолка сделки, а ноги соседа ниже: отказ временный и в карв-ауте
-     * живого риска, строка исполнения остаётся живой, и транш стои́т в
-     * предвходовой проверке с истинным условием.
+     * порядок прогона:</b> номинал его ноги выше катастрофического потолка
+     * сделки, а ноги соседа ниже, — и отказ держится, какой бы из траншей ни
+     * решался первым. Второй риск-создающий вход проходом не решается, и
+     * сосед, вошедший раньше, преконтролю удержанного виден. Отказ временный
+     * и в карв-ауте живого риска, строка исполнения остаётся живой, и транш
+     * стои́т в предвходовой проверке с истинным условием.
      *
      * @param trail   тропа
      * @param entered сколько траншей входит — два либо один
@@ -272,6 +284,7 @@ public final class ExitTrail {
      * @return идентичность сделки
      */
     static String walkToTwoTranches(Trail trail, String definition, Integer entered, Runnable afterActivation) {
+        trail.pairWithoutDeal();
         trail.exchangeAcceptsCommands();
         exchangeAcceptsTeardown(trail);
         trail.exchange().forgetScenarios();
@@ -279,24 +292,31 @@ public final class ExitTrail {
                 {"code": "0", "msg": "", "data": [{"ordId": "okx-{{jsonPath request.body '$.clOrdId'}}",
                   "clOrdId": "{{jsonPath request.body '$.clOrdId'}}", "sCode": "0", "sMsg": "", "ts": "1758240000000"}]}
                 """);
-        trail.withoutDeals();
         trail.activeDefinition(definition);
         afterActivation.run();
         String deal = trail.openDeal();
         Database core = trail.database(Party.TRADING_CORE);
         trail.passUntil("входные ноги отправлены", () -> core
-                .query("select id from orders where external_id is not null").size() == entered);
+                .query("select id from orders where "
+                        + Trail.BY_DEAL + " and external_id is not null", trail.account()).size() == entered);
         trail.relayCore();
         String size = exchangeFillsEveryEntry(trail);
+        // Позиция у площадки есть с первым наливом: заведённая позже, она
+        // оставила бы проходу окно, где ноги налиты, а позиции нет, — и проход
+        // прочёл бы её закрытой до зеркала.
+        exchangeHoldsPosition(trail, size);
         exchangeMirrorsClose(trail);
         if (entered > 1) {
             exchangeMirrorsAttachedPair(trail);
         }
         trail.passUntil("наливы наблюдены", () -> core
-                .query("select id from orders where external_status = 'filled'").size() == entered);
+                .query("select id from orders where "
+                        + Trail.BY_DEAL + " and external_status = 'filled'", trail.account()).size() == entered);
         trail.relayCore();
-        exchangeHoldsPosition(trail, size);
-        trail.passUntil("экспозиция вошедших траншей ненулевая", () -> {
+        trail.passUntil("позиция наблюдена, экспозиция вошедших траншей ненулевая", () -> {
+            if (isFalse(livePositionMirrored(trail))) {
+                return false;
+            }
             int exposed = 0;
             for (JsonNode tranche : dealRead(trail, deal).path("tranches")) {
                 if (tranche.path("exposure").decimalValue().signum() > 0) {
@@ -418,7 +438,9 @@ public final class ExitTrail {
     /**
      * Встроенная защита вошедшего транша сработала у площадки: из живых она
      * ушла, в истории находится на ноге сработавших, а позиция читается
-     * плоской — её закрыл стоп.
+     * плоской — её закрыл стоп, и история закрытых эпизодов отдаёт запись
+     * закрытия того же эпизода: плоская позиция без неё на площадке не
+     * бывает.
      *
      * @param trail тропа
      */
@@ -431,10 +453,13 @@ public final class ExitTrail {
         trail.exchange().answers(Trail.EXCHANGE_POSITIONS, """
                 {"code": "0", "msg": "", "data": []}
                 """);
+        trail.exchange().answers(POSITIONS_HISTORY, """
+                {"code": "0", "msg": "", "data": [%s]}
+                """.formatted(mirroredCloseRecord()));
     }
 
     /**
-     * Сделка заведена восстановлением: на свежем развёртывании ядра площадка
+     * Сделка заведена восстановлением: на свежей паре «тенант, счёт» площадка
      * держит позицию инструмента тропы, которую не объясняет ни одна сделка,
      * а заявок и условных заявок у счёта нет; тик детектора аномалий ручным
      * фасадом заводит сделку по позиции (.claude/tests/cases/e2e-exit-and-close.md
@@ -446,10 +471,10 @@ public final class ExitTrail {
      * @return идентичность сделки
      */
     static String walkToRecoveredDeal(Trail trail, String size) {
+        trail.pairWithoutDeal();
         trail.exchangeAcceptsCommands();
         exchangeAcceptsTeardown(trail);
         trail.exchange().forgetScenarios();
-        trail.withoutDeals();
         exchangeHoldsPosition(trail, size);
         trail.exchange().answers(ORDERS_PENDING, """
                 {"code": "0", "msg": "", "data": []}
@@ -476,7 +501,8 @@ public final class ExitTrail {
     static String exchangeFillsEveryEntry(Trail trail) {
         BigDecimal total = BigDecimal.ZERO;
         for (Map<String, Object> order : trail.database(Party.TRADING_CORE)
-                .query("select internal_id, external_id, size from orders where external_id is not null order by id")) {
+                .query("select internal_id, external_id, size from orders where "
+                        + Trail.BY_DEAL + " and external_id is not null order by id", trail.account())) {
             trail.exchange().answersWhere(Trail.EXCHANGE_ORDER, "clOrdId", String.valueOf(order.get("internal_id")),
                     """
                     {"code": "0", "msg": "", "data": [{"instId": "%s", "ordId": "%s", "clOrdId": "%s",
@@ -613,11 +639,18 @@ public final class ExitTrail {
                 {"code": "0", "msg": "", "data": []}
                 """);
         exchange.answersInState(POSITIONS_HISTORY, POSITION_SCENARIO, FLAT, """
-                {"code": "0", "msg": "", "data": [{"posId": "%s", "instId": "%s", "direction": "long",
+                {"code": "0", "msg": "", "data": [%s]}
+                """.formatted(mirroredCloseRecord()));
+    }
+
+    /** Запись закрытия эпизода позиции тропы, которую площадка отдаёт после принятого закрытия. */
+    public static String mirroredCloseRecord() {
+        return """
+                {"posId": "%s", "instId": "%s", "direction": "long",
                   "realizedPnl": "-0.2", "ccy": "USDT", "closeAvgPx": "%s", "pnl": "0", "fee": "-0.2",
                   "fundingFee": "0", "liqPenalty": "0", "type": "2",
-                  "cTime": "1758240000000", "uTime": "1758240005000"}]}
-                """.formatted(EXTERNAL_POSITION, Trail.EXTERNAL_INSTRUMENT, Trail.ENTRY_PRICE));
+                  "cTime": "1758240000000", "uTime": "1758240005000"}
+                """.formatted(EXTERNAL_POSITION, Trail.EXTERNAL_INSTRUMENT, Trail.ENTRY_PRICE);
     }
 
     /**
@@ -706,6 +739,9 @@ public final class ExitTrail {
      * Площадка отвечает на секундную свечу индекса названной ценой закрытия
      * — свечой, открытой в секунду события, — а на минутную пусто.
      *
+     * <p><b>Путь свечей индекса общий:</b> чтение публичное и подписи счёта
+     * не несёт, и ответ его ни одному счёту не адресован.
+     *
      * @param trail  тропа
      * @param openAt момент открытия свечи, мс
      * @param close  цена закрытия; пусто — секундной свечи нет
@@ -714,6 +750,7 @@ public final class ExitTrail {
         String empty = """
                 {"code": "0", "msg": "", "data": []}
                 """;
+        trail.exchange().shared(INDEX_CANDLES);
         trail.exchange().answers(INDEX_CANDLES, empty);
         trail.exchange().answersWhere(INDEX_CANDLES, "bar", "1s", isNull(close) ? empty : """
                 {"code": "0", "msg": "", "data": [["%d", "%s", "%s", "%s", "%s", "1"]]}
@@ -763,7 +800,8 @@ public final class ExitTrail {
     /** Встроенные защиты ядра — в порядке заведения. */
     private static List<Map<String, Object>> attachedProtections(Trail trail) {
         return trail.database(Party.TRADING_CORE)
-                .query("select internal_id, size, stop_loss_trigger_price from attached_algo_orders order by id");
+                .query("select internal_id, size, stop_loss_trigger_price from attached_algo_orders where "
+                        + Trail.BY_ORDER + " order by id", trail.account());
     }
 
     /**
@@ -789,7 +827,7 @@ public final class ExitTrail {
     }
 
     /**
-     * Пролог на свежем развёртывании ядра: сделка тропы с налившейся входной
+     * Пролог на свежей паре «тенант, счёт»: сделка тропы с налившейся входной
      * ногой и без экспозиции в зеркале.
      *
      * @param trail тропа
@@ -799,22 +837,23 @@ public final class ExitTrail {
         String deal = walkToSubmittedEntry(trail);
         trail.exchangeFillsEntry();
         trail.passUntil("пролог: налив наблюдён", () -> isFalse(trail.database(Party.TRADING_CORE)
-                .query("select id from orders where external_status = 'filled'").isEmpty()));
+                .query("select id from orders where "
+                        + Trail.BY_DEAL + " and external_status = 'filled'", trail.account()).isEmpty()));
         trail.relayCore();
         return deal;
     }
 
     /**
-     * Пролог на свежем развёртывании ядра до отправки входной ноги: сделка
+     * Пролог на свежей паре «тенант, счёт» до отправки входной ноги: сделка
      * тропы заведена, площадка подтвердила постановку, налива нет.
      *
      * @param trail тропа
      * @return идентичность сделки
      */
     static String walkToSubmittedEntry(Trail trail) {
+        trail.pairWithoutDeal();
         trail.exchangeAcceptsCommands();
         exchangeAcceptsTeardown(trail);
-        trail.withoutDeals();
         trail.activeDefinition(conditionOnlyExit());
         String deal = trail.openDeal();
         trail.entrySubmitted();
@@ -835,7 +874,8 @@ public final class ExitTrail {
     static void exchangeCancelsUnfilledEntry(Trail trail) {
         Stub exchange = trail.exchange();
         Map<String, Object> order = trail.database(Party.TRADING_CORE)
-                .query("select internal_id, size from orders where external_id is not null").getFirst();
+                .query("select internal_id, size from orders where "
+                        + Trail.BY_DEAL + " and external_id is not null", trail.account()).getFirst();
         String read = """
                 {"code": "0", "msg": "", "data": [{"instId": "%s", "ordId": "%s", "clOrdId": "%s",
                   "ordType": "market", "side": "buy", "posSide": "net", "state": "%s", "px": "",
@@ -878,7 +918,8 @@ public final class ExitTrail {
     /** Размер налившейся входной ноги — в контрактах, как его несёт зеркало. */
     static String filledSize(Trail trail) {
         return plain(trail.database(Party.TRADING_CORE)
-                .query("select size from orders where external_status = 'filled'").getFirst().get("size"));
+                .query("select size from orders where "
+                        + Trail.BY_DEAL + " and external_status = 'filled'", trail.account()).getFirst().get("size"));
     }
 
     /**
@@ -899,19 +940,27 @@ public final class ExitTrail {
 
     /**
      * Состояние {@code E1.1}: стаб отдаёт позицию размером налившейся ноги, и
-     * проходы сопровождения идут, пока экспозиция транша не станет ненулевой.
+     * проходы сопровождения идут, пока в зеркале не появится живой эпизод, а
+     * экспозиция транша не станет ненулевой.
      *
-     * <p><b>Проходы, а не тик:</b> проход дробит работу по звену за раз —
-     * наблюдение позиции, затем пересчёт наливов транша, — и экспозицию,
-     * которую читает поверхность, пишет проход, следующий за наблюдением.
+     * <p><b>Признак наблюдения — эпизод в зеркале, а не экспозиция:</b>
+     * поверхность выводит экспозицию из ног транша на каждом чтении, и
+     * ненулевой она становится уже с наблюдённым наливом — до того, как проход
+     * прочтёт позицию.
      *
      * @param trail тропа
      * @param deal  сделка
      */
     static void standAtExposure(Trail trail, String deal) {
         exchangeHoldsPosition(trail, filledSize(trail));
-        trail.passUntil("экспозиция транша ненулевая", () -> dealRead(trail, deal).path("tranches").get(0)
-                .path("exposure").decimalValue().signum() > 0);
+        trail.passUntil("позиция наблюдена, экспозиция транша ненулевая", () -> isTrue(livePositionMirrored(trail))
+                && dealRead(trail, deal).path("tranches").get(0).path("exposure").decimalValue().signum() > 0);
+    }
+
+    /** В зеркале ядра есть живой эпизод позиции сделки счёта. */
+    private static Boolean livePositionMirrored(Trail trail) {
+        return isFalse(trail.database(Party.TRADING_CORE).query("select id from positions where "
+                + Trail.BY_DEAL + " and status = 'ACTIVE'", trail.account()).isEmpty());
     }
 
     /**
@@ -977,14 +1026,16 @@ public final class ExitTrail {
     /**
      * Активное определение удалено у владельца, и копия у ядра получила тот
      * же статус — ходами {@code E1.3}: смена статуса поверхностью владельца,
-     * тик его реле, ожидание копии.
+     * тик его реле, ожидание копии. Открыт тропе снятия риска: её {@code E7.5}
+     * уводит сделку в координированный выход этой же инициативой.
      *
      * @param trail тропа
      * @return идентичность удалённого определения
      */
-    static String deleteDefinition(Trail trail) {
+    public static String deleteDefinition(Trail trail) {
         String definition = String.valueOf(trail.database(Party.STRATEGIES)
-                .query("select internal_id from strategies where status = 'ACTIVE'").getFirst().get("internal_id"));
+                .query("select internal_id from strategies where exchange_account_internal_id = ?"
+                        + " and status = 'ACTIVE'", trail.account()).getFirst().get("internal_id"));
         Answer deleted = trail.moveDefinition(definition, "DELETED");
         if (deleted.status() != 200) {
             throw new IllegalStateException("Предусловие не поставлено: удаление определения — "
@@ -1008,7 +1059,7 @@ public final class ExitTrail {
      * @param trail тропа
      */
     static void dealFactSeriesStartedYesterday(Trail trail) {
-        trail.factSeriesStartedYesterday("DEAL_CLOSED", """
+        trail.factSeriesStartedYesterday("DEAL_CLOSED", () -> """
                 {"dealInternalId": "%s", "exchangeAccountInternalId": "%s", "instrumentInternalId": "%s",
                  "strategyInternalId": "%s", "status": "CLOSED", "closeReason": "STRATEGY_EXIT", "tookRisk": true,
                  "graphComplete": true, "result": 1, "resultCurrency": "USDT", "fee": 0, "funding": 0,
@@ -1058,11 +1109,6 @@ public final class ExitTrail {
         return trail.database(Party.AUDIT).query(
                 "select event_type, occurred_at, content::text as content from audit_records "
                         + "where deal_internal_id = ? order by occurred_at", deal);
-    }
-
-    static Long count(Trail trail, Party party, String table) {
-        Database database = trail.database(party);
-        return database.count(table);
     }
 
     static String plain(Object number) {

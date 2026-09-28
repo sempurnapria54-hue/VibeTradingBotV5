@@ -3,6 +3,7 @@ package com.example.tests.e2e.strategytodeal;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -43,7 +44,7 @@ class LateConsumerPathTest {
 
     @BeforeAll
     static void openTrailWithoutConsumers() {
-        trail = Trail.open("e84");
+        trail = SharedStand.dealPath(LateConsumerPathTest.class);
         trail.stop(Party.AUDIT);
         trail.stop(Party.STATISTICS);
         trail.factSeriesStartedYesterday();
@@ -53,7 +54,7 @@ class LateConsumerPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(LateConsumerPathTest.class);
         }
     }
 
@@ -64,8 +65,8 @@ class LateConsumerPathTest {
         String dealId = trail.openDeal();
         trail.entrySubmitted();
         trail.relayCore();
-        Long coreOutbox = trail.database(Party.TRADING_CORE).count("outbox_events");
-        Long ownerOutbox = trail.database(Party.STRATEGIES).count("outbox_events");
+        Long coreOutbox = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long ownerOutbox = trail.rows(Party.STRATEGIES, "outbox_events");
         trail.side(Party.STATISTICS).set("jobs.aggregate-recompute.cron", RECOMPUTE_EVERY_TWO_SECONDS);
         Instant raised = Instant.now();
 
@@ -82,9 +83,11 @@ class LateConsumerPathTest {
                 .containsExactlyInAnyOrder(DealTrace.DEAL_OPENED, DealTrace.ORDER_DECIDED);
         Database statistics = trail.database(Party.STATISTICS);
         Trail.await("E8.4: статистика добрала факты своих классов и собрала строку суток", () -> present(statistics
-                .query("select id from incident_aggregates where bucket_date = ? and opened_deals = 1"
-                        + " and order_decisions = 1", LocalDate.now(ZoneOffset.UTC))));
-        assertThat(statistics.query("select event_type from incident_facts where occurred_at >= ?",
+                .query("select id from incident_aggregates where "
+                        + Trail.BY_TENANT + " and bucket_date = ? and opened_deals = 1"
+                        + " and order_decisions = 1", trail.tenant(), LocalDate.now(ZoneOffset.UTC))));
+        assertThat(statistics.query("select event_type from incident_facts where "
+                + Trail.BY_TENANT + " and occurred_at >= ?", trail.tenant(),
                 Timestamp.from(raised.minusSeconds(3600))))
                 .as("E8.4: факты своих классов, произведённые до подъёма")
                 .extracting(row -> row.get("event_type"))
@@ -100,16 +103,16 @@ class LateConsumerPathTest {
                 .isEqualTo(latest(statistics));
         assertThat(List.of(journalBound, statisticsBound)).as("E8.4: ни одна граница не равна моменту подъёма")
                 .doesNotContain(raised);
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events"))
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events"))
                 .as("E8.4: подъём потребителей состояния ядра не тронул").isEqualTo(coreOutbox);
-        assertThat(trail.database(Party.STRATEGIES).count("outbox_events"))
+        assertThat(trail.rows(Party.STRATEGIES, "outbox_events"))
                 .as("E8.4: подъём потребителей состояния владельца не тронул").isEqualTo(ownerOutbox);
     }
 
     private static JsonNode journalRead() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         Trail.Answer answer = trail.call(Party.AUDIT, "GET", "/api/v1/audit/journal/records?from="
-                + now.minusHours(12) + "&to=" + now.plusMinutes(5), Trail.TENANT, null);
+                + now.minusHours(12) + "&to=" + now.plusMinutes(5), trail.tenant(), null);
         assertThat(answer.status()).as("чтение журнала — " + answer.body()).isEqualTo(200);
         return Json.tree(answer.body());
     }
@@ -117,7 +120,7 @@ class LateConsumerPathTest {
     private static JsonNode statisticsRead() {
         LocalDate day = LocalDate.now(ZoneOffset.UTC);
         Trail.Answer answer = trail.call(Party.STATISTICS, "GET", "/api/v1/statistics/aggregates/rows?grain=INCIDENT"
-                + "&from=" + day + "&to=" + day, Trail.TENANT, null);
+                + "&from=" + day + "&to=" + day, trail.tenant(), null);
         assertThat(answer.status()).as("чтение агрегатов — " + answer.body()).isEqualTo(200);
         return Json.tree(answer.body());
     }

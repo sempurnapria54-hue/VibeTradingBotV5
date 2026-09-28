@@ -2,6 +2,7 @@ package com.example.tradingbot.domain.unit.predicate;
 
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.attached;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.deal;
+import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.episode;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.order;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.orderWith;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.standaloneStop;
@@ -15,6 +16,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTra
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.position.Position;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -197,6 +199,35 @@ class DealAggregateTest {
         subject.setEntryReason(Deal.EntryReason.STRATEGY);
 
         assertThat(subject.positionObserved()).isFalse();
+    }
+
+    /**
+     * Эпизодная половина неполного графа: позиция наблюдалась, строки
+     * эпизода нет. Восстановленная сделка до первой добычи позиции —
+     * единственное состояние, где сверка экспозиции нулевая с обеих сторон
+     * при живом риске (находки {@code F13} и {@code F9} сквозного набора).
+     */
+    @Test
+    @DisplayName("Восстановленная сделка без строки эпизода: эпизод не предъявлен, граф неполон")
+    void aRecoveredDealWithoutAnEpisodeRowHasItsEpisodeNotPresented() {
+        Deal subject = deal(Deal.Status.ACTIVE, quietTranche());
+        subject.setEntryReason(Deal.EntryReason.RECOVERY);
+
+        assertThat(subject.episodeNotPresented()).isTrue();
+        assertThat(subject.graphComplete()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Эпизод есть либо позиция не наблюдалась: эпизод предъявлен")
+    void anEpisodeRowOrAnUnobservedPositionPresentsTheEpisode() {
+        Deal recovered = deal(Deal.Status.ACTIVE, quietTranche());
+        recovered.setEntryReason(Deal.EntryReason.RECOVERY);
+        recovered.setPositions(List.of(episode(Position.Status.CLOSED, "0", null)));
+        Deal unfilled = deal(Deal.Status.ACTIVE, quietTranche());
+        unfilled.setEntryReason(Deal.EntryReason.STRATEGY);
+
+        assertThat(recovered.episodeNotPresented()).isFalse();
+        assertThat(unfilled.episodeNotPresented()).isFalse();
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.example.tradingcore.domain.safety;
 
 import com.example.tradingbot.domain.model.Auditable;
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -77,6 +78,14 @@ public class AnomalyReport extends Auditable {
 
     /** Снимок внешнего состояния после обработки. */
     private String externalAfter;
+
+    /**
+     * Момент последнего наблюдения признака детектором с гистерезисом —
+     * носитель серии подряд идущих проходов. Пусто — серии нет: строку не
+     * наблюдал такой детектор либо серию прервал полный проход без признака
+     * (docs/components/AnomalyJob.md §«Такт и гистерезис»).
+     */
+    private OffsetDateTime lastObservedAt;
 
     /** Статус обработки происшествия реактивным контуром. */
     public enum Status {

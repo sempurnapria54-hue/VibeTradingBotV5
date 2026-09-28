@@ -2,6 +2,7 @@ package com.example.tests.e2e.perimeterread;
 
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -62,8 +63,6 @@ import static org.assertj.core.api.Assertions.tuple;
 @DisplayName("E4 — Переподключение, окно и разрыв на живой тропе")
 class StreamReconnectPathTest {
 
-    private static final String SUBJECT = "subject-s1";
-
     private static final String ORDER_DECIDED = "ORDER_DECIDED";
 
     private static final String WINDOW_KEY = "perimeter.stream.replay-window";
@@ -95,8 +94,8 @@ class StreamReconnectPathTest {
 
     @BeforeAll
     static void standInTheStateOfE31() {
-        trail = Trail.openPerimeter("p8");
-        token = trail.identity().browserToken(SUBJECT, "Trader One");
+        trail = SharedStand.perimeter(StreamReconnectPathTest.class);
+        token = trail.identity().browserToken(Subjects.fresh("subject-s1"), "Trader One");
         prologue = Prologue.walkToOpenDeal(trail, token);
         warmTheCache(trail, token);
         firstTicket = ticket(trail, token);
@@ -114,7 +113,7 @@ class StreamReconnectPathTest {
             }
         }
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(StreamReconnectPathTest.class);
         }
     }
 
@@ -203,7 +202,7 @@ class StreamReconnectPathTest {
     @Order(4)
     @DisplayName("E4.2 — Идентичность вне окна даёт явный разрыв, и дочитывается он чтением у владельца")
     void e4_2_anIdentityOutsideTheWindowGivesAGapReadBackAtTheOwner() {
-        restartThePerimeter(WINDOW_KEY, "2");
+        trail.restartWith(Party.BFF, Map.of(WINDOW_KEY, "2"));
         warmTheCache(trail, token);
         String narrowTicket = ticket(trail, token);
         Subscription narrow = Subscription.open(trail, narrowTicket);
@@ -237,10 +236,7 @@ class StreamReconnectPathTest {
     @Order(5)
     @DisplayName("E4.3 — Просроченный билет подписку не открывает, а новый открывает её тем же адресом")
     void e4_3_anExpiredTicketDoesNotOpenAndANewOneDoes() {
-        trail.stop(Party.BFF);
-        trail.side(Party.BFF).set(TICKET_TTL_KEY, "3s");
-        trail.side(Party.BFF).set(CACHE_TTL_KEY, "2s");
-        trail.start(Party.BFF);
+        trail.restartWith(Party.BFF, Map.of(TICKET_TTL_KEY, "3s", CACHE_TTL_KEY, "2s"));
         warmTheCache(trail, token);
         Answer issued = trail.callWith(token, Party.BFF, "POST", TICKETS, null, "");
         String shortTicket = Json.tree(issued.body()).path("ticket").asString();
@@ -273,7 +269,8 @@ class StreamReconnectPathTest {
             reopened.awaitId(next);
             assertThat(reopened.status()).as("E4.3: новый билет открывает подписку тем же адресом").isEqualTo(200);
             assertThat(distinctIds(reopened.facts()))
-                    .as("E4.3: поток продолжился с переданной идентичности — пропущенная запись переиграна")
+                    .as("E4.3: поток продолжился с переданной идентичности — пропущенная запись переиграна; кадры "
+                            + reopened.frames().stream().map(frame -> frame.type() + "/" + frame.id()).toList())
                     .containsExactly(between, next);
         } finally {
             reopened.close();
@@ -281,12 +278,6 @@ class StreamReconnectPathTest {
     }
 
     // ---------------------------------------------------------------- ходы и чтения
-
-    private static void restartThePerimeter(String key, String value) {
-        trail.stop(Party.BFF);
-        trail.side(Party.BFF).set(key, value);
-        trail.start(Party.BFF);
-    }
 
     /** Чтения группы E2 через периметр — ответ на путь. */
     private static Map<String, JsonNode> ownerReads(String journal) {

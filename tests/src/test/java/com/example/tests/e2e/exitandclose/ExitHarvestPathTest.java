@@ -2,6 +2,7 @@ package com.example.tests.e2e.exitandclose;
 
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Trail;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -113,7 +114,7 @@ class ExitHarvestPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("x3");
+        trail = SharedStand.dealPath(ExitHarvestPathTest.class);
         Side core = trail.side(Party.TRADING_CORE);
         core.set("service-command-retry.default-policy.max-attempts", "10");
         core.set("service-command-retry.default-policy.initial-delay", "1s");
@@ -125,7 +126,7 @@ class ExitHarvestPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(ExitHarvestPathTest.class);
         }
     }
 
@@ -167,9 +168,9 @@ class ExitHarvestPathTest {
                         + "deal_id = ? and system_action_type = 'FINALIZE_DEAL_EXIT_ACTION'", dealId))
                 .as("E3.1: финализации нет").isEmpty();
         assertThat(journalOf(trail, deal)).as("E3.1: у журнала следа нет").hasSize(journalMark);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E3.1: у статистики следа нет")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E3.1: у статистики следа нет")
                 .isEqualTo(dealFacts);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E3.1: и фактов происшествий")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E3.1: и фактов происшествий")
                 .isEqualTo(incidentFacts);
     }
 
@@ -210,9 +211,9 @@ class ExitHarvestPathTest {
                         tuple("9003", "REALIZED_PNL", "0.4", "-0.1", "USDT"),
                         tuple("9004", "REALIZED_PNL", "0.8", "-0.2", "USDT"));
         assertThat(journalOf(trail, deal)).as("E3.3: у журнала следа нет").hasSize(journalMark);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E3.3: у статистики следа нет")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E3.3: у статистики следа нет")
                 .isEqualTo(dealFacts);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E3.3: и фактов происшествий")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E3.3: и фактов происшествий")
                 .isEqualTo(incidentFacts);
     }
 
@@ -220,13 +221,13 @@ class ExitHarvestPathTest {
     @Order(3)
     @DisplayName("E3.5 — Повторная добыча тех же движений второй строки не заводит")
     void e3_5_aRepeatedFetchOfTheSameFlowsAddsNoRow() {
-        Long rows = trail.database(Party.TRADING_CORE).count("deal_cash_flows");
+        Long rows = trail.rows(Party.TRADING_CORE, "deal_cash_flows");
         trail.forgetTraces();
 
         trail.passUntil("E3.5: движения спрошены повторно",
                 () -> isFalse(trail.exchange().requests(BILLS).isEmpty()));
 
-        assertThat(trail.database(Party.TRADING_CORE).count("deal_cash_flows"))
+        assertThat(trail.rows(Party.TRADING_CORE, "deal_cash_flows"))
                 .as("E3.5: число строк разбивки не изменилось").isEqualTo(rows);
         assertThat(trail.database(Party.TRADING_CORE).query("select external_bill_id from deal_cash_flows "
                         + "group by exchange_account_id, external_bill_id having count(*) > 1"))
@@ -276,9 +277,9 @@ class ExitHarvestPathTest {
                 .extracting(request -> request.getUrl().split("\\?")[0])
                 .allSatisfy(path -> assertThat(path).isIn(BILLS, BILLS_ARCHIVE));
         assertThat(journalOf(trail, deal)).as("E3.6: у журнала следа нет").hasSize(journalMark);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E3.6: у статистики следа нет")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E3.6: у статистики следа нет")
                 .isEqualTo(dealFacts);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E3.6: и фактов происшествий")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E3.6: и фактов происшествий")
                 .isEqualTo(incidentFacts);
     }
 
@@ -332,15 +333,18 @@ class ExitHarvestPathTest {
                     assertThat(param(request, "begin")).isNotBlank();
                     assertThat(param(request, "end")).isNotBlank();
                 });
-        assertThat(trail.database(Party.TRADING_CORE).query("select reconciliation_status from deals where id = ?",
+        assertThat(trail.database(Party.TRADING_CORE).query("select reconciliation_status from deals where "
+                + Trail.BY_ACCOUNT + " and id = ?", trail.account(),
                 dealId).getFirst().get("reconciliation_status"))
                 .as("E3.4: строки соседа в область сверки не попали — сверка сошлась").isEqualTo("MATCHED");
         Database core = trail.database(Party.TRADING_CORE);
-        assertThat(core.query("select deal_id from deal_cash_flows where external_instrument_id = ?",
+        assertThat(core.query("select deal_id from deal_cash_flows where "
+                + Trail.BY_ACCOUNT + " and external_instrument_id = ?", trail.account(),
                 NEIGHBOUR_INSTRUMENT)).as("E3.4: строка соседнего инструмента сохранена с пустой ссылкой")
                 .hasSize(1)
                 .allSatisfy(flow -> assertThat(flow.get("deal_id")).isNull());
-        assertThat(core.query("select deal_id from deal_cash_flows where external_instrument_id = ?",
+        assertThat(core.query("select deal_id from deal_cash_flows where "
+                + Trail.BY_ACCOUNT + " and external_instrument_id = ?", trail.account(),
                 Trail.EXTERNAL_INSTRUMENT)).as("E3.4: ссылку получили только строки нашего инструмента")
                 .hasSize(3)
                 .allSatisfy(flow -> assertThat(flow.get("deal_id")).isEqualTo(dealId));
@@ -373,7 +377,8 @@ class ExitHarvestPathTest {
         assertThat(core.query("select id from deal_system_action_states where deal_id = ? and "
                         + "system_action_type = 'REFRESH_DEAL_CONTEXT_ACTION' and status = 'FAILED'", dealId))
                 .as("E3.7: по исчерпании строка исполнения в отказе").isNotEmpty();
-        assertThat(core.query("select safety_rung from account_instrument_states"))
+        assertThat(core.query("select safety_rung from account_instrument_states where "
+                + Trail.BY_ACCOUNT, trail.account()))
                 .as("E3.7: поднята ступень блокировки входа по инструменту")
                 .extracting(state -> state.get("safety_rung")).contains("ENTRY_BLOCKED");
         assertThat(trail.exchange().requests(INDEX_CANDLES))
@@ -418,8 +423,8 @@ class ExitHarvestPathTest {
                 LAST_BILL, bill(LAST_BILL, Trail.EXTERNAL_INSTRUMENT, "2", "1", "USDT", "0.8", "-0.2", closedAt));
         dealId = trail.database(Party.TRADING_CORE).query("select id from deals where internal_id = ?", deal)
                 .getFirst().get("id");
-        dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
-        incidentFacts = trail.database(Party.STATISTICS).count("incident_facts");
+        dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
+        incidentFacts = trail.rows(Party.STATISTICS, "incident_facts");
         journalMark = journalOf(trail, deal).size();
         trail.forgetTraces();
 
@@ -439,13 +444,13 @@ class ExitHarvestPathTest {
         assertThat(param(fresh.getFirst(), "end")).as("E3.8: верхняя — момент, который отдала площадка")
                 .isEqualTo(String.valueOf(sourceTime));
         assertThat(trail.database(Party.TRADING_CORE).query("select external_bill_id, deal_id from deal_cash_flows "
-                        + "where external_bill_id = ?", LAST_BILL))
+                        + "where " + Trail.BY_ACCOUNT + " and external_bill_id = ?", trail.account(), LAST_BILL))
                 .as("E3.8: строка разбивки заведена и получила ссылку на сделку тем же проходом")
                 .extracting(row -> row.get("deal_id")).containsExactly(dealId);
         assertThat(journalOf(trail, deal)).as("E3.8: у журнала следа нет").hasSize(journalMark);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E3.8: у статистики следа нет")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E3.8: у статистики следа нет")
                 .isEqualTo(dealFacts);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E3.8: и фактов происшествий")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E3.8: и фактов происшествий")
                 .isEqualTo(incidentFacts);
     }
 
@@ -467,8 +472,8 @@ class ExitHarvestPathTest {
                 bill(LAST_BILL, Trail.EXTERNAL_INSTRUMENT, "8", "173", "USDC", "-0.05", "0", FUNDED)));
         dealId = trail.database(Party.TRADING_CORE).query("select id from deals where internal_id = ?", deal)
                 .getFirst().get("id");
-        dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
-        incidentFacts = trail.database(Party.STATISTICS).count("incident_facts");
+        dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
+        incidentFacts = trail.rows(Party.STATISTICS, "incident_facts");
     }
 
     /**
@@ -510,7 +515,7 @@ class ExitHarvestPathTest {
 
     private static List<Map<String, Object>> outbox(String eventType) {
         return trail.database(Party.TRADING_CORE).query("select event_id, event_type from outbox_events "
-                + "where event_type = ? order by id", eventType);
+                + "where " + Trail.BY_TENANT + " and event_type = ? order by id", trail.tenant(), eventType);
     }
 
     private static String accountPath(String suffix) {

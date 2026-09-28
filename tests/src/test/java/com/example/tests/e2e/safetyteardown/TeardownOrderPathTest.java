@@ -2,6 +2,7 @@ package com.example.tests.e2e.safetyteardown;
 
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.exitandclose.ExitTrail;
@@ -23,23 +24,29 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import tools.jackson.databind.JsonNode;
 
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.ANOMALY_REPORTED;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.DEAL_SHUTDOWN_INITIATED;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.FOREIGN_ORDER;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.HOLD_RAISED;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.MIN_AGE;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.STALE_OPERAND;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.TEARDOWN_ATTEMPTS;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.awaitJournalRow;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.counter;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.dealStatus;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.detect;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.exchangeAcknowledgesCloseWithoutEffect;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.incidents;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.outbox;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.pairRung;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.payload;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.safetyState;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.standAtObservation;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.walkToExposure;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.walkToScaledIn;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.walkToStaleGuardedExposure;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,9 +61,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ядре, поднятом заново прологом: ступень необратима. {@code E2.4} продолжает
  * ядро {@code E2.3}.
  *
+ * <p><b>{@code E2.7} идёт на своём ядре, и вход у неё другой</b> — владелец
+ * данных перестаёт отдавать операнд шага {@code EXIT} уровня сделки, и
+ * жёсткую ступень пары поднимает сам проход сопровождения
+ * ({@link TeardownTrail#walkToStaleGuardedExposure}).
+ *
  * <p><b>Клетки {@code E2.5} и {@code E2.6} здесь не написаны:</b> их
- * предусловие — две активные сделки на разных инструментах, и пролога двух
- * инструментов у набора ещё нет.
+ * предусловие — две активные сделки на разных инструментах одного счёта — в
+ * построенной системе недостижимо: контурная половина гейта входа держит один
+ * инструмент на счёт (.claude/tests/cases/e2e-safety-teardown.md §«Кейсы, не
+ * прогоняемые сегодня»).
  */
 @Tag("e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -71,13 +85,15 @@ class TeardownOrderPathTest {
 
     private static final List<String> LIVE_ORDER = List.of("CREATED", "PENDING", "ACTIVE", "PARTIALLY_COMPLETED");
 
+    private static final String STALE_CODE = "INSTRUMENT_MARKET_DATA_EXPIRED";
+
     private static Trail trail;
 
     private static Long closesOfTheUnconfirmedTeardown;
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("t2");
+        trail = SharedStand.dealPath(TeardownOrderPathTest.class);
         trail.factSeriesStartedYesterday();
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.side(Party.TRADING_CORE).set(MIN_AGE, "0s");
@@ -88,7 +104,7 @@ class TeardownOrderPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TeardownOrderPathTest.class);
         }
     }
 
@@ -98,7 +114,7 @@ class TeardownOrderPathTest {
     void e2_1_theEntryLegsGoFirstThenThePositionAndTheProtectionsLast() {
         walkToScaledIn(trail);
         standAtObservation(trail);
-        Integer outboxRows = trail.database(Party.TRADING_CORE).count("outbox_events").intValue();
+        Integer outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events").intValue();
         trail.forgetTraces();
 
         detect(trail);
@@ -126,10 +142,11 @@ class TeardownOrderPathTest {
         assertThat(live(core, "orders")).as("E2.1: живых заявок у траншей не осталось").isZero();
         assertThat(live(core, "algo_orders")).as("E2.1: живых отдельных защит не осталось").isZero();
         assertThat(live(core, "attached_algo_orders")).as("E2.1: живых встроенных защит не осталось").isZero();
-        assertThat(core.query("select status from positions")).as("E2.1: эпизод позиции закрыт")
+        assertThat(core.query("select status from positions where "
+                + Trail.BY_DEAL, trail.account())).as("E2.1: эпизод позиции закрыт")
                 .extracting(row -> row.get("status")).containsOnly("CLOSED");
         List<Map<String, Object>> tickRows = core.query("select event_id, event_type from outbox_events "
-                + "order by id offset ?", outboxRows);
+                + "where " + Trail.BY_TENANT + " order by id offset ?", trail.tenant(), outboxRows);
         assertThat(tickRows).as("E2.1: следа сверх классов тика подъёма нет").extracting(row -> row.get("event_type"))
                 .isNotEmpty().allSatisfy(type -> assertThat(TICK_CLASSES).contains(String.valueOf(type)));
         tickRows.forEach(row -> awaitJournalRow(trail, row.get("event_id")));
@@ -143,7 +160,8 @@ class TeardownOrderPathTest {
         standAtObservation(trail);
         Database core = trail.database(Party.TRADING_CORE);
         Map<String, Object> attached = core.query("select a.internal_id, o.status as parent_status, "
-                + "o.external_id as parent from attached_algo_orders a join orders o on o.id = a.order_id").getFirst();
+                + "o.external_id as parent from attached_algo_orders a join orders o on o.id = a.order_id"
+                + " where o." + Trail.BY_DEAL, trail.account()).getFirst();
         assertThat(attached.get("parent_status")).as("предусловие E2.2: родитель встроенной защиты терминален")
                 .isEqualTo("COMPLETED");
         trail.forgetTraces();
@@ -155,7 +173,8 @@ class TeardownOrderPathTest {
         Integer cancelAttached = first(journal, ExitTrail.CANCEL_ALGOS, String.valueOf(attached.get("internal_id")));
         assertThat(cancelAttached).as("E2.2: снятие встроенной защиты терминального родителя дошло до стаба — "
                 + urls(journal)).isNotNegative();
-        assertThat(core.query("select internal_id from algo_orders")).as("E2.2: в перечне отдельных заявок её нет")
+        assertThat(core.query("select internal_id from algo_orders where "
+                + Trail.BY_DEAL, trail.account())).as("E2.2: в перечне отдельных заявок её нет")
                 .extracting(row -> row.get("internal_id")).doesNotContain(attached.get("internal_id"));
         List<LoggedRequest> parentReads = IntStream.range(cancelAttached + 1, journal.size())
                 .mapToObj(journal::get)
@@ -163,7 +182,8 @@ class TeardownOrderPathTest {
                         && Objects.equals("GET", request.getMethod().getName()))
                 .toList();
         assertThat(parentReads).as("E2.2: судьба защиты резолвлена добычей родителя после снятия").isNotEmpty();
-        assertThat(core.query("select status from attached_algo_orders").getFirst().get("status"))
+        assertThat(core.query("select status from attached_algo_orders where "
+                + Trail.BY_ORDER, trail.account()).getFirst().get("status"))
                 .as("E2.2: встроенная защита терминальна").isEqualTo("CANCELED");
         Map<String, Object> critical = critical(core);
         assertThat(critical.get("status")).as("E2.2: снятие подтверждено — отчёт завершён").isEqualTo("COMPLETED");
@@ -198,7 +218,8 @@ class TeardownOrderPathTest {
                 .contains(Trail.EXCHANGE_POSITIONS, Trail.EXCHANGE_ORDER);
         Map<String, Object> critical = critical(trail.database(Party.TRADING_CORE));
         assertThat(critical.get("status")).as("E2.3: отчёт терминала не получил").isNotEqualTo("COMPLETED");
-        assertThat(trail.database(Party.TRADING_CORE).query("select status from positions").getFirst()
+        assertThat(trail.database(Party.TRADING_CORE).query("select status from positions where "
+                + Trail.BY_DEAL, trail.account()).getFirst()
                 .get("status")).as("E2.3: живая позиция осталась живой").isEqualTo("ACTIVE");
         assertThat(outbox(trail, ANOMALY_REPORTED)).as("E2.3: строк о завершении отчёта нет — одна о заведении")
                 .hasSize(reported + 1);
@@ -230,7 +251,62 @@ class TeardownOrderPathTest {
                 .isEqualTo(counter(before, "raised_holds"));
     }
 
+    @Test
+    @Order(5)
+    @DisplayName("E2.7 — Инструментная реакция, поднятая проходом сделки, снимает риск по графу этой сделки")
+    void e2_7_anInstrumentReactionRaisedByTheDealPassTearsDownByThatDealGraph() {
+        String deal = walkToStaleGuardedExposure(trail);
+        assertThat(pairRung(trail)).as("предусловие E2.7: ступени пары нет").isEqualTo("ACTIVE");
+        trail.forgetTraces();
+
+        trail.marketLosesIndicator(STALE_OPERAND);
+        trail.passUntil("E2.7: сделка уведена в ошибочное состояние",
+                () -> Objects.equals("ERROR", dealStatus(trail, deal)));
+        Database core = trail.database(Party.TRADING_CORE);
+        String reportSql = "select status, scope from anomaly_reports where code = ? and severity = 'CRITICAL'";
+        Trail.await("E2.7: отчёт реакции доведён", () -> isFalse(core.query(reportSql, STALE_CODE).isEmpty())
+                && Objects.equals("COMPLETED", core.query(reportSql, STALE_CODE).getFirst().get("status")));
+        trail.relayCore();
+
+        assertThat(pairRung(trail)).as("E2.7: ступень пары — сворачивание").isEqualTo("TRADE_BLOCKED");
+        assertThat(safetyState(trail).path("accountSafetyRung").asString()).as("E2.7: ступени счёта нет")
+                .isEqualTo("ACTIVE");
+        List<Map<String, Object>> raised = outbox(trail, HOLD_RAISED);
+        assertThat(raised).as("E2.7: строка outbox класса подъёма одна").hasSize(1);
+        JsonNode content = payload(raised.getFirst());
+        assertThat(content.path("scope").asString()).as("E2.7: радиус пары").isEqualTo("INSTRUMENT");
+        assertThat(content.path("instrumentInternalId").asString()).as("E2.7: инструмент в содержимом")
+                .isEqualTo(Trail.INSTRUMENT);
+        assertThat(content.path("code").asString()).as("E2.7: код устаревания данных").isEqualTo(STALE_CODE);
+        assertThat(content.path("rung").asString()).as("E2.7: ступень жёсткая").isEqualTo("HARD");
+        List<Map<String, Object>> reports = core.query(reportSql, STALE_CODE);
+        assertThat(reports).as("E2.7: критичная строка отчёта одна").hasSize(1);
+        assertThat(reports.getFirst().get("scope")).as("E2.7: отчёт радиуса пары").isEqualTo("INSTRUMENT");
+        assertThat(core.query("select shutdown_reason from deals where internal_id = ?", deal).getFirst()
+                .get("shutdown_reason")).as("E2.7: причина — риск-политики").isEqualTo("RISK_POLICY");
+        List<Map<String, Object>> shutdown = TeardownTrail.dealOutbox(trail, DEAL_SHUTDOWN_INITIATED, deal);
+        assertThat(shutdown).as("E2.7: строка outbox остановки одна").hasSize(1);
+        List<LoggedRequest> journal = trail.exchange().requests();
+        List<String> commands = commandBodies(journal);
+        assertThat(commands).as("E2.7: команды снятия риска дошли до стаба и несут инструмент сделки")
+                .isNotEmpty().allSatisfy(command -> assertThat(command).contains(Trail.EXTERNAL_INSTRUMENT));
+        Integer close = first(journal, ExitTrail.CLOSE_POSITION, Trail.EXTERNAL_INSTRUMENT);
+        Integer protections = first(journal, ExitTrail.CANCEL_ALGOS, "");
+        assertThat(close).as("E2.7: закрытие позиции дошло до стаба — " + urls(journal)).isNotNegative();
+        assertThat(protections).as("E2.7: снятие защит позже закрытия позиции").isGreaterThan(close);
+        awaitJournalRow(trail, raised.getFirst().get("event_id"));
+        awaitJournalRow(trail, shutdown.getFirst().get("event_id"));
+    }
+
     // ---------------------------------------------------------------- чтения
+
+    /** Команды площадке — адресом и телом: всё, что не чтение. */
+    private static List<String> commandBodies(List<LoggedRequest> journal) {
+        return journal.stream()
+                .filter(request -> isFalse(Objects.equals("GET", request.getMethod().getName())))
+                .map(request -> request.getUrl() + " " + request.getBodyAsString())
+                .toList();
+    }
 
     /** Позиция первого запроса по пути, чьё тело несёт значение; -1 — такого нет. */
     private static Integer first(List<LoggedRequest> journal, String path, String bodyValue) {
@@ -261,7 +337,8 @@ class TeardownOrderPathTest {
 
     /** Критичная строка отчёта кодом чужой заявки. */
     private static Map<String, Object> critical(Database core) {
-        return core.query("select status, modified_at from anomaly_reports where code = ? and severity = 'CRITICAL'",
+        return core.query("select status, modified_at from anomaly_reports where "
+                + Trail.BY_ACCOUNT + " and code = ? and severity = 'CRITICAL'", trail.account(),
                 FOREIGN_ORDER).getFirst();
     }
 

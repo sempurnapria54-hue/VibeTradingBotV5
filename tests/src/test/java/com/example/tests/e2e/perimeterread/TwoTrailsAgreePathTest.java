@@ -3,6 +3,7 @@ package com.example.tests.e2e.perimeterread;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -77,8 +78,8 @@ class TwoTrailsAgreePathTest {
 
     @BeforeAll
     static void standInTheStateOfE31() {
-        trail = Trail.openPerimeter("p10");
-        token = trail.identity().browserToken("subject-s1", "Trader One");
+        trail = SharedStand.perimeter(TwoTrailsAgreePathTest.class);
+        token = trail.identity().browserToken(Subjects.fresh("subject-s1"), "Trader One");
         prologue = Prologue.walkToOpenDeal(trail, token);
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         Trail.await("сутки сложены до хода, порождающего факт", () -> isFalse(trail.database(Party.STATISTICS)
@@ -98,7 +99,7 @@ class TwoTrailsAgreePathTest {
             first.close();
         }
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TwoTrailsAgreePathTest.class);
         }
     }
 

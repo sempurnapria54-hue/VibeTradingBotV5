@@ -1,6 +1,7 @@
 package com.example.tests.e2e.safetyteardown;
 
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
@@ -79,7 +80,7 @@ class TeardownEscalationPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("t5");
+        trail = SharedStand.dealPath(TeardownEscalationPathTest.class);
         trail.factSeriesStartedYesterday();
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.side(Party.TRADING_CORE).set(TEARDOWN_ATTEMPTS, String.valueOf(ATTEMPTS));
@@ -89,7 +90,7 @@ class TeardownEscalationPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TeardownEscalationPathTest.class);
         }
     }
 
@@ -123,7 +124,9 @@ class TeardownEscalationPathTest {
                 .isEqualTo(RESIDUAL);
         assertThat(absent(account.path("instrumentInternalId"))).as("E5.1: инструмента у счётного нет").isTrue();
         assertThat(trail.database(Party.TRADING_CORE).query("select status from anomaly_reports "
-                + "where code = ? and scope = 'INSTRUMENT' and severity = 'CRITICAL'", MANUAL).getFirst()
+                + "where " + Trail.BY_ACCOUNT
+                + " and code = ? and scope = 'INSTRUMENT' and severity = 'CRITICAL'",
+                        trail.account(), MANUAL).getFirst()
                 .get("status")).as("E5.1: отчёт инструментной реакции терминала не получил").isNotEqualTo("COMPLETED");
         assertThat(raised).as("E5.1: две строки журнала о подъёме, с разными радиусами и кодами")
                 .extracting(row -> awaitJournalRow(trail, row.get("event_id")).get("content").toString())
@@ -134,7 +137,8 @@ class TeardownEscalationPathTest {
                 .isEqualTo(counter(before, "raised_holds") + 2);
         assertThat(counter(after, "hard_raised_holds")).as("E5.1: жёстких на два больше")
                 .isEqualTo(counter(before, "hard_raised_holds") + 2);
-        assertThat(counter(after, "manually_raised_holds")).as("E5.1: ручных — на один: эскалация ручной тропой не является")
+        assertThat(counter(after, "manually_raised_holds"))
+                .as("E5.1: ручных — на один: эскалация ручной тропой не является")
                 .isEqualTo(counter(before, "manually_raised_holds") + 1);
     }
 
@@ -155,7 +159,8 @@ class TeardownEscalationPathTest {
         Instant first = moment(awaitJournalRow(trail, raised.get(0).get("event_id")).get("occurred_at"));
         Instant last = moment(awaitJournalRow(trail, stops.getFirst().get("event_id")).get("occurred_at"));
         List<Map<String, Object>> window = trail.database(Party.AUDIT).query("select event_type, occurred_at "
-                + "from audit_records where occurred_at between ? and ? order by occurred_at",
+                + "from audit_records where "
+                        + Trail.BY_TENANT + " and occurred_at between ? and ? order by occurred_at", trail.tenant(),
                 Timestamp.from(first), Timestamp.from(last));
         assertThat(window).as("E5.2: строк чужих классов между ними нет")
                 .allSatisfy(row -> assertThat(REACTION_CLASSES).contains(String.valueOf(row.get("event_type"))));
@@ -181,7 +186,9 @@ class TeardownEscalationPathTest {
         assertThat(safetyState(trail).path("accountSafetyRung").asString()).as("E5.4: ступень счёта — сворачивание")
                 .isEqualTo("TRADE_BLOCKED");
         assertThat(trail.database(Party.TRADING_CORE).query("select status from anomaly_reports "
-                + "where code = ? and severity = 'CRITICAL'", MANUAL).getFirst().get("status"))
+                + "where " + Trail.BY_ACCOUNT
+                + " and code = ? and severity = 'CRITICAL'",
+                        trail.account(), MANUAL).getFirst().get("status"))
                 .as("E5.4: отчёт в промежуточном статусе").isIn("CREATED", "IN_PROGRESS", "KILL_SWITCH_EXECUTED");
         assertThat(trail.exchange().requests(ExitTrail.CLOSE_POSITION))
                 .as("E5.4: проход снятия риска один — закрытий не больше предела попыток").isNotEmpty()

@@ -33,7 +33,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.Value;
 
 /**
@@ -163,6 +165,23 @@ public class DealContext {
     Boolean computationAllowed;
 
     /**
+     * Строки исполнения, чей <b>риск-создающий вход решён этим проходом</b>
+     * — команда заведения ноги выдана, а ноги в графе ещё нет.
+     *
+     * <p>Операнды потолков считаются графом в точке проверки, а граф
+     * собран до решений прохода: вход, решённый соседним траншем, преконтролю
+     * второго не виден. Поэтому второй риск-создающий вход сделки этим
+     * проходом не решается, а ждёт следующего, чей граф ногу первого уже
+     * несёт (docs/rules/risk-policy.md §«Живое меряется от живой
+     * экспозиции»).
+     *
+     * <p>В сборку контекста не входит: отметку ставит исполнитель входа
+     * ({@link #markRiskCreatingEntryDecided(DealActionState)}).
+     */
+    @Getter(AccessLevel.NONE)
+    List<Long> riskCreatingEntryDecisions = new ArrayList<>();
+
+    /**
      * Явный конструктор — ради изменяемости списка строк исполнения:
      * строку, заведённую этим проходом, регистрирует
      * {@link #register(DealActionState)}, и вызывающая сторона не обязана
@@ -286,6 +305,25 @@ public class DealContext {
         if (nonNull(state) && isFalse(actionStates.contains(state))) {
             actionStates.add(state);
         }
+    }
+
+    /**
+     * Отметить риск-создающий вход, решённый этим проходом: команда
+     * заведения его ноги выдана.
+     */
+    public void markRiskCreatingEntryDecided(DealActionState state) {
+        if (nonNull(state) && isFalse(riskCreatingEntryDecisions.contains(state.getId()))) {
+            riskCreatingEntryDecisions.add(state.getId());
+        }
+    }
+
+    /**
+     * Риск-создающий вход сделки уже решён этим проходом <b>другой</b>
+     * строкой исполнения — её нога преконтролю этой не видна.
+     */
+    public Boolean riskCreatingEntryDecidedBesides(DealActionState state) {
+        return riskCreatingEntryDecisions.stream()
+                .anyMatch(id -> isNull(state) || isFalse(Objects.equals(id, state.getId())));
     }
 
     /**

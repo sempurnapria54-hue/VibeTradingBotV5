@@ -3,6 +3,7 @@ package com.example.tests.e2e.strategytodeal;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -33,11 +34,11 @@ import static org.assertj.core.api.Assertions.tuple;
  * (.claude/tests/cases/e2e-strategy-to-deal.md §«E3 — Вход по копии: сделка и её
  * событие»).
  *
- * <p><b>Каждый кейс начинает с пары без сделки</b> ({@link Trail#withoutDeals()}):
+ * <p><b>Каждый кейс начинает с пары без сделки</b> ({@link Trail#pairWithoutDeal()}):
  * сделку на паре снять нечем, кроме её терминала, и кейс, пришедший после
- * соседа, получает свежее развёртывание ядра. Журнал, статистика и темы при
- * этом общие на класс, поэтому след отбирается идентичностью события либо
- * сделки, а не счётом строк.
+ * соседа, получает свежую пару «тенант, счёт». Ядро, журнал, статистика и
+ * темы при этом общие на класс, поэтому след отбирается идентичностью события
+ * либо сделки, «пусто» — тенантом кейса, а не счётом строк.
  *
  * <p><b>Порядок ассертов двойной</b>: до тика реле ядра проверяется, что
  * следа потребителей ещё нет, и только потом — что он появился
@@ -51,21 +52,21 @@ class DealEntryPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("e3");
+        trail = SharedStand.dealPath(DealEntryPathTest.class);
         trail.commonPreconditions();
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(DealEntryPathTest.class);
         }
     }
 
     @Test
     @DisplayName("E3.1 — Тик сканера входа по копии заводит сделку, и её событие доезжает до обоих потребителей")
     void e3_1_anEntryScanOverTheCopyOpensADealAndItsEventReachesBothConsumers() {
-        trail.withoutDeals();
+        trail.pairWithoutDeal();
         trail.activeDefinition();
         trail.marketFavoursEntry();
         Long ownerOutbox = trail.database(Party.STRATEGIES).count("outbox_events");
@@ -78,7 +79,7 @@ class DealEntryPathTest {
         JsonNode deal = deals.getFirst();
         String dealId = deal.path("internalId").asString();
         assertThat(deal.path("status").asString()).as("E3.1: сделка в активном статусе").isEqualTo("ACTIVE");
-        assertThat(deal.path("exchangeAccountInternalId").asString()).isEqualTo(Trail.ACCOUNT);
+        assertThat(deal.path("exchangeAccountInternalId").asString()).isEqualTo(trail.account());
         assertThat(deal.path("instrumentInternalId").asString()).isEqualTo(Trail.INSTRUMENT);
         assertThat(dealRead(trail, dealId).path("tranches")).as("E3.1: транш материализован по объявлению детали")
                 .extracting(tranche -> tranche.path("entryStepType").asString())
@@ -105,16 +106,16 @@ class DealEntryPathTest {
                 .as("E3.1: реле пометило строку").isNotNull();
         List<ConsumerRecord<String, String>> published = coreRecordsOf(trail, eventId);
         assertThat(published).as("E3.1: в теме ядра одна запись события").hasSize(1);
-        assertThat(published.getFirst().key()).as("E3.1: ключ записи — тенант").isEqualTo(Trail.TENANT);
+        assertThat(published.getFirst().key()).as("E3.1: ключ записи — тенант").isEqualTo(trail.tenant());
         assertThat(awaitJournal(trail, eventId).get("event_type")).as("E3.1: строка журнала класса создания сделки")
                 .isEqualTo(DealTrace.DEAL_OPENED);
         assertThat(awaitIncident(trail, eventId).get("event_type")).as("E3.1: факт происшествия этого класса")
                 .isEqualTo(DealTrace.DEAL_OPENED);
-        Database statistics = trail.database(Party.STATISTICS);
-        assertThat(statistics.count("deal_facts")).as("E3.1: строк сделочного зерна нет ни одной").isZero();
-        assertThat(statistics.count("deal_aggregates")).as("E3.1: строк агрегата нет — тик пересчёта не подавался")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E3.1: строк сделочного зерна нет ни одной")
                 .isZero();
-        assertThat(statistics.count("incident_aggregates")).isZero();
+        assertThat(trail.rows(Party.STATISTICS, "deal_aggregates"))
+                .as("E3.1: строк агрегата нет — тик пересчёта не подавался").isZero();
+        assertThat(trail.rows(Party.STATISTICS, "incident_aggregates")).isZero();
         assertThat(trail.accesses(Party.STRATEGIES)).as("E3.1: к владельцу определений обращений нет").isEmpty();
         assertThat(trail.database(Party.STRATEGIES).count("outbox_events"))
                 .as("E3.1: владелец потребителем не является — его outbox не тронут").isEqualTo(ownerOutbox);
@@ -123,7 +124,7 @@ class DealEntryPathTest {
     @Test
     @DisplayName("E3.2 — Сделка закрепляет деталь копии, а событие несёт идентичность определения и фазу входа")
     void e3_2_theDealPinsTheCopyDetailAndTheEventCarriesTheDefinitionAndThePhase() {
-        trail.withoutDeals();
+        trail.pairWithoutDeal();
         String definition = trail.activeDefinition();
         trail.marketFavoursEntry();
         trail.forgetTraces();
@@ -154,9 +155,9 @@ class DealEntryPathTest {
         assertThat(awaitJournal(trail, eventId).get("strategy_internal_id"))
                 .as("E3.2: радиус строки журнала — определение, которое вернул владелец").isEqualTo(definition);
         Map<String, Object> incident = awaitIncident(trail, eventId);
-        assertThat(incident.get("tenant_id")).as("E3.2: факт несёт тенанта").isEqualTo(Trail.TENANT);
+        assertThat(incident.get("tenant_id")).as("E3.2: факт несёт тенанта").isEqualTo(trail.tenant());
         assertThat(incident.get("exchange_account_internal_id")).as("E3.2: факт несёт счёт")
-                .isEqualTo(Trail.ACCOUNT);
+                .isEqualTo(trail.account());
         assertThat(trail.database(Party.STATISTICS).query(
                 "select column_name from information_schema.columns where table_name = 'incident_facts'"))
                 .as("E3.2: идентичностей сделки и определения у зерна происшествий нет вовсе")
@@ -171,7 +172,7 @@ class DealEntryPathTest {
     @Test
     @DisplayName("E3.3 — Деактивация у владельца закрывает вход у ядра")
     void e3_3_aDeactivationAtTheOwnerClosesTheEntryAtTheCore() {
-        trail.withoutDeals();
+        trail.pairWithoutDeal();
         String definition = trail.activeDefinition();
         assertThat(trail.moveDefinition(definition, "INACTIVE").status()).isEqualTo(200);
         trail.relayOwner();
@@ -191,7 +192,7 @@ class DealEntryPathTest {
         trail.relayCore();
 
         assertThat(trail.deals()).as("E3.3: сделок нет ни одной").isEmpty();
-        assertThat(core.count("outbox_events")).as("E3.3: строк outbox у ядра нет").isZero();
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E3.3: строк outbox у ядра нет").isZero();
         assertThat(trail.marketData().requests())
                 .as("E3.3: чтения фич не состоялось вовсе — отбор кончился раньше").isEmpty();
         assertThat(trail.records(Substrate.CORE_TOPIC)).as("E3.3: тема ядра не прибавила записей")
@@ -207,7 +208,7 @@ class DealEntryPathTest {
     @Test
     @DisplayName("E3.4 — Удаление определения у владельца живую сделку детали не лишает")
     void e3_4_deletingTheDefinitionLeavesTheLiveDealItsDetail() {
-        trail.withoutDeals();
+        trail.pairWithoutDeal();
         String definition = trail.activeDefinition();
         String dealId = trail.openDeal();
         Database core = trail.database(Party.TRADING_CORE);
@@ -227,7 +228,7 @@ class DealEntryPathTest {
                 """, dealId)).as("E3.4: закреплённая деталь сделки по-прежнему разрешается").hasSize(1);
         assertThat(dealRead(trail, dealId).path("status").asString())
                 .as("E3.4: сделка читается поверхностью и не терминальна").isEqualTo("ACTIVE");
-        Trail.Answer owner = trail.call(Party.STRATEGIES, "GET", Trail.STRATEGIES + "/" + definition, Trail.TENANT,
+        Trail.Answer owner = trail.call(Party.STRATEGIES, "GET", Trail.STRATEGIES + "/" + definition, trail.tenant(),
                 null);
         assertThat(Json.tree(owner.body()).path("status").asString())
                 .as("E3.4: владелец читает определение логически удалённым").isEqualTo("DELETED");
@@ -241,7 +242,7 @@ class DealEntryPathTest {
 
         assertThat(trail.deals()).as("E3.4: следующий тик сканера сделок не заводит")
                 .extracting(opened -> opened.path("internalId").asString()).containsExactly(dealId);
-        assertThat(core.query("select id from outbox_events where event_type = ?", DealTrace.DEAL_OPENED))
-                .as("E3.4: второго события создания сделки нет").hasSize(1);
+        assertThat(core.query("select id from outbox_events where tenant_id = ? and event_type = ?", trail.tenant(),
+                DealTrace.DEAL_OPENED)).as("E3.4: второго события создания сделки нет").hasSize(1);
     }
 }

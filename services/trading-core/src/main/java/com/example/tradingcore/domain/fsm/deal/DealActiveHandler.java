@@ -57,6 +57,14 @@ import org.springframework.stereotype.Component;
  * ненулевого размера есть, — и держится на каждом тике, то есть детектор
  * подтверждает его вторым же тиком.
  *
+ * <p><b>Эпизод, которого в зеркале нет, — не нулевая сторона сверки, а
+ * ненаблюдённая.</b> Сделка, чья позиция наблюдалась, без строки эпизода
+ * сверяет экспозицию с нулём, которого на бирже может не быть; у
+ * восстановленной сделки нулевые обе стороны при любом живом риске. Проход
+ * тогда добывает позицию первой и работы не делает: эпизод, живой либо
+ * закрытый, заводит только эта добыча, а без него ни расхождение не
+ * наблюдаемо, ни терминал транша не допустим.
+ *
  * <p><b>Добыча траншей прохода не занимает.</b> Команды наблюдения каскада
  * едут вместе с его работой либо последними, когда проходу больше нечего
  * делать: работа уровня сделки их не ждёт
@@ -88,6 +96,11 @@ public class DealActiveHandler implements DealHandler {
     @Override
     public DealTransition handle(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
+        if (isTrue(deal.episodeNotPresented())) {
+            log.info("Deal position was observed but no episode is mirrored, observing it dealId={}",
+                    deal.getId());
+            return reobserveExposure(dealContext);
+        }
         if (isFalse(terminalGate.exposureReconciled(deal.livePosition(), deal.getTranches()))) {
             log.warn("Deal exposure does not reconcile with the exchange, observing both sides dealId={}",
                     deal.getId());
@@ -127,7 +140,9 @@ public class DealActiveHandler implements DealHandler {
      * бирже нет. Жёсткая ступень счёта на такой гонке снимала бы покрытый
      * риск по рынку. Поэтому живые заявки траншей добываются первыми, а
      * позиция — последней, чтобы правая сторона была не старше левой.
-     * Устойчивое расхождение поднимает детектор инварианта вне прохода с
+     * Среди заявок — и налитые носители живой встроенной защиты: её
+     * срабатывание меняет левую сторону так же, как налив ноги, а факт её
+     * добывается только добычей родителя. Устойчивое расхождение поднимает детектор инварианта вне прохода с
      * гистерезисом в два тика, и ступень у него та же — биржевая ступень 2
      * (docs/models/domain/aggregate/Deal.md §«Экспозиция сделки и сверка с
      * биржей»).
@@ -147,7 +162,7 @@ public class DealActiveHandler implements DealHandler {
             fetch(dealContext, ServiceCommandType.REFRESH_POSITION_COMMAND, null).ifPresent(observations::add);
         }
         for (DealTranche tranche : emptyIfNull(dealContext.getDeal().getTranches())) {
-            tranche.liveOrders().forEach(order -> fetch(dealContext, ServiceCommandType.REFRESH_ORDER_COMMAND,
+            tranche.observedOrders().forEach(order -> fetch(dealContext, ServiceCommandType.REFRESH_ORDER_COMMAND,
                     new RefreshOrderCommandPayload(order.getId())).ifPresent(observations::add));
             tranche.liveAlgoOrders().forEach(algo -> fetch(dealContext,
                     ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND,
@@ -206,6 +221,14 @@ public class DealActiveHandler implements DealHandler {
      * Шаги УЗКОЙ агрегатной поверхности: выход и страховочный шаг.
      * Причина у них разная и объявлена типом шага
      * (docs/lifecycles/Deal.md).
+     *
+     * <p><b>Шаг сделки работает ребром, и пакета действий не запускает.</b>
+     * Действие выхода, объявленное на нём, исполняет само сворачивание:
+     * каскад снимает входные ноги всех траншей, обработчик координированного
+     * выхода шлёт одно закрытие. Запущенное здесь, оно шло бы в штатном
+     * ведении, где транши ещё берут риск, и снимало бы ноги наперегонки с
+     * каскадом (docs/rules/no-partial-close.md §«Две законные формы полного
+     * выхода»).
      *
      * <p>Пусто — агрегатного шага на этом проходе нет. У восстановленной
      * сделки его нет никогда: шаги живут на детали, а детали у неё нет.

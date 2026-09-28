@@ -3,6 +3,7 @@ package com.example.tests.e2e.perimeterread;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -43,7 +44,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p><b>Субъекты — средство прогона</b>: {@code S1} заводит тенанта первым
  * ходом, {@code S2} — второго для радиуса, {@code S3} ни разу не
- * предъявлялся до кейса о недоступном владельце.
+ * предъявлялся до кейса о недоступном владельце. Имена у них свежие у
+ * каждого класса ({@link Subjects#fresh(String)}): членства прежних классов
+ * на стенде остаются.
  */
 @Tag("e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -56,13 +59,7 @@ class TenantContextPathTest {
 
     private static final String RESOLVE = "/api/v1/auth/memberships/self";
 
-    private static final String FIRST_SUBJECT = "subject-s1";
-
     private static final String FIRST_NAME = "Trader One";
-
-    private static final String SECOND_SUBJECT = "subject-s2";
-
-    private static final String THIRD_SUBJECT = "subject-s3";
 
     private static final String CACHE_TTL_KEY = "perimeter.membership.cache-ttl";
 
@@ -71,18 +68,27 @@ class TenantContextPathTest {
 
     private static Trail trail;
 
+    private static String firstSubject;
+
+    private static String secondSubject;
+
+    private static String thirdSubject;
+
     private static String firstToken;
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.openPerimeter("p1");
-        firstToken = trail.identity().browserToken(FIRST_SUBJECT, FIRST_NAME);
+        trail = SharedStand.perimeter(TenantContextPathTest.class);
+        firstSubject = Subjects.fresh("subject-s1");
+        secondSubject = Subjects.fresh("subject-s2");
+        thirdSubject = Subjects.fresh("subject-s3");
+        firstToken = trail.identity().browserToken(firstSubject, FIRST_NAME);
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TenantContextPathTest.class);
         }
     }
 
@@ -91,7 +97,7 @@ class TenantContextPathTest {
     @DisplayName("E1.1 — Браузерный токен без членств заводит тенанта у владельца, и он же становится контекстом")
     void e1_1_aBrowserTokenWithoutMembershipsProvisionsTheTenant() {
         Database auth = trail.database(Party.AUTH);
-        assertThat(membershipsOf(FIRST_SUBJECT)).as("E1.1: предусловие — членств у S1 нет").isEmpty();
+        assertThat(membershipsOf(firstSubject)).as("E1.1: предусловие — членств у S1 нет").isEmpty();
         Long tenantsBefore = auth.count("tenants");
         trail.forgetTraces();
 
@@ -103,14 +109,14 @@ class TenantContextPathTest {
         assertThat(String.valueOf(context.get("tenantId"))).isNotBlank();
         assertThat(resolves()).as("E1.1: к владельцу членств пришёл ровно один резолв").hasSize(1);
         assertThat(auth.count("tenants")).as("E1.1: заведена одна строка тенанта").isEqualTo(tenantsBefore + 1);
-        List<Map<String, Object>> memberships = membershipsOf(FIRST_SUBJECT);
+        List<Map<String, Object>> memberships = membershipsOf(firstSubject);
         assertThat(memberships).as("E1.1: одна строка членства субъекта").hasSize(1);
         assertThat(memberships.getFirst().get("role")).isEqualTo("OWNER");
-        Map<String, Object> tenant = tenantOf(FIRST_SUBJECT);
+        Map<String, Object> tenant = tenantOf(firstSubject);
         assertThat(tenant.get("internal_id")).as("E1.1: контекст — тот самый тенант").isEqualTo(context.get("tenantId"));
         assertThat(tenant.get("name")).as("E1.1: имя тенанта — из claim'а имени предъявителя").isEqualTo(FIRST_NAME);
         assertDataOwnersUntouched("E1.1");
-        assertTopicsEmpty("E1.1");
+        assertTopicsUntouched("E1.1");
     }
 
     @Test
@@ -125,7 +131,7 @@ class TenantContextPathTest {
         assertThat(answers).as("E1.5: три ответа одинаковы").extracting(Answer::body).containsOnly(answers.getFirst().body());
         assertThat(tenantIdOf(answers.getFirst())).isEqualTo(tenant);
         assertThat(resolves()).as("E1.5: годная запись кэша — к владельцу не ходили").isEmpty();
-        assertThat(membershipsOf(FIRST_SUBJECT)).as("E1.5: строк членства одна").hasSize(1);
+        assertThat(membershipsOf(firstSubject)).as("E1.5: строк членства одна").hasSize(1);
         assertDataOwnersUntouched("E1.5");
 
         restartPerimeter("60s");
@@ -151,7 +157,7 @@ class TenantContextPathTest {
         assertThat(resolves).hasSize(1);
         assertThat(resolves.getFirst().bearer()).as("E1.4: предъявление у владельца — тот же токен байт в байт")
                 .isEqualTo(firstToken);
-        assertThat(membershipsOf(FIRST_SUBJECT)).as("E1.4: субъект членства — субъект этого токена").hasSize(1);
+        assertThat(membershipsOf(firstSubject)).as("E1.4: субъект членства — субъект этого токена").hasSize(1);
         assertThat(trail.identity().requests()).as("E1.4: исходящей идентичности периметр не заводит — выдачи токена нет")
                 .noneMatch(request -> request.getUrl().startsWith("/token"));
         assertDataOwnersUntouched("E1.4");
@@ -163,7 +169,7 @@ class TenantContextPathTest {
     void e1_2_aRepeatedResolutionProvisionsNoSecondTenant() {
         restartPerimeter("2s");
         String tenant = provisioned(firstToken);
-        Object createdAt = tenantOf(FIRST_SUBJECT).get("created_at");
+        Object createdAt = tenantOf(firstSubject).get("created_at");
         Long tenants = trail.database(Party.AUTH).count("tenants");
         pastCacheTtl(Duration.ofSeconds(2));
         trail.forgetTraces();
@@ -175,11 +181,11 @@ class TenantContextPathTest {
         assertThat(resolves()).as("E1.2: срок истёк — пришёл второй резолв").hasSize(1);
         assertThat(trail.database(Party.AUTH).count("tenants")).as("E1.2: строк тенанта не прибавилось")
                 .isEqualTo(tenants);
-        assertThat(membershipsOf(FIRST_SUBJECT)).as("E1.2: строк членства одна").hasSize(1);
-        assertThat(tenantOf(FIRST_SUBJECT).get("created_at")).as("E1.2: момент создания не изменился")
+        assertThat(membershipsOf(firstSubject)).as("E1.2: строк членства одна").hasSize(1);
+        assertThat(tenantOf(firstSubject).get("created_at")).as("E1.2: момент создания не изменился")
                 .isEqualTo(createdAt);
         assertDataOwnersUntouched("E1.2");
-        assertTopicsEmpty("E1.2");
+        assertTopicsUntouched("E1.2");
     }
 
     @Test
@@ -188,7 +194,7 @@ class TenantContextPathTest {
     void e1_6_theOwnerAnswerStaysTheTruth() {
         restartPerimeter("3s");
         String tenant = provisioned(firstToken);
-        Integer memberships = membershipsOf(FIRST_SUBJECT).size();
+        Integer memberships = membershipsOf(firstSubject).size();
         trail.forgetTraces();
 
         Answer beforeExpiry = context(firstToken);
@@ -204,7 +210,7 @@ class TenantContextPathTest {
         assertThat(resolvesBeforeExpiry).as("E1.6: до истечения срока резолва не приходило").isZero();
         assertThat(resolvesAfterExpiry).as("E1.6: после истечения он пришёл").isEqualTo(1);
         assertThat(resolves()).as("E1.6: после перезапуска пришёл третий — кэш процесс не переживает").hasSize(2);
-        assertThat(membershipsOf(FIRST_SUBJECT)).as("E1.6: резолв существующего членства ничего не переписал")
+        assertThat(membershipsOf(firstSubject)).as("E1.6: резолв существующего членства ничего не переписал")
                 .hasSize(memberships);
         assertDataOwnersUntouched("E1.6");
     }
@@ -239,7 +245,7 @@ class TenantContextPathTest {
     @Order(7)
     @DisplayName("E1.7 — Владелец членств остановлен: контекст отвечает отказом, и тенант не заводится нигде")
     void e1_7_aStoppedMembershipOwnerRefusesTheContext() {
-        String thirdToken = trail.identity().browserToken(THIRD_SUBJECT, "Trader Three");
+        String thirdToken = trail.identity().browserToken(thirdSubject, "Trader Three");
         restartPerimeter("60s");
         trail.stop(Party.AUTH);
         trail.forgetTraces();
@@ -256,7 +262,7 @@ class TenantContextPathTest {
         } finally {
             trail.start(Party.AUTH);
         }
-        assertThat(membershipsOf(THIRD_SUBJECT)).as("E1.7: после подъёма у владельца членств S3 нет").isEmpty();
+        assertThat(membershipsOf(thirdSubject)).as("E1.7: после подъёма у владельца членств S3 нет").isEmpty();
 
         Answer contextAgain = context(thirdToken);
         Answer ticketAgain = trail.callWith(thirdToken, Party.BFF, "POST", TICKETS, null, "");
@@ -264,7 +270,7 @@ class TenantContextPathTest {
         assertThat(contextAgain.status()).as("E1.7: повтор после подъёма проходит").isEqualTo(200);
         assertThat(ticketAgain.status()).as("E1.7: билет выдан после подъёма — " + ticketAgain.body())
                 .isBetween(200, 201);
-        assertThat(membershipsOf(THIRD_SUBJECT)).as("E1.7: тенант заведён тем же ходом, что E1.1").hasSize(1);
+        assertThat(membershipsOf(thirdSubject)).as("E1.7: тенант заведён тем же ходом, что E1.1").hasSize(1);
     }
 
     @Test
@@ -272,7 +278,7 @@ class TenantContextPathTest {
     @DisplayName("E1.8 — Присланный браузером тенант не читается: владельцу уезжает выведенный")
     void e1_8_aBrowserSuppliedTenantIsNotRead() {
         String first = provisioned(firstToken);
-        String second = provisioned(trail.identity().browserToken(SECOND_SUBJECT, "Trader Two"));
+        String second = provisioned(trail.identity().browserToken(secondSubject, "Trader Two"));
         assertThat(second).as("E1.8: у второго субъекта свой тенант").isNotEqualTo(first);
         Long tenants = trail.database(Party.AUTH).count("tenants");
         trail.forgetTraces();
@@ -343,9 +349,11 @@ class TenantContextPathTest {
         }
     }
 
-    private static void assertTopicsEmpty(String label) {
-        assertThat(trail.records(Substrate.CORE_TOPIC)).as(label + ": тема ядра пуста").isEmpty();
-        assertThat(trail.records(Substrate.STRATEGY_TOPIC)).as(label + ": тема владельца определений пуста")
+    /** Стенд общий, и записи прежних классов в темах уже лежат: отрицание — о легших за ход. */
+    private static void assertTopicsUntouched(String label) {
+        assertThat(trail.published(Substrate.CORE_TOPIC)).as(label + ": в тему ядра за ход не легло ничего")
+                .isEmpty();
+        assertThat(trail.published(Substrate.STRATEGY_TOPIC)).as(label + ": в тему владельца определений — тоже")
                 .isEmpty();
     }
 }

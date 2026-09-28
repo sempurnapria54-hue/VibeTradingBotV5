@@ -55,9 +55,6 @@ public class DealSystemActionStateEntity extends AuditableEntity {
     @Column(name = "attempt_count")
     private Integer attemptCount;
 
-    @Column(name = "max_attempts")
-    private Integer maxAttempts;
-
     @Column(name = "next_retry_at")
     private OffsetDateTime nextRetryAt;
 

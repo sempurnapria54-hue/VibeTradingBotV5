@@ -2,6 +2,7 @@ package com.example.tests.e2e.safetyteardown;
 
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.exitandclose.ExitTrail;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -91,16 +92,16 @@ class TeardownTracePathTest {
 
     @BeforeAll
     static void walkTheTrail() {
-        trail = Trail.open("t8");
+        trail = SharedStand.dealPath(TeardownTracePathTest.class);
         trail.factSeriesStartedYesterday();
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.side(Party.TRADING_CORE).set(MIN_AGE, "0s");
         trail.renew(Party.TRADING_CORE);
         deal = walkToScaledIn(trail);
         trail.relayCore();
-        strategyOutbox = trail.database(Party.STRATEGIES).count("outbox_events");
-        strategyStatuses = trail.database(Party.STRATEGIES).query("select internal_id, status from strategies "
-                + "order by id");
+        strategyOutbox = trail.rows(Party.STRATEGIES, "outbox_events");
+        strategyStatuses = trail.database(Party.STRATEGIES).query("select internal_id, status from strategies"
+                + " where exchange_account_internal_id = ? order by id", trail.account());
         lossCount = safetyState(trail).path("consecutiveLossCount").asInt();
         trail.forgetTraces();
 
@@ -127,7 +128,7 @@ class TeardownTracePathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TeardownTracePathTest.class);
         }
     }
 
@@ -141,7 +142,9 @@ class TeardownTracePathTest {
         Instant observed = moment(rows.getFirst().get("created_at"));
         Instant confirmed = moment(rows.getLast().get("created_at"));
         Map<String, Object> critical = core.query("select modified_at from anomaly_reports "
-                + "where code = ? and severity = 'CRITICAL'", FOREIGN_ORDER).getFirst();
+                + "where " + Trail.BY_ACCOUNT
+                + " and code = ? and severity = 'CRITICAL'",
+                        trail.account(), FOREIGN_ORDER).getFirst();
         Instant reportTerminal = moment(critical.get("modified_at"));
         Instant raised = moment(outbox(trail, HOLD_RAISED).getFirst().get("occurred_at"));
         Map<String, Object> shutdown = dealOutbox(trail, DEAL_SHUTDOWN_INITIATED, deal).getFirst();
@@ -184,9 +187,10 @@ class TeardownTracePathTest {
     @Order(2)
     @DisplayName("E8.2 — Сторона вне тропы следа не оставляет ни одного")
     void e8_2_aSideOutsideTheTrailLeavesNoTrace() {
-        assertThat(trail.database(Party.STRATEGIES).count("outbox_events"))
+        assertThat(trail.rows(Party.STRATEGIES, "outbox_events"))
                 .as("E8.2: у strategies строк outbox не прибавилось").isEqualTo(strategyOutbox);
-        assertThat(trail.database(Party.STRATEGIES).query("select internal_id, status from strategies order by id"))
+        assertThat(trail.database(Party.STRATEGIES).query("select internal_id, status from strategies"
+                + " where exchange_account_internal_id = ? order by id", trail.account()))
                 .as("E8.2: определение аварией не трогается").isEqualTo(strategyStatuses);
         assertThat(observationFeatureReads).as("E8.2: тик наблюдения — одно чтение раскладки: детекторы "
                 + "инварианта сделки строят контекст по нетерминальной сделке").isEqualTo(1);
@@ -206,7 +210,7 @@ class TeardownTracePathTest {
     @DisplayName("E8.4 — Отсутствие выходов у тропы целиком")
     void e8_4_theWholeTrailHasNoExits() {
         Database core = trail.database(Party.TRADING_CORE);
-        Long deals = core.count("deals");
+        Long deals = trail.rows(Party.TRADING_CORE, "deals");
         trail.marketFavoursEntry();
         trail.forgetTraces();
 
@@ -214,12 +218,13 @@ class TeardownTracePathTest {
         trail.orchestrate();
         trail.relayCore();
 
-        assertThat(core.count("deals")).as("E8.4: новых сделок на счёте нет — счёт выпал из выборки входа")
+        assertThat(trail.rows(Party.TRADING_CORE, "deals"))
+                .as("E8.4: новых сделок на счёте нет — счёт выпал из выборки входа")
                 .isEqualTo(deals);
-        assertThat(core.query("select status from orders").stream()
+        assertThat(core.query("select status from orders where " + Trail.BY_DEAL, trail.account()).stream()
                 .filter(row -> LIVE_ORDER.contains(String.valueOf(row.get("status")))))
                 .as("E8.4: живых заявок контура у счёта нет").isEmpty();
-        assertThat(core.query("select status from positions"))
+        assertThat(core.query("select status from positions where " + Trail.BY_DEAL, trail.account()))
                 .as("E8.4: живой позиции нет — эпизод закрыт").extracting(row -> row.get("status"))
                 .containsOnly("CLOSED");
         assertThat(commands(trail)).as("E8.4: ни одной торговой команды после снятия риска к стабу не ушло")
@@ -252,9 +257,9 @@ class TeardownTracePathTest {
         Integer stops = dealOutbox(trail, DEAL_SHUTDOWN_INITIATED, deal).size();
         Integer terminals = dealOutbox(trail, DEAL_CLOSED, deal).size();
         Map<String, Object> grain = incidents(trail);
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
-        Long dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
+        Long dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
         for (Party party : List.of(Party.TRADING_CORE, Party.AUDIT, Party.STATISTICS)) {
             trail.stop(party);
             trail.start(party);
@@ -281,18 +286,19 @@ class TeardownTracePathTest {
         assertThat(dealOutbox(trail, DEAL_CLOSED, deal)).as("E8.3: терминал не переприменён").hasSize(terminals);
         assertThat(sliceReads(trail)).as("E8.3: повторные чтения срезов у стаба есть").isNotEmpty();
         assertThat(commands(trail)).as("E8.3: повторных команд нет").isEmpty();
-        assertThat(core.query("select id from outbox_events where published_at is null"))
+        assertThat(core.query("select id from outbox_events where "
+                + Trail.BY_TENANT + " and published_at is null", trail.tenant()))
                 .as("предусловие E8.3: всё опубликовано").isEmpty();
         Map<String, Object> after = incidents(trail);
         for (String column : List.of("raised_holds", "anomaly_reports", "critical_anomaly_reports")) {
             assertThat(counter(after, column)).as("E8.3: число агрегата " + column + " то же")
                     .isEqualTo(counter(grain, column));
         }
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E8.3: строк журнала столько же")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E8.3: строк журнала столько же")
                 .isEqualTo(journal);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E8.3: фактов столько же")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E8.3: фактов столько же")
                 .isEqualTo(facts);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E8.3: сделочных фактов столько же")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E8.3: сделочных фактов столько же")
                 .isEqualTo(dealFacts);
     }
 

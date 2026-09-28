@@ -3,9 +3,11 @@ package com.example.tests.e2e.safetyteardown;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
+import com.example.tests.e2e.exitandclose.ExitTrail;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -39,13 +41,17 @@ import static com.example.tests.e2e.safetyteardown.TeardownTrail.absent;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.awaitJournalRow;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.clear;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.counter;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.dealOutbox;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.dealStatus;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.detect;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.exchangeAcknowledgesCloseWithoutEffect;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.exchangeHoldsForeignOrder;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.haltFully;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.incidents;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.outbox;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.passUntilEmergencyClosed;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.payload;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.standAtObservation;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.walkToExposure;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
@@ -56,15 +62,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * (.claude/tests/cases/e2e-safety-teardown.md §«E7 — Журнал и статистика на
  * этой тропе»).
  *
- * <p><b>Ядер два, статистика одна.</b> Первое ядро проходит автоматическую
+ * <p><b>Ядер три, статистика одна.</b> Первое ядро проходит автоматическую
  * тропу от {@code E1.1} до аварийного терминала сделки ({@code E3.5}) и два
  * поглощённых повтора ({@code E4.3}); второе — ручную постановку
  * ({@code E6.1}) и ручное снятие ({@code E6.6}). Статистика между ними не
  * пересоздаётся, поэтому строка зерна суток складывает обе тропы, а числа
  * первого ядра, чья база уходит с пересозданием, сняты до него.
  *
- * <p><b>Клетка {@code E7.5} здесь не написана:</b> её предусловие — две
- * сделки счёта к моменту каскада, то есть пролог двух инструментов.
+ * <p><b>{@code E7.5} идёт последней, на третьем ядре:</b> сделка уведена в
+ * координированный выход удалением своего определения, закрытие площадка
+ * принимает и не исполняет, и каскад жёсткой ступени счёта переписывает её
+ * на ребре.
  */
 @Tag("e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -109,7 +117,7 @@ class TeardownJournalPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("t7");
+        trail = SharedStand.dealPath(TeardownJournalPathTest.class);
         trail.factSeriesStartedYesterday();
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.side(Party.TRADING_CORE).set(MIN_AGE, "0s");
@@ -119,7 +127,7 @@ class TeardownJournalPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TeardownJournalPathTest.class);
         }
     }
 
@@ -138,15 +146,16 @@ class TeardownJournalPathTest {
         trail.relayCore();
         Map<String, Object> before = incidents(trail);
         Integer raised = outbox(trail, HOLD_RAISED).size();
-        Long published = trail.database(Party.TRADING_CORE).count("outbox_events");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
+        Long published = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
 
         detect(trail);
         detect(trail);
         trail.relayCore();
 
         Database core = trail.database(Party.TRADING_CORE);
-        awaitJournalRow(trail, core.query("select event_id from outbox_events order by id").getLast()
+        awaitJournalRow(trail, core.query("select event_id from outbox_events where "
+                + Trail.BY_TENANT + " order by id", trail.tenant()).getLast()
                 .get("event_id"));
         Map<String, Object> after = incidents(trail);
         assertThat(outbox(trail, HOLD_RAISED)).as("предусловие E7.4: перестановок не было").hasSize(raised);
@@ -156,10 +165,10 @@ class TeardownJournalPathTest {
                 .as("E7.4: счётчик подъёмов равен числу состоявшихся перестановок").isEqualTo(raised);
         assertThat(counter(after, "anomaly_reports") - counter(start, "anomaly_reports"))
                 .as("E7.4: счётчик отчётов равен числу заведённых строк")
-                .isEqualTo(core.count("anomaly_reports").intValue());
-        assertThat(trail.database(Party.AUDIT).count("audit_records") - journal)
+                .isEqualTo(trail.rows(Party.TRADING_CORE, "anomaly_reports").intValue());
+        assertThat(trail.rows(Party.AUDIT, "audit_records") - journal)
                 .as("E7.4: строк журнала прибавилось столько, сколько классов опубликовано")
-                .isEqualTo(core.count("outbox_events") - published);
+                .isEqualTo(trail.rows(Party.TRADING_CORE, "outbox_events") - published);
     }
 
     @Test
@@ -168,7 +177,8 @@ class TeardownJournalPathTest {
     void e7_1_theTrailClassesLandAsJournalRowsInTheOrderOfOccurrence() {
         passUntilEmergencyClosed(trail, automaticDeal);
         List<Map<String, Object>> produced = trail.database(Party.TRADING_CORE).query("select event_id, event_type, "
-                + "occurred_at, published_at from outbox_events where occurred_at >= ? order by id",
+                + "occurred_at, published_at from outbox_events where "
+                        + Trail.BY_TENANT + " and occurred_at >= ? order by id", trail.tenant(),
                 Timestamp.from(from));
         awaitJournalRow(trail, produced.getLast().get("event_id"));
 
@@ -217,6 +227,7 @@ class TeardownJournalPathTest {
     @Order(3)
     @DisplayName("E7.2 — Счётчики происшествий растут по классам и разрезам, а не по предметам")
     void e7_2_theIncidentCountersGrowByClassAndSliceNotBySubject() {
+        trail.renew(Party.TRADING_CORE);
         manualDeal = walkToExposure(trail);
         trail.relayCore();
 
@@ -280,9 +291,9 @@ class TeardownJournalPathTest {
     @DisplayName("E7.7 — Второй такт пересчёта даёт те же числа")
     void e7_7_aSecondRecomputeTickGivesTheSameNumbers() {
         Map<String, Object> first = incidents(trail);
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
-        Long rows = trail.database(Party.STATISTICS).count("incident_aggregates");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
+        Long rows = trail.rows(Party.STATISTICS, "incident_aggregates");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
 
         Map<String, Object> second = incidents(trail);
 
@@ -292,11 +303,11 @@ class TeardownJournalPathTest {
             assertThat(counter(second, column)).as("E7.7: второй такт — то же " + column)
                     .isEqualTo(counter(first, column));
         }
-        assertThat(trail.database(Party.STATISTICS).count("incident_aggregates")).as("E7.7: строк агрегата столько же")
+        assertThat(trail.rows(Party.STATISTICS, "incident_aggregates")).as("E7.7: строк агрегата столько же")
                 .isEqualTo(rows);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E7.7: фактов не прибавилось")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E7.7: фактов не прибавилось")
                 .isEqualTo(facts);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E7.7: строк журнала столько же")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E7.7: строк журнала столько же")
                 .isEqualTo(journal);
     }
 
@@ -305,7 +316,8 @@ class TeardownJournalPathTest {
     @DisplayName("E7.6 — Полнота приёма обеих групп доходит до конца тропы")
     void e7_6_theReceptionOfBothGroupsReachesTheEndOfTheTrail() {
         Instant last = instant(trail.database(Party.TRADING_CORE)
-                .query("select occurred_at from outbox_events order by id").getLast().get("occurred_at"));
+                .query("select occurred_at from outbox_events where "
+                        + Trail.BY_TENANT + " order by id", trail.tenant()).getLast().get("occurred_at"));
         for (String group : List.of(AUDIT_GROUP, STATISTICS_GROUP)) {
             Trail.await("группа " + group + " дочитала тему ядра", () -> Objects.equals(
                     trail.committedOffset(group, Substrate.CORE_TOPIC), trail.endOffset(Substrate.CORE_TOPIC)));
@@ -338,6 +350,52 @@ class TeardownJournalPathTest {
                 .as("E7.6: рядом с числами — своя нижняя граница одним операндом").isNotBlank();
         assertThat(aggregates.path("completeness").path("continuityClaimable").asBoolean())
                 .as("E7.6: предикат непрерывности статистики истинен").isTrue();
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("E7.5 — Остановка сделки числа не даёт ни одного")
+    void e7_5_aDealShutdownGivesNoNumber() {
+        String deal = walkToExposure(trail);
+        exchangeAcknowledgesCloseWithoutEffect(trail);
+        ExitTrail.deleteDefinition(trail);
+        trail.passUntil("сделка в координированном выходе",
+                () -> Objects.equals("EXIT_PENDING", dealStatus(trail, deal)));
+        trail.relayCore();
+        Database core = trail.database(Party.TRADING_CORE);
+        assertThat(core.query("select shutdown_reason from deals where internal_id = ?", deal).getFirst()
+                .get("shutdown_reason")).as("предусловие E7.5: сделка в выходе со своей причиной")
+                .isEqualTo("STRATEGY_DELETED");
+        standAtObservation(trail);
+        detect(trail);
+        trail.relayCore();
+        Map<String, Object> shutdownRow = core.query("select status, shutdown_reason from deals where internal_id = ?",
+                deal).getFirst();
+        assertThat(shutdownRow.get("status")).as("предусловие E7.5: каскад увёл сделку в ошибочное состояние")
+                .isEqualTo("ERROR");
+        assertThat(shutdownRow.get("shutdown_reason")).as("предусловие E7.5: каскад переписал причину на ребре")
+                .isEqualTo("EXCHANGE_HOLD");
+
+        Map<String, Object> after = incidents(trail);
+
+        List<Object> shutdowns = dealOutbox(trail, DEAL_SHUTDOWN_INITIATED, deal).stream()
+                .map(row -> row.get("event_id"))
+                .toList();
+        Trail.await("группа статистики дочитала тему ядра", () -> Objects.equals(
+                trail.committedOffset(STATISTICS_GROUP, Substrate.CORE_TOPIC), trail.endOffset(Substrate.CORE_TOPIC)));
+        Database statistics = trail.database(Party.STATISTICS);
+        for (Object event : shutdowns) {
+            assertThat(statistics.query("select event_id from incident_facts where event_id = ?", event))
+                    .as("E7.5: факта происшествия класса остановки нет").isEmpty();
+            assertThat(statistics.query("select event_id from deal_facts where event_id = ?", event))
+                    .as("E7.5: число закрытых сделок двигает только терминал").isEmpty();
+        }
+        assertThat(after.keySet()).as("E7.5: счётчика под остановку в строке зерна не заведено")
+                .noneSatisfy(column -> assertThat(column).containsIgnoringCase("shutdown"));
+        shutdowns.forEach(event -> awaitJournalRow(trail, event));
+        assertThat(trail.database(Party.AUDIT).query("select event_id from audit_records where event_type = ? "
+                + "and deal_internal_id = ?", DEAL_SHUTDOWN_INITIATED, deal))
+                .as("E7.5: строк журнала об остановке две — по числу рёбер присвоения причины").hasSize(2);
     }
 
     /** Прирост счётчика от начала тропы. */

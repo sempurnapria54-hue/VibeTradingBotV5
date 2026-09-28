@@ -29,9 +29,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Гистерезис — вход клеток, а не помеха.</b> Детектор, чей признак
  * производит наш собственный незавершённый ход, ступени на первом тике не
- * запрашивает: он заводит наблюдательную строку, и подтверждением служит
- * она же — заведённая в окне наблюдения и не позже, чем разрешает
- * минимальный возраст подтверждения
+ * запрашивает: он заводит наблюдательную строку и начинает на ней серию, и
+ * подтверждением служит живая серия той же строки — последнее наблюдение
+ * не моложе минимального возраста подтверждения
  * (docs/components/AnomalyJob.md §«Такт и гистерезис»). Отсюда у таких
  * клеток два тика, а между ними — {@link #ageObservations()}.
  *
@@ -530,6 +530,8 @@ class ProactiveDetectionBoxTest extends SharedLiveDealBox {
         tick(Tick.DEAL_ORCHESTRATOR);
         String clientId = String.valueOf(rows.all("orders").getFirst().get("internal_id"));
         connector.answers(placementPath(ACCOUNT), Feed.ack("ex-1", clientId));
+        // Отправка ищет ногу по клиентскому идентификатору перед постановкой.
+        connector.answers(lookupPath(ACCOUNT), Feed.absent());
         tick(Tick.DEAL_ORCHESTRATOR);
         connector.answers(lookupPath(ACCOUNT), Feed.order("ex-1", clientId, "CANCELED"));
         tick(Tick.DEAL_ORCHESTRATOR);

@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -74,4 +75,7 @@ public class AnomalyReportEntity extends AuditableEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "external_after")
     private String externalAfter;
+
+    @Column(name = "last_observed_at")
+    private OffsetDateTime lastObservedAt;
 }

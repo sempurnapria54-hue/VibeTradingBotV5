@@ -142,7 +142,7 @@ final class TrancheHarness {
     }
 
     TrancheManagingHandler managing() {
-        return new TrancheManagingHandler(workPass, coverageGate);
+        return new TrancheManagingHandler(workPass, disposition, coverageGate);
     }
 
     TrancheExitPendingHandler exitPending() {

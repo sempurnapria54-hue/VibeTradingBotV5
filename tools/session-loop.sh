@@ -50,6 +50,8 @@
 # обычно. Дом правила — .claude/skills/session-chain.md §«Граница закрытого
 # шага останавливает цикл».
 #
+# Ручки — tools/session-loop.conf; переменная окружения его перекрывает.
+#
 # Запуск (из корня репозитория):
 #   bash tools/session-loop.sh 5             # не больше пяти сессий за запуск
 #   bash tools/session-loop.sh --max 5
@@ -57,7 +59,9 @@
 #
 # Код возврата: 0 — лимит исчерпан штатно либо фаза закрыта; 2 — отказ
 # предполётной проверки; 3 — нужен держатель (`holder_decision`);
-# 4 — `blocked`; 5 — гейты красные; 6 — отказ CLI или негодный ответ;
+# 4 — `blocked`; 5 — гейты красные; 6 — таймаут сессии (код 124 у
+# `timeout`), отказ CLI с классом по потоку (аутентификация, лимит подписки,
+# обрыв) либо негодный ответ;
 # 7 — предохранитель по диску; 8 — отказ коммита на границе шага;
 # 9 — шаг закрыт: держатель решает о входе в следующий.
 set -euo pipefail
@@ -65,17 +69,26 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-PROMPT_FILE="${SESSION_PROMPT:-$ROOT/tools/session-prompt.md}"
-LOOP_DIR="${SESSION_LOOP_DIR:-${LOCALAPPDATA:-$HOME}/vibetrading-stand/sessions}"
-MIN_FREE_GIB="${SESSION_MIN_FREE_GIB:-10}"
+# РУЧКИ — ИЗ КОНФИГА tools/session-loop.conf; переменная окружения, если
+# задана, его перекрывает (tools/session-config.sh). Умолчаний у сценария
+# нет: дом значений один. Разрешённые значения экспортируются — их читают
+# дети цикла (сессия видит SESSION_TIMEOUT).
+# shellcheck source=tools/session-config.sh
+. "$ROOT/tools/session-config.sh"
+load_session_config || exit 2
+export_session_config
+
+PROMPT_FILE="$SESSION_PROMPT"
+LOOP_DIR="$SESSION_LOOP_DIR"
+MIN_FREE_GIB="$SESSION_MIN_FREE_GIB"
 # Режим прав тот же, в котором держатель ведёт этот проект; allow-правила
 # проекта приезжают из .claude/settings.local.json сами. `--permission-prompts
 # none` держит обещание «ничто не ждёт ответа»: то, что запросило бы
 # подтверждение, отклоняется, а не висит.
-PERMISSION_MODE="${SESSION_PERMISSION_MODE:-bypassPermissions}"
-# Умолчание равно тому, что настройки держателя дают опусу сегодня: ход вводит
-# печать величины, а не новую политику расходов.
-EFFORT="${SESSION_EFFORT:-high}"
+PERMISSION_MODE="$SESSION_PERMISSION_MODE"
+# Умолчание в конфиге равно тому, что настройки держателя дают опусу: ход
+# ввёл печать величины, а не новую политику расходов.
+EFFORT="$SESSION_EFFORT"
 case "$EFFORT" in
   low|medium|high|xhigh|max) : ;;
   *) echo "ОТКАЗ: SESSION_EFFORT=«$EFFORT» — не уровень CLI (low, medium, high, xhigh, max)" >&2; exit 2 ;;
@@ -107,6 +120,32 @@ export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS="${CLAUDE_CODE_PRINT_BG_WAIT_CEILING
 # несколько субагентов одним сообщением по-прежнему идут параллельно.
 # Кейс — `.claude/traps/session-chain-traps.md` CHAIN-002.
 export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS="${CLAUDE_CODE_DISABLE_BACKGROUND_TASKS:-1}"
+
+# ДЕДЛАЙН СЕССИИ — МОМЕНТОМ, А НЕ ДЛИТЕЛЬНОСТЬЮ. Сессия планирует приземление
+# от остатка времени (.claude/rules/session-work-unit.md §«Бюджет прогонов
+# сессии»), а SESSION_TIMEOUT называет только длительность: момент старта ей
+# не виден, и остаток из него не выводится. Поэтому цикл перед каждой сессией
+# экспортирует SESSION_DEADLINE — эпоху в секундах, когда `timeout` её убьёт;
+# пустое значение — предела нет. Форма SESSION_TIMEOUT — та, что понимает
+# `timeout`: целое с суффиксом s, m, h, d либо без него; дробную цикл не
+# принимает, иначе дедлайн разошёлся бы с тем, что исполнит `timeout`.
+duration_seconds() { # $1 — значение SESSION_TIMEOUT; печатает секунды
+  local value="$1" number unit
+  number="${value%[smhd]}"
+  unit="${value#"$number"}"
+  case "$number" in ""|*[!0-9]*) return 1 ;; esac
+  case "$unit" in
+    ""|s) echo "$number" ;;
+    m) echo $(( number * 60 )) ;;
+    h) echo $(( number * 3600 )) ;;
+    d) echo $(( number * 86400 )) ;;
+  esac
+}
+TIMEOUT_S=""
+if [ -n "${SESSION_TIMEOUT:-}" ]; then
+  TIMEOUT_S="$(duration_seconds "$SESSION_TIMEOUT")" \
+    || { echo "ОТКАЗ: SESSION_TIMEOUT=«$SESSION_TIMEOUT» — не длительность timeout (целое с суффиксом s, m, h, d)" >&2; exit 2; }
+fi
 
 MAX=1
 DRY=0
@@ -157,10 +196,10 @@ FEED="$ROOT/tools/session_feed.py"
 # старого пути (%LOCALAPPDATA%\Docker\wsl) в цепочке нет вовсе, а у нового
 # ищется `*.vhdx`. Не нашлось ничего — функция отдаёт пустую строку, и
 # предполётная проверка отказывает: «мерить нечем» не то же, что «места хватает».
-DOCKER_DATA_DIR_DEFAULT="/d/Docker containers/DockerDesktopWSL"
-# Имя проверяемого пути держится отдельной переменной: отказ ниже называет
-# адрес, который ДЕЙСТВИТЕЛЬНО проверялся, а не умолчание.
-DOCKER_DATA_DIR_TRIED="${SESSION_DOCKER_DATA_DIR:-$DOCKER_DATA_DIR_DEFAULT}"
+# Путь — ручка SESSION_DOCKER_DATA_DIR (tools/session-loop.conf). Имя
+# проверяемого пути держится отдельной переменной: отказ ниже называет адрес,
+# который ДЕЙСТВИТЕЛЬНО проверялся.
+DOCKER_DATA_DIR_TRIED="$SESSION_DOCKER_DATA_DIR"
 docker_data_dir() {
   local host_path="$DOCKER_DATA_DIR_TRIED" root
   if [ -d "$host_path" ]      && [ -n "$(find "$host_path" -maxdepth 2 -name '*.vhdx' -print -quit 2>/dev/null)" ]; then
@@ -208,6 +247,9 @@ fi
 DOCKER_DIR="$(docker_data_dir)"
 [ -n "$DOCKER_DIR" ] || { echo "ОТКАЗ: хранилище Docker не найдено — в «$DOCKER_DATA_DIR_TRIED» нет ни одного *.vhdx (иной адрес — SESSION_DOCKER_DATA_DIR), DockerRootDir демона тоже не годится. Свободное место мерить нечем" >&2; exit 2; }
 echo "хранилище Docker: $DOCKER_DIR"
+# Откуда взято каждое значение — файл или окружение: ручка, перекрытая
+# забытым `export`, видна здесь, а не по поведению сессий.
+print_session_config
 echo "журнал: $JOURNAL"
 echo "режим прав: $PERMISSION_MODE, максимум сессий: $MAX"
 echo "модель: ${SESSION_MODEL:-умолчание настроек (сессия назовёт её сама)}, effort: $EFFORT"
@@ -306,8 +348,14 @@ for (( n = 1; n <= MAX; n++ )); do
   STEP_ID="?"; STEP_STATUS="?"
   eval "$(py -3 "$FEED" step)"
   STEP_BEFORE="$STEP_ID"; STATUS_BEFORE="$STEP_STATUS"
-  feed "▶ сессия $n/$MAX · шаг $STEP_BEFORE · $STATUS_BEFORE"
   STARTED="$(date '+%Y-%m-%d %H:%M:%S')"
+  if [ -n "$TIMEOUT_S" ]; then
+    export SESSION_DEADLINE=$(( $(date +%s) + TIMEOUT_S ))
+    feed "▶ сессия $n/$MAX · шаг $STEP_BEFORE · $STATUS_BEFORE · дедлайн $(date -d "@$SESSION_DEADLINE" '+%H:%M')"
+  else
+    unset SESSION_DEADLINE
+    feed "▶ сессия $n/$MAX · шаг $STEP_BEFORE · $STATUS_BEFORE · без предела времени"
+  fi
   RAW="$RAW_DIR/$LAUNCH-$n.ndjson"
 
   # Поток событий идёт в ленту, лента пишет его в $RAW целиком; код
@@ -339,9 +387,20 @@ for (( n = 1; n <= MAX; n++ )); do
   jrn ""
   jrn "- поток сессии (последняя строка — конверт): \`$RAW\`"
 
+  # КОД 124 — ТАЙМАУТ СЕССИИ, и называется он так. Его отдаёт `timeout`
+  # цикла, а не claude: сессия не приземлилась, конверта нет, и следующая
+  # сессия начнёт с чужого закрытия. Прочие коды называют класс по потоку
+  # (tools/session_envelope.py cli-failure) — аутентификация, лимит, обрыв
+  # требуют от держателя разных ходов, а код у claude на всех один.
+  if [ "$CLI_CODE" -eq 124 ]; then
+    jrn "- код выхода: **124** — таймаут сессии"
+    stop_with 6 "таймаут сессии: сессия $n убита по SESSION_TIMEOUT=$SESSION_TIMEOUT (код 124) без приземления — повторов нет"
+  fi
   if [ "$CLI_CODE" -ne 0 ]; then
-    jrn "- код выхода claude: **$CLI_CODE**"
-    stop_with 6 "claude вернул код $CLI_CODE на сессии $n (аутентификация, лимит, обрыв) — повторов нет"
+    CLI_FAIL="отказ CLI"; CLI_FAIL_TEXT=""
+    eval "$(py -3 "$ROOT/tools/session_envelope.py" cli-failure "$RAW")"
+    jrn "- код выхода claude: **$CLI_CODE** — $CLI_FAIL${CLI_FAIL_TEXT:+: $CLI_FAIL_TEXT}"
+    stop_with 6 "$CLI_FAIL: claude вернул код $CLI_CODE на сессии $n${CLI_FAIL_TEXT:+ («$CLI_FAIL_TEXT»)} — повторов нет"
   fi
 
   PARSE_OK=0

@@ -6,6 +6,7 @@ import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
@@ -23,6 +24,7 @@ import com.example.tradingcore.domain.fsm.TrancheEdge;
 import com.example.tradingcore.domain.safety.HardRungShutdownReasonResolver;
 import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
+import com.example.tradingcore.domain.safety.KillSwitchService;
 import com.example.tradingcore.exception.ControlledExchangeException;
 import com.example.tradingcore.exception.CredentialsRejectedException;
 import com.example.tradingcore.exception.DealShutdownEdgeException;
@@ -51,13 +53,19 @@ import org.springframework.stereotype.Component;
  * то есть каскад активных сделок радиуса не отрабатывал бы ровно тогда,
  * когда он единственный элемент реакции, исполняющийся целиком
  * (docs/rules/exchange-hold.md §«Ступень 2 — сворачивание», п. 5).
+ * <b>Снятие риска уведённой сделки стои́т ПОСЛЕ сборки</b>: без фактов
+ * снимать нечем, и на той же тропе оно не состоится — названное
+ * ограничение ступени, а не съеденный энфорсмент.
  *
- * <p><b>Перехватчиков четыре: три выделенных вокруг диспетчеризации и
- * один общий вокруг прохода.</b> Выделенный стои́т до общего: блокировка и
+ * <p><b>Перехватчиков, уводящих в ошибку, четыре: три выделенных вокруг
+ * диспетчеризации и один общий вокруг прохода.</b> Выделенный стои́т до общего: блокировка и
  * разбор живого риска не конкурируют, у каждой своя ветка. Дискриминатор
  * развязки — <b>класс броска</b>, а не уровень строки: контролируемое
  * исключение уводит сделку ошибочной тропой всегда, исчерпание бюджета —
- * только у системной строки.
+ * только у системной строки. Ловцов, НЕ уводящих в ошибку, у прохода три
+ * — отказ ребра причины, отказ соседа по ярусу на сборке контекста и
+ * молчание коннектора на диспетчеризации, — и все стоят раньше общего:
+ * сделку они оставляют следующему тику.
  *
  * <p><b>Все четыре пишут статус ошибки прямой записью, звена не
  * эмитируя</b>, и причины выхода из штатного ведения не пишут: писателя
@@ -102,6 +110,7 @@ public class DealOrchestratorJob {
     private final ServiceCommandExecutor serviceCommandExecutor;
     private final HoldService holdService;
     private final HardRungShutdownReasonResolver hardRungShutdownReasonResolver;
+    private final KillSwitchService killSwitchService;
 
     @Scheduled(cron = "${deal-orchestrator.cron}")
     public void tick() {
@@ -155,6 +164,15 @@ public class DealOrchestratorJob {
      * проход выводит их заново. Безусловной формы у клейма нет; цена
      * частичного применения названа у дома порядка прохода
      * (docs/components/DealOrchestratorJob.md §«Цикл прохода»).
+     *
+     * <p><b>Отказ соседа по ярусу — пропуск прохода, а не ошибка, и его
+     * ловец стои́т ДО общего.</b> Недоступность соседа на сборке контекста
+     * — штатное эксплуатационное событие: статус не двигается, ступень не
+     * поднимается, следующий тик повторяет. Пойманный общим, он уводил бы в
+     * ошибку каждую живую сделку на плановой выкатке соседа
+     * (docs/rules/runtime-error-classification.md §Реакция: первая строка
+     * разбирается до общей развязки). Молчание коннектора на исполнении
+     * команды сюда не доезжает — его ловит диспетчеризация.
      */
     private void passSafely(Deal deal, Map<Long, Deal.ShutdownReason> shutdownReasons) {
         try {
@@ -162,6 +180,9 @@ public class DealOrchestratorJob {
         } catch (DealShutdownEdgeException e) {
             log.error("Deal shutdown edge failed, the deal is left to the next pass dealId={}",
                     deal.getId(), e);
+        } catch (PeerServiceUnavailableException e) {
+            log.warn("Peer service is unavailable, the deal pass is skipped dealId={}: {}",
+                    deal.getId(), e.getMessage());
         } catch (RuntimeException e) {
             log.error("Deal pass failed dealId={}", deal.getId(), e);
             interceptToError(deal);
@@ -170,8 +191,11 @@ public class DealOrchestratorJob {
 
     /** Цикл прохода одной сделки в объявленном порядке шагов. */
     private void pass(Deal deal, Map<Long, Deal.ShutdownReason> shutdownReasons) {
-        enforceHardRung(deal, shutdownReasons);
+        Boolean enforced = enforceHardRung(deal, shutdownReasons);
         DealContext dealContext = dealContextService.build(deal);
+        if (isTrue(enforced)) {
+            tearDownEnforced(dealContext);
+        }
         systemActionExecutor.reviseLiveExecutions(dealContext);
         DealTransition transition = dealStateMachine.run(dealContext);
         if (isTrue(dispatch(dealContext, transition))) {
@@ -202,15 +226,39 @@ public class DealOrchestratorJob {
      * ({@link HardRungShutdownReasonResolver}), общий у обоих
      * затребователей ребра. Сделки без стоящей ступени в раскладке нет, и
      * шаг её пропускает.
+     *
+     * @return ребро применил этот проход
      */
-    private void enforceHardRung(Deal deal, Map<Long, Deal.ShutdownReason> shutdownReasons) {
+    private Boolean enforceHardRung(Deal deal, Map<Long, Deal.ShutdownReason> shutdownReasons) {
         Deal.ShutdownReason reason = shutdownReasons.get(deal.getId());
         if (isNull(reason)) {
-            return;
+            return false;
         }
-        if (isTrue(dealStatusEdgeService.enforceHardRung(deal, reason))) {
-            log.warn("Deal is moved to error by the hard rung enforcement dealId={} reason={}",
-                    deal.getId(), reason);
+        if (isFalse(dealStatusEdgeService.enforceHardRung(deal, reason))) {
+            return false;
+        }
+        log.warn("Deal is moved to error by the hard rung enforcement dealId={} reason={}",
+                deal.getId(), reason);
+        return true;
+    }
+
+    /**
+     * Снятие риска сделки, которую увёл ЭТОТ проход: жёсткая ступень —
+     * это и увод, и снятие принятого риска, а каскад реакции такую сделку
+     * не видит, и повтор реакции поглощает анкер
+     * (docs/rules/error-handling-policy.md §«Жёсткая ступень энфорсится
+     * непрерывно, а не одним ходом»).
+     *
+     * <p><b>Гоняется раз — на проходе, применившем ребро</b>, и после
+     * сборки контекста: исполнитель снятия читает граф сделки, и контекст
+     * у него тот же, что у прохода. Неподтверждённое снятие следующим
+     * проходом не повторяется — как и у каскада: живые сущности радиуса
+     * видит детекция, и довести снятие — ход держателя.
+     */
+    private void tearDownEnforced(DealContext dealContext) {
+        if (isFalse(killSwitchService.fireDeal(dealContext))) {
+            log.warn("Kill-switch of the deal moved by the hard rung enforcement is not confirmed dealId={}",
+                    dealContext.getDeal().getId());
         }
     }
 
@@ -253,7 +301,27 @@ public class DealOrchestratorJob {
             return interceptRejectedCredentials(dealContext, e);
         } catch (RetryBudgetExhaustedException e) {
             return interceptExhaustedBudget(dealContext, e);
+        } catch (PeerServiceUnavailableException e) {
+            return deferOnSilentConnector(dealContext, e);
         }
+    }
+
+    /**
+     * Выделенный перехватчик: коннектор молчит — транспорт либо {@code 5xx}
+     * без класса. Классифицировать нечего, поэтому это не отказ, а пропуск:
+     * сделка в ошибку не уходит, переход не применяется, строка исполнения
+     * ждёт следующего тика (docs/rules/runtime-error-classification.md
+     * §«Молчащий коннектор классифицируется этим же классом»).
+     *
+     * <p><b>Ловец стои́т здесь, а не у прохода, ради затребованной
+     * ступени:</b> переход уже вычислен по фактам, и ступень, которую он
+     * несёт, — реакция на состояние, а не на успех отправки; поднимается
+     * она тем же ходом, что после всякой неуспешной команды.
+     */
+    private Boolean deferOnSilentConnector(DealContext dealContext, PeerServiceUnavailableException e) {
+        log.warn("Connector is silent, the transition is deferred to the next pass dealId={}: {}",
+                dealContext.getDeal().getId(), e.getMessage());
+        return false;
     }
 
     /**

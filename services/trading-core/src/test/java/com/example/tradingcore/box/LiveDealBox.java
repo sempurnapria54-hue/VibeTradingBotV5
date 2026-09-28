@@ -116,6 +116,9 @@ abstract class LiveDealBox extends TradingCoreBox {
                 Feed.featuresWithPrice(MarketPhase.Type.BULL_TREND.name(), LAST_PRICE));
         connector.answers(balancePath(ACCOUNT), balanceBody());
         connector.answers(PEER_SERVER_TIME, Feed.serverTime(EXCHANGE_MOMENT));
+        // Площадка ноги ещё не знает: отправка ищет её по клиентскому
+        // идентификатору ПЕРЕД всякой постановкой (docs/components/SubmitOrderExecutor.md).
+        connector.answers(lookupPath(ACCOUNT), Feed.absent());
         Long dealsBefore = rows.count("deals");
         activate(definition);
         tick(Tick.ENTRY_SCANNER);
@@ -298,18 +301,30 @@ abstract class LiveDealBox extends TradingCoreBox {
     /**
      * Доводит ОБЕ ноги входа двухтраншевой сделки до отправленных: создание,
      * затем подтверждённое площадкой размещение каждой.
+     *
+     * <p><b>Ноги заводятся разными проходами:</b> риск-создающий вход
+     * решается один на сделку за проход (docs/rules/risk-policy.md §«Живое
+     * меряется от живой экспозиции»). Проход, отправляющий первую ногу,
+     * заводит вторую; следующий отправляет вторую и добывает первую — она
+     * найдена живой.
      */
     protected void submitTwoEntries(Strategy definition) {
         openCommandDeal(definition);
         if (ordersOfDeal().isEmpty()) {
             tick(Tick.DEAL_ORCHESTRATOR);
         }
+        List<Map<String, Object>> first = ordersOfDeal();
+        assertThat(first).hasSize(1);
+        connector.answers(placementPath(ACCOUNT),
+                Feed.ack(legExternalId(0), String.valueOf(first.get(0).get("internal_id"))));
+        connector.answers(lookupPath(ACCOUNT), Feed.absent());
+        tick(Tick.DEAL_ORCHESTRATOR);
         List<Map<String, Object>> legs = ordersOfDeal();
         assertThat(legs).hasSize(2);
-        connector.answersInTurn(placementPath(ACCOUNT),
-                Feed.ack(legExternalId(0), String.valueOf(legs.get(0).get("internal_id"))),
+        connector.answers(placementPath(ACCOUNT),
                 Feed.ack(legExternalId(1), String.valueOf(legs.get(1).get("internal_id"))));
-        connector.answers(lookupPath(ACCOUNT), Feed.absent());
+        connector.answersWhen(lookupPath(ACCOUNT), "externalId", legExternalId(0),
+                Feed.order(legExternalId(0), String.valueOf(legs.get(0).get("internal_id")), "PENDING"));
         tick(Tick.DEAL_ORCHESTRATOR);
         assertThat(ordersOfDeal()).allMatch(row -> Objects.equals("PENDING", row.get("status")));
         PeerStub.all().forEach(PeerStub::forgetRequests);
@@ -435,7 +450,11 @@ abstract class LiveDealBox extends TradingCoreBox {
      *
      * <p><b>Сценарий снятия один на все заявки сделки, и это названо:</b>
      * снятие разводилось бы по телу команды, а клетки, стоящие на этой
-     * площадке, снимают не больше одной отдельной заявки.
+     * площадке, снимают не больше одной отдельной заявки — первую. Поиск
+     * после снятия читает снятой только её: прочие живы, и сопровождение,
+     * добывающее живые защиты транша каждым проходом без работы, прочло бы
+     * их снятыми (docs/components/TrancheManagingHandler.md §«Наблюдение
+     * срабатывания защиты»).
      *
      * @param count сколько размещений клетка ждёт
      */
@@ -450,7 +469,9 @@ abstract class LiveDealBox extends TradingCoreBox {
         connector.answersInState(ALGO_SCENARIO, algoLookupPath(ACCOUNT), PeerStub.INITIAL,
                 Feed.algoOrderInStatus("ACTIVE"));
         connector.answersInState(ALGO_SCENARIO, algoLookupPath(ACCOUNT), CANCELED,
-                Feed.algoOrderInStatus("CANCELED"));
+                Feed.algoOrderInStatus("ACTIVE"));
+        connector.answersInStateWhen(ALGO_SCENARIO, algoLookupPath(ACCOUNT), CANCELED, "externalId",
+                algoExternalId(0), Feed.algoOrderInStatus("CANCELED"));
     }
 
     /** Биржевой идентификатор отдельной условной заявки последней сделки по её порядку. */
@@ -688,15 +709,18 @@ abstract class LiveDealBox extends TradingCoreBox {
     }
 
     /**
-     * Отодвигает назад момент СТОЯЩИХ наблюдательных строк, чтобы
-     * следующий тик детекции читал их подтверждением признака.
+     * Отодвигает назад момент СТОЯЩИХ наблюдательных строк и последнего
+     * наблюдения их серии, чтобы следующий тик детекции читал их
+     * подтверждением признака.
      *
-     * <p><b>Строк она не заводит и содержания их не трогает:</b> предмет
-     * правки — только возраст строки, которую завёл сам сервис; довод —
-     * шапка {@link ProactiveDetectionBoxTest}.
+     * <p><b>Строк она не заводит, серий не продлевает и не прерывает:</b>
+     * пустое последнее наблюдение пустым и остаётся, а предмет правки —
+     * только возраст того, что завёл сам сервис; довод — шапка
+     * {@link ProactiveDetectionBoxTest}.
      */
     protected void ageObservations() {
-        rows.put("update anomaly_reports set created_at = created_at - interval '2 minutes'");
+        rows.put("update anomaly_reports set created_at = created_at - interval '2 minutes', "
+                + "last_observed_at = last_observed_at - interval '2 minutes'");
     }
 
     /** Заявки последней сделки клетки в порядке заведения. */

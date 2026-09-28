@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
 import com.example.tradingcore.config.ServiceCommandRetryProperties;
 import com.example.tradingcore.domain.command.ActionKind;
@@ -112,6 +113,31 @@ class ServiceCommandDispatchTest {
         assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.FAILED);
         assertThat(row.getAttemptCount()).isEqualTo(1);
         assertThat(row.getNextRetryAt()).isNull();
+    }
+
+    /**
+     * Молчащий коннектор уходит наружу своим классом, а строка остаётся
+     * нетронутой: попытки не тратятся, статус не двигается.
+     *
+     * <p>Общий ловец классифицировал бы его нашим багом и закрыл строку
+     * отказом — сделка уходила бы в ошибку на плановой выкатке коннектора,
+     * хотя классифицировать нечего (docs/rules/runtime-error-classification.md
+     * §«Молчащий коннектор классифицируется этим же классом»).
+     */
+    @Test
+    void aSilentConnectorLeavesTheRowUntouchedAndPassesThrough() {
+        DealActionState row = strategyRow();
+        givenRow(row);
+        when(executor.execute(any(), any(), any()))
+                .thenThrow(new PeerServiceUnavailableException("connector transport error", null));
+
+        assertThatThrownBy(() -> dispatcher.execute(command(ServiceCommandType.SUBMIT_ORDER_COMMAND), context(row)))
+                .isInstanceOf(PeerServiceUnavailableException.class);
+
+        assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.SUBMITTED);
+        assertThat(row.getAttemptCount()).isNull();
+        assertThat(row.getLastError()).isNull();
+        verify(dataService, never()).save(any());
     }
 
     /** Повторяемый отказ в пределах бюджета ставит строку в ожидание повтора с назначенным моментом. */

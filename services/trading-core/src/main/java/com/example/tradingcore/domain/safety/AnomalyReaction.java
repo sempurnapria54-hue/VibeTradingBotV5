@@ -20,14 +20,14 @@ import org.springframework.stereotype.Service;
  * блокировки. Собственной ступени не выбирает — она приходит с находкой
  * (docs/components/AnomalyJob.md §«Такт и гистерезис»).
  *
- * <p><b>Носитель подтверждения — стоящий отчёт, а не счётчик.</b>
- * Детектор с гистерезисом в два тика на первом тике заводит
- * наблюдательную строку и ступени не запрашивает; на следующем признак
- * считается подтверждённым, если строка по этому ключу уже стои́т и
- * заведена в окне. Отдельного счётчика не заводится: durable-факт
- * «признак наблюдался прошлым тиком» и есть стоящая строка, и она
- * переживает рестарт — в отличие от памяти инстанса, которая обнуляется
- * ровно в аварии, когда рестарты и происходят.
+ * <p><b>Носитель подтверждения — серия на стоящем отчёте, а не счётчик
+ * в памяти.</b> Детектор с гистерезисом в два тика на первом тике заводит
+ * наблюдательную строку, отмечает на ней момент наблюдения и ступени не
+ * запрашивает; на следующем признак считается подтверждённым, если серия
+ * этой строки жива — каждое наблюдение её продлевает, а полный проход, в
+ * котором признака не было, прерывает. Durable-факт «признак наблюдался
+ * прошлым проходом» переживает рестарт — в отличие от памяти инстанса,
+ * которая обнуляется ровно в аварии, когда рестарты и происходят.
  *
  * <p><b>Повторное снятие риска не запускается.</b> Признак, держащийся
  * именно потому, что снятие риска не подтвердилось, каждым тиком зовёт
@@ -62,14 +62,26 @@ public class AnomalyReaction {
             holdService.raise(signalOf(finding), context);
             return;
         }
-        if (isFalse(confirmed(finding, account))) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        Boolean confirmed = confirmed(finding, account, now);
+        if (isFalse(confirmed)) {
             journal(finding, context);
-            return;
         }
-        if (isTrue(finding.getJournalOnly())) {
+        observe(finding, account, now);
+        if (isFalse(confirmed) || isTrue(finding.getJournalOnly())) {
             return;
         }
         holdService.raise(signalOf(finding), context);
+    }
+
+    /**
+     * Прервать серии счёта, которых полный проход не продлил: признак, не
+     * наблюдённый проходом, начатым в {@code passStartedAt}, подряд уже не
+     * держится. Зовёт проход только ПОЛНЫЙ — на неполном детекторы молчат,
+     * и молчание чистым не является.
+     */
+    public void breakUnobservedSeries(ExchangeAccount account, OffsetDateTime passStartedAt) {
+        reportDataService.breakSeries(account.getId(), passStartedAt);
     }
 
     /**
@@ -84,28 +96,46 @@ public class AnomalyReaction {
     }
 
     /**
-     * Признак подтверждён: наблюдательная строка по этому ключу уже стои́т
-     * — заведена в окне наблюдения и не позже, чем разрешает минимальный
-     * возраст подтверждения.
+     * Признак подтверждён: у наблюдательной строки по этому ключу, стоящей
+     * в окне наблюдения, серия жива, и последнее её наблюдение не моложе
+     * минимального возраста подтверждения.
      *
-     * <p><b>Границ у окна две, и обе обязательны.</b> Нижняя — иначе отчёт
-     * недельной давности читался бы подтверждением. Верхняя — иначе
-     * подтверждением служит строка, заведённая тем же или смежным
-     * проходом секундами раньше, а гонка чтения, против которой
-     * гистерезис заведён, живёт такт.
+     * <p><b>Серия, а не стоящая строка.</b> Строка стои́т окно целиком и
+     * чистого прохода между наблюдениями не видит: признак, замеченный,
+     * пропавший и вернувшийся в пределах окна, подтверждался бы сразу. Серию
+     * полный проход без признака прерывает (§«Такт и гистерезис»).
      *
-     * <p><b>Гейт стои́т и перед журнальной находкой.</b> Без него
-     * журнальная тропа заводила бы строку каждым тиком бессрочно — ровно
-     * то размножение отчётов, против которого дедуп по стоящему состоянию
-     * и записан.
+     * <p><b>Верхняя граница обязательна.</b> Без неё подтверждением служит
+     * наблюдение того же или смежного прохода секундами раньше, а гонка
+     * чтения, против которой гистерезис заведён, живёт такт.
+     *
+     * <p><b>Гейт стои́т и перед журнальной находкой.</b> Второй строки он
+     * ей не даёт вместе с дедупом писателя отчёта, который строку, стоящую
+     * в окне, не задваивает.
      */
-    private Boolean confirmed(AnomalyFinding finding, ExchangeAccount account) {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        return reportDataService.existsStanding(account.getId(), instrumentId(finding),
+    private Boolean confirmed(AnomalyFinding finding, ExchangeAccount account, OffsetDateTime now) {
+        return reportDataService.existsSeries(account.getId(), instrumentId(finding),
                 finding.getSubjectExternalId(), finding.getCode(),
                 AnomalyReport.Severity.NON_CRITICAL,
                 now.minus(reportProperties.getObservationWindow()),
                 now.minus(jobProperties.getConfirmationMinAge()));
+    }
+
+    /**
+     * Продлить серию стоящей строки моментом этого наблюдения — той, что
+     * заведена сейчас, либо той, что уже стои́т в окне. Отказ записи
+     * реакцию не гейтит: непродлённая серия подтверждения не даст, то есть
+     * ошибается в сторону пропуска, а не ложного снятия риска.
+     */
+    private void observe(AnomalyFinding finding, ExchangeAccount account, OffsetDateTime now) {
+        try {
+            reportDataService.markObserved(account.getId(), instrumentId(finding),
+                    finding.getSubjectExternalId(), finding.getCode(),
+                    AnomalyReport.Severity.NON_CRITICAL,
+                    now.minus(reportProperties.getObservationWindow()), now);
+        } catch (RuntimeException e) {
+            log.error("Anomaly observation series is not extended code={}", finding.getCode(), e);
+        }
     }
 
     /**

@@ -161,7 +161,7 @@ DEPLOY_SUFFIXES = ('yml', 'yaml', 'json')
 BUILD_FILES = ('pom.xml', '*/pom.xml', '*/*/pom.xml', '*/*/*/pom.xml',
                '*/*/*/*/pom.xml')
 
-# ДЕРЕВО ИНСТРУМЕНТОВ — ШЕСТЬ РАСШИРЕНИЙ, И ТРИ ИЗ НИХ ДОБАВЛЕНЫ ЭТИМ ХОДОМ.
+# ДЕРЕВО ИНСТРУМЕНТОВ — СЕМЬ РАСШИРЕНИЙ.
 # Шаблоны выписаны литералами, а не собраны из перечня суффиксов: их читает не
 # только эта строка, но и условие возврата задачи, которая их потребовала, —
 # собранный в цикле шаблон в тексте файла не встречается вовсе.
@@ -170,8 +170,11 @@ BUILD_FILES = ('pom.xml', '*/pom.xml', '*/*/pom.xml', '*/*/*/pom.xml',
 # каждую сессию. `tools/**/*.ps1` — оболочечный близнец `session-loop.sh`,
 # несущий ту же прозу. `tools/**/*.yaml` — манифест стенда
 # (`tools/stand/kind-cluster.yaml`) с комментариями о выборе формы кластера.
+# `tools/**/*.conf` — конфиг цикла (`tools/session-loop.conf`): значения ручек
+# и проза о приоритете окружения и месте секретов.
 TOOL_PATTERNS = ('tools/**/*.py', 'tools/**/*.sh', 'tools/**/*.txt',
-                 'tools/**/*.md', 'tools/**/*.ps1', 'tools/**/*.yaml')
+                 'tools/**/*.md', 'tools/**/*.ps1', 'tools/**/*.yaml',
+                 'tools/**/*.conf')
 
 ROOTS = (('CLAUDE.md', 'README.md', '*/README.md',
           'docs/**/*.md', 'docs/**/*.json',
@@ -3359,6 +3362,25 @@ RETIRED = [
              None),
             ('services/trading-core/src/main/java/com/example/tradingcore/domain/fsm/tranche/TrancheEntrySubmittedHandler.java',
              None),
+        ),
+    },
+    {
+        'name': 'снимок предела повторов на строке исполнения',
+        # Снято заходом 200 шага 12 фазы 2 (Д2253): колонку и поле не
+        # заполняла ни одна тропа, читателя у них не было. Что действует
+        # теперь — объявляет ключ `arrived` у каждого носителя популяции.
+        'pattern': r'снимк[а-яё]*\s+предела|снимок\s+для\s+истории',
+        'arrived': r'Предел\s+определён\s+только\s+в\s+политике',
+        'date': '2026-09-27',
+        'source': 'заход 200 шага 12 фазы 2 (Д2253)',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/tests/cases/trading-core-calc.md'),
+        'population': (
+            ('docs/components/RetryPolicyService.md', None),
+            ('docs/models/domain/other/DealActionState.md',
+             r'предел\W*\s+на\s+строке\s+не\s+хранится'),
+            ('services/trading-core/src/main/java/com/example/tradingcore/domain/command/Retryable.java',
+             r'Предела\s+здесь\s+нет'),
         ),
     },
 ]

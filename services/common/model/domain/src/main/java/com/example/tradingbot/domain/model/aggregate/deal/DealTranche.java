@@ -197,6 +197,26 @@ public class DealTranche extends Auditable {
     }
 
     /**
+     * Заявки транша, чей факт меняет его экспозицию и потому наблюдается
+     * добычей: живые ноги и НОСИТЕЛИ живой встроенной защиты. Факт такой
+     * защиты добывается добычей родителя — у источника у неё нет
+     * собственного статуса (docs/lifecycles/Order.md §«Судьба встроенной
+     * защиты по фактам родителя»).
+     *
+     * <p><b>Носитель берётся и у терминального родителя:</b> налитая
+     * нога защиту переживает, и обход по живым заявкам пропустил бы ровно
+     * сработавшую защиту — её срабатывание и схлопывает экспозицию транша
+     * (docs/rules/exit-teardown-order.md §«Гейт переоткрытия — по
+     * объявлению транша»).
+     */
+    public List<Order> observedOrders() {
+        return emptyIfNull(orders).stream()
+                .filter(order -> isTrue(order.isLive()) || emptyIfNull(order.getAttachedAlgoOrders()).stream()
+                        .anyMatch(protection -> isTrue(protection.isActiveLike())))
+                .collect(Collectors.toList());
+    }
+
+    /**
      * У транша есть живая входная нога — живая заявка, которая НЕ только
      * уменьшает позицию. Признак входа берётся у доменного намерения
      * заявки ({@code positionReducingOnly}), а не у её типа: reduce-only

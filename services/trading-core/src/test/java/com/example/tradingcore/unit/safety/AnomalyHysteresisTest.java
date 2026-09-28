@@ -10,6 +10,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -33,14 +35,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 /**
- * Гистерезис: стоящая строка как носитель подтверждения — группа `U10`
+ * Гистерезис: серия на стоящей строке как носитель подтверждения — группа `U10`
  * документа `.claude/tests/cases/trading-core-safety.md`
  * (дом — docs/components/AnomalyJob.md §«Такт и гистерезис»).
  *
  * <p><b>Базовая сборка:</b> реакция на находку; служба отчётов
- * подменена и отвечает на вопрос «стои́т ли строка в окне»; сервис
+ * подменена и отвечает на вопрос «жива ли серия стоящей строки»; сервис
  * журнала и сервис блокировки подменены. Находка собирается прямо:
  * радиус, ступень, код, инструмент, предмет, число тиков гистерезиса,
  * признак «только журнал».
@@ -73,7 +76,7 @@ class AnomalyHysteresisTest {
     }
 
     private void standing(boolean answer) {
-        when(reportDataService.existsStanding(any(), any(), any(), any(), any(), any(), any()))
+        when(reportDataService.existsSeries(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(answer);
     }
 
@@ -106,7 +109,7 @@ class AnomalyHysteresisTest {
         reaction.apply(finding().hysteresisTicks(1).build(), account());
 
         verify(holdService).raise(any(), any());
-        verify(reportDataService, never()).existsStanding(any(), any(), any(), any(), any(), any(), any());
+        verify(reportDataService, never()).existsSeries(any(), any(), any(), any(), any(), any(), any());
     }
 
     /** Наблюдательная строка различает «ничего не нашли» и «нашли, ждём подтверждения». */
@@ -138,7 +141,7 @@ class AnomalyHysteresisTest {
         reaction.apply(finding().build(), account());
 
         ArgumentCaptor<OffsetDateTime> until = ArgumentCaptor.forClass(OffsetDateTime.class);
-        verify(reportDataService).existsStanding(any(), any(), any(), any(), any(), any(),
+        verify(reportDataService).existsSeries(any(), any(), any(), any(), any(), any(),
                 until.capture());
         assertThat(Duration.between(until.getValue(), OffsetDateTime.now()))
                 .as("верхняя граница отстоит от момента на минимальный возраст подтверждения")
@@ -155,7 +158,7 @@ class AnomalyHysteresisTest {
 
         ArgumentCaptor<OffsetDateTime> since = ArgumentCaptor.forClass(OffsetDateTime.class);
         ArgumentCaptor<OffsetDateTime> until = ArgumentCaptor.forClass(OffsetDateTime.class);
-        verify(reportDataService).existsStanding(any(), any(), any(), any(), any(),
+        verify(reportDataService).existsSeries(any(), any(), any(), any(), any(),
                 since.capture(), until.capture());
         assertThat(Duration.between(since.getValue(), until.getValue()))
                 .as("между границами — окно наблюдения без минимального возраста")
@@ -169,7 +172,7 @@ class AnomalyHysteresisTest {
     void u10_6_theGateStandsBeforeAJournalFindingToo() {
         reaction.apply(finding().hysteresisTicks(1).journalOnly(true).build(), account());
 
-        verify(reportDataService).existsStanding(any(), any(), any(), any(), any(), any(), any());
+        verify(reportDataService).existsSeries(any(), any(), any(), any(), any(), any(), any());
         verify(holdService, never()).raise(any(), any());
     }
 
@@ -226,7 +229,7 @@ class AnomalyHysteresisTest {
     void u10_11_theConfirmationQuestionAlwaysAsksForANonCriticalRow() {
         reaction.apply(finding().rung(HoldRung.HARD).build(), account());
 
-        verify(reportDataService).existsStanding(any(), any(), any(), any(),
+        verify(reportDataService).existsSeries(any(), any(), any(), any(),
                 eq(AnomalyReport.Severity.NON_CRITICAL), any(), any());
     }
 
@@ -237,7 +240,7 @@ class AnomalyHysteresisTest {
         reaction.apply(finding().scope(HoldScope.EXCHANGE_ACCOUNT).instrument(null)
                 .subjectExternalId(SUBJECT).build(), account());
 
-        verify(reportDataService).existsStanding(eq(ACCOUNT_ID), isNull(), eq(SUBJECT), eq(CODE),
+        verify(reportDataService).existsSeries(eq(ACCOUNT_ID), isNull(), eq(SUBJECT), eq(CODE),
                 any(), any(), any());
     }
 
@@ -247,7 +250,7 @@ class AnomalyHysteresisTest {
     void u10_13_anInstrumentFindingAsksWithItsInstrumentId() {
         reaction.apply(finding().build(), account());
 
-        verify(reportDataService).existsStanding(eq(ACCOUNT_ID), eq(INSTRUMENT_ID), isNull(), eq(CODE),
+        verify(reportDataService).existsSeries(eq(ACCOUNT_ID), eq(INSTRUMENT_ID), isNull(), eq(CODE),
                 any(), any(), any());
     }
 
@@ -298,5 +301,91 @@ class AnomalyHysteresisTest {
         ArgumentCaptor<HoldSignal> captor = ArgumentCaptor.forClass(HoldSignal.class);
         verify(holdService, times(2)).raise(captor.capture(), any());
         assertThat(captor.getAllValues().get(1)).isEqualTo(HoldSignal.instrumentSoft(CODE));
+    }
+
+    /** Каждое наблюдение продлевает серию: иначе следующему тику нечем подтверждать. */
+    @Test
+    @DisplayName("U10.18 — первый тик: наблюдательная строка записана, затем серия продлена моментом тика в окне")
+    void u10_18_theFirstTickExtendsTheSeriesAfterTheObservationRow() {
+        reaction.apply(finding().build(), account());
+
+        InOrder order = inOrder(reportService, reportDataService);
+        order.verify(reportService).journalState(any(), any(), any());
+        ArgumentCaptor<OffsetDateTime> since = ArgumentCaptor.forClass(OffsetDateTime.class);
+        ArgumentCaptor<OffsetDateTime> observedAt = ArgumentCaptor.forClass(OffsetDateTime.class);
+        order.verify(reportDataService).markObserved(eq(ACCOUNT_ID), eq(INSTRUMENT_ID), isNull(), eq(CODE),
+                eq(AnomalyReport.Severity.NON_CRITICAL), since.capture(), observedAt.capture());
+        assertThat(Duration.between(since.getValue(), observedAt.getValue()))
+                .as("продлевается строка, стоящая в окне наблюдения")
+                .isEqualTo(reportProperties.getObservationWindow());
+        assertThat(Duration.between(observedAt.getValue(), OffsetDateTime.now()))
+                .as("момент наблюдения — момент тика")
+                .isLessThan(jobProperties.getConfirmationMinAge());
+    }
+
+    /** Тик подтверждения серию тоже продлевает — и до подъёма ступени. */
+    @Test
+    @DisplayName("U10.19 — тик подтверждения: серия продлена, затем ступень запрошена")
+    void u10_19_theConfirmingTickExtendsTheSeriesToo() {
+        standing(true);
+
+        reaction.apply(finding().build(), account());
+
+        InOrder order = inOrder(reportDataService, holdService);
+        order.verify(reportDataService).markObserved(any(), any(), any(), any(), any(), any(), any());
+        order.verify(holdService).raise(any(), any());
+    }
+
+    /**
+     * Признак вернулся после чистого прохода: серия прервана, и строка, всё
+     * ещё стоящая в окне, подтверждением не служит — серия начинается
+     * заново. Стоит ли строка, решает дедуп писателя отчёта, подменённого
+     * здесь; вопрос реакции — только о серии.
+     */
+    @Test
+    @DisplayName("U10.20 — жёсткая находка, серия прервана: ступень не запрошена, серия продлена заново")
+    void u10_20_aBrokenSeriesIsNotAConfirmation() {
+        reaction.apply(finding().rung(HoldRung.HARD).build(), account());
+
+        verify(holdService, never()).raise(any(), any());
+        verify(reportDataService).markObserved(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    /** Отказ продления реакцию не гейтит и ошибается в сторону пропуска. */
+    @Test
+    @DisplayName("U10.21 — продление серии бросает: исключения наружу нет, в логе запись, ступень подтверждённой находки запрошена")
+    void u10_21_aFailingSeriesExtensionIsSwallowed() {
+        standing(true);
+        doThrow(new IllegalStateException("db is down")).when(reportDataService)
+                .markObserved(any(), any(), any(), any(), any(), any(), any());
+
+        try (SafetyLogCapture log = SafetyLogCapture.attach(AnomalyReaction.class)) {
+            assertThatCode(() -> reaction.apply(finding().build(), account()))
+                    .doesNotThrowAnyException();
+
+            assertThat(log.messages())
+                    .anyMatch(message -> message.contains("Anomaly observation series is not extended"));
+        }
+        verify(holdService).raise(any(), any());
+    }
+
+    /** Находке без гистерезиса серия не нужна. */
+    @Test
+    @DisplayName("U10.22 — гистерезис в один тик, признак «только журнал» ложен: серия не продлевается")
+    void u10_22_aFindingWithoutHysteresisKeepsNoSeries() {
+        reaction.apply(finding().hysteresisTicks(1).build(), account());
+
+        verify(reportDataService, never()).markObserved(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    /** Прерывание серий зовёт службу отчётов счётом и моментом начала прохода. */
+    @Test
+    @DisplayName("U10.23 — прерывание серий счёта: служба отчётов позвана счётом и моментом начала прохода")
+    void u10_23_breakingTheSeriesPassesTheAccountAndThePassStart() {
+        OffsetDateTime passStartedAt = OffsetDateTime.now().minusSeconds(5);
+
+        reaction.breakUnobservedSeries(account(), passStartedAt);
+
+        verify(reportDataService).breakSeries(ACCOUNT_ID, passStartedAt);
     }
 }

@@ -100,6 +100,29 @@ public class DealActionState extends Retryable {
                 || DealActionStateStatus.RETRY_PENDING.equals(status);
     }
 
+    /**
+     * Стадия, с которой возобновляется СОЗДАЮЩЕЕ исполнение после ожидания
+     * повтора: цель заполнена — локальная сущность уже заведена, и повтор
+     * идёт с её отправки; пуста — с начала. Стадия выводится из факта, а не
+     * из сохранённого курсора (docs/lifecycles/DealActionState.md §«Повтор
+     * возвращает исполнение на стадию факта»).
+     */
+    public DealActionStateStatus creationRetryStage() {
+        return nonNull(targetEntityId) ? DealActionStateStatus.CREATED : DealActionStateStatus.PLANNED;
+    }
+
+    /**
+     * Стадия, с которой возобновляется СНЯТИЕ после ожидания повтора: цель
+     * заполнена — снятие уже принято площадкой (цель ставит ребро отправки),
+     * и повтор идёт с добычи его исхода; пуста — с начала. Повтор с начала
+     * слал бы снятие уже снятой защиты, и отказ площадки тратил бы бюджет на
+     * звено, которое не отказывало (docs/lifecycles/DealActionState.md
+     * §«Повтор возвращает исполнение на стадию факта»).
+     */
+    public DealActionStateStatus removalRetryStage() {
+        return nonNull(targetEntityId) ? DealActionStateStatus.SUBMITTED : DealActionStateStatus.PLANNED;
+    }
+
     /** Заполнить цель исполнения: локальная сущность заведена. */
     public void targetAt(TargetEntityType entityType, Long entityId) {
         this.targetEntityType = entityType;

@@ -324,12 +324,28 @@ public class OkxSourceReader {
         OkxApiResponse<OrderOkxResponse> response = execute(
                 () -> okxRestClient.getOrder(credentials, externalInstrumentId, externalId, internalId),
                 "trade-order", "instId=" + externalInstrumentId + " ordId=" + externalId + " clOrdId=" + internalId);
+        if (isTrue(orderAbsent(response))) {
+            return null;
+        }
         verifyCode(response, "trade-order", "instId=" + externalInstrumentId);
         if (isEmpty(response.getData())) {
             return null;
         }
         return orderMapper.integrationToSnapshot(response.getData().getFirst());
     }
+
+    /**
+     * Площадка ответила «заявки не существует» — это «не найдено в этом
+     * источнике», а не отказ (docs/components/IntegrationService.md). OKX
+     * сообщает ненайденность отказом со своим кодом, а не пустыми данными, и
+     * прочитанный отказом он обрывал бы оба читателя поиска: отправку, которая
+     * по ненайденной ноге ставит её, и цикл добычи, который по ней идёт к
+     * живым заявкам и истории (docs/integrations/okx/contracts/order.md).
+     */
+    private Boolean orderAbsent(OkxApiResponse<OrderOkxResponse> response) {
+        return nonNull(response) && Objects.equals(OkxConstants.ORDER_NOT_EXIST_CODE, response.getCode());
+    }
+
     public AlgoOrderExternalSnapshot getAlgoOrder(ExchangeCredentials credentials, String externalInstrumentId,
                                                   String externalId, String internalId) {
         OkxApiResponse<AlgoOrderOkxResponse> response = execute(

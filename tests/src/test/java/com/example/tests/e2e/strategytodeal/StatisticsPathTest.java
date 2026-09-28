@@ -3,6 +3,7 @@ package com.example.tests.e2e.strategytodeal;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -57,11 +58,11 @@ class StatisticsPathTest {
 
     @BeforeAll
     static void walkTheTrailToTheOrderDecision() {
-        trail = Trail.open("e7");
+        trail = SharedStand.dealPath(StatisticsPathTest.class);
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.factSeriesStartedYesterday();
         Trail.await("первый факт ряда принят статистикой",
-                () -> trail.database(Party.STATISTICS).count("incident_facts") == 1L);
+                () -> trail.rows(Party.STATISTICS, "incident_facts") == 1L);
         trail.commonPreconditions();
         trail.activeDefinition();
         dealId = trail.openDeal();
@@ -69,7 +70,8 @@ class StatisticsPathTest {
         trail.relayCore();
         awaitIncident(trail, String.valueOf(coreOutbox(trail, dealId, DealTrace.DEAL_OPENED).get("event_id")));
         String decided = String.valueOf(trail.database(Party.TRADING_CORE).query(
-                "select event_id from outbox_events where event_type = ?", DealTrace.ORDER_DECIDED)
+                "select event_id from outbox_events where "
+                        + Trail.BY_TENANT + " and event_type = ?", trail.tenant(), DealTrace.ORDER_DECIDED)
                 .getFirst().get("event_id"));
         awaitIncident(trail, decided);
     }
@@ -77,7 +79,7 @@ class StatisticsPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(StatisticsPathTest.class);
         }
     }
 
@@ -85,7 +87,7 @@ class StatisticsPathTest {
     @Order(1)
     @DisplayName("E7.1 — Тик пересчёта даёт строку зерна происшествий со счётчиками тропы")
     void e7_1_theRecomputeYieldsAnIncidentRowWithTheTrailCounters() {
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
         trail.forgetTraces();
 
         Trail.await("E7.1: строка зерна происшествий собрана тактом", () -> incidentRows().size() == 1
@@ -93,7 +95,7 @@ class StatisticsPathTest {
 
         JsonNode row = incidentRows().getFirst();
         firstRow = row;
-        assertThat(row.path("exchangeAccountInternalId").asString()).as("E7.1: ключ — счёт").isEqualTo(Trail.ACCOUNT);
+        assertThat(row.path("exchangeAccountInternalId").asString()).as("E7.1: ключ — счёт").isEqualTo(trail.account());
         assertThat(row.path("bucketDate").asString()).as("E7.1: ключ — сутки UTC").isEqualTo(today().toString());
         assertThat(row.path("openedDeals").asInt()).as("E7.1: заведённых сделок одна").isEqualTo(1);
         assertThat(row.path("orderDecisions").asInt()).as("E7.1: решений о заявке одно").isEqualTo(1);
@@ -102,11 +104,11 @@ class StatisticsPathTest {
             assertThat(row.path(zero).asInt()).as("E7.1: счётчик " + zero + " нулевой").isZero();
         }
         assertThat(row.path("assembledAt").asString()).as("E7.1: выдача несёт момент сборки").isNotBlank();
-        assertThat(trail.database(Party.STATISTICS).query(
-                "select tenant_id from incident_aggregates where bucket_date = ?", today()))
+        assertThat(trail.database(Party.STATISTICS).query("select tenant_id from incident_aggregates"
+                + " where exchange_account_internal_id = ? and bucket_date = ?", trail.account(), today()))
                 .as("E7.1: ключ — тенант")
-                .extracting(line -> line.get("tenant_id")).containsExactly(Trail.TENANT);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E7.1: строки журнала тиком не тронуты")
+                .extracting(line -> line.get("tenant_id")).containsExactly(trail.tenant());
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E7.1: строки журнала тиком не тронуты")
                 .isEqualTo(journal);
         assertOutwardSilence("E7.1");
     }
@@ -122,15 +124,16 @@ class StatisticsPathTest {
         assertThat(Json.tree(answer.body()).path("dealRows")).as("E7.2: строк сделочного зерна нет ни одной")
                 .isEmpty();
         Database statistics = trail.database(Party.STATISTICS);
-        assertThat(statistics.count("deal_aggregates")).isZero();
-        assertThat(statistics.count("deal_facts")).as("E7.2: сделочных фактов нет — терминала не было").isZero();
+        assertThat(trail.rows(Party.STATISTICS, "deal_aggregates")).isZero();
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts"))
+                .as("E7.2: сделочных фактов нет — терминала не было").isZero();
     }
 
     @Test
     @Order(3)
     @DisplayName("E7.3 — Второй такт пересчёта даёт те же числа и тот же состав строк")
     void e7_3_aSecondRecomputeGivesTheSameNumbersAndRows() {
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
         trail.forgetTraces();
 
         Trail.await("E7.3: момент сборки обновлён следующим тактом", () -> isFalse(Objects.equals(
@@ -143,7 +146,7 @@ class StatisticsPathTest {
             assertThat(row.path(counter).asInt()).as("E7.3: число " + counter + " то же")
                     .isEqualTo(firstRow.path(counter).asInt());
         }
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E7.3: новых фактов не появилось")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E7.3: новых фактов не появилось")
                 .isEqualTo(facts);
         assertOutwardSilence("E7.3");
     }
@@ -159,7 +162,7 @@ class StatisticsPathTest {
     private static Trail.Answer read(String grain) {
         LocalDate day = today();
         return trail.call(Party.STATISTICS, "GET", ROWS + "?grain=" + grain + "&from=" + day + "&to=" + day,
-                Trail.TENANT, null);
+                trail.tenant(), null);
     }
 
     private static LocalDate today() {

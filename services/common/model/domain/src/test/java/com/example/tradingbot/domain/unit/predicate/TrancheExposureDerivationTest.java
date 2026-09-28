@@ -144,6 +144,20 @@ class TrancheExposureDerivationTest {
         assertThat(single.exposure()).isEqualByComparingTo("0");
     }
 
+    @Test
+    @DisplayName("U1.17 — терминал сделки при плоской позиции: окно держится, закрытые транши без экспозиции")
+    void u1_17_aClosedDealKeepsTheDealCloseAttributed() {
+        DealTranche older = filled(1L, "5");
+        DealTranche younger = filled(2L, "3");
+        Deal subject = withEpisode(deal(Deal.Status.CLOSED, older, younger),
+                episode(Position.Status.CLOSED, "8", null));
+
+        subject.deriveTrancheExposures();
+
+        assertThat(older.exposure()).isEqualByComparingTo("0");
+        assertThat(younger.exposure()).isEqualByComparingTo("0");
+    }
+
     // --- сборка ------------------------------------------------------------
 
     /** Транш с идентичностью и налитой входной ногой; поля слагаемых намеренно ложны. */

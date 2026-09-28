@@ -41,8 +41,25 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-LOOP_DIR = os.environ.get("SESSION_LOOP_DIR") or os.path.join(
-    os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "vibetrading-stand", "sessions")
+def conf_loop_dir():
+    """SESSION_LOOP_DIR из tools/session-loop.conf — того же дома, что у цикла;
+    окружение, если задано, перекрывает файл (tools/session-config.sh)."""
+    path = os.environ.get("SESSION_CONFIG") or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "session-loop.conf")
+    local = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("SESSION_LOOP_DIR="):
+                    value = line.split("=", 1)[1].strip()
+                    if value:
+                        return value.replace("${LOCALAPPDATA}", local)
+    except OSError:
+        pass
+    return os.path.join(local, "vibetrading-stand", "sessions")
+
+
+LOOP_DIR = os.environ.get("SESSION_LOOP_DIR") or conf_loop_dir()
 RAW_DIR = os.path.join(LOOP_DIR, "raw")
 JOURNAL = os.path.join(LOOP_DIR, "journal.md")
 

@@ -245,7 +245,7 @@ class AnomalyDetectorTest {
     /** Подтверждённый стоящей строкой признак поднимает свою ступень. */
     @Test
     void aConfirmedFindingRaisesItsRung() {
-        when(reportDataService.existsStanding(eq(ACCOUNT_ID), eq(INSTRUMENT_ID), eq(null), eq("CODE"),
+        when(reportDataService.existsSeries(eq(ACCOUNT_ID), eq(INSTRUMENT_ID), eq(null), eq("CODE"),
                 eq(AnomalyReport.Severity.NON_CRITICAL), any(OffsetDateTime.class),
                 any(OffsetDateTime.class))).thenReturn(Boolean.TRUE);
 
@@ -262,7 +262,7 @@ class AnomalyDetectorTest {
      */
     @Test
     void aJournalOnlyFindingNeverRaisesARung() {
-        when(reportDataService.existsStanding(any(), any(), any(), any(), any(), any(), any()))
+        when(reportDataService.existsSeries(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Boolean.TRUE);
 
         anomalyReaction().apply(finding(2, true, HoldScope.INSTRUMENT, HoldRung.SOFT), account);

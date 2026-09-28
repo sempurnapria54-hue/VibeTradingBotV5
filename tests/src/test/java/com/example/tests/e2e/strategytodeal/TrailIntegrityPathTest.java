@@ -2,6 +2,7 @@ package com.example.tests.e2e.strategytodeal;
 
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -64,7 +65,7 @@ class TrailIntegrityPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("e8");
+        trail = SharedStand.dealPath(TrailIntegrityPathTest.class);
         trail.factSeriesStartedYesterday();
         trail.commonPreconditions();
     }
@@ -72,7 +73,7 @@ class TrailIntegrityPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TrailIntegrityPathTest.class);
         }
     }
 
@@ -85,7 +86,8 @@ class TrailIntegrityPathTest {
         definition = trail.createDefinition();
         assertThat(trail.moveDefinition(definition, "ACTIVE").status()).isEqualTo(200);
 
-        assertThat(trail.records(Substrate.STRATEGY_TOPIC)).as("E8.1: до тика реле владельца тема пуста").isEmpty();
+        assertThat(trail.published(Substrate.STRATEGY_TOPIC)).as("E8.1: до тика реле владельца в тему не легло ничего")
+                .isEmpty();
         assertThat(core.query("select id from strategies where internal_id = ?", definition))
                 .as("E8.1: до тика реле копии у ядра нет").isEmpty();
         assertThat(audit.query("select id from audit_records where strategy_internal_id = ?", definition))
@@ -112,12 +114,13 @@ class TrailIntegrityPathTest {
         trail.relayCore();
         awaitIncident(trail, opened);
 
-        assertThat(trail.database(Party.STATISTICS).count("incident_aggregates"))
+        assertThat(trail.rows(Party.STATISTICS, "incident_aggregates"))
                 .as("E8.1: до такта пересчёта строк агрегата нет").isZero();
 
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         Trail.await("E8.1: такт пересчёта собрал строку суток тропы", () -> present(trail.database(Party.STATISTICS)
-                .query("select id from incident_aggregates where bucket_date = ?", today())));
+                .query("select id from incident_aggregates where "
+                        + Trail.BY_TENANT + " and bucket_date = ?", trail.tenant(), today())));
     }
 
     @Test
@@ -143,9 +146,9 @@ class TrailIntegrityPathTest {
         assertThat(exchange.stream().filter(request -> request.startsWith("POST")).toList())
                 .as("E8.2: команды площадке — ровно плечо и постановка; ни отмены, ни закрытия, ни условной")
                 .containsExactly("POST " + Trail.EXCHANGE_LEVERAGE, "POST " + Trail.EXCHANGE_ORDER);
-        assertThat(trail.identity().requests()).as("E8.2: к провайдеру — диспетчер, ключи и выдача токена")
+        assertThat(trail.identity().requests()).as("E8.2: к провайдеру — диспетчер, ключи и выдача токена; "
+                        + "их самих может не быть — кэши сторон общего стенда прогреты прежними классами")
                 .extracting(LoggedRequest::getUrl)
-                .isNotEmpty()
                 .allMatch(url -> Set.of("/.well-known/openid-configuration", "/jwks", "/token").contains(url));
         assertThat(trail.side(Party.BFF)).as("E8.2: периметр не поднят вовсе — стороной тропы он не является")
                 .isNull();
@@ -157,12 +160,13 @@ class TrailIntegrityPathTest {
     void e8_5_theTrailAsAWholeHasNoAbsentOutputs() {
         Database core = trail.database(Party.TRADING_CORE);
 
-        assertThat(core.count("positions")).as("E8.5: позиции у сделки нет").isZero();
+        assertThat(trail.rows(Party.TRADING_CORE, "positions")).as("E8.5: позиции у сделки нет").isZero();
         assertThat(eventTypes(Substrate.CORE_TOPIC))
                 .as("E8.5: в теме ядра только создание сделки и решение о заявке — терминала, ступеней и отчётов нет")
                 .isNotEmpty().isSubsetOf(DealTrace.DEAL_OPENED, DealTrace.ORDER_DECIDED);
         Map<String, Object> incidents = trail.database(Party.STATISTICS).query(
-                "select * from incident_aggregates where bucket_date = ?", today()).getFirst();
+                "select * from incident_aggregates where "
+                        + Trail.BY_TENANT + " and bucket_date = ?", trail.tenant(), today()).getFirst();
         for (String zero : List.of("raised_holds", "hard_raised_holds", "manually_raised_holds", "anomaly_reports",
                 "critical_anomaly_reports", "manual_operation_reports")) {
             assertThat(((Number) incidents.get(zero)).intValue()).as("E8.5: счётчик " + zero + " нулевой").isZero();
@@ -189,11 +193,11 @@ class TrailIntegrityPathTest {
     @DisplayName("E8.3 — Повтор тропы целиком даёт то же состояние")
     void e8_3_replayingTheWholeTrailYieldsTheSameState() {
         Database core = trail.database(Party.TRADING_CORE);
-        Long ownerOutbox = trail.database(Party.STRATEGIES).count("outbox_events");
-        Long coreOutbox = core.count("outbox_events");
-        Long orders = core.count("orders");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
+        Long ownerOutbox = trail.rows(Party.STRATEGIES, "outbox_events");
+        Long coreOutbox = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long orders = trail.rows(Party.TRADING_CORE, "orders");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
         Map<String, Object> before = todayIncidents();
         trail.forgetTraces();
 
@@ -204,17 +208,18 @@ class TrailIntegrityPathTest {
         Trail.await("E8.3: следующий такт пересчёта отработал", () -> isFalse(Objects.equals(
                 before.get("assembled_at"), todayIncidents().get("assembled_at"))));
 
-        assertThat(trail.database(Party.STRATEGIES).count("outbox_events"))
+        assertThat(trail.rows(Party.STRATEGIES, "outbox_events"))
                 .as("E8.3: у владельца новых строк outbox нет").isEqualTo(ownerOutbox);
         assertThat(trail.deals()).as("E8.3: сделка та же, второй на паре нет")
                 .extracting(deal -> deal.path("internalId").asString()).containsExactly(dealId);
-        assertThat(core.count("orders")).as("E8.3: заявка та же, второй нет").isEqualTo(orders);
-        assertThat(core.count("outbox_events")).as("E8.3: у ядра новых строк outbox нет").isEqualTo(coreOutbox);
+        assertThat(trail.rows(Party.TRADING_CORE, "orders")).as("E8.3: заявка та же, второй нет").isEqualTo(orders);
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events"))
+                .as("E8.3: у ядра новых строк outbox нет").isEqualTo(coreOutbox);
         assertThat(paths(trail.exchange().requests())).as("E8.3: к площадке только чтения — второй постановки нет")
                 .noneMatch(request -> request.startsWith("POST"));
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E8.3: у журнала новых строк нет")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E8.3: у журнала новых строк нет")
                 .isEqualTo(journal);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E8.3: новых фактов нет")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E8.3: новых фактов нет")
                 .isEqualTo(facts);
         Map<String, Object> after = todayIncidents();
         for (String counter : List.of("opened_deals", "order_decisions")) {
@@ -231,14 +236,15 @@ class TrailIntegrityPathTest {
         trail.relayCore();
         trail.exchangeFillsEntry();
         trail.passUntil("E8.2: налив наблюдён", () -> present(core.query(
-                "select id from orders where external_status = 'filled'")));
+                "select id from orders where " + Trail.BY_DEAL + " and external_status = 'filled'", trail.account())));
         trail.relayCore();
         Trail.await("E8.2: строка суток собрала решение о заявке", () -> ((Number) todayIncidents()
                 .get("order_decisions")).intValue() == 1);
     }
 
     private static Map<String, Object> todayIncidents() {
-        return trail.database(Party.STATISTICS).query("select * from incident_aggregates where bucket_date = ?",
+        return trail.database(Party.STATISTICS).query("select * from incident_aggregates where "
+                + Trail.BY_TENANT + " and bucket_date = ?", trail.tenant(),
                 today()).getFirst();
     }
 

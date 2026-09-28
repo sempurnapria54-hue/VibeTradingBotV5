@@ -53,7 +53,12 @@
   Permission `Read`; rate limit 60 req / 2 s по User ID + Instrument
   ID. Query: `instId` обязателен, одно из `ordId` / `clOrdId`. Если
   оба — биржа возвращает по `ordId`. Если `clOrdId` переиспользован,
-  биржа возвращает **последний** ордер с этим `clOrdId`.
+  биржа возвращает **последний** ордер с этим `clOrdId`. **Ненайденный
+  ордер приходит отказом, а не пустыми данными:** `code=51603`
+  («Order does not exist»), `data` пуст (провенанс `рантайм`: наблюдено на
+  demo 2026-06-20 поиском по несуществующему `clOrdId`). Граница читает его
+  как «не найдено», а не как отказ: по нему отправка ставит неотправленную
+  ногу, а цикл добычи идёт к живым заявкам и истории.
 - **Pending** (звено цикла `REFRESH_ORDER_COMMAND`): `GET /api/v5/trade/orders-pending`.
   Permission `Read`; rate limit 60 req / 2 s по User ID. Фильтры:
   `instType`, `instId`, `ordType`, `state` (`live`/`partially_filled`),

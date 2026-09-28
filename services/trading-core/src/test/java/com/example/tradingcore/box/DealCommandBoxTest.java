@@ -15,7 +15,6 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -276,7 +275,6 @@ class DealCommandBoxTest extends SharedLiveDealBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B3.9 — отказ соседа по ярусу сделку в ошибку не уводит")
     void theTierPeerFailureDoesNotMoveTheDealToError() {
         openCommandDeal(workingDefinition());
@@ -285,9 +283,6 @@ class DealCommandBoxTest extends SharedLiveDealBox {
 
         tick(Tick.DEAL_ORCHESTRATOR);
 
-        // Долг: общий перехватчик прохода ловит отказ соседа наравне со
-        // всяким неожиданным исключением (.claude/work/backlog.md §«Отказ
-        // соседа по ярусу на проходе сопровождения уводит сделку в ERROR»).
         assertThat(dealStatus()).isEqualTo("ACTIVE");
         assertThat(rows.count("orders")).isEqualTo(0L);
         assertThat(rows.count("deal_strategy_action_states")).isEqualTo(0L);
@@ -298,17 +293,45 @@ class DealCommandBoxTest extends SharedLiveDealBox {
     @Test
     @DisplayName("B3.12 (а) — выход всех траншей идёт командой закрытия позиции")
     void theExitOfAllTranchesGoesByThePositionClosure() {
-        openLiveDeal(Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT, MarketPhase.Type.BULL_TREND,
-                List.of(Definitions.managingStep(StrategyStepType.EXIT, Definitions.positionExit(EXIT)))));
+        openLiveDeal();
         connector.answers(closurePath(ACCOUNT), Feed.ack("ex-close-1", "close-1"));
+        // Выход всех траншей — сворачивание СДЕЛКИ: его запускает удаление
+        // определения, и закрытие шлёт обработчик координированного выхода.
+        exitByDeletion(workingDefinition());
 
         passesUntil(() -> connector.count(closurePath(ACCOUNT)) > 0);
 
-        // Транш у сделки один — выходят ВСЕ, и нетто-экспозиция закрывается
-        // целиком командой закрытия, а не reduce-only заявкой.
-        assertThat(tranchesOfDeal()).hasSize(1);
+        // Нетто-экспозиция закрывается целиком одной командой закрытия, а
+        // не reduce-only заявкой.
         assertThat(connector.requests(closurePath(ACCOUNT))).hasSize(1);
         assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B3.12 (в) — действие выхода шага транша гасит его экспозицию reduce-only заявкой, а не закрытием позиции")
+    void theTrancheExitActionGoesByAReduceOnlyOrderOfItsExposure() {
+        openLiveDeal(Definitions.withManagingSteps(DEFINITION, ACCOUNT, INSTRUMENT, MarketPhase.Type.BULL_TREND,
+                List.of(Definitions.managingStep(StrategyStepType.EXIT, Definitions.positionExit(EXIT)))));
+        String entrySize = String.valueOf(ordersOfDeal().getFirst().get("size"));
+        // Поиск по клиентскому идентификатору до отправки нашёл бы налитый
+        // вход: ответ стаба на поиск ключа не различает, и нога читалась бы
+        // исполненной ещё до площадки.
+        connector.answers(lookupPath(ACCOUNT), Feed.absent());
+        connector.answers(placementPath(ACCOUNT), Feed.ack("ex-exit-1", "exit-1"));
+        connector.answers(closurePath(ACCOUNT), Feed.ack("ex-close-1", "close-1"));
+
+        passesUntil(() -> connector.count(placementPath(ACCOUNT)) > 0);
+
+        // Даже единственный транш своим действием выхода позицию не
+        // закрывает: закрытие нетто-экспозиции — уровня сделки.
+        assertThat(connector.requests(closurePath(ACCOUNT))).isEmpty();
+        List<Map<String, Object>> exits = ordersOfDeal().stream()
+                .filter(row -> Objects.equals(Boolean.TRUE, row.get("position_reducing_only")))
+                .toList();
+        assertThat(exits).hasSize(1);
+        assertThat(exits.getFirst().get("side")).isEqualTo("SELL");
+        assertThat(new BigDecimal(String.valueOf(exits.getFirst().get("size"))))
+                .isEqualByComparingTo(new BigDecimal(entrySize));
     }
 
     @Test

@@ -67,7 +67,7 @@
 контрактов через `ctVal`/`lotSz`/`minSz` — `docs/spec/order-sizing.json`,
 смысл — `docs/components/SizeCalculator.md`.
 Direct partial close позиции не рассчитывается; полное закрытие идёт
-market-close'ом (ведёт `DealExitPendingHandler`) — и при выходе по
-условию-переходу, и при явном действии шага `EXIT`; частичное уменьшение —
+market-close'ом (на выходе сделки ведёт `DealExitPendingHandler` — и по
+условию-переходу, и при явном действии шага `EXIT`); частичное уменьшение —
 через reduce-only `Order`/`AlgoOrder` (см.
 `docs/rules/no-partial-close.md`).

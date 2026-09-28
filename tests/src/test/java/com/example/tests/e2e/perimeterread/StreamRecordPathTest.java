@@ -3,6 +3,7 @@ package com.example.tests.e2e.perimeterread;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
@@ -65,8 +66,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("E3 — Факт производителя доезжает записью в браузер")
 class StreamRecordPathTest {
 
-    private static final String SUBJECT = "subject-s1";
-
     private static final String ORDER_DECIDED = "ORDER_DECIDED";
 
     private static final String STRATEGY_DEACTIVATED = "STRATEGY_DEACTIVATED";
@@ -99,8 +98,8 @@ class StreamRecordPathTest {
 
     @BeforeAll
     static void walkThePrologueToAnOpenDeal() {
-        trail = Trail.openPerimeter("p6");
-        token = trail.identity().browserToken(SUBJECT, "Trader One");
+        trail = SharedStand.perimeter(StreamRecordPathTest.class);
+        token = trail.identity().browserToken(Subjects.fresh("subject-s1"), "Trader One");
         prologue = Prologue.walkToOpenDeal(trail, token);
     }
 
@@ -112,7 +111,7 @@ class StreamRecordPathTest {
             }
         }
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(StreamRecordPathTest.class);
         }
     }
 
@@ -134,8 +133,8 @@ class StreamRecordPathTest {
 
         Frame record = first.awaitType(ORDER_DECIDED);
         Database core = trail.database(Party.TRADING_CORE);
-        List<Map<String, Object>> outbox = core.query(
-                "select event_id, published_at from outbox_events where event_type = ?", ORDER_DECIDED);
+        List<Map<String, Object>> outbox = core.query("select event_id, published_at from outbox_events"
+                + " where event_type = ? and " + Trail.BY_TENANT, ORDER_DECIDED, prologue.tenant());
         assertThat(outbox).as("E3.1: строку outbox решения о заявке завёл проход").hasSize(1);
         orderEvent = String.valueOf(outbox.getFirst().get("event_id"));
         assertThat(outbox.getFirst().get("published_at")).as("E3.1: и тик реле пометил её опубликованной")
@@ -143,7 +142,8 @@ class StreamRecordPathTest {
         assertThat(first.status()).as("E3.1: подписка открыта").isEqualTo(200);
         assertThat(first.carriesStream()).as("E3.1: провод — поток событий").isTrue();
         assertThat(record.id()).as("E3.1: на соединении — запись этого факта").isEqualTo(orderEvent);
-        assertThat(core.query("select id from orders where external_id is not null"))
+        assertThat(core.query("select id from orders where " + Trail.BY_DEAL + " and external_id is not null",
+                prologue.account()))
                 .as("E3.1: зеркало заявки заведено и несёт подтверждение площадки").hasSize(1);
         assertThat(trail.marketData().requests(Trail.PEER_FEATURES))
                 .as("E3.1: раскладку фич проход прочитал у стаба владельца").isNotEmpty();
@@ -214,8 +214,9 @@ class StreamRecordPathTest {
         trail.relayOwner();
 
         Frame record = first.awaitType(STRATEGY_DEACTIVATED);
-        List<Map<String, Object>> outbox = trail.database(Party.STRATEGIES).query(
-                "select event_id, published_at from outbox_events where event_type = ?", STRATEGY_DEACTIVATED);
+        List<Map<String, Object>> outbox = trail.database(Party.STRATEGIES).query("select event_id, published_at"
+                + " from outbox_events where event_type = ? and " + Trail.BY_TENANT, STRATEGY_DEACTIVATED,
+                prologue.tenant());
         assertThat(outbox).as("E3.4: строка outbox владельца определений").hasSize(1);
         assertThat(outbox.getFirst().get("published_at")).as("E3.4: помечена опубликованной").isNotNull();
         assertThat(record.id()).as("E3.4: запись этого события — провод тот же")

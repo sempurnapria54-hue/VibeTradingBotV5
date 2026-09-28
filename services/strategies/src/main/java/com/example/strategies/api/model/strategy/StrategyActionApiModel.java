@@ -12,8 +12,8 @@ import lombok.Setter;
  * дискриминатором actionKind: ORDER/ALGO_ORDER/POSITION (только форма
  * сериализации, не поле домена). Позиционный вид несёт ровно один тип —
  * EXIT_ACTION: выход выражается либо условием-переходом, либо явным
- * действием шага EXIT (docs/rules/no-partial-close.md §«Формы полного
- * выхода»).
+ * действием шага EXIT (docs/rules/no-partial-close.md §«Две законные
+ * формы полного выхода»).
  */
 @Getter
 @Setter

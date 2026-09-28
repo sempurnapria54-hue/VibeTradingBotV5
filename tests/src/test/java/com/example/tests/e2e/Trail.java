@@ -29,10 +29,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.GroupListing;
 import org.apache.kafka.clients.admin.ListGroupsOptions;
+import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -46,6 +48,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.awaitility.Awaitility;
 import org.testcontainers.kafka.KafkaContainer;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
@@ -72,6 +75,16 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
  * простановкой чисел поверхностью ядра, тиком синка ставок, — а не
  * записью в базу, и каждое помнит, поставлено ли оно, чтобы кейс брал
  * ровно те, которые называет.
+ *
+ * <p><b>Ходы изолированы парой «тенант, счёт», а не пересозданием
+ * стороны.</b> Ответы площадки и чтение её журнала — в области ключа счёта
+ * ходов ({@link Stub#scope(String, String)}), чтения баз сторон — условиями
+ * пары ({@link #BY_DEAL}, {@link #BY_ACCOUNT}, {@link #BY_ORDER},
+ * {@link #BY_TENANT}) и счётом {@link #rows(Party, String)}; кейс, которому
+ * нужна пара без сделки, берёт свежую пару ({@link #pairWithoutDeal()}), а
+ * не свежее развёртывание ядра. Сделки прежних пар на стенде остаются и
+ * видят свою площадку: их ответы стаб держит под их областью
+ * (.claude/skills/test-code.md §«Уровень 3 — сквозной набор»).
  */
 public final class Trail implements AutoCloseable {
 
@@ -117,6 +130,29 @@ public final class Trail implements AutoCloseable {
 
     public static final String ENTRY_PRICE = "2000";
 
+    /**
+     * Условие строки ядра, несущей {@code deal_id}, — сделка счёта ходов;
+     * параметр — идентичность счёта ({@link #account()}).
+     */
+    public static final String BY_DEAL = "deal_id in (select deals.id from deals join exchange_accounts"
+            + " on exchange_accounts.id = deals.exchange_account_id where exchange_accounts.internal_id = ?)";
+
+    /** Условие строки ядра, несущей {@code exchange_account_id}, — счёт ходов; параметр — идентичность счёта. */
+    public static final String BY_ACCOUNT =
+            "exchange_account_id in (select id from exchange_accounts where internal_id = ?)";
+
+    /** Условие строки условной заявки, встроенной в заявку, — заявка счёта ходов; параметр — идентичность счёта. */
+    public static final String BY_ORDER = "order_id in (select id from orders where " + BY_DEAL + ")";
+
+    /** Условие строки, несущей {@code tenant_id}, — тенант ходов; параметр — тенант ({@link #tenant()}). */
+    public static final String BY_TENANT = "tenant_id = ?";
+
+    /** Префикс пути коннектора, называющего счёт: по нему журнал доступа разводит счета. */
+    public static final String CONNECTOR_ACCOUNTS = "/api/v1/accounts/";
+
+    /** Заголовок подписанного запроса площадке, называющий ключ счёта: им стаб площадки разводит счета. */
+    public static final String ACCESS_KEY = "OK-ACCESS-KEY";
+
     private static final String NEVER = "0 0 0 1 1 *";
 
     private static final Integer OWNER_PORT = 8080;
@@ -126,6 +162,10 @@ public final class Trail implements AutoCloseable {
     private static final String MARKET_DATA_ADDRESS = "127.0.0.40";
 
     private static final Duration TICK_WAIT = Duration.ofSeconds(90);
+
+    private static final Long ACKNOWLEDGED_AT = 1758240000000L;
+
+    private static final String REFUSE_TRIGGER = "trail_refuse_insert";
 
     private static final List<String> TERMINAL_DEAL = List.of("CLOSED", "EMERGENCY_CLOSED");
 
@@ -147,13 +187,17 @@ public final class Trail implements AutoCloseable {
     private final Map<Party, Database> databases = new EnumMap<>(Party.class);
     private final Map<Party, Side> sides = new EnumMap<>(Party.class);
     private final Map<Party, Integer> accessMarks = new EnumMap<>(Party.class);
+    private final Map<String, Map<Integer, Long>> topicMarks = new HashMap<>();
+    private final Map<String, String> registry = new LinkedHashMap<>();
+    private final Map<String, Supplier<String>> startedSeries = new LinkedHashMap<>();
+    private Integer freshPairs = 0;
     private Boolean projectionsSynced = Boolean.FALSE;
     private Boolean riskAppetiteSet = Boolean.FALSE;
     private Boolean leverageAssigned = Boolean.FALSE;
     private Boolean feeRatesSynced = Boolean.FALSE;
     private String tenant = TENANT;
     private String account = ACCOUNT;
-    private Long acknowledgedAt = 1758240000000L;
+    private Long acknowledgedAt = ACKNOWLEDGED_AT;
 
     private Trail(String name, Layout layout) {
         this.name = name;
@@ -176,6 +220,9 @@ public final class Trail implements AutoCloseable {
         if (Objects.equals(layout, Layout.PERIMETER)) {
             side(Party.BFF).jvmOption("-Djdk.net.hosts.file=" + ownerNames());
         }
+        registry.put(ACCOUNT, TENANT);
+        exchange.shared(EXCHANGE_TIME);
+        exchange.scope(ACCESS_KEY, Substrate.apiKeyOf(ACCOUNT));
         neighboursAnswer();
         Substrate.putAccountKeys(ACCOUNT, CONTOUR);
     }
@@ -207,6 +254,11 @@ public final class Trail implements AutoCloseable {
         trail.sides.values().forEach(Side::awaitUp);
         trail.forgetTraces();
         return trail;
+    }
+
+    /** Имя тропы — префикс её баз. */
+    public String name() {
+        return name;
     }
 
     /** Сторона тропы. */
@@ -255,6 +307,23 @@ public final class Trail implements AutoCloseable {
     }
 
     /**
+     * Поднимает сторону заново на той же базе с подъёмной конфигурацией и
+     * названными перекрытиями: ключи, перекрытые прежними кейсами, сняты.
+     *
+     * <p>Кейс стоит на своём предусловии, а не на остатке соседнего: ключ,
+     * перекрытый ходом, иначе переживает перезапуск ({@link Side#set}).
+     *
+     * @param party     сторона
+     * @param overrides ключи конфигурации кейса
+     */
+    public void restartWith(Party party, Map<String, String> overrides) {
+        side(party).stop();
+        side(party).reset(settingsOf(party));
+        overrides.forEach(side(party)::set);
+        start(party);
+    }
+
+    /**
      * Поднимает сторону заново на ПУСТОЙ базе — свежее развёртывание.
      *
      * <p>Предусловия, которые сторона держала у себя, этим сняты, и тропа
@@ -280,18 +349,149 @@ public final class Trail implements AutoCloseable {
     /**
      * Ходы тропы идут под названными тенантом и счётом.
      *
-     * <p>У тропы сделки оба постоянны — счёт отдаёт стаб владельца реестра.
-     * У тропы периметра владелец реестра — сторона: тенанта заводит первый
-     * ход самой тропы, а идентичность счёта выдаёт его регистрация, и
-     * пролог идёт под ними (.claude/tests/cases/e2e-perimeter-read.md
-     * §«Предусловия тропы — что лежит до первого хода»).
+     * <p>У тропы сделки счёт отдаёт стаб владельца реестра. У тропы периметра
+     * владелец реестра — сторона: тенанта заводит первый ход самой тропы, а
+     * идентичность счёта выдаёт его регистрация, и пролог идёт под ними
+     * (.claude/tests/cases/e2e-perimeter-read.md §«Предусловия тропы — что
+     * лежит до первого хода»).
+     *
+     * <p>Площадка переходит в область ключа счёта и отвечает ему с первого
+     * хода; предусловия, поставленные прежнему счёту, новому не принадлежат, и
+     * тропа это помнит; начатые ряды фактов начинаются и новой паре.
      *
      * @param tenantInternalId  тенант ходов
      * @param accountInternalId биржевой счёт ходов
+     * @param accessKey         ключ API счёта — им подписан запрос площадке
      */
-    public void under(String tenantInternalId, String accountInternalId) {
+    public void under(String tenantInternalId, String accountInternalId, String accessKey) {
         this.tenant = tenantInternalId;
         this.account = accountInternalId;
+        exchange.scope(ACCESS_KEY, accessKey);
+        exchangeServesAccount();
+        projectionsSynced = Boolean.FALSE;
+        riskAppetiteSet = Boolean.FALSE;
+        leverageAssigned = Boolean.FALSE;
+        feeRatesSynced = Boolean.FALSE;
+        startedSeries.forEach((eventType, payload) -> seriesStartedYesterday(eventType, payload.get()));
+    }
+
+    /**
+     * Пара без сделки — свежей парой «тенант, счёт», а не свежим
+     * развёртыванием ядра; общие предусловия после этого поставлены.
+     *
+     * <p>Сделки прежнего счёта остаются, и снять их нечем, кроме их
+     * собственного терминала; но другой счёт — другая пара, и проход
+     * оркестратора их ведёт под их областью площадки. Активные определения
+     * прежнего тенанта сняты до перехода: иначе сканер открыл бы по ним
+     * сделку посреди чужого кейса.
+     *
+     * <p>Свежая пара заводится так, как её завёл бы владелец реестра: ключи в
+     * хранилище, строка в реестре у его стаба; прежние строки реестра
+     * остаются — синк сводит проекцию с реестром целиком.
+     */
+    public void pairWithoutDeal() {
+        if (isTrue(projectionsSynced) && isFalse(deals().isEmpty())) {
+            freshPair();
+        }
+        commonPreconditions();
+    }
+
+    /**
+     * Передаёт стенд следующему классу группы: его ходы начинаются так, будто
+     * стенд поднят для него, — кроме строк прежних классов, которые разводит
+     * пара ходов.
+     *
+     * <p>У тропы сделки класс получает свежую пару; у тропы периметра пару
+     * заводит пролог самого класса. Ряды фактов, начатые прежним классом, и
+     * его момент подтверждения площадки забыты; ответы соседей, не
+     * являющихся стороной, — умолчания тропы; следы забыты
+     * (.claude/skills/test-code.md §«Уровень 3 — сквозной набор»).
+     */
+    public void handOver() {
+        startedSeries.clear();
+        acknowledgedAt = ACKNOWLEDGED_AT;
+        auth.forgetScenarios();
+        marketData.forgetScenarios();
+        neighboursAnswer();
+        if (Objects.equals(layout, Layout.DEAL_PATH)) {
+            freshPair();
+        }
+        forgetTraces();
+    }
+
+    /**
+     * Возвращает сторонам подъёмную конфигурацию: сторона, оставленная
+     * классом остановленной либо с перекрытым ключом, поднимается заново на
+     * своей базе с конфигурацией подъёма тропы.
+     *
+     * <p>Это починка, а не порча: состояние стороны живёт в её базе, и
+     * перезапуск его не трогает — ровно как перезапуски внутри класса.
+     *
+     * @return что поднято заново — сторона и перекрытые ключи
+     */
+    public List<String> restoreSides() {
+        List<String> restored = new ArrayList<>();
+        sides.forEach((party, side) -> {
+            Map<String, String> origin = settingsOf(party);
+            Map<String, String> current = side.settings();
+            Set<String> keys = new TreeSet<>(origin.keySet());
+            keys.addAll(current.keySet());
+            keys.removeIf(key -> Objects.equals(origin.get(key), current.get(key)));
+            if (isTrue(side.isAlive()) && keys.isEmpty()) {
+                return;
+            }
+            side.stop();
+            side.reset(origin);
+            start(party);
+            restored.add(party.module() + (keys.isEmpty() ? " (была остановлена)" : " " + keys));
+        });
+        return restored;
+    }
+
+    /**
+     * Порча стенда — чем он расходится с тем, что подъём обещает следующему
+     * классу и что перезапуском стороны не чинится: остановленный брокер,
+     * отказ вставки в базе, остановленный приём.
+     *
+     * <p>Свежее развёртывание стороны ({@link #renew(Party)}) порчей не
+     * является: сторона поднята на пустой базе с подъёмной конфигурацией, и
+     * предусловия, которые она держала, тропа помнит снятыми. Конфигурацию и
+     * остановленную сторону чинит {@link #restoreSides()}.
+     *
+     * @return причины порчи; пусто — стенд годен следующему классу
+     */
+    public List<String> spoilage() {
+        List<String> reasons = new ArrayList<>();
+        if (isFalse(broker.isRunning())) {
+            reasons.add("брокер остановлен");
+        }
+        databases.forEach((party, database) -> {
+            if (isFalse(database.query("select tgname from pg_trigger where tgname = ?", REFUSE_TRIGGER).isEmpty())) {
+                reasons.add("у базы " + database.name() + " стоит отказ вставки");
+            }
+            if (isTrue(database.hasTable("reception_states")) && isFalse(database
+                    .query("select topic from reception_states where reception_halted").isEmpty())) {
+                reasons.add("приём стороны " + party.module() + " остановлен");
+            }
+        });
+        return reasons;
+    }
+
+    /**
+     * Свежая пара «тенант, счёт» — так, как её завёл бы владелец реестра:
+     * ключи в хранилище, строка в реестре у его стаба; прежние строки реестра
+     * остаются — синк сводит проекцию с реестром целиком. Активные определения
+     * прежнего тенанта сняты до перехода.
+     */
+    private void freshPair() {
+        retireActiveDefinitions();
+        freshPairs++;
+        String freshTenant = TENANT + "-" + freshPairs;
+        String freshAccount = ACCOUNT + "-" + freshPairs;
+        Substrate.putAccountKeys(freshAccount, CONTOUR);
+        registry.put(freshAccount, freshTenant);
+        auth.answers(PEER_ACCOUNTS, accountsBody());
+        under(freshTenant, freshAccount, Substrate.apiKeyOf(freshAccount));
     }
 
     /** Тенант ходов тропы. */
@@ -323,22 +523,6 @@ public final class Trail implements AutoCloseable {
         if (isTrue(riskAppetiteSet)) {
             renew(Party.TRADING_CORE);
         }
-    }
-
-    /**
-     * Сделок у ядра нет: ядро их не заводило либо поднято заново.
-     *
-     * <p>Сделку на паре снять нечем, кроме её собственного терминала, а
-     * терминал — предмет другой тропы; поэтому кейс, которому нужна пара
-     * без сделки после чужой, получает свежее развёртывание ядра тем же
-     * способом, что {@link #withoutProjections()}. Общие предусловия после
-     * этого ставятся заново.
-     */
-    public void withoutDeals() {
-        if (isFalse(database(Party.TRADING_CORE).query("select id from deals").isEmpty())) {
-            renew(Party.TRADING_CORE);
-        }
-        commonPreconditions();
     }
 
     /**
@@ -424,7 +608,8 @@ public final class Trail implements AutoCloseable {
     }
 
     /**
-     * Забывает следы предусловий: журналы стабов и отметки журналов доступа.
+     * Забывает следы предусловий: журналы стабов, отметки журналов доступа и
+     * концы обеих тем ({@link #published(String)}).
      *
      * <p>Чтения предусловий ушли в те же журналы, что и чтения кейса, и без
      * разделения отрицание «обращений нет» не сошлось бы никогда.
@@ -435,13 +620,69 @@ public final class Trail implements AutoCloseable {
         exchange.forgetRequests();
         identity.forgetRequests();
         sides.forEach((party, side) -> accessMarks.put(party, side.accessMark()));
+        for (String topic : List.of(Substrate.CORE_TOPIC, Substrate.STRATEGY_TOPIC)) {
+            topicMarks.put(topic, ends(topic));
+        }
     }
 
-    /** Обращения к поверхности стороны после последнего забывания, без проб живости. */
+    /**
+     * Обращения к поверхности стороны после последнего забывания, без проб
+     * живости и без обращений, адресованных чужому счёту: путь коннектора
+     * называет счёт, и сделки прежних пар стенда ходят к нему своим.
+     */
     public List<Side.Access> accesses(Party party) {
         return side(party).accessSince(accessMarks.getOrDefault(party, 0)).stream()
                 .filter(access -> isFalse(access.isProbe()))
+                .filter(access -> isFalse(access.under(CONNECTOR_ACCOUNTS))
+                        || access.under(CONNECTOR_ACCOUNTS + account + "/"))
                 .toList();
+    }
+
+    /**
+     * Число строк таблицы стороны, принадлежащих паре ходов, — по первой из
+     * колонок, которой таблица несёт пару: тенант, счёт, сделка счёта либо
+     * заявка счёта.
+     *
+     * <p>Ядро, журнал и статистика на стенде общие, и сделки прежних пар
+     * пишут в те же таблицы; счёт строк таблицы целиком мерил бы их, а не
+     * кейс. Таблица, не несущая пары ни одной колонкой, — отказ, а не счёт
+     * целиком: такой счёт кейсу не принадлежит.
+     *
+     * @param party сторона
+     * @param table таблица её базы
+     * @return число строк пары
+     */
+    public Long rows(Party party, String table) {
+        Database database = database(party);
+        Set<String> columns = new TreeSet<>();
+        database.query("select column_name from information_schema.columns where table_schema = 'public'"
+                + " and table_name = ?", table).forEach(row -> columns.add(String.valueOf(row.get("column_name"))));
+        String condition;
+        String owner;
+        if (columns.contains("tenant_id")) {
+            condition = BY_TENANT;
+            owner = tenant;
+        } else if (columns.contains("tenant_internal_id")) {
+            condition = "tenant_internal_id = ?";
+            owner = tenant;
+        } else if (columns.contains("exchange_account_id")) {
+            condition = BY_ACCOUNT;
+            owner = account;
+        } else if (columns.contains("exchange_account_internal_id")) {
+            condition = "exchange_account_internal_id = ?";
+            owner = account;
+        } else if (columns.contains("deal_id")) {
+            condition = BY_DEAL;
+            owner = account;
+        } else if (columns.contains("order_id")) {
+            condition = BY_ORDER;
+            owner = account;
+        } else {
+            throw new IllegalStateException("Таблица " + database.name() + "." + table
+                    + " пары не несёт ни одной колонкой: " + columns);
+        }
+        return ((Number) database.query("select count(*) as rows from " + table + " where " + condition, owner)
+                .getFirst().get("rows")).longValue();
     }
 
     // ---------------------------------------------------------------- ходы и чтения
@@ -569,13 +810,22 @@ public final class Trail implements AutoCloseable {
      * @return идентичность определения
      */
     public String createDefinition(String definition) {
-        Answer answer = call(Party.STRATEGIES, "POST", STRATEGIES, tenant,
-                definition.replace("\"" + ACCOUNT + "\"", "\"" + account + "\""));
+        Answer answer = call(Party.STRATEGIES, "POST", STRATEGIES, tenant, onPair(definition));
         if (answer.status() != 201) {
             throw new IllegalStateException("Предусловие не поставлено: создание определения — "
                     + answer.status() + " " + answer.body());
         }
         return String.valueOf(Json.object(answer.body()).get("internalId"));
+    }
+
+    /**
+     * Тело определения на паре ходов: счёт эталона заменён счётом пары.
+     *
+     * @param definition тело определения
+     * @return то же тело на счёте ходов
+     */
+    public String onPair(String definition) {
+        return definition.replace("\"" + ACCOUNT + "\"", "\"" + account + "\"");
     }
 
     /**
@@ -686,6 +936,36 @@ public final class Trail implements AutoCloseable {
     }
 
     /**
+     * Стаб владельца рыночных данных отдаёт бычью раскладку без названного
+     * индикатора: так владелец отдаёт значение устаревшее либо не собранное —
+     * пустым местом (docs/rules/market-data-freshness.md).
+     *
+     * @param indicatorKey авторское имя операнда
+     */
+    public void marketLosesIndicator(String indicatorKey) {
+        JsonNode features = Json.tree(featuresBody("BULL_TREND"));
+        ((ObjectNode) features.path("latestIndicators")).remove(indicatorKey);
+        marketData.answersPost(PEER_FEATURES, features.toString());
+    }
+
+    /**
+     * Каталог владельца рыночных данных несёт сверх инструмента тропы второй
+     * инструмент контура, и правила второго отдаются по его идентичности; до
+     * ядра каталог доезжает следующим синком проекций. Каталог одного
+     * инструмента возвращает передача стенда следующему классу.
+     *
+     * @param instrumentInternalId идентичность второго инструмента
+     * @param externalInstrumentId биржевое имя второго инструмента
+     */
+    public void marketListsSecondInstrument(String instrumentInternalId, String externalInstrumentId) {
+        String first = instrumentsBody(INSTRUMENT, EXTERNAL_INSTRUMENT).strip();
+        String second = instrumentsBody(instrumentInternalId, externalInstrumentId).strip();
+        marketData.answers(PEER_INSTRUMENTS,
+                first.substring(0, first.length() - 1) + "," + second.substring(1));
+        marketData.answers(PEER_INSTRUMENTS + "/" + instrumentInternalId + "/rules", rulesBody(externalInstrumentId));
+    }
+
+    /**
      * Стаб площадки принимает команды тропы: отдаёт свежий снимок средств,
      * подтверждает плечо и постановку, а заявку, которой ещё не наливал,
      * не знает.
@@ -710,6 +990,13 @@ public final class Trail implements AutoCloseable {
                 """.formatted(EXTERNAL_ORDER, acknowledgedAt));
         exchange.answers(EXCHANGE_ORDER, """
                 {"code": "0", "msg": "", "data": []}
+                """);
+        // Поиск одним клиентским идентификатором — отправка ищет ногу перед
+        // постановкой — находит лишь ту, что площадке названа по нему; прочие
+        // не существуют, какую бы ногу ни отдавал ответ пути. Ненайденность
+        // площадка сообщает кодом отказа (docs/integrations/okx/contracts/order.md).
+        exchange.answersWithout(EXCHANGE_ORDER, "ordId", """
+                {"code": "51603", "msg": "Order does not exist", "data": []}
                 """);
         exchange.answers(EXCHANGE_POSITIONS, """
                 {"code": "0", "msg": "", "data": []}
@@ -747,7 +1034,7 @@ public final class Trail implements AutoCloseable {
      * ({@link #factSeriesStartedYesterday(String, String)}).
      */
     public void factSeriesStartedYesterday() {
-        factSeriesStartedYesterday("DEAL_OPENED", """
+        factSeriesStartedYesterday("DEAL_OPENED", () -> """
                 {"dealInternalId": "%s", "exchangeAccountInternalId": "%s", "instrumentInternalId": "%s",
                  "strategyInternalId": "%s", "entryReason": "STRATEGY", "direction": "LONG",
                  "entryMarketPhase": "BULL_TREND"}
@@ -760,10 +1047,19 @@ public final class Trail implements AutoCloseable {
      * статистики ряд свой, и начинает его факт того класса, который зерно
      * несёт.
      *
+     * <p><b>Ряд у каждой пары свой</b>, и тропа его помнит: смена пары
+     * ({@link #under(String, String, String)}) начинает тот же ряд новой паре
+     * тем же ходом — содержимое собирается заново под её счёт.
+     *
      * @param eventType класс события
-     * @param payload   содержимое события
+     * @param payload   содержимое события — под счёт ходов на момент хода
      */
-    public void factSeriesStartedYesterday(String eventType, String payload) {
+    public void factSeriesStartedYesterday(String eventType, Supplier<String> payload) {
+        startedSeries.put(eventType, payload);
+        seriesStartedYesterday(eventType, payload.get());
+    }
+
+    private void seriesStartedYesterday(String eventType, String payload) {
         OffsetDateTime yesterday = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("eventId", UUID.randomUUID().toString());
@@ -838,7 +1134,8 @@ public final class Trail implements AutoCloseable {
      */
     public void entrySubmitted() {
         passUntil("входная заявка отправлена", () -> isFalse(database(Party.TRADING_CORE)
-                .query("select id from orders where external_id is not null").isEmpty()));
+                .query("select id from orders where " + BY_DEAL + " and external_id is not null", account)
+                .isEmpty()));
     }
 
     /**
@@ -851,10 +1148,10 @@ public final class Trail implements AutoCloseable {
      */
     public void exchangeFillsEntry() {
         Database core = database(Party.TRADING_CORE);
-        Map<String, Object> order = core.query(
-                "select internal_id, size from orders where external_id is not null").getFirst();
-        Map<String, Object> protection = core.query(
-                "select internal_id, size, stop_loss_trigger_price from attached_algo_orders").getFirst();
+        Map<String, Object> order = core.query("select internal_id, size from orders where " + BY_DEAL
+                + " and external_id is not null", account).getFirst();
+        Map<String, Object> protection = core.query("select internal_id, size, stop_loss_trigger_price"
+                + " from attached_algo_orders where " + BY_ORDER, account).getFirst();
         exchange.answers(EXCHANGE_ORDER, """
                 {"code": "0", "msg": "", "data": [{"instId": "%s", "ordId": "%s", "clOrdId": "%s",
                   "ordType": "market", "side": "buy", "posSide": "net", "state": "filled", "px": "",
@@ -985,6 +1282,42 @@ public final class Trail implements AutoCloseable {
     }
 
     /**
+     * Записи темы, легшие после последнего забывания следов, — отрицание «за
+     * ход в тему не легло ничего» на общем стенде, где записи прежних классов
+     * в теме уже лежат.
+     *
+     * @param topic тема
+     * @return записи со смещением не меньше конца, снятого забыванием
+     */
+    public List<ConsumerRecord<String, String>> published(String topic) {
+        Map<Integer, Long> ends = topicMarks.getOrDefault(topic, Map.of());
+        return records(topic).stream()
+                .filter(record -> record.offset() >= ends.getOrDefault(record.partition(), 0L))
+                .toList();
+    }
+
+    /** Концы партиций темы — администратором брокера, без чтения записей. */
+    private Map<Integer, Long> ends(String topic) {
+        Map<String, Object> settings = new HashMap<>();
+        settings.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBootstrapServers());
+        try (Admin admin = Admin.create(settings)) {
+            Map<TopicPartition, OffsetSpec> latest = new HashMap<>();
+            admin.describeTopics(List.of(topic)).allTopicNames().get(30, TimeUnit.SECONDS).get(topic).partitions()
+                    .forEach(partition -> latest.put(new TopicPartition(topic, partition.partition()),
+                            OffsetSpec.latest()));
+            Map<Integer, Long> ends = new HashMap<>();
+            admin.listOffsets(latest).all().get(30, TimeUnit.SECONDS)
+                    .forEach((partition, offset) -> ends.put(partition.partition(), offset.offset()));
+            return ends;
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Чтение концов темы прервано", failure);
+        } catch (ExecutionException | TimeoutException failure) {
+            throw new IllegalStateException("Концы темы " + topic + " не прочитаны", failure);
+        }
+    }
+
+    /**
      * Кладёт запись в тему тропы — так, как её положил бы производитель.
      *
      * @param topic   тема
@@ -1044,17 +1377,22 @@ public final class Trail implements AutoCloseable {
     // ---------------------------------------------------------------- проводка
 
     private void neighboursAnswer() {
-        auth.answers(PEER_ACCOUNTS, accountsBody(ACCOUNT));
+        auth.answers(PEER_ACCOUNTS, accountsBody());
         marketData.answers(PEER_INSTRUMENTS, instrumentsBody(INSTRUMENT, EXTERNAL_INSTRUMENT));
         marketData.answers(PEER_INSTRUMENTS + "/" + INSTRUMENT + "/rules", rulesBody(EXTERNAL_INSTRUMENT));
+        exchange.answers(EXCHANGE_TIME, """
+                {"code": "0", "msg": "", "data": [{"ts": "%d"}]}
+                """.formatted(System.currentTimeMillis()));
+        exchangeServesAccount();
+    }
+
+    /** Площадка отвечает счёту ходов с первого хода: ставкой комиссии и приёмом команд. */
+    private void exchangeServesAccount() {
         exchange.answers(EXCHANGE_FEE, """
                 {"code": "0", "msg": "", "data": [{"instType": "SWAP", "level": "Lv1", "ts": "1758240000000",
                   "taker": "-0.0005", "maker": "-0.0002",
                   "feeGroup": [{"groupId": "1", "taker": "-0.0005", "maker": "-0.0002"}]}]}
                 """);
-        exchange.answers(EXCHANGE_TIME, """
-                {"code": "0", "msg": "", "data": [{"ts": "%d"}]}
-                """.formatted(System.currentTimeMillis()));
         exchangeAcceptsCommands();
     }
 
@@ -1070,17 +1408,19 @@ public final class Trail implements AutoCloseable {
         return ((BigDecimal) number).stripTrailingZeros().toPlainString();
     }
 
-    private static String accountsBody(String accountInternalId) {
-        return """
-                [{
+    /** Реестр счетов у стаба владельца — все пары, заведённые тропой. */
+    private String accountsBody() {
+        List<String> rows = new ArrayList<>();
+        registry.forEach((accountInternalId, tenantInternalId) -> rows.add("""
+                {
                   "internalId": "%s",
                   "tenantInternalId": "%s",
                   "exchangeCode": "OKX",
                   "label": "e2e account",
                   "contour": "%s",
                   "status": "ACTIVE"
-                }]
-                """.formatted(accountInternalId, TENANT, CONTOUR);
+                }""".formatted(accountInternalId, tenantInternalId, CONTOUR)));
+        return "[" + String.join(",", rows) + "]";
     }
 
     /** Каталог, который стаб владельца рыночных данных отдаёт на чтение инструментов. */

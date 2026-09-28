@@ -242,7 +242,7 @@ class PlacementExecutorTest {
     }
 
     /**
-     * Перед ПОВТОРНОЙ отправкой заявка ищется по стабильному клиентскому
+     * Перед повторной отправкой заявка ищется по стабильному клиентскому
      * идентификатору: предыдущая постановка могла пройти, а ответ
      * потеряться — второй раз не шлём.
      */
@@ -264,6 +264,31 @@ class PlacementExecutorTest {
 
         verify(exchange, never()).placeOrder(any(), any(), any());
         assertThat(entry.getExternalId()).isEqualTo("ext-recovered");
+    }
+
+    /**
+     * Поиск условлен пустым биржевым идентификатором, а не номером попытки:
+     * молчание коннектора строку не трогает, и проход, пришедший к отправке с
+     * нулём попыток, без поиска поставил бы дошедшую до площадки заявку
+     * второй раз тем же клиентским идентификатором.
+     */
+    @Test
+    void theFirstSubmitAlsoRecoversByClientIdInsteadOfPlacingTwice() {
+        Order entry = stored(new Order(), 100L);
+        entry.setDealId(DEAL);
+        entry.setStatus(Order.Status.CREATED);
+        entry.setInternalId("vtbclientid");
+        Order onExchange = new Order();
+        onExchange.setExternalId("ext-recovered");
+        when(orderDataService.getRequiredById(100L)).thenReturn(entry);
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, "vtbclientid")).thenReturn(onExchange);
+
+        DealActionState first = row();
+        submitOrderExecutor().execute(submitCommand(first), first, context(deal()));
+
+        verify(exchange, never()).placeOrder(any(), any(), any());
+        assertThat(entry.getExternalId()).isEqualTo("ext-recovered");
+        assertThat(first.getStatus()).isEqualTo(DealActionStateStatus.SUBMITTED);
     }
 
     /**

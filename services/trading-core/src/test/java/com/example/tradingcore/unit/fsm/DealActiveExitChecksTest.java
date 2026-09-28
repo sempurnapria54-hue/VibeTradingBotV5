@@ -3,6 +3,7 @@ package com.example.tradingcore.unit.fsm;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingRung;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeObserving;
 import static com.example.tradingcore.unit.fsm.FsmFixture.TRANCHE_ID;
+import static com.example.tradingcore.unit.fsm.FsmFixture.closedPosition;
 import static com.example.tradingcore.unit.fsm.FsmFixture.contextBuilder;
 import static com.example.tradingcore.unit.fsm.FsmFixture.deal;
 import static com.example.tradingcore.unit.fsm.FsmFixture.exposed;
@@ -146,8 +147,10 @@ class DealActiveExitChecksTest {
     void u9_8_allTranchesClosedWithOperationsGoesToTheCoordinatedExit() {
         DealTranche closed = fills(tranche(TRANCHE_ID, DealTranche.Status.CLOSED), "5", "5");
         closed.setCloseReason(DealTranche.CloseReason.TAKE_PROFIT);
+        Deal entered = deal(Deal.Status.ACTIVE, closed);
+        entered.getPositions().add(closedPosition("0"));
 
-        DealTransition transition = harness.handle(contextBuilder(deal(Deal.Status.ACTIVE, closed)).build());
+        DealTransition transition = harness.handle(contextBuilder(entered).build());
 
         assertThat(transition.getNextStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
         assertThat(transition.getCloseReason()).isEqualTo(Deal.CloseReason.TAKE_PROFIT);

@@ -112,6 +112,22 @@ public final class Side {
         return "http://" + host + ":" + port;
     }
 
+    /** Ключи конфигурации, с которыми сторона поднимется следующим подъёмом. */
+    public Map<String, String> settings() {
+        return Map.copyOf(settings);
+    }
+
+    /**
+     * Заменяет конфигурацию к следующему подъёму целиком: ключи, перекрытые
+     * ходами, сняты.
+     *
+     * @param origin конфигурация подъёма
+     */
+    public void reset(Map<String, String> origin) {
+        settings.clear();
+        settings.putAll(origin);
+    }
+
     /** Перекрывает ключ конфигурации к следующему подъёму. */
     public void set(String key, String value) {
         settings.put(key, value);

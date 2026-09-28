@@ -3,6 +3,7 @@ package com.example.tests.e2e.strategytodeal;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -34,8 +35,10 @@ import static org.assertj.core.api.Assertions.tuple;
  * через коннектор»).
  *
  * <p><b>Каждый кейс начинает с состояния после {@code E3.1}</b> — своей
- * сделки на паре без заявок, — и стаб площадки перед ним возвращается к
- * общему предусловию: кейс отказа перекрывает ответ на постановку своим.
+ * сделки на свежей паре без заявок ({@link Trail#pairWithoutDeal()}), — и
+ * стаб площадки перед ним возвращается к общему предусловию: кейс отказа
+ * перекрывает ответ на постановку своим. Зеркало ядра читается по сделкам
+ * счёта кейса ({@link Trail#BY_DEAL}): сделки прежних пар остаются.
  *
  * <p><b>Вход кейсов — проходы оркестратора, а не один тик.</b> Проход
  * дробит работу по звену за раз — снимок средств, заведение заявки, её
@@ -46,8 +49,6 @@ import static org.assertj.core.api.Assertions.tuple;
 @DisplayName("E4 — Заявка доходит до площадки через коннектор")
 class DealOrderPathTest {
 
-    private static final String CONNECTOR_ORDERS = "/api/v1/accounts/" + Trail.ACCOUNT + "/orders";
-
     private static final List<String> SIGNATURE_HEADERS =
             List.of("OK-ACCESS-KEY", "OK-ACCESS-SIGN", "OK-ACCESS-TIMESTAMP", "OK-ACCESS-PASSPHRASE");
 
@@ -57,21 +58,21 @@ class DealOrderPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("e4");
+        trail = SharedStand.dealPath(DealOrderPathTest.class);
         trail.commonPreconditions();
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(DealOrderPathTest.class);
         }
     }
 
     @BeforeEach
     void openDealOverTheCopy() {
         trail.exchangeAcceptsCommands();
-        trail.withoutDeals();
+        trail.pairWithoutDeal();
         trail.activeDefinition();
         dealId = trail.openDeal();
         trail.relayCore();
@@ -83,9 +84,11 @@ class DealOrderPathTest {
     void e4_1_theOrchestratorPassDecidesTheOrderAndItReachesTheExchangeSigned() {
         Database core = trail.database(Party.TRADING_CORE);
 
-        trail.passUntil("E4.1: заявка заведена", () -> present(core.query("select id from orders")));
+        trail.passUntil("E4.1: заявка заведена", () -> present(core.query("select id from orders where "
+                + Trail.BY_DEAL, trail.account())));
 
-        Map<String, Object> order = core.query("select * from orders").getFirst();
+        Map<String, Object> order = core.query("select * from orders where "
+                + Trail.BY_DEAL, trail.account()).getFirst();
         String clientId = String.valueOf(order.get("internal_id"));
         Map<String, Object> decided = decidedOutbox(clientId);
         assertThat(decided.get("published_at")).as("E4.1: строка решения о заявке заведена вместе со строкой заявки")
@@ -100,7 +103,7 @@ class DealOrderPathTest {
         assertThat(decidedOutbox(clientId).get("published_at")).as("E4.1: реле пометило строку").isNotNull();
         List<Side.Access> placements = trail.accesses(Party.CONNECTOR).stream()
                 .filter(access -> Objects.equals("POST", access.method())
-                        && Objects.equals(CONNECTOR_ORDERS, access.path()))
+                        && Objects.equals(connectorOrders(), access.path()))
                 .toList();
         assertThat(placements).as("E4.1: к коннектору пришла одна команда постановки").hasSize(1);
         assertThat(placements.getFirst().bearer()).as("E4.1: команда несёт токен службы, выданный провайдером")
@@ -128,7 +131,8 @@ class DealOrderPathTest {
         trail.entrySubmitted();
         trail.relayCore();
 
-        String clientId = String.valueOf(core.query("select internal_id from orders").getFirst().get("internal_id"));
+        String clientId = String.valueOf(core.query("select internal_id from orders where "
+                + Trail.BY_DEAL, trail.account()).getFirst().get("internal_id"));
         LoggedRequest placement = commands().getLast();
         assertThat(Json.tree(placement.getBodyAsString()).path("clOrdId").asString())
                 .as("E4.2: clOrdId у площадки посимвольно равен идентификатору заявки ядра").isEqualTo(clientId);
@@ -136,7 +140,8 @@ class DealOrderPathTest {
 
         trail.orchestrate();
 
-        assertThat(core.query("select internal_id from orders")).as("E4.2: идентификатор не пересоздан тиком")
+        assertThat(core.query("select internal_id from orders where "
+                + Trail.BY_DEAL, trail.account())).as("E4.2: идентификатор не пересоздан тиком")
                 .extracting(row -> row.get("internal_id")).containsExactly(clientId);
         String tranche = dealRead(trail, dealId).path("tranches").get(0).path("internalId").asString();
         String eventId = String.valueOf(decidedOutbox(clientId).get("event_id"));
@@ -158,13 +163,13 @@ class DealOrderPathTest {
         List<LoggedRequest> commands = commands();
         assertThat(commands).as("E4.3: команды подписаны ключами счёта из хранилища").isNotEmpty()
                 .allSatisfy(command -> {
-                    assertThat(command.getHeader("OK-ACCESS-KEY")).isEqualTo(Substrate.apiKeyOf(Trail.ACCOUNT));
-                    assertThat(command.getHeader("OK-ACCESS-PASSPHRASE")).isEqualTo("passphrase-" + Trail.ACCOUNT);
+                    assertThat(command.getHeader(Trail.ACCESS_KEY)).isEqualTo(Substrate.apiKeyOf(trail.account()));
+                    assertThat(command.getHeader("OK-ACCESS-PASSPHRASE")).isEqualTo("passphrase-" + trail.account());
                     assertThat(command.getHeaders().getHeader("OK-ACCESS-SIGN").values())
                             .as("E4.3: подпись ровно одна").hasSize(1);
                 });
-        List<String> secrets = List.of(Substrate.apiKeyOf(Trail.ACCOUNT), "secret-" + Trail.ACCOUNT,
-                "passphrase-" + Trail.ACCOUNT);
+        List<String> secrets = List.of(Substrate.apiKeyOf(trail.account()), "secret-" + trail.account(),
+                "passphrase-" + trail.account());
         assertThat(trail.accesses(Party.CONNECTOR)).as("E4.3: исходящие ядра к коннектору — токен службы, не ключи")
                 .isNotEmpty()
                 .allSatisfy(access -> {
@@ -186,13 +191,14 @@ class DealOrderPathTest {
         trail.passUntil("E4.4: постановка ушла площадке", () -> present(placements()));
         trail.relayCore();
 
-        Map<String, Object> order = core.query("select internal_id, external_id from orders").getFirst();
+        Map<String, Object> order = core.query("select internal_id, external_id from orders where "
+                + Trail.BY_DEAL, trail.account()).getFirst();
         String clientId = String.valueOf(order.get("internal_id"));
         assertThat(order.get("external_id")).as("E4.4: внешнего идентификатора у заявки нет").isNull();
         trail.passUntil("E4.4: сделка в объявленном состоянии разбора отказа",
                 () -> Objects.equals("ERROR", dealRead(trail, dealId).path("status").asString()));
         assertThat(trail.accesses(Party.CONNECTOR)).as("E4.4: коннектор перевёл отказ в свою форму и отдал ядру")
-                .filteredOn(access -> Objects.equals(CONNECTOR_ORDERS, access.path()))
+                .filteredOn(access -> Objects.equals(connectorOrders(), access.path()))
                 .extracting(Side.Access::status).containsExactly(200);
         String eventId = String.valueOf(decidedOutbox(clientId).get("event_id"));
         awaitJournal(trail, eventId);
@@ -210,8 +216,8 @@ class DealOrderPathTest {
                 .filteredOn(request -> request.getUrl().contains("clOrdId="))
                 .isNotEmpty()
                 .allSatisfy(request -> assertThat(request.getUrl()).contains("clOrdId=" + clientId));
-        assertThat(core.query("select id from outbox_events where event_type = ?", DealTrace.ORDER_DECIDED))
-                .as("E4.4: второго решения о заявке нет").hasSize(1);
+        assertThat(core.query("select id from outbox_events where tenant_id = ? and event_type = ?", trail.tenant(),
+                DealTrace.ORDER_DECIDED)).as("E4.4: второго решения о заявке нет").hasSize(1);
         assertThat(trail.database(Party.AUDIT).query(
                 "select id from audit_records where deal_internal_id = ? and event_type = ?", dealId,
                 DealTrace.ORDER_DECIDED)).as("E4.4: строка решения о заявке у журнала одна").hasSize(1);
@@ -221,12 +227,13 @@ class DealOrderPathTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("E4.5 — Сторона-коннектор недостижима: команда не считается исполненной")
     void e4_5_anUnreachableConnectorLeavesTheCommandUnexecuted() {
         Database core = trail.database(Party.TRADING_CORE);
-        trail.passUntil("E4.5: заявка заведена локально", () -> present(core.query("select id from orders")));
-        String clientId = String.valueOf(core.query("select internal_id from orders").getFirst().get("internal_id"));
+        trail.passUntil("E4.5: заявка заведена локально", () -> present(core.query("select id from orders where "
+                + Trail.BY_DEAL, trail.account())));
+        String clientId = String.valueOf(core.query("select internal_id from orders where "
+                + Trail.BY_DEAL, trail.account()).getFirst().get("internal_id"));
         trail.stop(Party.CONNECTOR);
         try {
             trail.forgetTraces();
@@ -269,22 +276,23 @@ class DealOrderPathTest {
 
         assertThat(paths(commands())).as("E4.6: площадке ушли только команды плеча — постановки нет")
                 .isNotEmpty().containsOnly("POST " + Trail.EXCHANGE_LEVERAGE);
-        assertThat(core.query("select external_id from orders")).as("E4.6: у заявки внешнего идентификатора нет")
+        assertThat(core.query("select external_id from orders where "
+                + Trail.BY_DEAL, trail.account())).as("E4.6: у заявки внешнего идентификатора нет")
                 .extracting(row -> row.get("external_id")).containsOnlyNulls();
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("E4.7 — Площадка нашла заявку по клиентскому идентификатору: второй постановки нет")
     void e4_7_aFoundOrderIsRecoveredWithoutASecondPlacement() {
         Database core = trail.database(Party.TRADING_CORE);
         trail.exchange().failsPostTransportOnce(Trail.EXCHANGE_ORDER);
 
         trail.passUntil("E4.7: постановка ушла площадке", () -> present(placements()));
-        Map<String, Object> order = core.query("select internal_id, size from orders").getFirst();
+        Map<String, Object> order = core.query("select internal_id, size from orders where "
+                + Trail.BY_DEAL, trail.account()).getFirst();
         String clientId = String.valueOf(order.get("internal_id"));
         String size = ((BigDecimal) order.get("size")).stripTrailingZeros().toPlainString();
-        trail.exchange().answers(Trail.EXCHANGE_ORDER, """
+        trail.exchange().answersWhere(Trail.EXCHANGE_ORDER, "clOrdId", clientId, """
                 {"code": "0", "msg": "", "data": [{"instId": "%s", "ordId": "%s", "clOrdId": "%s",
                   "ordType": "market", "side": "buy", "posSide": "net", "state": "live", "px": "",
                   "sz": "%s", "accFillSz": "0", "avgPx": "", "cTime": "1758240000000", "uTime": "1758240001000"}]}
@@ -292,13 +300,14 @@ class DealOrderPathTest {
         trail.forgetTraces();
 
         trail.passUntil("E4.7: повтор нашёл заявку по клиентскому идентификатору", () -> present(core.query(
-                "select id from orders where external_id is not null")));
+                "select id from orders where " + Trail.BY_DEAL
+                + " and external_id is not null", trail.account())));
 
         assertThat(placements()).as("E4.7: второй постановки нет — факт отправки восстановлен").isEmpty();
         assertThat(trail.exchange().requests(Trail.EXCHANGE_ORDER))
                 .as("E4.7: повтор искал заявку тем же клиентским идентификатором").isNotEmpty()
                 .allSatisfy(request -> assertThat(request.getUrl()).contains("clOrdId=" + clientId));
-        assertThat(core.query("select internal_id, external_id from orders"))
+        assertThat(core.query("select internal_id, external_id from orders where " + Trail.BY_DEAL, trail.account()))
                 .as("E4.7: зеркало несёт биржевой идентификатор найденной заявки")
                 .extracting(row -> row.get("internal_id"), row -> row.get("external_id"))
                 .containsExactly(tuple(clientId, Trail.EXTERNAL_ORDER));
@@ -312,6 +321,11 @@ class DealOrderPathTest {
                 DealTrace.ORDER_DECIDED, clientId);
         assertThat(rows).as("строка решения о заявке " + clientId).hasSize(1);
         return rows.getFirst();
+    }
+
+    /** Путь команд заявок счёта ходов у коннектора. */
+    private static String connectorOrders() {
+        return "/api/v1/accounts/" + trail.account() + "/orders";
     }
 
     /** Постановки заявки у площадки, в порядке прихода. */

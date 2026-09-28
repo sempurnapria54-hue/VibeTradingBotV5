@@ -13,9 +13,9 @@
 #
 # Аргументы уезжают в сценарий как есть; код возврата возвращается как есть
 # (его значения — в шапке tools/session-loop.sh и в
-# .claude/skills/session-chain.md). Переменные среды (SESSION_MAX_USD,
-# SESSION_TIMEOUT, ...) наследует процесс bash, задавать их можно по-обычному:
-# $env:SESSION_MAX_USD = '5'.
+# .claude/skills/session-chain.md). Ручки цикла (SESSION_TIMEOUT,
+# SESSION_MAX_USD, ...) живут в tools/session-loop.conf, и цикл читает его
+# сам; переменная среды процесса его перекрывает: $env:SESSION_MAX_USD = '5'.
 #
 # Путь к bash перекрывается $env:SESSION_GIT_BASH.
 

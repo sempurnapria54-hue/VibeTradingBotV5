@@ -3,6 +3,7 @@ package com.example.tests.e2e.exitandclose;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -106,7 +107,7 @@ class ExitOrderPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("x7");
+        trail = SharedStand.dealPath(ExitOrderPathTest.class);
         trail.factSeriesStartedYesterday();
         dealFactSeriesStartedYesterday(trail);
         trail.side(Party.TRADING_CORE).set(EXPLORATORY, "false");
@@ -116,7 +117,7 @@ class ExitOrderPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(ExitOrderPathTest.class);
         }
     }
 
@@ -167,13 +168,13 @@ class ExitOrderPathTest {
     void e7_3_replayingTheWholeTrailGivesTheSameState() {
         Database core = trail.database(Party.TRADING_CORE);
         Object dealId = core.query("select id from deals where internal_id = ?", deal).getFirst().get("id");
-        Long deals = core.count("deals");
+        Long deals = trail.rows(Party.TRADING_CORE, "deals");
         Integer terminals = coreOutbox(trail, DEAL_CLOSED, deal).size();
         Integer flows = core.query("select id from deal_cash_flows where deal_id = ?", dealId).size();
         Object streak = lossStreak();
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
-        Long dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
-        Long incidentFacts = trail.database(Party.STATISTICS).count("incident_facts");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
+        Long dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
+        Long incidentFacts = trail.rows(Party.STATISTICS, "incident_facts");
         for (Party party : SIDES) {
             trail.stop(party);
         }
@@ -192,16 +193,16 @@ class ExitOrderPathTest {
         JsonNode replayed = aggregateRow();
         trail.statisticsRecomputes(NEVER);
 
-        assertThat(core.count("deals")).as("E7.3: второй сделки не заведено").isEqualTo(deals);
+        assertThat(trail.rows(Party.TRADING_CORE, "deals")).as("E7.3: второй сделки не заведено").isEqualTo(deals);
         assertThat(coreOutbox(trail, DEAL_CLOSED, deal)).as("E7.3: терминал не переприменён").hasSize(terminals);
         assertThat(core.query("select id from deal_cash_flows where deal_id = ?", dealId))
                 .as("E7.3: строк разбивки не прибавилось").hasSize(flows);
         assertThat(lossStreak()).as("E7.3: счётчик серии не двинулся").isEqualTo(streak);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E7.3: строк журнала столько же")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E7.3: строк журнала столько же")
                 .isEqualTo(journal);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E7.3: сделочных фактов столько же")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E7.3: сделочных фактов столько же")
                 .isEqualTo(dealFacts);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E7.3: фактов происшествий столько же")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E7.3: фактов происшествий столько же")
                 .isEqualTo(incidentFacts);
         for (String number : AGGREGATE_NUMBERS) {
             assertThat(replayed.path(number).decimalValue()).as("E7.3: число агрегата " + number + " то же")
@@ -216,22 +217,29 @@ class ExitOrderPathTest {
     void e7_4_theWholeTrailLeavesNoOutputsBeyondItsOwn() {
         Database core = trail.database(Party.TRADING_CORE);
 
-        assertThat(core.query("select id from deals where status not in ('CLOSED', 'EMERGENCY_CLOSED')"))
+        assertThat(core.query("select id from deals where "
+                + Trail.BY_ACCOUNT + " and status not in ('CLOSED', 'EMERGENCY_CLOSED')", trail.account()))
                 .as("E7.4: новой сделки на паре нет").isEmpty();
-        assertThat(core.query("select id from positions where status = 'ACTIVE'"))
+        assertThat(core.query("select id from positions where "
+                + Trail.BY_DEAL + " and status = 'ACTIVE'", trail.account()))
                 .as("E7.4: живой позиции у счёта нет").isEmpty();
-        assertThat(core.query("select id from orders where external_status = 'live'"))
+        assertThat(core.query("select id from orders where "
+                + Trail.BY_DEAL + " and external_status = 'live'", trail.account()))
                 .as("E7.4: живых заявок у счёта нет").isEmpty();
-        assertThat(core.query("select safety_rung from exchange_accounts").getFirst().get("safety_rung"))
+        assertThat(core.query("select safety_rung from exchange_accounts where internal_id = ?",
+                trail.account()).getFirst().get("safety_rung"))
                 .as("E7.4: ступеней не поднято").isEqualTo("ACTIVE");
-        assertThat(core.query("select id from outbox_events where event_type = ?", HOLD_RAISED))
+        assertThat(core.query("select id from outbox_events where "
+                + Trail.BY_TENANT + " and event_type = ?", trail.tenant(), HOLD_RAISED))
                 .as("E7.4: события подъёма ступени нет").isEmpty();
-        assertThat(core.query("select code from anomaly_reports")).as("E7.4: отчётов нет").isEmpty();
+        assertThat(core.query("select code from anomaly_reports where "
+                + Trail.BY_ACCOUNT, trail.account())).as("E7.4: отчётов нет").isEmpty();
         for (Party party : List.of(Party.AUDIT, Party.STATISTICS)) {
             assertThat(trail.database(party).count("access_denials"))
                     .as("E7.4: строк отказа доступа у " + party.module() + " нет").isZero();
         }
-        assertThat(core.query("select risk_base from exchange_accounts").getFirst().get("risk_base"))
+        assertThat(core.query("select risk_base from exchange_accounts where internal_id = ?",
+                trail.account()).getFirst().get("risk_base"))
                 .as("E7.4: база риска счёта не двигалась").isEqualTo(riskBase);
     }
 
@@ -241,8 +249,8 @@ class ExitOrderPathTest {
     void e7_2_aSideOffTheTrailLeavesNoTrace() {
         List<Long> owner = new ArrayList<>();
         String second = walkToTerminal(() -> {
-            owner.add(trail.database(Party.STRATEGIES).count("strategies"));
-            owner.add(trail.database(Party.STRATEGIES).count("outbox_events"));
+            owner.add(trail.rows(Party.STRATEGIES, "strategies"));
+            owner.add(trail.rows(Party.STRATEGIES, "outbox_events"));
             trail.marketPhaseIs("BEAR_TREND");
         });
         Integer passes = passes();
@@ -262,8 +270,8 @@ class ExitOrderPathTest {
                 .map(LoggedRequest::getUrl)
                 .toList()).as("E7.2: ни спроса каталога, ни правил инструмента").isEmpty();
         assertThat(trail.auth().requests()).as("E7.2: к стабу владельца реестра запросов нет").isEmpty();
-        assertThat(List.of(trail.database(Party.STRATEGIES).count("strategies"),
-                trail.database(Party.STRATEGIES).count("outbox_events")))
+        assertThat(List.of(trail.rows(Party.STRATEGIES, "strategies"),
+                trail.rows(Party.STRATEGIES, "outbox_events")))
                 .as("E7.2: у владельца определений на тропе выхода строк не прибавилось").isEqualTo(owner);
         String token = URI.create(trail.identity().tokenUri()).getPath();
         assertThat(trail.identity().requests()).as("E7.2: к провайдеру идентичности — только выдача токенов")
@@ -287,7 +295,9 @@ class ExitOrderPathTest {
                         bill("9005", Trail.EXTERNAL_INSTRUMENT, "8", "173", "USDT", "-0.05", "0", CLOSED + 1000),
                         bill("9004", Trail.EXTERNAL_INSTRUMENT, "2", "1", "USDT", "0.8", "-0.2", CLOSED),
                         bill(LAST_BILL, Trail.EXTERNAL_INSTRUMENT, "2", "1", "USDT", "0.4", "-0.1", RECLOSED)));
-        riskBase = trail.database(Party.TRADING_CORE).query("select risk_base from exchange_accounts").getFirst()
+        riskBase = trail.database(Party.TRADING_CORE).query("select risk_base from exchange_accounts"
+                + " where internal_id = ?",
+                trail.account()).getFirst()
                 .get("risk_base");
         trail.passUntil("сделка ушла в терминал", () -> isFalse(Objects.equals("EXIT_PENDING",
                 dealRead(trail, walked).path("status").asString())));
@@ -331,7 +341,9 @@ class ExitOrderPathTest {
     }
 
     private static Object lossStreak() {
-        return trail.database(Party.TRADING_CORE).query("select consecutive_loss_count from exchange_accounts")
+        return trail.database(Party.TRADING_CORE).query("select consecutive_loss_count from exchange_accounts"
+                + " where internal_id = ?",
+                trail.account())
                 .getFirst().get("consecutive_loss_count");
     }
 

@@ -1,14 +1,20 @@
 package com.example.tests.e2e;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+
+import static java.util.Objects.isNull;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 /**
  * Стаб чужой поверхности — соседа, который стороной тропы не является:
@@ -22,6 +28,15 @@ import java.util.Objects;
  * <p><b>Журнал обращений отдаётся в порядке прихода</b>, а не от свежего к
  * старому, как его держит WireMock: кейсы о порядке читают его как ход
  * событий.
+ *
+ * <p><b>Область — заголовок, которым сосед называет, ЧЕЙ это запрос</b>
+ * (у площадки — ключ счёта {@code OK-ACCESS-KEY}). Поставленная, она
+ * сужает всё, что стаб делает дальше: ответ отдаётся только запросу с этим
+ * значением заголовка, сценарий живёт под её именем, журнал и забывание
+ * сценариев — в её пределах. Ответы прежней области остаются и отвечают
+ * своим запросам: сделка прежнего счёта на общем стенде видит свою площадку,
+ * а не площадку кейса. <b>Общий путь</b> области не знает: запрос без
+ * подписи счёта ни одному счёту не адресован, и в журнал области он входит.
  */
 public final class Stub {
 
@@ -36,9 +51,14 @@ public final class Stub {
 
     private static final Integer WHERE = 2;
 
+    private static final Integer WITHOUT = 3;
+
     private final String name;
     private final WireMockServer server;
     private final String host;
+    private final Set<String> sharedPaths = new HashSet<>();
+    private String scopeHeader;
+    private String scopeValue;
 
     public Stub(String name) {
         this.name = name;
@@ -78,14 +98,36 @@ public final class Stub {
         return name;
     }
 
+    /**
+     * Ставит область: дальнейшие ответы, сценарии и чтения журнала — только
+     * для запросов с этим значением заголовка.
+     *
+     * @param header заголовок, называющий владельца запроса
+     * @param value  значение области
+     */
+    public void scope(String header, String value) {
+        this.scopeHeader = header;
+        this.scopeValue = value;
+    }
+
+    /**
+     * Объявляет путь общим: ответ на нём области не знает — запрос без
+     * подписи счёта ни одному счёту не адресован.
+     *
+     * @param path путь
+     */
+    public void shared(String path) {
+        sharedPaths.add(path);
+    }
+
     /** Отвечает на {@code GET} по пути телом JSON. */
     public void answers(String path, String json) {
-        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path)).willReturn(WireMock.okJson(json)));
+        server.stubFor(scoped(WireMock.get(WireMock.urlPathEqualTo(path)), path).willReturn(WireMock.okJson(json)));
     }
 
     /** Отвечает на {@code POST} по пути телом JSON. */
     public void answersPost(String path, String json) {
-        server.stubFor(WireMock.post(WireMock.urlPathEqualTo(path)).willReturn(WireMock.okJson(json)));
+        server.stubFor(scoped(WireMock.post(WireMock.urlPathEqualTo(path)), path).willReturn(WireMock.okJson(json)));
     }
 
     /**
@@ -97,8 +139,8 @@ public final class Stub {
      * @param template тело с выражениями шаблонизатора WireMock
      */
     public void answersTemplated(String path, String template) {
-        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path))
-                .willReturn(WireMock.okJson(template).withTransformers("response-template")));
+        server.stubFor(scoped(WireMock.get(WireMock.urlPathEqualTo(path)), path)
+                .willReturn(WireMock.okJson(template).withTransformers(TEMPLATE)));
     }
 
     /**
@@ -110,8 +152,8 @@ public final class Stub {
      * @param template тело с выражениями шаблонизатора WireMock
      */
     public void answersPostTemplated(String path, String template) {
-        server.stubFor(WireMock.post(WireMock.urlPathEqualTo(path))
-                .willReturn(WireMock.okJson(template).withTransformers("response-template")));
+        server.stubFor(scoped(WireMock.post(WireMock.urlPathEqualTo(path)), path)
+                .willReturn(WireMock.okJson(template).withTransformers(TEMPLATE)));
     }
 
     /**
@@ -125,9 +167,26 @@ public final class Stub {
      * @param json  тело
      */
     public void answersWhere(String path, String param, String value, String json) {
-        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path))
+        server.stubFor(scoped(WireMock.get(WireMock.urlPathEqualTo(path)), path)
                 .withQueryParam(param, WireMock.equalTo(value))
                 .atPriority(WHERE)
+                .willReturn(WireMock.okJson(json).withTransformers(TEMPLATE)));
+    }
+
+    /**
+     * Отвечает на {@code GET} по пути, когда параметра в запросе НЕТ, — раньше
+     * ответа пути без условия, но позже ответа по значению параметра:
+     * площадка ищет сущность тем идентификатором, который ей дали, и на поиск
+     * одним нашим идентификатором не отдаёт сущность, которой под ним не знает.
+     *
+     * @param path  путь
+     * @param param имя параметра, которого в запросе нет
+     * @param json  тело
+     */
+    public void answersWithout(String path, String param, String json) {
+        server.stubFor(scoped(WireMock.get(WireMock.urlPathEqualTo(path)), path)
+                .withQueryParam(param, WireMock.absent())
+                .atPriority(WITHOUT)
                 .willReturn(WireMock.okJson(json).withTransformers(TEMPLATE)));
     }
 
@@ -142,8 +201,8 @@ public final class Stub {
      * @param json     тело
      */
     public void answersInState(String path, String scenario, String state, String json) {
-        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path))
-                .inScenario(scenario)
+        server.stubFor(scoped(WireMock.get(WireMock.urlPathEqualTo(path)), path)
+                .inScenario(scenario(scenario))
                 .whenScenarioStateIs(state)
                 .atPriority(IN_STATE)
                 .willReturn(WireMock.okJson(json).withTransformers(TEMPLATE)));
@@ -164,9 +223,9 @@ public final class Stub {
      */
     public void answersWhereInState(String path, String param, String value, String scenario, String state,
                                     String json) {
-        server.stubFor(WireMock.get(WireMock.urlPathEqualTo(path))
+        server.stubFor(scoped(WireMock.get(WireMock.urlPathEqualTo(path)), path)
                 .withQueryParam(param, WireMock.equalTo(value))
-                .inScenario(scenario)
+                .inScenario(scenario(scenario))
                 .whenScenarioStateIs(state)
                 .atPriority(IN_STATE)
                 .willReturn(WireMock.okJson(json).withTransformers(TEMPLATE)));
@@ -188,9 +247,9 @@ public final class Stub {
      */
     public void answersPostMoving(String path, String jsonPath, String value, String scenario, String from,
                                   String to, String json) {
-        server.stubFor(WireMock.post(WireMock.urlPathEqualTo(path))
+        server.stubFor(scoped(WireMock.post(WireMock.urlPathEqualTo(path)), path)
                 .withRequestBody(WireMock.matchingJsonPath(jsonPath, WireMock.equalTo(value)))
-                .inScenario(scenario)
+                .inScenario(scenario(scenario))
                 .whenScenarioStateIs(from)
                 .willSetStateTo(to)
                 .atPriority(WHERE)
@@ -205,8 +264,8 @@ public final class Stub {
      * @param path путь
      */
     public void failsPostTransportOnce(String path) {
-        server.stubFor(WireMock.post(WireMock.urlPathEqualTo(path))
-                .inScenario("post " + path)
+        server.stubFor(scoped(WireMock.post(WireMock.urlPathEqualTo(path)), path)
+                .inScenario(scenario("post " + path))
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
                 .willSetStateTo(ANSWERING));
@@ -220,22 +279,26 @@ public final class Stub {
      * @param json тело штатного ответа
      */
     public void failsTransportThenAnswers(String path, String json) {
-        server.resetScenarios();
-        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
-                .inScenario(path)
+        server.stubFor(scoped(WireMock.any(WireMock.urlPathEqualTo(path)), path)
+                .inScenario(scenario(path))
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
                 .willSetStateTo(ANSWERING));
-        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
-                .inScenario(path)
+        server.stubFor(scoped(WireMock.any(WireMock.urlPathEqualTo(path)), path)
+                .inScenario(scenario(path))
                 .whenScenarioStateIs(ANSWERING)
                 .willReturn(WireMock.okJson(json)));
+        server.resetScenario(scenario(path));
     }
 
-    /** Все обращения со времени последнего забывания — в порядке прихода. */
+    /**
+     * Обращения со времени последнего забывания — в порядке прихода; под
+     * областью — её обращения и обращения без заголовка области.
+     */
     public List<LoggedRequest> requests() {
         return server.getAllServeEvents().reversed().stream()
                 .map(ServeEvent::getRequest)
+                .filter(this::inScope)
                 .toList();
     }
 
@@ -246,9 +309,16 @@ public final class Stub {
                 .toList();
     }
 
-    /** Возвращает все сценарии площадки в начальное состояние, не трогая ответов. */
+    /** Возвращает сценарии в начальное состояние, не трогая ответов; под областью — только её. */
     public void forgetScenarios() {
-        server.resetScenarios();
+        if (isNull(scopeValue)) {
+            server.resetScenarios();
+            return;
+        }
+        server.getAllScenarios().getScenarios().stream()
+                .map(Scenario::getName)
+                .filter(scenario -> scenario.startsWith(scenario("")))
+                .forEach(server::resetScenario);
     }
 
     /** Забывает журнал обращений, не трогая ответов. */
@@ -259,5 +329,24 @@ public final class Stub {
     /** Останавливает стаб. */
     public void stop() {
         server.stop();
+    }
+
+    private MappingBuilder scoped(MappingBuilder mapping, String path) {
+        if (isNull(scopeValue) || isTrue(sharedPaths.contains(path))) {
+            return mapping;
+        }
+        return mapping.withHeader(scopeHeader, WireMock.equalTo(scopeValue));
+    }
+
+    private String scenario(String scenario) {
+        return isNull(scopeValue) ? scenario : scopeValue + " " + scenario;
+    }
+
+    private Boolean inScope(LoggedRequest request) {
+        if (isNull(scopeValue)) {
+            return Boolean.TRUE;
+        }
+        String owner = request.getHeader(scopeHeader);
+        return isNull(owner) || Objects.equals(scopeValue, owner);
     }
 }

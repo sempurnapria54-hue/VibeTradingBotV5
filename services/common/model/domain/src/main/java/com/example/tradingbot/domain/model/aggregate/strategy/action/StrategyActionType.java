@@ -14,8 +14,8 @@ package com.example.tradingbot.domain.model.aggregate.strategy.action;
  * <p>Частичное уменьшение позиции действием не выражается — только
  * reduce-only заявкой (docs/rules/no-partial-close.md); полное закрытие
  * выражается либо условием-переходом, либо явным {@code EXIT_ACTION}
- * шага {@code EXIT} (docs/rules/no-partial-close.md §«Формы полного
- * выхода»). См. docs/models/domain/aggregate/Strategy.md (§Действия).
+ * шага {@code EXIT} (docs/rules/no-partial-close.md §«Две законные формы
+ * полного выхода»). См. docs/models/domain/aggregate/Strategy.md (§Действия).
  */
 public enum StrategyActionType {
 
@@ -34,8 +34,9 @@ public enum StrategyActionType {
 
     /**
      * Выйти: снять живые входные ноги своей области и закрыть экспозицию.
-     * Область задаёт уровень объявления — транш либо вся сделка
-     * (docs/components/ExitActionExecutor.md).
+     * Область задаёт уровень объявления: у транша действие исполняет
+     * исполнитель выхода, у сделки — сворачивание
+     * (docs/rules/no-partial-close.md).
      */
     EXIT_ACTION
 }

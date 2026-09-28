@@ -18,7 +18,9 @@ SUBMITTED -> REFRESH_ORDER_COMMAND
 ```
 
 На продвинутых стадиях расчёт и риск не повторяются — нога ведётся по
-фактам из `DealActionState.target`. Секвенс ведёт петля по подтверждённым
+фактам из `DealActionState.target`; повтор заведённой ноги возвращается на
+`CREATED`, а не в планирование (`docs/lifecycles/DealActionState.md`
+§«Повтор возвращает исполнение на стадию факта»). Секвенс ведёт петля по подтверждённым
 фактам (см. `docs/processes/fsm-execution-layering.md`).
 
 **Исход округления reduce-only выхода читается до преконтроля.** Исход
@@ -34,5 +36,9 @@ SUBMITTED -> REFRESH_ORDER_COMMAND
 маппит решение через `RiskBlockResolver` в `RiskBlockAction`, отдавая его
 `ActionPlan`'ом (реакцию исполняет resolver в handler'е —
 `docs/rules/risk-validator-scope.md`, `docs/components/RiskBlockResolver.md`).
+Разрешённый вход он отмечает в контексте прохода, а риск-создающее действие,
+пришедшее в проход, где вход сделки уже решён, откладывает до расчёта —
+пустым планом при запланированной строке (правило —
+`docs/rules/risk-policy.md` §«Живое меряется от живой экспозиции»).
 Ошибка расчёта возвращается как `calcError`-`ActionPlan`. Сам команды не
 исполняет и статус сделки не двигает.

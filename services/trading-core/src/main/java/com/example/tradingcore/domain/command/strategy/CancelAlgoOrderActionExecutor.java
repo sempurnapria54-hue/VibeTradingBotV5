@@ -13,6 +13,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAct
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingcore.domain.command.DealActionState;
+import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
@@ -36,6 +37,10 @@ import org.springframework.stereotype.Component;
  * <p><b>Стадии {@code CREATED} у снятия нет:</b> локальной сущности оно не
  * создаёт, а факт снятия подтверждает добыча, а не приём команды
  * (docs/rules/ack-not-runtime-truth.md).
+ *
+ * <p><b>Повтор идёт со стадии факта:</b> цель строки ставит ребро
+ * отправки, и заполненная цель значит, что снятие уже принято, — повтор
+ * добывает его исход, а не шлёт снятие второй раз.
  *
  * <p><b>Преконтроль стои́т в двух местах, и это не дубль.</b> Гейт
  * готовности отвечает ДО строки исполнения: отложенное действие
@@ -80,6 +85,11 @@ public class CancelAlgoOrderActionExecutor implements StrategyActionExecutor {
             case SUBMITTED -> refresh(state);
             default -> ActionPlan.nothing();
         };
+    }
+
+    @Override
+    public DealActionStateStatus retryStage(DealActionState state) {
+        return state.removalRetryStage();
     }
 
     private ActionPlan planCancel(StrategyAction action, DealActionState state, DealContext dealContext,

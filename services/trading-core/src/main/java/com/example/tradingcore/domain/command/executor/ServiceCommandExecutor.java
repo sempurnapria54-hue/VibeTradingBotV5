@@ -8,6 +8,7 @@ import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
+import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
@@ -65,10 +66,15 @@ import org.springframework.stereotype.Service;
  * Различитель обязан стоять там, где класс ещё известен, то есть на
  * ловце.
  *
- * <p><b>Отказ соседа по ярусу сюда не доходит и учёта не получает:</b>
- * его реакция — пропуск прохода целиком, то есть до команды дело не
- * доходит (docs/rules/runtime-error-classification.md §«Отказ соседа по
- * ярусу — свой класс, и сделку в ошибку он не уводит»).
+ * <p><b>Отказ соседа по ярусу учёта не получает и уходит наружу
+ * нетронутым.</b> Изнутри команды он приходит от МОЛЧАЩЕГО коннектора —
+ * транспорт либо {@code 5xx} без класса, — и реакция у него та же, что у
+ * соседа по ярусу: проход по сделке пропускается целиком, строка
+ * исполнения ждёт следующего тика
+ * (docs/rules/runtime-error-classification.md §«Молчащий коннектор
+ * классифицируется этим же классом»). Общий ловец классифицировал бы его
+ * нашим багом и закрыл строку отказом — и сделка уходила бы в ошибку на
+ * плановой выкатке коннектора.
  */
 @Slf4j
 @Service
@@ -112,6 +118,10 @@ public class ServiceCommandExecutor {
         } catch (RetryBudgetExhaustedException e) {
             // Учёт уже применён — строка переведена в отказ; бросок идёт
             // выделенному обработчику прохода нетронутым.
+            throw e;
+        } catch (PeerServiceUnavailableException e) {
+            // Коннектор молчит — классифицировать нечего: строка не тратит
+            // попытки и не закрывается, переход откладывает ловец прохода.
             throw e;
         } catch (ControlledExchangeException e) {
             // Свой ловец, а не общий: класс говорит «продолжать небезопасно», и

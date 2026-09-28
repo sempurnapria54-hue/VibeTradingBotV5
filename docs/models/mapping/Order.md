@@ -233,7 +233,7 @@ write-once для причины закрытия —
 | # | Эндпоинт | Параметры запроса | Что даёт |
 |---|---|---|---|
 | 1 | `GET /api/v5/trade/orders-algo-pending` | `instType`, `instId`, `ordType=conditional` | живую запись — матч по `algoClOrdId` **в ответе**; нога живых, идёт всегда |
-| 2 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=effective` | `instType`, `instId`, `ordType=conditional`, `state=effective` | сработавшую запись — терминал `TRIGGERED`; нога разбора истории (ветвь `ANALYSE_HISTORY` второй ступени) |
+| 2 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=effective` | `instType`, `instId`, `ordType=conditional`, `state=effective` | сработавшую запись — терминал `TRIGGERED`; нога разбора истории (обе ветви второй ступени) |
 | 3 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=canceled` | то же со `state=canceled` | снятую запись — терминал `CANCELED` по стоящему намерению; та же ветвь |
 | 4 | `GET /api/v5/trade/orders-algo-history`, вызов на `state=order_failed` | то же со `state=order_failed` | сработавшую и неисполнившуюся запись — терминал `ERROR` / `PROTECTION_TRIGGER_FAILED` с фактическим кодом отказа; та же ветвь |
 
@@ -248,8 +248,9 @@ required»). `algoId` материализованной записи нам н�
 пары значений, которые имелись в виду, — неопрошенный `order_failed`
 исчерпывал бы разбор на существующем факте (сработала и не исполнилась —
 запись достижима гонкой срабатывания защиты с закрытием позиции другим
-актором). Ноги разбора идут только на ветви `ANALYSE_HISTORY` второй
-ступени; исходы каждой — таблица разбора в `docs/lifecycles/Order.md`
+актором). Ноги разбора идут на **обеих** ветвях второй ступени — и на
+ветви потерянного покрытия, где сработавший стоп иначе читался бы
+пропавшим; исходы каждой — таблица разбора в `docs/lifecycles/Order.md`
 §«Исход ненайденности — вторая ступень». Глубина задаётся пагинацией
 `after` по `algoId` и `limit` ≤ 100, не окном.
 

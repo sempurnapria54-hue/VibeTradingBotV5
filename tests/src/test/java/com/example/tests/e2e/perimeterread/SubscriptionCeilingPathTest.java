@@ -2,6 +2,7 @@ package com.example.tests.e2e.perimeterread;
 
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
 import java.io.IOException;
@@ -63,13 +64,13 @@ class SubscriptionCeilingPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.openPerimeter("p5");
+        trail = SharedStand.perimeter(SubscriptionCeilingPathTest.class);
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(SubscriptionCeilingPathTest.class);
         }
     }
 
@@ -81,8 +82,8 @@ class SubscriptionCeilingPathTest {
         trail.side(Party.BFF).set(CEILING_KEY, "2");
         trail.side(Party.BFF).set(PULSE_KEY, "1s");
         trail.start(Party.BFF);
-        String first = trail.identity().browserToken("subject-s1", "Trader One");
-        String second = trail.identity().browserToken("subject-s2", "Trader Two");
+        String first = trail.identity().browserToken(Subjects.fresh("subject-s1"), "Trader One");
+        String second = trail.identity().browserToken(Subjects.fresh("subject-s2"), "Trader Two");
         trail.callWith(first, Party.BFF, "GET", "/api/v1/bff/context", null, null);
         trail.callWith(second, Party.BFF, "GET", "/api/v1/bff/context", null, null);
         String firstTicket = ticketOf(first);

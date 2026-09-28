@@ -3,6 +3,7 @@ package com.example.tests.e2e.perimeterread;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -27,8 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 /**
- * Группа {@code E2} тропы периметра, клетки {@code E2.1}-{@code E2.4}: чтение
- * через периметр у настоящего владельца строк, сложенных прологом
+ * Группа {@code E2} тропы периметра, клетки {@code E2.1}-{@code E2.4} и
+ * {@code E2.10}: чтение и команда через периметр у настоящего владельца строк,
+ * сложенных прологом
  * (.claude/tests/cases/e2e-perimeter-read.md §«E2 — Чтение и команда через
  * периметр у настоящего владельца»).
  *
@@ -43,10 +45,6 @@ import static org.assertj.core.api.Assertions.tuple;
 @Tag("e2e")
 @DisplayName("E2 — Чтение через периметр строк, сложенных прологом")
 class PrologueReadPathTest {
-
-    private static final String SUBJECT = "subject-s1";
-
-    private static final String SECOND_SUBJECT = "subject-s2";
 
     private static final String CONTEXT = "/api/v1/bff/context";
 
@@ -67,26 +65,25 @@ class PrologueReadPathTest {
 
     @BeforeAll
     static void walkThePrologue() {
-        trail = Trail.openPerimeter("p3");
-        token = trail.identity().browserToken(SUBJECT, "Trader One");
+        trail = SharedStand.perimeter(PrologueReadPathTest.class);
+        token = trail.identity().browserToken(Subjects.fresh("subject-s1"), "Trader One");
         prologue = Prologue.walk(trail, token);
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(PrologueReadPathTest.class);
         }
     }
 
     @Test
     @DisplayName("E2.1 — Чтение журнала уходит владельцу с выведенным тенантом, и отбирает строки он")
     void e2_1_theJournalReadGoesToTheOwnerWhoSelectsTheRows() {
-        produceForeignFact();
+        String foreign = produceForeignFact();
         Database audit = trail.database(Party.AUDIT);
         Trail.await("E2.1: строка чужого тенанта у журнала есть",
-                () -> audit.count("audit_records") > audit.query(
-                        "select id from audit_records where tenant_id = ?", prologue.tenant()).size());
+                () -> audit.query("select id from audit_records where event_id = ?", foreign).size() == 1);
         Long rows = audit.count("audit_records");
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         String path = JOURNAL + "?from=" + now.minusDays(2) + "&to=" + now.plusMinutes(5);
@@ -142,7 +139,7 @@ class PrologueReadPathTest {
     @Test
     @DisplayName("E2.3 — Чтение определений отбирается заголовком, а не телом запроса")
     void e2_3_theDefinitionReadIsSelectedByTheHeader() {
-        String secondToken = trail.identity().browserToken(SECOND_SUBJECT, "Trader Two");
+        String secondToken = trail.identity().browserToken(Subjects.fresh("subject-s2"), "Trader Two");
         Long tenants = trail.database(Party.AUTH).count("tenants");
         warmTheCache();
 
@@ -195,12 +192,46 @@ class PrologueReadPathTest {
         assertOthersUntouched("E2.4", Party.TRADING_CORE);
     }
 
+    @Test
+    @DisplayName("E2.10 — Команда пользователя у второго пишущего владельца: смена статуса ложится на строку "
+            + "выведенного тенанта")
+    void e2_10_aUserCommandAtTheSecondWritingOwnerLandsOnTheDerivedTenantRow() {
+        String status = Trail.STRATEGIES + "/" + prologue.definition() + "/status";
+        String body = """
+                {"status": "INACTIVE"}
+                """;
+        warmTheCache();
+
+        Answer answer = trail.callWith(token, Party.BFF, "PUT", status, null, body);
+
+        assertThat(answer.status()).as("E2.10: команда принята владельцем — " + answer.body()).isEqualTo(200);
+        assertThat(trail.database(Party.STRATEGIES).query("select status from strategies where internal_id = ?",
+                prologue.definition()).getFirst().get("status"))
+                .as("E2.10: определение тенанта пролога стало неактивным").isEqualTo("INACTIVE");
+        List<Side.Access> reached = trail.accesses(Party.STRATEGIES);
+        assertThat(reached).as("E2.10: глагол и путь ушли владельцу как есть, повтора нет ни одного")
+                .extracting(Side.Access::method, Side.Access::path)
+                .containsExactly(tuple("PUT", status));
+        assertThat(reached.getFirst().tenant()).as("E2.10: заголовком контекста — выведенный тенант")
+                .isEqualTo(prologue.tenant());
+        assertOthersUntouched("E2.10", Party.STRATEGIES);
+        Answer foreign = trail.call(Party.STRATEGIES, "PUT", status, FOREIGN_TENANT, body);
+        assertThat(foreign.status()).as("E2.10: с чужим тенантом заголовком владелец определения не находит — "
+                + foreign.body()).isEqualTo(404);
+    }
+
     // ---------------------------------------------------------------- ходы и чтения
 
-    /** Факт чужого тенанта в теме ядра — так, как положил бы производитель. */
-    private static void produceForeignFact() {
+    /**
+     * Факт чужого тенанта в теме ядра — так, как положил бы производитель.
+     *
+     * @return идентичность события: строки прочих тенантов на общем стенде
+     *         есть и без него, и дождаться надо именно его
+     */
+    private static String produceForeignFact() {
+        String eventId = UUID.randomUUID().toString();
         Map<String, String> headers = new LinkedHashMap<>();
-        headers.put("eventId", UUID.randomUUID().toString());
+        headers.put("eventId", eventId);
         headers.put("eventType", "DEAL_OPENED");
         headers.put("occurredAt", OffsetDateTime.now(ZoneOffset.UTC).toString());
         headers.put("version", "1");
@@ -209,6 +240,7 @@ class PrologueReadPathTest {
                  "instrumentInternalId": "%s", "strategyInternalId": "%s", "entryReason": "STRATEGY",
                  "direction": "LONG", "entryMarketPhase": "BULL_TREND"}
                 """.formatted(UUID.randomUUID(), Trail.INSTRUMENT, UUID.randomUUID()), headers);
+        return eventId;
     }
 
     /** Кэш членств прогрет выводом контекста, следы до хода кейса забыты. */

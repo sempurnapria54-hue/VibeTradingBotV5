@@ -3,6 +3,8 @@ package com.example.tradingcore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.strategy.engine.calc.CalculatedPrice;
@@ -161,6 +163,71 @@ class ActionCommandPlanTest {
         assertThat(plan.hasCommand()).isFalse();
     }
 
+    /**
+     * Второй риск-создающий вход сделки за проход откладывается, не
+     * доходя до преконтроля.
+     *
+     * <p>Граф прохода собран до его решений: нога, решённая соседним
+     * траншем, в нём не стои́т, и оба входа прошли бы потолки порознь
+     * (docs/rules/risk-policy.md §«Живое меряется от живой экспозиции»).
+     * Следующий проход собирает контекст заново и решает отложенный вход.
+     */
+    @Test
+    void secondRiskCreatingEntryOfThePassIsDeferred() {
+        when(calculator.calculate(any())).thenReturn(StrategyActionCalculationResult.success(calculatedEntry()));
+        DealContext pass = dealContext();
+
+        ActionPlan first = orderExecutor.next(new StrategyStep(), entryAction(), planned(STATE_ID), pass,
+                tranche());
+        ActionPlan second = orderExecutor.next(new StrategyStep(), entryAction(), planned(STATE_ID + 1), pass,
+                tranche());
+
+        assertThat(first.getCommand().getType()).isEqualTo(ServiceCommandType.CREATE_ORDER_COMMAND);
+        assertThat(second.isEmpty()).isTrue();
+        verify(riskGate, times(1)).gate(any(), any(), any());
+
+        ActionPlan nextPass = orderExecutor.next(new StrategyStep(), entryAction(), planned(STATE_ID + 1),
+                dealContext(), tranche());
+
+        assertThat(nextPass.getCommand().getType()).isEqualTo(ServiceCommandType.CREATE_ORDER_COMMAND);
+    }
+
+    /**
+     * Вход, отвергнутый преконтролем, решённым не считается: ноги у него не
+     * будет, и соседний вход проверяется тем же графом без опоздания.
+     */
+    @Test
+    void blockedEntryDoesNotDeferItsSibling() {
+        when(calculator.calculate(any())).thenReturn(StrategyActionCalculationResult.success(calculatedEntry()));
+        when(riskGate.gate(any(), any(), any()))
+                .thenReturn(Optional.of(ActionPlan.blocked(
+                        RiskBlockAction.builder().type(RiskBlockAction.Type.SKIP_ACTION).build())))
+                .thenReturn(Optional.empty());
+        DealContext pass = dealContext();
+
+        ActionPlan first = orderExecutor.next(new StrategyStep(), entryAction(), planned(STATE_ID), pass,
+                tranche());
+        ActionPlan second = orderExecutor.next(new StrategyStep(), entryAction(), planned(STATE_ID + 1), pass,
+                tranche());
+
+        assertThat(first.isBlocked()).isTrue();
+        assertThat(second.getCommand().getType()).isEqualTo(ServiceCommandType.CREATE_ORDER_COMMAND);
+    }
+
+    /** Reduce-only нога риска не создаёт, и решённый вход её не откладывает. */
+    @Test
+    void reduceOnlyLegIsNotDeferredByADecidedEntry() {
+        when(calculator.calculate(any())).thenReturn(StrategyActionCalculationResult.success(calculatedEntry()));
+        DealContext pass = dealContext();
+        StrategyOrderAction reducing = entryAction();
+        reducing.setPositionReducingOnly(true);
+
+        orderExecutor.next(new StrategyStep(), entryAction(), planned(STATE_ID), pass, tranche());
+        ActionPlan plan = orderExecutor.next(new StrategyStep(), reducing, planned(STATE_ID + 1), pass, tranche());
+
+        assertThat(plan.getCommand().getType()).isEqualTo(ServiceCommandType.CREATE_ORDER_COMMAND);
+    }
+
     /** Стадии ноги идут по подтверждённым фактам: завести, отправить, добыть. */
     @Test
     void legAdvancesByConfirmedFacts() {
@@ -226,7 +293,7 @@ class ActionCommandPlanTest {
      */
     @Test
     void exitCancelsLiveEntryLegBeforeClosing() {
-        DealTranche tranche = tranche();
+        DealTranche tranche = trancheWithExposure("2");
         tranche.setOrders(List.of(liveEntryLeg()));
         DealContext context = dealContext(tranche);
 
@@ -237,13 +304,13 @@ class ActionCommandPlanTest {
         tranche.setOrders(List.of());
 
         ActionPlan second = exitExecutor.next(new StrategyStep(), exitAction(), planned(), context, tranche);
-        assertThat(second.getCommand().getType()).isEqualTo(ServiceCommandType.CLOSE_POSITION_COMMAND);
+        assertThat(second.getCommand().getType()).isEqualTo(ServiceCommandType.CREATE_ORDER_COMMAND);
     }
 
     /** Reduce-only нога под отмену выхода не идёт: она риск снимает. */
     @Test
     void exitDoesNotCancelReduceOnlyLegs() {
-        DealTranche tranche = tranche();
+        DealTranche tranche = trancheWithExposure("2");
         Order reducing = liveEntryLeg();
         reducing.setPositionReducingOnly(true);
         tranche.setOrders(List.of(reducing));
@@ -251,7 +318,62 @@ class ActionCommandPlanTest {
         ActionPlan plan = exitExecutor.next(new StrategyStep(), exitAction(), planned(), dealContext(tranche),
                 tranche);
 
-        assertThat(plan.getCommand().getType()).isEqualTo(ServiceCommandType.CLOSE_POSITION_COMMAND);
+        assertThat(plan.getCommand().getType()).isEqualTo(ServiceCommandType.CREATE_ORDER_COMMAND);
+    }
+
+    /**
+     * Экспозицию транша гасит его собственная reduce-only нога размером этой
+     * экспозиции, а не закрытие позиции: позиция сделки шире транша, и её
+     * закрытие обнулило бы соседей (docs/rules/exit-teardown-order.md
+     * §«Два уровня выхода»).
+     */
+    @Test
+    void exitClosesTheTrancheExposureByItsOwnReduceOnlyLeg() {
+        DealTranche tranche = trancheWithExposure("2");
+
+        ActionPlan plan = exitExecutor.next(new StrategyStep(), exitAction(), planned(), dealContext(tranche),
+                tranche);
+
+        assertThat(plan.getCommand().getType()).isEqualTo(ServiceCommandType.CREATE_ORDER_COMMAND);
+        assertThat(plan.getCommand().getDealActionStateId()).isEqualTo(STATE_ID);
+        CreateOrderCommandPayload payload = (CreateOrderCommandPayload) plan.getCommand().getPayload();
+        assertThat(payload.getPositionReducingOnly()).isTrue();
+        assertThat(payload.getSide()).isEqualTo(Order.Side.SELL);
+        assertThat(payload.getSizeContracts()).isEqualByComparingTo("2");
+        assertThat(payload.getDealTrancheId()).isEqualTo(TRANCHE_ID);
+        assertThat(payload.getSendPriceToExchange()).isFalse();
+        assertThat(payload.getPrice()).isNull();
+        assertThat(payload.getPlannedRiskAmount()).isNull();
+    }
+
+    /** Экспозиции у транша нет — гасить нечего, и команды нет. */
+    @Test
+    void exitWithoutTrancheExposurePlansNothing() {
+        DealTranche tranche = tranche();
+
+        ActionPlan plan = exitExecutor.next(new StrategyStep(), exitAction(), planned(), dealContext(tranche),
+                tranche);
+
+        assertThat(plan.isEmpty()).isTrue();
+    }
+
+    /** Заведённая закрывающая нога ведётся по фактам: отправка, затем добыча. */
+    @Test
+    void exitLegAdvancesBySubmissionAndRefresh() {
+        DealTranche tranche = trancheWithExposure("2");
+        DealActionState created = planned();
+        created.targetAt(TargetEntityType.ORDER, 900L);
+        created.setStatus(DealActionStateStatus.CREATED);
+
+        ActionPlan submit = exitExecutor.next(new StrategyStep(), exitAction(), created, dealContext(tranche),
+                tranche);
+        assertThat(submit.getCommand().getType()).isEqualTo(ServiceCommandType.SUBMIT_ORDER_COMMAND);
+
+        created.setStatus(DealActionStateStatus.SUBMITTED);
+        ActionPlan refresh = exitExecutor.next(new StrategyStep(), exitAction(), created, dealContext(tranche),
+                tranche);
+        assertThat(refresh.getCommand().getType()).isEqualTo(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        assertThat(exitExecutor.retryStage(created)).isEqualTo(DealActionStateStatus.CREATED);
     }
 
     private CreateAlgoOrderCommandPayload payloadOf(ActionPlan plan) {
@@ -344,8 +466,12 @@ class ActionCommandPlanTest {
     }
 
     private DealActionState planned() {
+        return planned(STATE_ID);
+    }
+
+    private DealActionState planned(Long id) {
         DealActionState state = new DealActionState();
-        state.setId(STATE_ID);
+        state.setId(id);
         state.setDealId(DEAL_ID);
         state.setStatus(DealActionStateStatus.PLANNED);
         return state;
@@ -357,6 +483,13 @@ class ActionCommandPlanTest {
         tranche.setEpisodeSeq(1);
         tranche.setOrders(List.of());
         tranche.setAlgoOrders(List.of());
+        return tranche;
+    }
+
+    /** Транш с налитым входом: экспозиция — объём входных исполнений. */
+    private DealTranche trancheWithExposure(String entryFilled) {
+        DealTranche tranche = tranche();
+        tranche.setEntryFilled(new BigDecimal(entryFilled));
         return tranche;
     }
 

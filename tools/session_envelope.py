@@ -108,10 +108,55 @@ def fields(path):
     return 0
 
 
-COMMANDS = {"probe": probe, "fields": fields}
+def cli_failure(path):
+    """Класс ненулевого кода `claude`, кроме таймаута (его код 124 отдаёт
+    `timeout` цикла, и класс там называет оболочка) — присваиваниями оболочки.
+
+    Класс читается по потоку, а не по коду: CLI отвечает кодом 1 и на
+    просроченный вход, и на исчерпанный лимит, и на внутреннюю ошибку, а
+    держателю нужны разные ходы — вход заново, ожидание окна, разбор потока.
+    Признак — поле `error` сообщения API и текст итоговой строки `result`;
+    потока без итоговой строки у CLI, вернувшего код сам, не бывает штатно —
+    это обрыв."""
+    errors = []
+    result = None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                if record.get("error"):
+                    errors.append(str(record.get("error")))
+                if record.get("type") == "result":
+                    result = record
+    except OSError as error:
+        print("CLI_FAIL=%s" % quote("поток не прочитан"))
+        print("CLI_FAIL_TEXT=%s" % quote(error))
+        return 0
+    text = " ".join(((result or {}).get("result") or "").split())[:300]
+    marks = " ".join(errors).lower() + " " + text.lower()
+    if result is None:
+        kind = "обрыв CLI"
+        text = "в потоке нет итоговой строки `result`"
+    elif "authentication" in marks or "failed to authenticate" in marks or "oauth" in marks:
+        kind = "аутентификация"
+    elif "rate_limit" in marks or "usage limit" in marks or "hit your limit" in marks or "limit reached" in marks:
+        kind = "лимит подписки"
+    else:
+        kind = "отказ CLI"
+    print("CLI_FAIL=%s" % quote(kind))
+    print("CLI_FAIL_TEXT=%s" % quote(text))
+    return 0
+
+
+COMMANDS = {"probe": probe, "fields": fields, "cli-failure": cli_failure}
 
 if __name__ == "__main__":
     if len(sys.argv) != 3 or sys.argv[1] not in COMMANDS:
-        print("вызов: session_envelope.py {probe|fields} <ответ.json>", file=sys.stderr)
+        print("вызов: session_envelope.py {probe|fields|cli-failure} <ответ.json>", file=sys.stderr)
         raise SystemExit(2)
     raise SystemExit(COMMANDS[sys.argv[1]](sys.argv[2]))

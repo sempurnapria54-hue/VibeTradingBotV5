@@ -236,6 +236,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <!--
+                      Классы одного пакета идут подряд: пакет — группа общего
+                      стенда (SharedStand), и стенд поднимается заново на
+                      границе группы. Порядок — полное имя класса.
+                    -->
+                    <runOrder>alphabetical</runOrder>
                     <excludedGroups>${test.excluded.groups}</excludedGroups>
                     <systemPropertyVariables>
                         <e2e.repository.root>${project.basedir}/..</e2e.repository.root>

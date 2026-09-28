@@ -18,13 +18,13 @@ import org.junit.jupiter.api.Test;
  * звенья Z29, Z30).
  *
  * <p><b>Предел резолвится по типу ТЕКУЩЕЙ команды, счётчик — сквозной
- * бюджет одного исполнения.</b> Поле предела на строке исполнения —
- * снимок для истории, и в решении не участвует ни одним битом.
+ * бюджет одного исполнения.</b> Предела на строке исполнения нет: его
+ * источник — только политика.
  *
  * <p><b>Базовая сборка:</b> {@code new RetryPolicyService(properties)};
  * конфигурация собирается кейсом — политика по умолчанию плюс отображение
  * «тип команды → политика». Строка исполнения — повторяемая сущность со
- * счётчиком попыток и снимком предела.
+ * счётчиком попыток.
  */
 class RetryPolicyBudgetTest {
 
@@ -41,7 +41,7 @@ class RetryPolicyBudgetTest {
                     .as("третья ветвь несущая: без неё проверка бюджета падала бы в ветке учёта "
                             + "отказа, подменяя исходную ошибку (Z29)")
                     .isNotNull();
-            assertThat(service.canRetry(RetryFixture.row(0, null), COMMAND))
+            assertThat(service.canRetry(RetryFixture.row(0), COMMAND))
                     .as("пустая политика означает «повторов нет»")
                     .isFalse();
         }).doesNotThrowAnyException();
@@ -73,7 +73,7 @@ class RetryPolicyBudgetTest {
         RetryPolicyService service =
                 RetryFixture.service(RetryFixture.policy(null, RetryBackoffType.FIXED));
 
-        assertThat(service.canRetry(RetryFixture.row(null, null), COMMAND))
+        assertThat(service.canRetry(RetryFixture.row(null), COMMAND))
                 .as("благоприятное умолчание запрещено (Z30)")
                 .isFalse();
     }
@@ -84,7 +84,7 @@ class RetryPolicyBudgetTest {
         RetryPolicyService service =
                 RetryFixture.service(RetryFixture.policy(3, RetryBackoffType.FIXED));
 
-        assertThat(service.canRetry(RetryFixture.row(null, null), COMMAND)).isTrue();
+        assertThat(service.canRetry(RetryFixture.row(null), COMMAND)).isTrue();
     }
 
     @Test
@@ -93,7 +93,7 @@ class RetryPolicyBudgetTest {
         RetryPolicyService service =
                 RetryFixture.service(RetryFixture.policy(3, RetryBackoffType.FIXED));
 
-        assertThat(service.canRetry(RetryFixture.row(2, null), COMMAND)).isTrue();
+        assertThat(service.canRetry(RetryFixture.row(2), COMMAND)).isTrue();
     }
 
     @Test
@@ -102,7 +102,7 @@ class RetryPolicyBudgetTest {
         RetryPolicyService service =
                 RetryFixture.service(RetryFixture.policy(3, RetryBackoffType.FIXED));
 
-        assertThat(service.canRetry(RetryFixture.row(3, null), COMMAND)).isFalse();
+        assertThat(service.canRetry(RetryFixture.row(3), COMMAND)).isFalse();
     }
 
     @Test
@@ -111,18 +111,7 @@ class RetryPolicyBudgetTest {
         RetryPolicyService service =
                 RetryFixture.service(RetryFixture.policy(3, RetryBackoffType.FIXED));
 
-        assertThat(service.canRetry(RetryFixture.row(4, null), COMMAND)).isFalse();
-    }
-
-    @Test
-    @DisplayName("U12.9 — авторитет предела — политика: снимок на строке исполнения не читается")
-    void u12_9_theSnapshotOnTheRowTakesNoPartInTheDecision() {
-        RetryPolicyService service =
-                RetryFixture.service(RetryFixture.policy(3, RetryBackoffType.FIXED));
-
-        assertThat(service.canRetry(RetryFixture.row(3, 99), COMMAND))
-                .as("поле строки — снимок для истории, а не операторное значение")
-                .isFalse();
+        assertThat(service.canRetry(RetryFixture.row(4), COMMAND)).isFalse();
     }
 
     @Test
@@ -132,7 +121,7 @@ class RetryPolicyBudgetTest {
                 RetryFixture.policy(2, RetryBackoffType.FIXED),
                 COMMAND, RetryFixture.policy(5, RetryBackoffType.FIXED));
 
-        assertThat(service.canRetry(RetryFixture.row(3, null), COMMAND)).isTrue();
+        assertThat(service.canRetry(RetryFixture.row(3), COMMAND)).isTrue();
     }
 
     @Test
@@ -142,7 +131,7 @@ class RetryPolicyBudgetTest {
                 RetryFixture.policy(2, RetryBackoffType.FIXED),
                 COMMAND, RetryFixture.policy(5, RetryBackoffType.FIXED));
 
-        assertThat(service.canRetry(RetryFixture.row(3, null), OTHER_COMMAND))
+        assertThat(service.canRetry(RetryFixture.row(3), OTHER_COMMAND))
                 .as("счётчик при этом остаётся сквозным")
                 .isFalse();
     }

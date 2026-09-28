@@ -59,11 +59,10 @@ final class RetryFixture {
         return new RetryPolicyService(properties);
     }
 
-    /** Строка исполнения со счётчиком попыток и снимком предела. */
-    static DealActionState row(Integer attemptCount, Integer maxAttemptsSnapshot) {
+    /** Строка исполнения со счётчиком попыток. */
+    static DealActionState row(Integer attemptCount) {
         DealActionState row = new DealActionState();
         row.setAttemptCount(attemptCount);
-        row.setMaxAttempts(maxAttemptsSnapshot);
         return row;
     }
 }

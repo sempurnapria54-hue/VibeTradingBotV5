@@ -13,22 +13,37 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
+import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.api.controller.TradingSurfaceController;
 import com.example.tradingcore.api.model.DealApiResponse;
+import com.example.tradingcore.api.model.DealTrancheApiResponse;
 import com.example.tradingcore.api.model.RiskAppetiteApiRequest;
 import com.example.tradingcore.api.model.RiskAppetiteApiResponse;
 import com.example.tradingcore.api.model.SafetyStateApiResponse;
+import com.example.tradingcore.config.DealContextProperties;
+import com.example.tradingcore.domain.deal.DealContextService;
+import com.example.tradingcore.domain.market.MarketFeatureService;
 import com.example.tradingcore.domain.service.TradingSurfaceService;
 import com.example.tradingcore.mapping.TradingSurfaceMapperImpl;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
+import com.example.tradingcore.persistence.service.AlgoOrderDataService;
+import com.example.tradingcore.persistence.service.BalanceContainerDataService;
+import com.example.tradingcore.persistence.service.DealActionStateDataService;
+import com.example.tradingcore.persistence.service.DealCashFlowDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
+import com.example.tradingcore.persistence.service.OrderDataService;
+import com.example.tradingcore.persistence.service.PositionDataService;
+import com.example.tradingcore.persistence.service.StrategyDataService;
 import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,7 +63,10 @@ import org.junit.jupiter.api.Test;
  * api-моделью вглубь: сервис api-модели не видит вовсе.
  *
  * <p>Маппер — НАСТОЯЩИЙ (сгенерированный MapStruct), не подменённый:
- * предмет половины проверок — именно перенос полей.
+ * предмет половины проверок — именно перенос полей. Сборка графа сделки —
+ * тоже настоящая: экспозиция транша есть производная его ног и приписанного
+ * закрытия уровня сделки, и подменённая сборка проверяла бы поверхность
+ * против вывода, которого в проде нет.
  */
 class TradingSurfaceReadTest {
 
@@ -62,13 +80,21 @@ class TradingSurfaceReadTest {
 
     private final DealDataService deals = mock(DealDataService.class);
     private final DealTrancheDataService tranches = mock(DealTrancheDataService.class);
+    private final OrderDataService orders = mock(OrderDataService.class);
+    private final AlgoOrderDataService algoOrders = mock(AlgoOrderDataService.class);
+    private final PositionDataService positions = mock(PositionDataService.class);
     private final ExchangeAccountDataService accounts = mock(ExchangeAccountDataService.class);
     private final InstrumentDataService instruments = mock(InstrumentDataService.class);
     private final AccountInstrumentStateDataService pairStates =
             mock(AccountInstrumentStateDataService.class);
     private final TenantRiskAppetiteDataService appetites = mock(TenantRiskAppetiteDataService.class);
 
-    private final TradingSurfaceService service = new TradingSurfaceService(deals, tranches, accounts,
+    private final DealContextService dealContext = new DealContextService(accounts, instruments,
+            mock(StrategyDataService.class), orders, algoOrders, positions, tranches,
+            mock(BalanceContainerDataService.class), mock(DealActionStateDataService.class),
+            mock(DealCashFlowDataService.class), mock(MarketFeatureService.class), new DealContextProperties());
+
+    private final TradingSurfaceService service = new TradingSurfaceService(deals, dealContext, accounts,
             instruments, pairStates, appetites);
     private final TradingSurfaceController controller =
             new TradingSurfaceController(service, new TradingSurfaceMapperImpl());
@@ -116,6 +142,36 @@ class TradingSurfaceReadTest {
         assertThat(responses).hasSize(3);
         verify(instruments, times(1)).findInternalIdsByIds(anyCollection());
         verify(instruments, never()).getRequiredById(anyLong());
+    }
+
+    /**
+     * Сделка, чьи транши погасило одно закрытие уровня сделки: экспозиция
+     * каждого закрытого транша отдаётся с приписанным ему объёмом — нулём, а
+     * не налитым входом. Строка транша несёт налив, записанный последним
+     * проходом, и не несёт приписанного: чтение строк без сборки графа
+     * отдавало бы налитое.
+     */
+    @Test
+    void aTrancheClosedByTheDealLevelCloseIsReadWithItsAttributedVolume() {
+        Deal deal = deal(FIRST_INSTRUMENT_ID);
+        deal.setStatus(Deal.Status.CLOSED);
+        ExchangeAccount account = givenAccount();
+        when(accounts.getRequiredById(ACCOUNT_ID)).thenReturn(account);
+        when(deals.getRequiredByInternalId(deal.getInternalId())).thenReturn(deal);
+        when(tranches.findByDealId(deal.getId()))
+                .thenReturn(new ArrayList<>(List.of(closedTranche(10L, "5"), closedTranche(11L, "3"))));
+        when(orders.findByDealId(deal.getId())).thenReturn(new ArrayList<>(List.of(
+                filledEntry(100L, 10L, "5"), filledEntry(110L, 11L, "3"))));
+        when(algoOrders.findByDealId(deal.getId())).thenReturn(new ArrayList<>());
+        when(positions.findEpisodes(deal.getId())).thenReturn(new ArrayList<>(List.of(closedEpisode())));
+        when(instruments.findInternalIdsByIds(anyCollection()))
+                .thenReturn(Map.of(FIRST_INSTRUMENT_ID, FIRST_INSTRUMENT_INTERNAL_ID));
+
+        DealApiResponse response = controller.getDeal(deal.getInternalId());
+
+        assertThat(response.getTranches()).hasSize(2)
+                .extracting(DealTrancheApiResponse::getExposure)
+                .allSatisfy(exposure -> assertThat(exposure).isEqualByComparingTo(BigDecimal.ZERO));
     }
 
     /**
@@ -172,7 +228,7 @@ class TradingSurfaceReadTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    private void givenAccount() {
+    private ExchangeAccount givenAccount() {
         ExchangeAccount account = new ExchangeAccount();
         account.setId(ACCOUNT_ID);
         account.setInternalId(ACCOUNT_INTERNAL_ID);
@@ -181,6 +237,38 @@ class TradingSurfaceReadTest {
         account.setConsecutiveLossCount(1);
         account.setBlindPassCount(0);
         when(accounts.getRequiredByInternalId(ACCOUNT_INTERNAL_ID)).thenReturn(account);
+        return account;
+    }
+
+    /**
+     * Строка закрытого транша: налив входа записан последним проходом, а
+     * приписанного закрытия колонкой нет — его выводит только сборка графа.
+     */
+    private DealTranche closedTranche(Long id, String persistedEntryFill) {
+        DealTranche tranche = new DealTranche();
+        tranche.setId(id);
+        tranche.setInternalId("tr-" + id);
+        tranche.setStatus(DealTranche.Status.CLOSED);
+        tranche.setEntryFilled(new BigDecimal(persistedEntryFill));
+        return tranche;
+    }
+
+    private Order filledEntry(Long id, Long trancheId, String fill) {
+        Order order = new Order();
+        order.setId(id);
+        order.setDealTrancheId(trancheId);
+        order.setStatus(Order.Status.COMPLETED);
+        order.setAccumulatedFillSize(new BigDecimal(fill));
+        order.setPositionReducingOnly(Boolean.FALSE);
+        return order;
+    }
+
+    /** Эпизод закрыт и несёт необнулённый размер — так его оставляет площадка. */
+    private Position closedEpisode() {
+        Position episode = new Position();
+        episode.setStatus(Position.Status.CLOSED);
+        episode.setExternalSize(new BigDecimal("8"));
+        return episode;
     }
 
     private Deal deal(Long instrumentId) {

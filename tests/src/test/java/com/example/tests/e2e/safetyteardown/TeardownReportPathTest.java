@@ -3,6 +3,7 @@ package com.example.tests.e2e.safetyteardown;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.exitandclose.ExitTrail;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -78,7 +79,7 @@ class TeardownReportPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("t4");
+        trail = SharedStand.dealPath(TeardownReportPathTest.class);
         trail.factSeriesStartedYesterday();
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.side(Party.TRADING_CORE).set(MIN_AGE, "0s");
@@ -88,7 +89,7 @@ class TeardownReportPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TeardownReportPathTest.class);
         }
     }
 
@@ -108,7 +109,8 @@ class TeardownReportPathTest {
         escalationTick = trail.exchange().requests();
 
         List<Map<String, Object>> rows = trail.database(Party.TRADING_CORE)
-                .query("select severity from anomaly_reports where code = ? order by id", FOREIGN_ORDER);
+                .query("select severity from anomaly_reports where "
+                        + Trail.BY_ACCOUNT + " and code = ? order by id", trail.account(), FOREIGN_ORDER);
         assertThat(rows).as("E4.4: строк отчёта по коду две — некритичная и критичная")
                 .extracting(row -> row.get("severity")).containsExactly("NON_CRITICAL", "CRITICAL");
         List<Map<String, Object>> events = outbox(trail, ANOMALY_REPORTED).subList(reported, reported + 2);
@@ -178,7 +180,8 @@ class TeardownReportPathTest {
                 .map(LoggedRequest::getUrl))
                 .as("E4.2: после команд — только чтения подтверждения, срезов заявок счёта нет")
                 .isEmpty();
-        assertThat(trail.database(Party.TRADING_CORE).query("select status from positions").getFirst()
+        assertThat(trail.database(Party.TRADING_CORE).query("select status from positions where "
+                + Trail.BY_DEAL, trail.account()).getFirst()
                 .get("status")).as("E4.2: отсутствие живой позиции читается срезом — эпизод закрыт")
                 .isEqualTo("CLOSED");
         assertThat(outbox(trail, ANOMALY_REPORTED).stream()
@@ -192,7 +195,8 @@ class TeardownReportPathTest {
     void e4_3_theStandingRowDeduplicatesARepeatOfTheSameGround() {
         Map<String, Object> before = incidents(trail);
         Integer rows = trail.database(Party.TRADING_CORE)
-                .query("select id from anomaly_reports where code = ?", FOREIGN_ORDER).size();
+                .query("select id from anomaly_reports where "
+                        + Trail.BY_ACCOUNT + " and code = ?", trail.account(), FOREIGN_ORDER).size();
         Integer reported = outbox(trail, ANOMALY_REPORTED).size();
         Integer raised = outbox(trail, HOLD_RAISED).size();
         trail.forgetTraces();
@@ -203,7 +207,8 @@ class TeardownReportPathTest {
         List<Map<String, Object>> fresh = outbox(trail, ANOMALY_REPORTED).subList(reported,
                 outbox(trail, ANOMALY_REPORTED).size());
 
-        assertThat(trail.database(Party.TRADING_CORE).query("select id from anomaly_reports where code = ?",
+        assertThat(trail.database(Party.TRADING_CORE).query("select id from anomaly_reports where "
+                + Trail.BY_ACCOUNT + " and code = ?", trail.account(),
                 FOREIGN_ORDER)).as("E4.3: строк отчёта по ключу столько же").hasSize(rows);
         assertThat(fresh).as("E4.3: строк outbox класса отчёта по этому ключу не прибавилось — прибавилась одна, "
                         + "детектора непроэнфорсенной ступени").singleElement()
@@ -253,7 +258,9 @@ class TeardownReportPathTest {
     @Order(7)
     @DisplayName("E4.7 — Счёт-широкая тропа: локальный снимок несёт только поля счёта")
     void e4_7_theAccountWidePathSnapshotCarriesOnlyTheAccountFields() {
-        trail.withoutDeals();
+        // отказ вставки, поставленный E4.6, снимает только свежее развёртывание ядра
+        trail.renew(Party.TRADING_CORE);
+        trail.pairWithoutDeal();
         exchangeHoldsOnlyForeignPosition(trail);
         trail.forgetTraces();
 
@@ -303,8 +310,9 @@ class TeardownReportPathTest {
                 .isEqualTo("TRADE_BLOCKED");
         List<Map<String, Object>> raised = outbox(trail, HOLD_RAISED);
         assertThat(raised).as("E4.6: строка outbox класса подъёма есть").hasSize(1);
-        assertThat(trail.database(Party.TRADING_CORE).query("select id from anomaly_reports where severity = "
-                + "'CRITICAL'")).as("E4.6: строки отчёта нет").isEmpty();
+        assertThat(trail.database(Party.TRADING_CORE).query("select id from anomaly_reports where "
+                + Trail.BY_ACCOUNT + " and severity = "
+                + "'CRITICAL'", trail.account())).as("E4.6: строки отчёта нет").isEmpty();
         assertThat(outbox(trail, ANOMALY_REPORTED)).as("E4.6: строки outbox класса отчёта нет").hasSize(reported);
         assertThat(trail.exchange().requests(ExitTrail.CLOSE_POSITION))
                 .as("E4.6: команды снятия риска ушли — реакция журналом не гейтится").isNotEmpty();
@@ -322,7 +330,9 @@ class TeardownReportPathTest {
         return core.query("select status, created_at, modified_at, internal_before::text as internal_before, "
                 + "external_before::text as external_before, internal_after::text as internal_after, "
                 + "external_after::text as external_after from anomaly_reports "
-                + "where code = ? and severity = 'CRITICAL' order by id", code).getLast();
+                + "where " + Trail.BY_ACCOUNT
+                + " and code = ? and severity = 'CRITICAL' order by id",
+                        trail.account(), code).getLast();
     }
 
     private static String path(LoggedRequest request) {

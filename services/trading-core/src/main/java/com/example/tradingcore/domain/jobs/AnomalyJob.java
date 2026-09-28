@@ -16,6 +16,7 @@ import com.example.tradingcore.config.AnomalyJobProperties;
 import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.safety.AccountingDetectors;
 import com.example.tradingcore.domain.safety.AnomalyPassGate;
+import com.example.tradingcore.domain.safety.AnomalyReaction;
 import com.example.tradingcore.domain.safety.AnomalyScan;
 import com.example.tradingcore.domain.safety.AnomalyScanReader;
 import com.example.tradingcore.domain.safety.DealInvariantDetectors;
@@ -25,6 +26,8 @@ import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -83,6 +86,7 @@ public class AnomalyJob {
     private final ExchangeSideDetectors exchangeSideDetectors;
     private final AccountingDetectors accountingDetectors;
     private final DealInvariantDetectors dealInvariantDetectors;
+    private final AnomalyReaction anomalyReaction;
     private final DealOpeningService dealOpeningService;
 
     @Scheduled(cron = "${anomaly-job.cron}")
@@ -120,8 +124,18 @@ public class AnomalyJob {
     /**
      * Наблюдение одного счёта; {@code false} — проход по нему неполон, и
      * детекторы промолчали.
+     *
+     * <p><b>Полный проход прерывает серии гистерезиса, которых не
+     * продлил:</b> признак, не наблюдённый им, подряд уже не держится
+     * (docs/components/AnomalyJob.md §«Такт и гистерезис»). Момент прохода
+     * снимается ДО среза — наблюдения этого прохода его не старше. Отказ
+     * прерывания засчитывается неполнотой: непрерванная серия подтвердила
+     * бы признак, вернувшийся после чистого прохода. Серию предмета,
+     * промолчавшего локально (отказ по инструменту, по сделке, неполный
+     * граф), прерывание тоже гасит — ошибка в сторону задержки, выбор дома.
      */
     private Boolean observe(ExchangeAccount account) {
+        OffsetDateTime passStartedAt = OffsetDateTime.now(ZoneOffset.UTC);
         AnomalyScan scan = scanReader.read(account.getInternalId());
         List<Instrument> contour = instrumentDataService.findContourWithin(account.getExchangeCode(),
                 properties.getContourWindow());
@@ -129,6 +143,7 @@ public class AnomalyJob {
             return false;
         }
         detect(scan, account, contour);
+        anomalyReaction.breakUnobservedSeries(account, passStartedAt);
         return true;
     }
 

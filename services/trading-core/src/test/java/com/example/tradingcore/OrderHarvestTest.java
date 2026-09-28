@@ -332,11 +332,12 @@ class OrderHarvestTest {
     }
 
     /**
-     * Живой риск транша без отдельной защиты и без нашего намерения снятия —
-     * покрытие потеряно: терминал сразу, и история не опрашивается вовсе.
+     * Живой риск транша без отдельной защиты и без нашего намерения снятия,
+     * и ни одна нога разбора записи не дала — покрытие потеряно: терминал,
+     * а не сигнал неопределённого исхода.
      */
     @Test
-    void liveTrancheRiskWithoutAnIntentLosesTheProtectionWithoutAnalysis() {
+    void liveTrancheRiskWithoutAnIntentLosesTheProtectionAfterAnEmptyAnalysis() {
         Order order = order(Order.Status.COMPLETED, Order.CloseReason.FILLED);
         AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.ACTIVE);
         order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
@@ -346,12 +347,41 @@ class OrderHarvestTest {
         when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
                 .thenReturn(fetchedOrder(Order.Status.COMPLETED, "1"));
         when(exchange.getPendingMaterializedProtections(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+        when(exchange.getMaterializedProtectionHistory(any(), any(), any())).thenReturn(List.of());
 
-        orderExecutor.execute(orderCommand(), row(), context(deal));
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
 
         assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.ERROR);
         assertThat(attached.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.PROTECTION_LOST);
-        verify(exchange, never()).getMaterializedProtectionHistory(any(), any(), any());
+        assertThat(result.getHoldSignals()).isEmpty();
+        verify(exchange).getMaterializedProtectionHistory(ACCOUNT, INSTRUMENT, ProtectionHistoryLeg.EFFECTIVE);
+    }
+
+    /**
+     * Защита, сработавшая у площадки, из живых уходит так же, как пропавшая,
+     * а экспозиция транша до наблюдения срабатывания стоит налитой. Разбор
+     * идёт и на этой ветви: сработавший стоп закрыл риск, и потерянным
+     * покрытием он не читается.
+     */
+    @Test
+    void aProtectionTriggeredAtTheVenueIsNotReadAsLostCoverage() {
+        Order order = order(Order.Status.COMPLETED, Order.CloseReason.FILLED);
+        AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.ACTIVE);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        order.setAccumulatedFillSize(new BigDecimal("1"));
+        Deal deal = dealWithLiveExposure(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.COMPLETED, "1"));
+        when(exchange.getPendingMaterializedProtections(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+        when(exchange.getMaterializedProtectionHistory(ACCOUNT, INSTRUMENT, ProtectionHistoryLeg.EFFECTIVE))
+                .thenReturn(List.of(protection(null)));
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.COMPLETED);
+        assertThat(attached.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.TRIGGERED);
+        assertThat(result.getHoldSignals()).isEmpty();
     }
 
     /**

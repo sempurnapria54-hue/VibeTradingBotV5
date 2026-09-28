@@ -4,6 +4,7 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
 import com.example.tradingcore.domain.command.DealActionState;
+import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 
 /**
@@ -37,4 +38,20 @@ public interface StrategyActionExecutor {
     /** Следующая команда действия за проход либо пустой план. */
     ActionPlan next(StrategyStep step, StrategyAction action, DealActionState state,
                     DealContext dealContext, DealTranche tranche);
+
+    /**
+     * Стадия, на которую перевзводится строка {@code RETRY_PENDING},
+     * дождавшаяся времени повтора.
+     *
+     * <p>Умолчание {@code PLANNED} — звено повторяется с начала.
+     * Переопределяет исполнитель, у чьей строки заполненная цель есть факт
+     * пройденной стадии: заведённая нога (повтор с начала прогнал бы её
+     * заново через расчёт и преконтроль, где её собственный плановый риск
+     * уже учтён) либо принятое снятие (повтор с начала слал бы его второй
+     * раз) — docs/lifecycles/DealActionState.md §«Повтор возвращает
+     * исполнение на стадию факта».
+     */
+    default DealActionStateStatus retryStage(DealActionState state) {
+        return DealActionStateStatus.PLANNED;
+    }
 }

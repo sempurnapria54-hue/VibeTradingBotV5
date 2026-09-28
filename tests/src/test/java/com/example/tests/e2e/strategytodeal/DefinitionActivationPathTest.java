@@ -3,6 +3,7 @@ package com.example.tests.e2e.strategytodeal;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
 import java.nio.charset.StandardCharsets;
@@ -56,14 +57,14 @@ class DefinitionActivationPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("e2");
+        trail = SharedStand.dealPath(DefinitionActivationPathTest.class);
         trail.commonPreconditions();
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(DefinitionActivationPathTest.class);
         }
     }
 
@@ -86,21 +87,21 @@ class DefinitionActivationPathTest {
         assertThat(outboxRow(definition, ACTIVATED).get("published_at")).as("E2.1: реле пометило строку").isNotNull();
         List<ConsumerRecord<String, String>> published = recordsOf(eventId);
         assertThat(published).as("E2.1: в теме владельца одна запись события").hasSize(1);
-        assertThat(published.getFirst().key()).as("E2.1: ключ записи — тенант").isEqualTo(Trail.TENANT);
+        assertThat(published.getFirst().key()).as("E2.1: ключ записи — тенант").isEqualTo(trail.tenant());
         Map<String, Object> journal = awaitJournal(eventId);
         assertThat(journal.get("event_type")).isEqualTo(ACTIVATED);
         assertThat(journal.get("strategy_internal_id")).as("E2.1: радиус строки — определение").isEqualTo(definition);
-        assertThat(journal.get("exchange_account_internal_id")).isEqualTo(Trail.ACCOUNT);
+        assertThat(journal.get("exchange_account_internal_id")).isEqualTo(trail.account());
         assertThat(journal.get("instrument_internal_id")).isEqualTo(Trail.INSTRUMENT);
         assertStatisticsSilent("E2.1");
         assertExchangeSilent("E2.1");
-        assertThat(trail.records(Substrate.CORE_TOPIC)).as("E2.1: ядро событий не публикует").isEmpty();
+        assertThat(trail.published(Substrate.CORE_TOPIC)).as("E2.1: ядро событий не публикует").isEmpty();
 
         Map<String, Object> copy = awaitCopy(definition);
         Database core = trail.database(Party.TRADING_CORE);
         assertThat(copy.get("status")).as("E2.1: копия активна").isEqualTo("ACTIVE");
         assertThat(copy.get("exchange_account_id")).as("E2.1: счёт резолвлен в ключ базы ядра")
-                .isEqualTo(keyOf(core, "exchange_accounts", Trail.ACCOUNT));
+                .isEqualTo(keyOf(core, "exchange_accounts", trail.account()));
         assertThat(copy.get("instrument_id")).as("E2.1: инструмент резолвлен в ключ базы ядра")
                 .isEqualTo(keyOf(core, "instruments", Trail.INSTRUMENT));
         assertThat(DefinitionTree.ofCopy(core, definition)).as("E2.1: дерево копии поэлементно равно снимку")
@@ -132,7 +133,7 @@ class DefinitionActivationPathTest {
             assertThat(headers.get("traceContext")).as("E2.2: пустой заголовок не ставится вовсе").isNotBlank();
         }
         Map<String, Object> journal = awaitJournal(eventId);
-        assertThat(journal.get("tenant_id")).as("E2.2: журнал взял тенанта из ключа").isEqualTo(Trail.TENANT);
+        assertThat(journal.get("tenant_id")).as("E2.2: журнал взял тенанта из ключа").isEqualTo(trail.tenant());
         assertThat(journal.get("event_type")).isEqualTo(headers.get("eventType"));
         assertThat(String.valueOf(journal.get("version"))).isEqualTo(headers.get("version"));
         assertThat(journal.get("occurred_at")).as("E2.2: момент прочитан из заголовка").isNotNull();
@@ -155,7 +156,7 @@ class DefinitionActivationPathTest {
         trail.relayOwner();
         awaitJournal(eventId);
         ConsumerRecord<String, String> original = recordsOf(eventId).getFirst();
-        Long ownerOutbox = trail.database(Party.STRATEGIES).count("outbox_events");
+        Long ownerOutbox = trail.rows(Party.STRATEGIES, "outbox_events");
 
         trail.produce(Substrate.STRATEGY_TOPIC, original.key(), original.value(), headersOf(original));
 
@@ -166,7 +167,7 @@ class DefinitionActivationPathTest {
                 () -> trail.committedOffset(CORE_GROUP, Substrate.STRATEGY_TOPIC) >= end);
         assertThat(trail.database(Party.AUDIT).query("select id from audit_records where event_id = ?", eventId))
                 .as("E2.3: строка журнала одна").hasSize(1);
-        assertThat(trail.database(Party.STRATEGIES).count("outbox_events"))
+        assertThat(trail.rows(Party.STRATEGIES, "outbox_events"))
                 .as("E2.3: владелец потребителем не является — его состояние не тронуто").isEqualTo(ownerOutbox);
         assertStatisticsSilent("E2.3");
 
@@ -243,7 +244,9 @@ class DefinitionActivationPathTest {
 
     private static Map<String, Object> outboxRow(String definition, String eventType) {
         List<Map<String, Object>> rows = trail.database(Party.STRATEGIES).query(
-                "select * from outbox_events where event_type = ? and payload ->> 'strategyInternalId' = ?",
+                "select * from outbox_events where "
+                        + Trail.BY_TENANT + " and event_type = ? and payload ->> 'strategyInternalId' = ?",
+                        trail.tenant(),
                 eventType, definition);
         assertThat(rows).as("строка outbox класса " + eventType + " определения " + definition).hasSize(1);
         return rows.getFirst();
@@ -251,7 +254,7 @@ class DefinitionActivationPathTest {
 
     private static String ownerStatusOf(String definition) {
         Trail.Answer answer = trail.call(Party.STRATEGIES, "GET", Trail.STRATEGIES + "/" + definition,
-                Trail.TENANT, null);
+                trail.tenant(), null);
         assertThat(answer.status()).as("чтение определения у владельца — " + answer.body()).isEqualTo(200);
         return String.valueOf(Json.object(answer.body()).get("status"));
     }
@@ -295,7 +298,7 @@ class DefinitionActivationPathTest {
     /** Статистика тему владельца определений не читает: ни фактов, ни пары «группа × тема». */
     private static void assertStatisticsSilent(String label) {
         Database statistics = trail.database(Party.STATISTICS);
-        assertThat(statistics.count("incident_facts")).as(label + ": фактов статистики нет").isZero();
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as(label + ": фактов статистики нет").isZero();
         assertThat(statistics.query("select id from reception_states where topic = ?", Substrate.STRATEGY_TOPIC))
                 .as(label + ": пары с темой владельца определений у статистики нет").isEmpty();
     }

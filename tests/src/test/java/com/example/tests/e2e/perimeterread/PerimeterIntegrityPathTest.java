@@ -4,6 +4,7 @@ import com.example.tests.e2e.Database;
 import com.example.tests.e2e.IdentityStub;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -38,6 +39,7 @@ import static com.example.tests.e2e.perimeterread.StreamTrace.header;
 import static com.example.tests.e2e.perimeterread.StreamTrace.ticket;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -53,6 +55,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code E8.4} повторяет её ходы, {@code E8.5} читает отсутствие выходов.
  * Журналы стабов и доступа не забываются ни разу после подъёма сторон.
  *
+ * <p><b>«За тропу» отсчитывается от подъёма класса:</b> записи тем — от
+ * забывания следов при подъёме ({@link Trail#published(String)}), строки
+ * отказа доступа сняты до первого хода, членства читаются по субъекту класса,
+ * а не по базе целиком — записи и строки прежних классов общего стенда тропе
+ * не принадлежат.
+ *
  * <p><b>Пульс — раз в секунду:</b> ответ открытия подписки приходит с первой
  * записью (находка {@code F-11} ящика периметра), и подписке, по которой
  * факта нет, — у {@code E8.4} их две — ответить иначе нечем.
@@ -66,8 +74,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("E8 — Порядок, отсутствие следов и повтор тропы")
 class PerimeterIntegrityPathTest {
-
-    private static final String SUBJECT = "subject-s1";
 
     private static final String ORDER_DECIDED = "ORDER_DECIDED";
 
@@ -91,6 +97,8 @@ class PerimeterIntegrityPathTest {
             List.of(Party.TRADING_CORE, Party.STRATEGIES, Party.AUDIT, Party.STATISTICS, Party.AUTH);
 
     private static Trail trail;
+
+    private static String subject;
 
     private static String token;
 
@@ -124,13 +132,22 @@ class PerimeterIntegrityPathTest {
 
     private static Integer exchangeAfterPrologue;
 
+    private static final Map<Party, Long> denialsBefore = new EnumMap<>(Party.class);
+
     @BeforeAll
     static void openTrailWithEmptyCache() {
-        trail = Trail.openPerimeter("p12");
+        trail = SharedStand.perimeter(PerimeterIntegrityPathTest.class);
         trail.stop(Party.BFF);
         trail.side(Party.BFF).set(PULSE_KEY, "1s");
         trail.start(Party.BFF);
-        token = trail.identity().browserToken(SUBJECT, "Trader One");
+        subject = Subjects.fresh("subject-s1");
+        token = trail.identity().browserToken(subject, "Trader One");
+        for (Party party : KEEPERS) {
+            Database database = trail.database(party);
+            denialsBefore.put(party, isTrue(database.hasTable("access_denials"))
+                    ? database.count("access_denials")
+                    : 0L);
+        }
     }
 
     @AfterAll
@@ -140,7 +157,7 @@ class PerimeterIntegrityPathTest {
             first.close();
         }
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(PerimeterIntegrityPathTest.class);
         }
     }
 
@@ -149,14 +166,16 @@ class PerimeterIntegrityPathTest {
     @DisplayName("E8.1 — След стороны не появляется раньше причины на предыдущей")
     void e8_1_aTraceNeverPrecedesItsCauseOnThePreviousSide() {
         Database auth = trail.database(Party.AUTH);
-        assertThat(auth.count("tenants")).as("E8.1: до запроса контекста тенантов у владельца нет").isZero();
-        assertThat(auth.count("memberships")).as("E8.1: и членств нет").isZero();
+        assertThat(membershipsOf(subject)).as("E8.1: до запроса контекста членств у субъекта нет").isEmpty();
+        Long tenants = auth.count("tenants");
 
         Answer context = viaPerimeter("GET", CONTEXT, null);
 
         assertThat(context.status()).as("E8.1: контекст выведен — " + context.body()).isEqualTo(200);
-        assertThat(auth.count("tenants")).as("E8.1: после контекста тенант заведён").isEqualTo(1L);
-        assertThat(auth.count("memberships")).as("E8.1: и членство").isEqualTo(1L);
+        assertThat(auth.count("tenants")).as("E8.1: после контекста тенант заведён").isEqualTo(tenants + 1);
+        assertThat(membershipsOf(subject)).as("E8.1: и членство субъекта в нём").hasSize(1)
+                .allSatisfy(membership -> assertThat(membership.get("tenant_id"))
+                        .isEqualTo(Json.object(context.body()).get("tenantId")));
 
         prologue = Prologue.walkToOpenDeal(trail, token);
         awaitPerimeterCaughtUp();
@@ -177,8 +196,8 @@ class PerimeterIntegrityPathTest {
         exchangeBeforeFactMove = trail.exchange().requests().size();
 
         trail.entrySubmitted();
-        List<Map<String, Object>> outbox = trail.database(Party.TRADING_CORE).query(
-                "select event_id, published_at from outbox_events where event_type = ?", ORDER_DECIDED);
+        List<Map<String, Object>> outbox = trail.database(Party.TRADING_CORE).query("select event_id, published_at"
+                + " from outbox_events where event_type = ? and " + Trail.BY_TENANT, ORDER_DECIDED, prologue.tenant());
         assertThat(outbox).as("E8.1: проход завёл строку outbox решения о заявке").hasSize(1);
         orderEvent = String.valueOf(outbox.getFirst().get("event_id"));
         assertThat(outbox.getFirst().get("published_at")).as("E8.1: до тика реле она не опубликована").isNull();
@@ -292,6 +311,7 @@ class PerimeterIntegrityPathTest {
     void e8_4_replayingTheWholeTrailYieldsTheSameState() {
         Map<String, List<String>> before = snapshot();
         Long outbox = trail.database(Party.TRADING_CORE).count("outbox_events");
+        Long tenants = trail.database(Party.AUTH).count("tenants");
 
         Answer context = viaPerimeter("GET", CONTEXT, null);
         String secondTicket = ticket(trail, token);
@@ -306,8 +326,8 @@ class PerimeterIntegrityPathTest {
                 .isEqualTo(200);
         assertThat(Json.object(context.body()).get("tenantId")).isEqualTo(prologue.tenant());
         assertThat(trail.database(Party.AUTH).count("tenants")).as("E8.4: второго тенанта не завелось")
-                .isEqualTo(1L);
-        assertThat(trail.database(Party.AUTH).count("memberships")).as("E8.4: членств столько же").isEqualTo(1L);
+                .isEqualTo(tenants);
+        assertThat(membershipsOf(subject)).as("E8.4: членств у субъекта столько же").hasSize(1);
         assertThat(second.status()).as("E8.4: вторая подписка открыта в пределах потолка").isEqualTo(200);
         assertThat(again.status()).as("E8.4: прежний билет не отменён и в пределах срока годен").isEqualTo(200);
         assertThat(first.isOpen()).as("E8.4: первая подписка жива").isTrue();
@@ -334,19 +354,21 @@ class PerimeterIntegrityPathTest {
         }
         List<ConsumerRecord<String, String>> unpublished = new ArrayList<>();
         for (String topic : List.of(Substrate.CORE_TOPIC, Substrate.STRATEGY_TOPIC)) {
-            trail.records(topic).stream()
+            trail.published(topic).stream()
                     .filter(record -> isFalse(published.contains(header(record, "eventId"))))
                     .forEach(unpublished::add);
         }
-        assertThat(unpublished).as("E8.5: каждая запись тем — строка outbox производителя; сверх — только "
-                        + "первый факт ряда, положенный прошлыми сутками")
+        assertThat(unpublished).as("E8.5: каждая запись тем, легшая за тропу, — строка outbox производителя; "
+                        + "сверх — только первый факт ряда, положенный прошлыми сутками")
                 .singleElement()
                 .satisfies(record -> assertThat(OffsetDateTime.parse(header(record, "occurredAt")).toLocalDate())
                         .isBefore(LocalDate.now(ZoneOffset.UTC)));
-        assertThat(trail.database(Party.AUTH).query("select datname from pg_database where datname like 'p12\\_%'"))
+        assertThat(trail.database(Party.AUTH).query("select datname from pg_database where datname like ?",
+                        trail.name() + "\\_%"))
                 .as("E8.5: своей базы у периметра нет — баз ровно столько, сколько владельцев")
                 .extracting(row -> String.valueOf(row.get("datname")))
-                .containsExactlyInAnyOrder("p12_core", "p12_strategies", "p12_audit", "p12_statistics", "p12_auth");
+                .containsExactlyInAnyOrderElementsOf(KEEPERS.stream().map(owner -> trail.database(owner).name())
+                        .toList());
         assertThat(ownerCalls()).as("E8.5: каждый вызов владельцу под токеном браузера имеет входящий вызов "
                 + "периметра, его породивший").isEqualTo(perimeterForwards());
         assertThat(trail.database(Party.TRADING_CORE).hasTable("audit_records")
@@ -370,12 +392,14 @@ class PerimeterIntegrityPathTest {
                 .as("E8.5: команды площадке — ровно плечо и постановка входа пролога; торговых команд тропы нет")
                 .containsExactly(Trail.EXCHANGE_LEVERAGE, Trail.EXCHANGE_ORDER);
         assertThat(trail.database(Party.AUDIT).count("access_denials"))
-                .as("E8.5: у журнала одна строка отказа — от E2.6").isEqualTo(1L);
+                .as("E8.5: у журнала за тропу одна строка отказа — от E2.6")
+                .isEqualTo(denialsBefore.get(Party.AUDIT) + 1);
         for (Party party : List.of(Party.TRADING_CORE, Party.STRATEGIES, Party.STATISTICS, Party.AUTH)) {
             Database database = trail.database(party);
             if (database.hasTable("access_denials")) {
                 assertThat(database.count("access_denials")).as("E8.5: у " + party.module()
-                        + " строк отказа нет — отвергнутые периметром вызовы до владельцев не дошли").isZero();
+                        + " строк отказа за тропу нет — отвергнутые периметром вызовы до владельцев не дошли")
+                        .isEqualTo(denialsBefore.get(party));
             }
         }
     }
@@ -427,7 +451,7 @@ class PerimeterIntegrityPathTest {
         try {
             assertThat(trail.callWith("", Party.BFF, "GET", journalPath(), null, null).status())
                     .as("E8.5: чтение без токена отвергнуто периметром").isEqualTo(401);
-            assertThat(trail.callWith(foreign.browserToken(SUBJECT, "Trader One"), Party.BFF, "GET", journalPath(),
+            assertThat(trail.callWith(foreign.browserToken(subject, "Trader One"), Party.BFF, "GET", journalPath(),
                     null, null).status()).as("E8.5: чтение чужой подписью отвергнуто периметром").isEqualTo(401);
             assertThat(viaPerimeter("GET", "/api/v1/bff/stream?ticket=forged-ticket", null).status())
                     .as("E8.5: подделанный билет отвергнут периметром").isEqualTo(401);
@@ -490,6 +514,10 @@ class PerimeterIntegrityPathTest {
         String call = request.getMethod().getName() + " " + request.getUrl();
         return Set.of("GET " + Trail.PEER_INSTRUMENTS, "GET " + Trail.PEER_INSTRUMENTS + "/" + Trail.INSTRUMENT
                 + "/rules", "POST " + Trail.PEER_FEATURES).contains(call);
+    }
+
+    private static List<Map<String, Object>> membershipsOf(String member) {
+        return trail.database(Party.AUTH).query("select * from memberships where user_id = ?", member);
     }
 
     private static void mark(Map<Party, Integer> marks) {

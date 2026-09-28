@@ -6,10 +6,10 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
+import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.model.PairCheck;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
-import com.example.tradingcore.persistence.service.DealTrancheDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
@@ -49,7 +49,7 @@ public class TradingSurfaceService {
     private static final Integer DEAL_WINDOW = 100;
 
     private final DealDataService dealDataService;
-    private final DealTrancheDataService dealTrancheDataService;
+    private final DealContextService dealContextService;
     private final ExchangeAccountDataService exchangeAccountDataService;
     private final InstrumentDataService instrumentDataService;
     private final AccountInstrumentStateDataService accountInstrumentStateDataService;
@@ -70,10 +70,19 @@ public class TradingSurfaceService {
         return dealDataService.findRecentOnAccount(exchangeAccountId, DEAL_WINDOW);
     }
 
-    /** Одна сделка со своими траншами, уложенными в сам агрегат. */
+    /**
+     * Одна сделка со своими траншами, уложенными в сам агрегат.
+     *
+     * <p><b>Граф собирается тем же ходом, что у прохода</b>, а не чтением
+     * строк траншей: экспозиция транша — производная его ног и приписанного
+     * ему закрытия уровня сделки, и колонкой её нет
+     * (docs/models/domain/aggregate/DealTranche.md §«Экспозиция транша»).
+     * Транш, чью экспозицию погасило одно закрытие на всю сделку, без
+     * четвёртого слагаемого отдавался бы налитым объёмом.
+     */
     public Deal getDeal(String internalId) {
         Deal deal = dealDataService.getRequiredByInternalId(internalId);
-        deal.setTranches(dealTrancheDataService.findByDealId(deal.getId()));
+        dealContextService.reloadRuntimeGraph(deal);
         return deal;
     }
 

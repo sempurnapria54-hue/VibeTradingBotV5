@@ -3,10 +3,12 @@ package com.example.tests.e2e.perimeterread;
 import com.example.tests.e2e.IdentityStub;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
@@ -37,8 +39,6 @@ import static org.assertj.core.api.Assertions.tuple;
 @DisplayName("E2 — Чтение и команда через периметр у настоящего владельца")
 class OwnerReadPathTest {
 
-    private static final String SUBJECT = "subject-s1";
-
     private static final String INSTRUMENTS = "/api/v1/market-data/instruments";
 
     private static final String FEATURES = INSTRUMENTS + "/" + Trail.INSTRUMENT + "/features";
@@ -58,8 +58,8 @@ class OwnerReadPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.openPerimeter("p2");
-        token = trail.identity().browserToken(SUBJECT, "Trader One");
+        trail = SharedStand.perimeter(OwnerReadPathTest.class);
+        token = trail.identity().browserToken(Subjects.fresh("subject-s1"), "Trader One");
         Answer context = viaPerimeter("GET", "/api/v1/bff/context", null);
         assertThat(context.status()).as("предусловие — состояние E1.1: " + context.body()).isEqualTo(200);
         tenant = String.valueOf(Json.object(context.body()).get("tenantId"));
@@ -68,7 +68,7 @@ class OwnerReadPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(OwnerReadPathTest.class);
         }
     }
 
@@ -163,15 +163,16 @@ class OwnerReadPathTest {
                   "globalConsecutiveLossLimit": 4
                 }
                 """;
+        List<Object> before = appetiteOwners();
         trail.forgetTraces();
 
         Answer answer = viaPerimeter("PUT", Trail.CORE + "/risk-appetites/" + tenant, body);
 
         assertThat(answer.status()).as("E2.8: команда принята владельцем — " + answer.body()).isEqualTo(200);
-        List<Map<String, Object>> rows = trail.database(Party.TRADING_CORE)
-                .query("select tenant_internal_id from tenant_risk_appetites");
-        assertThat(rows).as("E2.8: строка риск-аппетита принадлежит именно этому тенанту, чужому не завелось")
-                .extracting(row -> row.get("tenant_internal_id")).containsExactly(tenant);
+        List<Object> added = new ArrayList<>(appetiteOwners());
+        before.forEach(added::remove);
+        assertThat(added).as("E2.8: строка риск-аппетита завелась именно этому тенанту, чужому не завелось")
+                .containsExactly(tenant);
         List<Side.Access> core = trail.accesses(Party.TRADING_CORE);
         assertThat(core).as("E2.8: глагол и путь ушли владельцу как есть, повтора нет ни одного")
                 .extracting(Side.Access::method, Side.Access::path)
@@ -208,6 +209,18 @@ class OwnerReadPathTest {
 
     private static Answer viaPerimeter(String method, String path, String body) {
         return trail.callWith(token, Party.BFF, method, path, null, body);
+    }
+
+    /**
+     * Тенанты строк риск-аппетита у ядра — все, а не условием тенанта: условие
+     * над выборкой, чей ассерт — сам тенант, сделало бы его тавтологией.
+     * Стенд общий, и строки прежних классов разводит разность до и после хода.
+     */
+    private static List<Object> appetiteOwners() {
+        return trail.database(Party.TRADING_CORE).query("select tenant_internal_id from tenant_risk_appetites")
+                .stream()
+                .map(row -> row.get("tenant_internal_id"))
+                .toList();
     }
 
     private static void restart(Party party, String issuer) {

@@ -2,6 +2,7 @@ package com.example.tests.e2e.safetyteardown;
 
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
 import com.example.tests.e2e.exitandclose.ExitTrail;
@@ -35,6 +36,7 @@ import static com.example.tests.e2e.safetyteardown.TeardownTrail.exchangeAcknowl
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.halt;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.outbox;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.passUntilEmergencyClosed;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.payload;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.recoverAfterCascade;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.safetyState;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.standAtObservation;
@@ -57,8 +59,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code E3.6} — на своём, с закрытием, которое площадка не исполняет.
  *
  * <p><b>Клетка {@code E3.1} здесь не написана:</b> её предусловие — две
- * активные сделки на разных инструментах. <b>{@code E3.4} — красное ожидание</b>
- * (метка {@code debt}, находка {@code F7} документа).
+ * активные сделки на разных инструментах одного счёта — недостижимо, тем же
+ * доводом, что у {@code E2.5}.
  */
 @Tag("e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -73,7 +75,7 @@ class TeardownCascadePathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("t3");
+        trail = SharedStand.dealPath(TeardownCascadePathTest.class);
         trail.side(Party.TRADING_CORE).set(MIN_AGE, "0s");
         trail.renew(Party.TRADING_CORE);
     }
@@ -81,7 +83,7 @@ class TeardownCascadePathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TeardownCascadePathTest.class);
         }
     }
 
@@ -98,7 +100,9 @@ class TeardownCascadePathTest {
 
         Database core = trail.database(Party.TRADING_CORE);
         Map<String, Object> report = core.query("select created_at, modified_at, status from anomaly_reports "
-                + "where code = ? and severity = 'CRITICAL'", FOREIGN_ORDER).getFirst();
+                + "where " + Trail.BY_ACCOUNT
+                + " and code = ? and severity = 'CRITICAL'",
+                        trail.account(), FOREIGN_ORDER).getFirst();
         assertThat(report.get("status")).as("E3.3: снятие подтверждено — отчёт терминален").isEqualTo("COMPLETED");
         List<LoggedRequest> journal = trail.exchange().requests();
         Instant firstCommand = journal.stream()
@@ -148,19 +152,17 @@ class TeardownCascadePathTest {
     }
 
     /**
-     * Красна последним ожиданием — находка {@code F7} документа: шаг прохода
-     * затребует только ребро энфорсмента, обработчик ошибочного состояния
-     * команд не шлёт, и живая позиция сделки, ставшей активной после каскада,
-     * под жёсткой ступенью не снимается никем.
+     * Снятие риска восстановленной сделки гоняет проход, применивший ребро
+     * энфорсмента, а не второй прогон реакции: каскад её не видит, повтор
+     * реакции поглощает анкер (находка {@code F7} документа закрыта).
      */
     @Test
     @Order(3)
-    @Tag("debt")
     @DisplayName("E3.4 — Сделка, ставшая активной после каскада, подбирается шагом прохода")
     void e3_4_aDealBecomingActiveAfterTheCascadeIsPickedByThePass() {
         String recovered = recoverAfterCascade(trail);
         Integer raised = outbox(trail, HOLD_RAISED).size();
-        Integer reported = outbox(trail, ANOMALY_REPORTED).size();
+        Long reported = reactionReports(trail);
         trail.forgetTraces();
 
         trail.passUntil("E3.4: восстановленная сделка уведена в ошибочное состояние",
@@ -176,7 +178,7 @@ class TeardownCascadePathTest {
         assertThat(shutdown).as("E3.4: строка outbox остановки по ней одна").hasSize(1);
         awaitJournalRow(trail, shutdown.getFirst().get("event_id"));
         assertThat(outbox(trail, HOLD_RAISED)).as("E3.4: второго прогона реакции ступени нет").hasSize(raised);
-        assertThat(outbox(trail, ANOMALY_REPORTED)).as("E3.4: и отчёта реакции тоже").hasSize(reported);
+        assertThat(reactionReports(trail)).as("E3.4: и отчёта реакции тоже").isEqualTo(reported);
         assertThat(trail.exchange().requests(ExitTrail.CLOSE_POSITION))
                 .as("E3.4: снятие риска по ней гоняется проходом").isNotEmpty();
     }
@@ -224,7 +226,7 @@ class TeardownCascadePathTest {
         trail.relayCore();
         assertThat(dealStatus(trail, unconfirmed)).as("предусловие E3.6: состояние E3.1").isEqualTo("ERROR");
         ExitTrail.exchangeKeepsBills(trail, System.currentTimeMillis(), "0", "");
-        Long dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
+        Long dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
         trail.forgetTraces();
 
         trail.orchestrate();
@@ -237,8 +239,19 @@ class TeardownCascadePathTest {
         assertThat(trail.exchange().requests().stream()
                 .filter(request -> Objects.equals("GET", request.getMethod().getName())))
                 .as("E3.6: к стабу ушли чтения добычи фактов").isNotEmpty();
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E3.6: сделочного факта нет")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E3.6: сделочного факта нет")
                 .isEqualTo(dealFacts);
+    }
+
+    /**
+     * Отчёты реакции — критичные: снятая сделка доходит до аварийного
+     * терминала, и некритичные журнальные строки её терминала прогоном реакции
+     * не являются.
+     */
+    private static Long reactionReports(Trail trail) {
+        return outbox(trail, ANOMALY_REPORTED).stream()
+                .filter(row -> Objects.equals("CRITICAL", payload(row).path("severity").asString()))
+                .count();
     }
 
     private static Instant moment(Object column) {

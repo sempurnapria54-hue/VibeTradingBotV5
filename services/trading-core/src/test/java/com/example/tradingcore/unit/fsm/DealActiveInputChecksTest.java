@@ -1,9 +1,11 @@
 package com.example.tradingcore.unit.fsm;
 
 import static com.example.tradingcore.unit.fsm.FsmFixture.TRANCHE_ID;
+import static com.example.tradingcore.unit.fsm.FsmFixture.attachedProtection;
 import static com.example.tradingcore.unit.fsm.FsmFixture.contextBuilder;
 import static com.example.tradingcore.unit.fsm.FsmFixture.deal;
 import static com.example.tradingcore.unit.fsm.FsmFixture.exposed;
+import static com.example.tradingcore.unit.fsm.FsmFixture.filledEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.livePosition;
 import static com.example.tradingcore.unit.fsm.FsmFixture.tranche;
@@ -12,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
@@ -73,6 +76,19 @@ class DealActiveInputChecksTest {
     void u7_10_aLiveLegIsObservedBeforeThePosition() {
         DealTranche tranche = exposedTranche("1");
         tranche.getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
+        DealContext context = contextOf(tranche, livePosition("2"));
+
+        assertReobserved(context, ServiceCommandType.REFRESH_ORDER_COMMAND,
+                ServiceCommandType.REFRESH_POSITION_COMMAND);
+    }
+
+    @Test
+    @DisplayName("U7.12 — расхождение при налитой ноге с живой встроенной защитой: носитель добывается до позиции")
+    void u7_12_aFilledCarrierOfALiveProtectionIsObservedBeforeThePosition() {
+        DealTranche tranche = exposedTranche("1");
+        Order carrier = filledEntryLeg(30L, TRANCHE_ID, "1");
+        carrier.getAttachedAlgoOrders().add(attachedProtection(60L, "1"));
+        tranche.getOrders().add(carrier);
         DealContext context = contextOf(tranche, livePosition("2"));
 
         assertReobserved(context, ServiceCommandType.REFRESH_ORDER_COMMAND,
@@ -145,6 +161,24 @@ class DealActiveInputChecksTest {
         assertThat(transition.getHoldSignal()).isNull();
         assertThat(transition.hasCommands()).isFalse();
         assertThat(transition.movesStatus()).isFalse();
+    }
+
+    /**
+     * Восстановленная сделка до первой добычи позиции: заявок у транша нет,
+     * строки эпизода нет — сверка нулевая с обеих сторон при любом живом
+     * риске. Проход добывает позицию и каскада не гонит: иначе транш уходит
+     * в выход по нулевой экспозиции, а его терминал матрица отвергает на
+     * неполном графе навсегда (находки {@code F13} и {@code F9} сквозного
+     * набора).
+     */
+    @Test
+    @DisplayName("Восстановленная сделка без строки эпизода: добыча позиции, каскад не идёт")
+    void aRecoveredDealWithoutAnEpisodeObservesThePositionFirst() {
+        Deal recovered = deal(Deal.Status.ACTIVE, tranche(TRANCHE_ID, DealTranche.Status.MANAGING));
+        recovered.setEntryReason(Deal.EntryReason.RECOVERY);
+        DealContext context = contextBuilder(recovered).strategyDetail(null).graphComplete(Boolean.FALSE).build();
+
+        assertReobserved(context, ServiceCommandType.REFRESH_POSITION_COMMAND);
     }
 
     // --- сборка ------------------------------------------------------------

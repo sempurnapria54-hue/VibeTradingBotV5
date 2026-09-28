@@ -1,7 +1,6 @@
 package com.example.tradingcore.domain.command.executor;
 
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -39,8 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
  * (docs/components/SubmitOrderExecutor.md).
  *
  * <p><b>Восстановимость:</b> упади приложение после отправки, но до
- * сохранения внешнего идентификатора, следующая отправка найдёт заявку по
- * клиентскому идентификатору. Подтверждение приёма состоянием не считается
+ * сохранения внешнего идентификатора, либо оборвись ответ, следующая
+ * отправка найдёт заявку по клиентскому идентификатору. Подтверждение приёма состоянием не считается
  * (docs/rules/ack-not-runtime-truth.md): факт подтверждает добыча.
  */
 @Component
@@ -69,8 +68,7 @@ public class SubmitOrderExecutor implements CommandExecutor {
         }
         String accountInternalId = dealContext.getExchangeAccount().getInternalId();
         Instrument instrument = dealContext.getInstrument();
-        if (isBlank(order.getExternalId())
-                && isFalse(recoverByClientId(order, accountInternalId, instrument, actionState))) {
+        if (isBlank(order.getExternalId()) && isFalse(recoverByClientId(order, accountInternalId, instrument))) {
             if (isFalse(ensureLeverage(order, dealContext, accountInternalId, instrument))) {
                 return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR,
                         "Leverage is not assigned for the account on instrument " + instrument.getExternalId());
@@ -101,16 +99,19 @@ public class SubmitOrderExecutor implements CommandExecutor {
     }
 
     /**
-     * Только перед ПОВТОРНОЙ отправкой ищем заявку по стабильному
-     * клиентскому идентификатору: предыдущая постановка могла реально
-     * пройти, даже если ответ не получен. Найдена — восстанавливаем факт
-     * отправки и второй раз не шлём.
+     * Перед ВСЯКОЙ отправкой ноги без биржевого идентификатора ищем её по
+     * стабильному клиентскому идентификатору: предыдущая постановка могла
+     * реально пройти, даже если ответ не получен. Найдена — восстанавливаем
+     * факт отправки и второй раз не шлём; не найдена — отправляем.
+     *
+     * <p><b>Условие — пустой биржевой идентификатор, а не счётчик
+     * попыток.</b> Прежняя редакция искала только на повторе, а молчание
+     * коннектора строку не трогает: следующий проход приходил к отправке с
+     * нулём попыток, и постановка, дошедшая до площадки при оборванном
+     * ответе, уходила второй раз тем же клиентским идентификатором
+     * (docs/components/SubmitOrderExecutor.md §«Что делает»).
      */
-    private Boolean recoverByClientId(Order order, String accountInternalId, Instrument instrument,
-                                      DealActionState actionState) {
-        if (isFalse(isRetry(actionState))) {
-            return false;
-        }
+    private Boolean recoverByClientId(Order order, String accountInternalId, Instrument instrument) {
         Order existing = exchangeOperationsClient.getOrder(accountInternalId, instrument.getExternalId(),
                 null, order.getInternalId());
         if (isNull(existing) || isBlank(existing.getExternalId())) {
@@ -205,10 +206,5 @@ public class SubmitOrderExecutor implements CommandExecutor {
                     "Leverage rejected for instrument " + instrument.getExternalId() + ": " + ack.getMessage());
         }
         return true;
-    }
-
-    private Boolean isRetry(DealActionState actionState) {
-        return nonNull(actionState) && nonNull(actionState.getAttemptCount())
-                && actionState.getAttemptCount() > 0;
     }
 }

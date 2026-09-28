@@ -83,6 +83,14 @@
 # (.claude/skills/session-chain.md §«Лента хода сессии в консоли»). Прогоны
 # обёртки поэтому не идут параллельно — второй опустошил бы лог первого.
 #
+# ДЛИТЕЛЬНОСТЬ ПОЛНОГО РЕАКТОРА — строкой `target/reactor-full.last`
+# («<эпоха конца> <секунды> <исход>»), переписываемой каждым полным прогоном,
+# зелёным или красным; прогон, отказавший «не измерялось», её не пишет — его
+# секунды не цена реактора. По ней сессия цикла решает, помещается ли полный
+# реактор в остаток её времени (.claude/rules/session-work-unit.md §«Бюджет
+# прогонов сессии»); лог для этого не годится — его перезаписывает и режим
+# модулей. Режимы модулей и классов строку не трогают.
+#
 # Каталоги `target/classes` и `target/test-classes` всех модулей реактора
 # СНОСЯТСЯ перед прогоном: плагин `clean` в офлайне не резолвится, а без
 # сноса ось 1 срабатывала бы на каждом втором запуске и мерить было бы
@@ -549,6 +557,7 @@ if [ -n "$MODULES" ]; then
   rm -f "$EXCLUDES"
   VERDICT="$(analyze_log "$LOG" "$(grep -cE '^\[INFO\] -+\[ pom \]-+$' "$LOG")")"
 else
+  FULL_STARTED="$(date +%s)"
   JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-verify} \
       -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
   MVN_CODE=$?
@@ -556,6 +565,9 @@ else
 fi
 
 OUTCOME="$(decide "$VERDICT" "$MVN_CODE")"
+if [ -z "$MODULES" ] && { [ "$OUTCOME" = "GREEN" ] || [ "$OUTCOME" = "RED" ]; }; then
+  printf '%s %s %s\n' "$(date +%s)" "$(( $(date +%s) - FULL_STARTED ))" "$OUTCOME" > "$REPO_ROOT/target/reactor-full.last"
+fi
 case "$OUTCOME" in
   VACUUM)
     echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: в логе есть «Nothing to compile» — часть дерева не компилировалась; лог: $LOG"

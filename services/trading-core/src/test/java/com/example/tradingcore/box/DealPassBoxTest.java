@@ -315,23 +315,17 @@ class DealPassBoxTest extends SharedLiveDealBox {
         if (ordersOfDeal().isEmpty()) {
             tick(Tick.DEAL_ORCHESTRATOR);
         }
-        List<Map<String, Object>> legs = ordersOfDeal();
-        assertThat(legs).hasSize(2);
-        // Площадка отказывает команде ПЕРВОГО транша повторяемым классом и
-        // принимает всё, что придёт после. Второй к ней уходит нога ВТОРОГО
-        // транша: первый ждёт отката повтора, второй — нет.
-        connector.answersInTurn(placementPath(ACCOUNT), List.of(502, 200, 200), List.of(
-                Feed.peerFailure("EXCHANGE_UNREACHABLE"),
-                Feed.ack(legExternalId(1), String.valueOf(legs.get(1).get("internal_id"))),
-                Feed.ack(legExternalId(0), String.valueOf(legs.get(0).get("internal_id")))));
+        // Риск-создающий вход решается один на сделку за проход: нога первого
+        // транша заведена, второй заводит свою следующим проходом — тем же,
+        // что отправляет ногу первого. У каждого транша своя команда.
+        List<Map<String, Object>> first = ordersOfDeal();
+        assertThat(first).hasSize(1);
+        // Площадка отказывает отправке ПЕРВОГО транша повторяемым классом.
+        connector.answersInTurn(placementPath(ACCOUNT), List.of(502),
+                List.of(Feed.peerFailure("EXCHANGE_UNREACHABLE")));
         // Поиск без биржевого идентификатора — восстановление повторной
         // отправки — не находит ничего: первая отправка до площадки не дошла.
-        // Принятая нога находится живой.
         connector.answers(lookupPath(ACCOUNT), Feed.absent());
-        for (int index = 0; index < legs.size(); index++) {
-            connector.answersWhen(lookupPath(ACCOUNT), "externalId", legExternalId(index),
-                    Feed.order(legExternalId(index), String.valueOf(legs.get(index).get("internal_id")), "ACTIVE"));
-        }
         connector.answers(pendingPath(ACCOUNT), Feed.emptyArray());
         connector.answers(historyPath(ACCOUNT), Feed.emptyArray());
         // Налива нет, позиции тоже: добыча отправленного входа наблюдает её
@@ -341,11 +335,28 @@ class DealPassBoxTest extends SharedLiveDealBox {
 
         tick(Tick.DEAL_ORCHESTRATOR);
 
-        // Команда второго транша в этом проходе не уходила: к площадке одна
-        // отправка — отказанная. Переход не применён, статусы прежние.
+        // Команда второго транша в этом проходе не исполнялась: его нога не
+        // заведена, к площадке одна отправка — отказанная. Переход не
+        // применён, статусы прежние.
         assertThat(connector.requests(placementPath(ACCOUNT))).hasSize(1);
+        assertThat(ordersOfDeal()).hasSize(1);
         assertThat(tranchesOfDeal().stream().map(row -> row.get("status")).toList())
                 .isEqualTo(statusesBefore);
+
+        // Следующий проход заводит ногу второго транша: первый ждёт отката
+        // повтора, второй — нет. Площадка принимает всё, что придёт после
+        // отказа: второй к ней уходит нога ВТОРОГО транша, третьей — повтор
+        // первой; принятые ноги находятся живыми.
+        passesUntil(() -> ordersOfDeal().size() >= 2 || Objects.equals("ERROR", dealStatus()));
+        List<Map<String, Object>> legs = ordersOfDeal();
+        assertThat(legs).hasSize(2);
+        connector.answersInTurn(placementPath(ACCOUNT),
+                Feed.ack(legExternalId(1), String.valueOf(legs.get(1).get("internal_id"))),
+                Feed.ack(legExternalId(0), String.valueOf(legs.get(0).get("internal_id"))));
+        for (int index = 0; index < legs.size(); index++) {
+            connector.answersWhen(lookupPath(ACCOUNT), "externalId", legExternalId(index),
+                    Feed.order(legExternalId(index), String.valueOf(legs.get(index).get("internal_id")), "ACTIVE"));
+        }
 
         // Следующие проходы подбирают оба транша: обе ноги уходят к
         // площадке, сделка остаётся в штатном ведении
@@ -361,10 +372,12 @@ class DealPassBoxTest extends SharedLiveDealBox {
     void aFailureOnOneDealDoesNotCancelThePassOverTheOthers() {
         List<String> instruments = pairs(2);
         openDeals(instruments);
-        // Сборка контекста первой сделки роняется: связку фич её
-        // инструмента владелец не отдаёт.
-        marketData.answers(featuresPath(instruments.getFirst()), 503,
-                Feed.peerFailure(PEER_SERVICE_UNAVAILABLE));
+        // Сборка контекста первой сделки роняется: владелец отвергает чтение
+        // фич её инструмента как негодный запрос — наш дефект. Недоступность
+        // соседа сюда не годится: её реакция — пропуск прохода, а не
+        // перехват (B3.9).
+        marketData.answers(featuresPath(instruments.getFirst()), 400,
+                Feed.peerFailure(INVALID_REQUEST));
         Integer mark = AppLog.mark();
 
         tick(Tick.DEAL_ORCHESTRATOR);
@@ -388,8 +401,8 @@ class DealPassBoxTest extends SharedLiveDealBox {
     void theLoopInterceptorWritesNoShutdownReason() {
         List<String> instruments = pairs(2);
         openDeals(instruments);
-        marketData.answers(featuresPath(instruments.getFirst()), 503,
-                Feed.peerFailure(PEER_SERVICE_UNAVAILABLE));
+        marketData.answers(featuresPath(instruments.getFirst()), 400,
+                Feed.peerFailure(INVALID_REQUEST));
 
         tick(Tick.DEAL_ORCHESTRATOR);
 

@@ -3,6 +3,7 @@ package com.example.tests.e2e.exitandclose;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
@@ -114,7 +115,7 @@ class ExitJournalPathTest {
 
     @BeforeAll
     static void walkTheTrailToTheTerminal() {
-        trail = Trail.open("x6");
+        trail = SharedStand.dealPath(ExitJournalPathTest.class);
         trail.factSeriesStartedYesterday();
         dealFactSeriesStartedYesterday(trail);
         trail.side(Party.TRADING_CORE).set(EXPLORATORY, "false");
@@ -130,7 +131,7 @@ class ExitJournalPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(ExitJournalPathTest.class);
         }
     }
 
@@ -149,7 +150,8 @@ class ExitJournalPathTest {
                 + "where event_type = 'STRATEGY_DELETED' and payload ->> 'strategyInternalId' = ?", definition)
                 .getFirst().get("event_id"));
         List<Map<String, Object>> rows = audit.query("select event_id, event_type, tenant_id, deal_internal_id, "
-                + "strategy_internal_id from audit_records where occurred_at >= ? order by occurred_at, id",
+                + "strategy_internal_id from audit_records where "
+                        + Trail.BY_TENANT + " and occurred_at >= ? order by occurred_at, id", trail.tenant(),
                 initiatedAt);
         assertThat(rows).as("E6.1: строки отрезка — удаление, остановка и терминал, в порядке ходов тропы")
                 .extracting(row -> row.get("event_type"))
@@ -237,7 +239,7 @@ class ExitJournalPathTest {
     @Order(4)
     @DisplayName("E6.4 — Пересчёт даёт строку сделочного зерна с суммами тропы, а второй такт — те же числа")
     void e6_4_theRecomputeGivesTheDealGrainRowAndASecondTickTheSameNumbers() {
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         Trail.await("E6.4: строка сделочного зерна собрана тактом", () -> nonNull(ourRow()));
 
@@ -271,7 +273,7 @@ class ExitJournalPathTest {
                     .isEqualByComparingTo(firstRow.path(field).decimalValue());
         }
         assertThat(dealRows()).as("E6.4: и то же число строк").hasSize(rowCount);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E6.4: строк журнала такт не трогает")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E6.4: строк журнала такт не трогает")
                 .isEqualTo(journal);
     }
 
@@ -299,7 +301,8 @@ class ExitJournalPathTest {
                 .as("E6.6: смещения групп сошлись с концом темы и друг с другом")
                 .isEqualTo(trail.committedOffset(STATISTICS_GROUP, Substrate.CORE_TOPIC))
                 .isEqualTo(trail.endOffset(Substrate.CORE_TOPIC));
-        assertThat(trail.database(Party.TRADING_CORE).query("select id from outbox_events where published_at is null"))
+        assertThat(trail.database(Party.TRADING_CORE).query("select id from outbox_events where "
+                + Trail.BY_TENANT + " and published_at is null", trail.tenant()))
                 .as("E6.6: неопубликованных строк outbox не осталось").isEmpty();
     }
 
@@ -322,11 +325,12 @@ class ExitJournalPathTest {
         assertThat(row.get("result_profit_currency")).as("E6.5: валюта результата пуста").isNull();
         assertThat(row.get("status")).as("E6.5: штатное ребро закрыто — сделка ушла аварийным терминалом")
                 .isEqualTo("EMERGENCY_CLOSED");
-        assertThat(core.query("select code from anomaly_reports")).as("E6.5: заведён журнальный отчёт").isNotEmpty();
+        assertThat(core.query("select code from anomaly_reports where "
+                + Trail.BY_ACCOUNT, trail.account())).as("E6.5: заведён журнальный отчёт").isNotEmpty();
         Map<String, Object> terminal = single(coreOutbox(trail, DEAL_CLOSED, second), "E6.5: терминал");
         awaitRow(trail.database(Party.AUDIT), "audit_records", String.valueOf(terminal.get("event_id")));
         for (Map<String, Object> reported : core.query("select event_id from outbox_events "
-                + "where event_type = 'ANOMALY_REPORTED'")) {
+                + "where " + Trail.BY_TENANT + " and event_type = 'ANOMALY_REPORTED'", trail.tenant())) {
             awaitRow(trail.database(Party.AUDIT), "audit_records", String.valueOf(reported.get("event_id")));
         }
         awaitRow(trail.database(Party.STATISTICS), "deal_facts", String.valueOf(terminal.get("event_id")));

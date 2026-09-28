@@ -1,6 +1,7 @@
 package com.example.tests.e2e.safetyteardown;
 
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import java.math.BigDecimal;
 import java.util.List;
@@ -48,16 +49,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * (.claude/tests/cases/e2e-safety-teardown.md §«E1 — Детекция расхождения и
  * гистерезис»).
  *
- * <p><b>Ядер три, и разводит их необратимость ступени и калибровка.</b>
+ * <p><b>Пар три, и разводит их необратимость ступени и калибровка.</b>
  * Поднятая ступень счёта не снимается ничем, кроме ручного снятия, а оно —
- * предмет своей группы, поэтому ветви одного состояния получают свежее
- * развёртывание ядра прологом: {@code E1.1}-{@code E1.2} — первое;
- * {@code E1.3} и тропа слепоты {@code E1.6}-{@code E1.8} — второе
+ * предмет своей группы, поэтому ветви одного состояния получают свежую пару
+ * «тенант, счёт» прологом ({@link Trail#pairWithoutDeal()}): {@code E1.1}-{@code E1.2}
+ * — первую; {@code E1.3} и тропа слепоты {@code E1.6}-{@code E1.8} — вторую
  * ({@code E1.3} ступени не поднимает, а срез её конца — без расхождения);
  * {@code E1.4} с ненулевым минимальным возрастом и {@code E1.5}, чьему
- * детектору гистерезис не нужен, — третье.
+ * детектору гистерезис не нужен, — третью, на ядре, поднятом заново с этой
+ * калибровкой.
  *
- * <p><b>Минимальный возраст подтверждения — ноль</b> у первых двух ядер:
+ * <p><b>Минимальный возраст подтверждения — ноль</b> у первых двух пар:
  * два тика, поданных подряд, и есть гистерезис
  * (§«Чем достаются выходы»). Предел слепоты — три, названный явно.
  */
@@ -74,7 +76,7 @@ class TeardownDetectionPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("t1");
+        trail = SharedStand.dealPath(TeardownDetectionPathTest.class);
         trail.factSeriesStartedYesterday();
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.side(Party.TRADING_CORE).set(MIN_AGE, "0s");
@@ -85,7 +87,7 @@ class TeardownDetectionPathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TeardownDetectionPathTest.class);
         }
     }
 
@@ -183,8 +185,8 @@ class TeardownDetectionPathTest {
         trail.relayCore();
         assertThat(reports(trail, FOREIGN_ORDER)).as("предусловие E1.3: строка наблюдения стои́т").hasSize(1);
         Map<String, Object> before = incidents(trail);
-        Long outboxRows = trail.database(Party.TRADING_CORE).count("outbox_events");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
         trail.forgetTraces();
 
         exchangeHoldsNoForeignOrder(trail);
@@ -197,11 +199,11 @@ class TeardownDetectionPathTest {
         List<Map<String, Object>> rows = reports(trail, FOREIGN_ORDER);
         assertThat(rows).as("E1.3: второй строки отчёта нет, строка наблюдения осталась").hasSize(1);
         assertThat(rows.getFirst().get("severity")).isEqualTo("NON_CRITICAL");
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events")).as("E1.3: строк outbox не прибавилось")
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E1.3: строк outbox не прибавилось")
                 .isEqualTo(outboxRows);
         assertThat(commands(trail)).as("E1.3: команд у стаба нет").isEmpty();
         assertThat(sliceReads(trail)).as("E1.3: чтения срезов повторились").hasSize(SLICE_READS);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E1.3: новых строк журнала нет")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E1.3: новых строк журнала нет")
                 .isEqualTo(journal);
         assertThat(incidents(trail)).as("E1.3: числа статистики те же").satisfies(after -> {
             for (String column : List.of("anomaly_reports", "critical_anomaly_reports", "raised_holds")) {
@@ -284,8 +286,8 @@ class TeardownDetectionPathTest {
     @DisplayName("E1.8 — Наблюдённый проход обнуляет счёт слепоты и ступени не снимает")
     void e1_8_anObservedPassResetsTheBlindCountAndKeepsTheRung() {
         Map<String, Object> before = incidents(trail);
-        Long outboxRows = trail.database(Party.TRADING_CORE).count("outbox_events");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
+        Long outboxRows = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
 
         exchangeHoldsNoForeignOrder(trail);
         exchangeAnswersAlgoSlice(trail);
@@ -295,9 +297,9 @@ class TeardownDetectionPathTest {
         JsonNode state = safetyState(trail);
         assertThat(state.path("blindPassCount").asInt()).as("E1.8: счёт слепоты обнулён").isZero();
         assertThat(state.path("accountSafetyRung").asString()).as("E1.8: ступень осталась мягкой").isEqualTo("HOLD");
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events")).as("E1.8: строк outbox не прибавилось")
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E1.8: строк outbox не прибавилось")
                 .isEqualTo(outboxRows);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E1.8: новых строк журнала нет")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E1.8: новых строк журнала нет")
                 .isEqualTo(journal);
         assertThat(incidents(trail)).as("E1.8: числа статистики те же").satisfies(after -> {
             for (String column : List.of("anomaly_reports", "critical_anomaly_reports", "raised_holds",
@@ -342,7 +344,8 @@ class TeardownDetectionPathTest {
     void e1_5_liveRiskOnAnInstrumentOutsideTheContourRaisesTheRungOnTheFirstTick() {
         exchangeHoldsNoForeignOrder(trail);
         BigDecimal size = (BigDecimal) trail.database(Party.TRADING_CORE)
-                .query("select external_size from positions where status = 'ACTIVE'").getFirst().get("external_size");
+                .query("select external_size from positions where "
+                        + Trail.BY_DEAL + " and status = 'ACTIVE'", trail.account()).getFirst().get("external_size");
         exchangeHoldsForeignInstrumentPosition(trail, size.stripTrailingZeros().toPlainString());
         Map<String, Object> before = incidents(trail);
         trail.forgetTraces();

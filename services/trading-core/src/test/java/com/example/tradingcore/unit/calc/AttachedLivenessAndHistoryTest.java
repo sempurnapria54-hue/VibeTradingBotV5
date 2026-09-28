@@ -187,7 +187,7 @@ class AttachedLivenessAndHistoryTest {
     }
 
     @Test
-    @DisplayName("U11.12 — живой риск транша без покрытия: потерянное покрытие, терминал сразу")
+    @DisplayName("U11.12 — живой риск транша без покрытия, разбор истории пуст: потерянное покрытие")
     void u11_12_liveTrancheRiskWithoutCoverageIsLostProtection() {
         AttachedProtectionResolution resolution = resolver.resolve(afterSearchCycle()
                 .trancheExposure(fill("1"))
@@ -196,8 +196,23 @@ class AttachedLivenessAndHistoryTest {
 
         assertThat(resolution.getStatus()).isEqualTo(AttachedAlgoOrder.Status.ERROR);
         assertThat(resolution.getCloseReason())
-                .as("разбор истории не ждётся: любой её факт оставляет покрытие потерянным")
+                .as("ни живой записи, ни записи в истории: защита пропала")
                 .isEqualTo(AttachedAlgoOrder.CloseReason.PROTECTION_LOST);
+    }
+
+    @Test
+    @DisplayName("U11.22 — живой риск транша без покрытия, разбор нашёл срабатывание: стоп сработал, а не пропал")
+    void u11_22_aTriggeredLegOutranksTheLostCoverageBranch() {
+        AttachedProtectionResolution resolution = resolver.resolve(afterSearchCycle()
+                .trancheExposure(fill("1"))
+                .standaloneProtectionExists(false)
+                .historyLegFound(ProtectionHistoryLeg.EFFECTIVE)
+                .build());
+
+        assertThat(resolution.getStatus())
+                .as("экспозиция транша стоит налитой до наблюдения срабатывания — сработавшая защита её и закрыла")
+                .isEqualTo(AttachedAlgoOrder.Status.COMPLETED);
+        assertThat(resolution.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.TRIGGERED);
     }
 
     @Test
@@ -229,16 +244,26 @@ class AttachedLivenessAndHistoryTest {
     }
 
     @Test
-    @DisplayName("U11.21 — предикат потерянного покрытия публичен и читает намерение: гейт разбора у добытчика тот же")
-    void u11_21_theCoverageLostPredicateReadsTheStandingIntent() {
-        assertThat(resolver.coverageLost(fill("1"), false, false)).isTrue();
-        assertThat(resolver.coverageLost(fill("1"), false, null))
+    @DisplayName("U11.21 — пустой разбор при живом риске транша: ветвь потерянного покрытия читает намерение")
+    void u11_21_theLostCoverageBranchReadsTheStandingIntent() {
+        assertThat(emptyAnalysis(fill("1"), false, false).getCloseReason())
+                .isEqualTo(AttachedAlgoOrder.CloseReason.PROTECTION_LOST);
+        assertThat(emptyAnalysis(fill("1"), false, null).getCloseReason())
                 .as("пустой признак намерения — отсутствие намерения")
-                .isTrue();
-        assertThat(resolver.coverageLost(fill("1"), false, true)).isFalse();
-        assertThat(resolver.coverageLost(fill("1"), true, false)).isFalse();
-        assertThat(resolver.coverageLost(fill("0"), false, false)).isFalse();
-        assertThat(resolver.coverageLost(null, false, false)).isFalse();
+                .isEqualTo(AttachedAlgoOrder.CloseReason.PROTECTION_LOST);
+        assertThat(emptyAnalysis(fill("1"), false, true).getOutcomeUndetermined()).isTrue();
+        assertThat(emptyAnalysis(fill("1"), true, false).getOutcomeUndetermined()).isTrue();
+        assertThat(emptyAnalysis(fill("0"), false, false).getOutcomeUndetermined()).isTrue();
+        assertThat(emptyAnalysis(null, false, false).getOutcomeUndetermined()).isTrue();
+    }
+
+    private AttachedProtectionResolution emptyAnalysis(BigDecimal trancheExposure, Boolean standaloneExists,
+                                                       Boolean cancelIntentStanding) {
+        return resolver.resolve(afterSearchCycle()
+                .trancheExposure(trancheExposure)
+                .standaloneProtectionExists(standaloneExists)
+                .cancelIntentStanding(cancelIntentStanding)
+                .build());
     }
 
     @Test

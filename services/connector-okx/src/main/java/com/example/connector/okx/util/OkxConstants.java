@@ -18,6 +18,13 @@ public class OkxConstants {
     /** Код успешного ответа OKX (иначе — ошибка). */
     public static final String SUCCESS_CODE = "0";
 
+    /**
+     * Код OKX «заявки не существует» на поиске обычной заявки
+     * ({@code GET /api/v5/trade/order}): площадка сообщает ненайденность
+     * отказом, а не пустыми данными (docs/integrations/okx/contracts/order.md).
+     */
+    public static final String ORDER_NOT_EXIST_CODE = "51603";
+
     /** Значение confirm OKX для закрытой свечи. */
     public static final String CONFIRM_CLOSED = "1";
 

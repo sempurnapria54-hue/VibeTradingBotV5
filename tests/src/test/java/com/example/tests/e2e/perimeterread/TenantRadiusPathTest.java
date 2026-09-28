@@ -3,6 +3,7 @@ package com.example.tests.e2e.perimeterread;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
@@ -71,6 +72,10 @@ class TenantRadiusPathTest {
 
     private static Trail trail;
 
+    private static String firstSubject;
+
+    private static String secondSubject;
+
     private static String token;
 
     private static String secondToken;
@@ -83,9 +88,11 @@ class TenantRadiusPathTest {
 
     @BeforeAll
     static void standInTheStateOfE31() {
-        trail = Trail.openPerimeter("p9");
-        token = trail.identity().browserToken("subject-s1", "Trader One");
-        secondToken = trail.identity().browserToken("subject-s2", "Trader Two");
+        trail = SharedStand.perimeter(TenantRadiusPathTest.class);
+        firstSubject = Subjects.fresh("subject-s1");
+        secondSubject = Subjects.fresh("subject-s2");
+        token = trail.identity().browserToken(firstSubject, "Trader One");
+        secondToken = trail.identity().browserToken(secondSubject, "Trader Two");
         prologue = Prologue.walkToOpenDeal(trail, token);
         warmTheCache(trail, token);
         first = Subscription.open(trail, ticket(trail, token));
@@ -97,7 +104,7 @@ class TenantRadiusPathTest {
             first.close();
         }
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(TenantRadiusPathTest.class);
         }
     }
 
@@ -145,16 +152,17 @@ class TenantRadiusPathTest {
     @DisplayName("E5.2 — Второй субъект получает своего тенанта, и чтения радиусов не пересекаются")
     void e5_2_theSecondSubjectGetsItsOwnTenant() {
         Database auth = trail.database(Party.AUTH);
-        List<Map<String, Object>> firstMemberships = auth.query("select * from memberships order by id");
+        List<Map<String, Object>> firstMemberships =
+                auth.query("select * from memberships where user_id = ? order by id", firstSubject);
 
         Answer context = trail.callWith(secondToken, Party.BFF, "GET", CONTEXT, null, null);
 
         assertThat(context.status()).as("E5.2: контекст второго субъекта — " + context.body()).isEqualTo(200);
         secondTenant = String.valueOf(Json.object(context.body()).get("tenantId"));
         assertThat(secondTenant).as("E5.2: субъекту S2 заведён свой тенант").isNotEqualTo(prologue.tenant());
-        assertThat(auth.query("select role from memberships where user_id = ?", "subject-s2"))
+        assertThat(auth.query("select role from memberships where user_id = ?", secondSubject))
                 .as("E5.2: и своё членство OWNER").extracting(row -> row.get("role")).containsExactly("OWNER");
-        assertThat(auth.query("select * from memberships where user_id = ? order by id", "subject-s1"))
+        assertThat(auth.query("select * from memberships where user_id = ? order by id", firstSubject))
                 .as("E5.2: строки S1 не тронуты").isEqualTo(firstMemberships);
         Map<String, JsonNode> own = reads(token);
         Map<String, JsonNode> other = reads(secondToken);
@@ -181,15 +189,15 @@ class TenantRadiusPathTest {
         String otherTicket = ticket(trail, secondToken);
 
         assertThat(fields).as("E5.3: билет несёт субъекта, тенанта и срок — роли в нём нет")
-                .hasSize(3).containsSequence("subject-s1", prologue.tenant());
+                .hasSize(3).containsSequence(firstSubject, prologue.tenant());
         Subscription own = Subscription.open(trail, ownTicket);
         Subscription other = Subscription.open(trail, otherTicket);
         try {
             String ownFact = ownerFact(trail);
             String otherFact = produceFact(Substrate.STRATEGY_TOPIC, secondTenant, "STRATEGY_DELETED", """
                     {"strategyInternalId": "%s", "exchangeAccountInternalId": "%s", "instrumentInternalId": "%s",
-                     "actor": "subject-s2"}
-                    """.formatted(UUID.randomUUID(), prologue.account(), Trail.INSTRUMENT));
+                     "actor": "%s"}
+                    """.formatted(UUID.randomUUID(), prologue.account(), Trail.INSTRUMENT, secondSubject));
             own.awaitId(ownFact);
             other.awaitId(otherFact);
             assertThat(own.facts()).as("E5.3: подписка S1 несёт записи только его тенанта — присланное не прочитано")

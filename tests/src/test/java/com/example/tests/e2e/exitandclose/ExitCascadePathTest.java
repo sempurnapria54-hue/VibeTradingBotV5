@@ -2,6 +2,7 @@ package com.example.tests.e2e.exitandclose;
 
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Trail;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -76,7 +77,7 @@ class ExitCascadePathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("x2");
+        trail = SharedStand.dealPath(ExitCascadePathTest.class);
         trail.factSeriesStartedYesterday();
         trail.commonPreconditions();
     }
@@ -84,7 +85,7 @@ class ExitCascadePathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(ExitCascadePathTest.class);
         }
     }
 
@@ -94,13 +95,15 @@ class ExitCascadePathTest {
     void e2_4_aRefusedCancelSendsNoCloseAndTheLinkRepeats() {
         deal = walkToScaledIn(trail);
         size = plain(trail.database(Party.TRADING_CORE)
-                .query("select size from orders where external_id = ?", SECOND_ORDER).getFirst().get("size"));
+                .query("select size from orders where "
+                        + Trail.BY_DEAL + " and external_id = ?",
+                        trail.account(), SECOND_ORDER).getFirst().get("size"));
         trail.marketPhaseIs("BEAR_TREND");
         passUntilLeaves(trail, deal, "ACTIVE");
         trail.relayCore();
         journalMark = journalOf(trail, deal).size();
         actionMark = actionMark();
-        Long strategyRows = trail.database(Party.TRADING_CORE).count("deal_strategy_action_states");
+        Long strategyRows = trail.rows(Party.TRADING_CORE, "deal_strategy_action_states");
         trail.exchange().answersPost(CANCEL_ORDER, """
                 {"code": "51400", "msg": "Order cancellation failed as the order has been filled, canceled or does not exist",
                   "data": []}
@@ -119,16 +122,18 @@ class ExitCascadePathTest {
                 .isEmpty();
         assertThat(dealRead(trail, deal).path("status").asString())
                 .as("E2.4: сделка осталась в координированном выходе").isEqualTo("EXIT_PENDING");
-        assertThat(trail.database(Party.TRADING_CORE).count("deal_strategy_action_states"))
+        assertThat(trail.rows(Party.TRADING_CORE, "deal_strategy_action_states"))
                 .as("E2.4: строки исполнения по отмене нет").isEqualTo(strategyRows);
         assertThat(systemActionsSince(actionMark)).as("E2.4: учёта отказа нет — системные строки только добычи")
                 .allSatisfy(type -> assertThat(type).isEqualTo(REFRESH));
         List<Map<String, Object>> reports = trail.database(Party.TRADING_CORE)
-                .query("select internal_id from anomaly_reports where code = ?", ANCHORLESS);
+                .query("select internal_id from anomaly_reports where "
+                        + Trail.BY_ACCOUNT + " and code = ?", trail.account(), ANCHORLESS);
         assertThat(reports).as("E2.4: отчёт об отказе без анкера один, сколько бы отказ ни повторялся")
                 .hasSize(1);
         List<Map<String, Object>> reported = trail.database(Party.TRADING_CORE).query(
-                "select event_id from outbox_events where event_type = 'ANOMALY_REPORTED'");
+                "select event_id from outbox_events where "
+                        + Trail.BY_TENANT + " and event_type = 'ANOMALY_REPORTED'", trail.tenant());
         assertThat(reported).as("E2.4: событие отчёта одно").hasSize(1);
         String event = String.valueOf(reported.getFirst().get("event_id"));
         Database audit = trail.database(Party.AUDIT);
@@ -142,7 +147,7 @@ class ExitCascadePathTest {
     @Order(2)
     @DisplayName("E2.2 — Пока отмена не подтверждена, закрытия нетто-экспозиции у стаба нет")
     void e2_2_whileTheCancelIsUnconfirmedNoNetCloseReachesTheStub() {
-        Long strategyRows = trail.database(Party.TRADING_CORE).count("deal_strategy_action_states");
+        Long strategyRows = trail.rows(Party.TRADING_CORE, "deal_strategy_action_states");
         exchangeAcceptsTeardown(trail);
         trail.forgetTraces();
 
@@ -165,7 +170,7 @@ class ExitCascadePathTest {
                 .hasSizeGreaterThanOrEqualTo(2);
         assertThat(dealRead(trail, deal).path("status").asString())
                 .as("E2.2: сделка осталась в координированном выходе, терминала нет").isEqualTo("EXIT_PENDING");
-        assertThat(trail.database(Party.TRADING_CORE).count("deal_strategy_action_states"))
+        assertThat(trail.rows(Party.TRADING_CORE, "deal_strategy_action_states"))
                 .as("E2.2: строки исполнения по отмене не заведено").isEqualTo(strategyRows);
         assertThat(systemActionsSince(actionMark)).as("E2.2: счётчика попыток у отмены нет")
                 .allSatisfy(type -> assertThat(type).isEqualTo(REFRESH));
@@ -177,7 +182,7 @@ class ExitCascadePathTest {
     @Order(3)
     @DisplayName("E2.1 — Отмена живой входной ноги доходит до стаба раньше закрытия позиции")
     void e2_1_theLiveEntryLegCancelReachesTheStubBeforeThePositionClose() {
-        Long dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
+        Long dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
         exchangeHoldsSecondLeg(trail, size, CANCELED);
 
         passUntilTranchesTerminal();
@@ -197,11 +202,12 @@ class ExitCascadePathTest {
                 .extracting(Side.Access::path)
                 .contains("/api/v1/accounts/" + trail.account() + "/orders/cancellations",
                         "/api/v1/accounts/" + trail.account() + "/positions/closures");
-        assertThat(trail.database(Party.TRADING_CORE).query("select id from orders where "
-                        + "position_reducing_only = false and status not in ('COMPLETED', 'CANCELED', 'ERROR')"))
+        assertThat(trail.database(Party.TRADING_CORE).query("select id from orders where " + Trail.BY_DEAL + " and "
+                        + "position_reducing_only = false and status not in ('COMPLETED', 'CANCELED', 'ERROR')",
+                        trail.account()))
                 .as("E2.1: живых входных ног у траншей не осталось").isEmpty();
         assertThat(journalOf(trail, deal)).as("E2.1: у журнала следа сверх классов E5 нет").hasSize(journalMark);
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E2.1: у статистики следа нет")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E2.1: у статистики следа нет")
                 .isEqualTo(dealFacts);
     }
 
@@ -223,10 +229,14 @@ class ExitCascadePathTest {
         assertThat(attached().get("close_reason")).as("E2.5: намерение снятия встроенной — «снята стратегией»")
                 .isEqualTo("CANCELED_BY_STRATEGY");
         assertThat(trail.database(Party.TRADING_CORE).query(
-                        "select status from algo_orders where status not in ('COMPLETED', 'CANCELED', 'ERROR')"))
+                        "select status from algo_orders where "
+                                + Trail.BY_DEAL + " and status not in ('COMPLETED', 'CANCELED', 'ERROR')",
+                                trail.account()))
                 .as("E2.5: живых отдельных защит у транша не осталось").isEmpty();
         assertThat(trail.database(Party.TRADING_CORE).query("select status from attached_algo_orders "
-                        + "where status not in ('COMPLETED', 'CANCELED', 'ERROR')"))
+                        + "where " + Trail.BY_ORDER
+                        + " and status not in ('COMPLETED', 'CANCELED', 'ERROR')",
+                                trail.account()))
                 .as("E2.5: живых встроенных защит не осталось").isEmpty();
         JsonNode read = dealRead(trail, deal);
         assertThat(read.path("tranches")).as("E2.5: транш терминален")
@@ -236,12 +246,14 @@ class ExitCascadePathTest {
     }
 
     /**
-     * Красна по находке {@code F7} документа: поверхность сделки отдаёт
-     * экспозицию транша без приписанного объёма закрытия уровня сделки, и у
-     * закрытого транша она остаётся налитым объёмом
-     * (.claude/work/backlog.md §«Поверхность сделки отдаёт экспозицию транша
-     * без приписанного объёма закрытия»). Ассерт экспозиции стои́т последним:
-     * прочие ожидания клетки прогон с меткой проверяет до него.
+     * Красна по находке {@code F14} документа: из двух вошедших траншей один
+     * остаётся в предвходовой проверке, хотя его входная нога отправлена и
+     * налита, — его строка исполнения ждёт повтора, и обработчик на ней
+     * стоит; под сворачиванием он закрывает транш, а матрица терминала
+     * рискующему траншу не даёт, и каскад не доходит до конца
+     * (.claude/work/backlog.md §«Транш с отправленной входной ногой остаётся в
+     * предвходовой проверке»). Находка {@code F7} закрыта: экспозиция транша
+     * читается поверхностью с приписанным объёмом.
      */
     @Test
     @Order(5)
@@ -290,7 +302,8 @@ class ExitCascadePathTest {
         Object waitingId = waiting.get("id");
         Database core = trail.database(Party.TRADING_CORE);
         List<Map<String, Object>> tried = core.query(
-                "select status from deal_strategy_action_states where deal_tranche_id = ?", waitingId);
+                "select status from deal_strategy_action_states where "
+                        + Trail.BY_DEAL + " and deal_tranche_id = ?", trail.account(), waitingId);
         assertThat(tried).as("предусловие E2.6: условие входа второго транша истинно — его действие дошло "
                 + "до преконтроля и отвергнуто потолком риска").isNotEmpty();
         Integer decided = coreOutbox(trail, ORDER_DECIDED, deal).size();
@@ -300,7 +313,8 @@ class ExitCascadePathTest {
         trail.passUntil("E2.6: сделка ушла в выход", () -> isFalse(Objects.equals("ACTIVE",
                 dealRead(trail, deal).path("status").asString())));
         trail.passUntil("E2.6: второй транш терминален", () -> Objects.equals("CLOSED", core
-                .query("select status from deal_tranches where id = ?", waitingId).getFirst().get("status")));
+                .query("select status from deal_tranches where "
+                        + Trail.BY_DEAL + " and id = ?", trail.account(), waitingId).getFirst().get("status")));
         trail.relayCore();
 
         assertThat(trail.exchange().requests(Trail.EXCHANGE_ORDER))
@@ -308,12 +322,15 @@ class ExitCascadePathTest {
                 .noneSatisfy(request -> assertThat(request.getMethod().getName()).isEqualTo("POST"));
         Object dealReason = core.query("select close_reason from deals where internal_id = ?", deal).getFirst()
                 .get("close_reason");
-        assertThat(core.query("select close_reason from deal_tranches where id = ?", waitingId).getFirst()
+        assertThat(core.query("select close_reason from deal_tranches where "
+                + Trail.BY_DEAL + " and id = ?", trail.account(), waitingId).getFirst()
                 .get("close_reason")).as("E2.6: второй транш закрыт причиной сделки").isNotNull()
                 .isEqualTo(dealReason);
-        assertThat(core.query("select id from orders where deal_tranche_id = ?", waitingId))
+        assertThat(core.query("select id from orders where "
+                + Trail.BY_DEAL + " and deal_tranche_id = ?", trail.account(), waitingId))
                 .as("E2.6: заявки по второму траншу не заведено").isEmpty();
-        assertThat(core.query("select status from deal_strategy_action_states where deal_tranche_id = ?",
+        assertThat(core.query("select status from deal_strategy_action_states where "
+                + Trail.BY_DEAL + " and deal_tranche_id = ?", trail.account(),
                 waitingId)).as("E2.6: строки исполнения по нему не прибавилось").hasSize(tried.size());
         assertThat(coreOutbox(trail, ORDER_DECIDED, deal)).as("E2.6: решения о заявке нет").hasSize(decided);
         assertThat(journalOf(trail, deal)).as("E2.6: и строки журнала о нём")
@@ -322,19 +339,17 @@ class ExitCascadePathTest {
     }
 
     /**
-     * Красна по находке {@code F11} документа: действие, объявленное шагом
-     * {@code EXIT} уровня сделки, ядро не исполняет вовсе — выбранный шаг
-     * сделки становится ребром сворачивания, а закрытие шлёт обработчик
-     * координированного выхода и на этой форме (.claude/work/backlog.md
-     * §«Действие шага выхода уровня сделки не исполняется»). Ассерт строки
-     * исполнения действия стои́т последним: прочие ожидания клетки прогон с
-     * меткой проверяет до него.
+     * Действие выхода, объявленное шагом {@code EXIT} уровня сделки,
+     * исполняет само сворачивание: шаг работает ребром, каскад снимает
+     * входные ноги, обработчик координированного выхода шлёт одно закрытие
+     * (docs/rules/no-partial-close.md §«Две законные формы полного выхода»).
+     * Строки исполнения у действия сделки поэтому нет — её отсутствие и
+     * отличает форму от исполнителя действия транша.
      */
     @Test
     @Order(7)
-    @Tag("debt")
-    @DisplayName("E2.7 — Выход, объявленный действием: закрытие одно, и шлёт его исполнитель действия")
-    void e2_7_aDeclaredExitActionSendsTheOnlyCloseItself() {
+    @DisplayName("E2.7 — Выход, объявленный действием сделки: закрытие одно, и шлёт его сворачивание")
+    void e2_7_aDeclaredDealExitActionIsCarriedOutByTheCollapse() {
         deal = walkToExposure(trail, Trail.referenceDefinition());
         Integer decided = coreOutbox(trail, ORDER_DECIDED, deal).size();
         trail.marketPhaseIs("BEAR_TREND");
@@ -354,15 +369,11 @@ class ExitCascadePathTest {
                 .allSatisfy(tranche -> assertThat(tranche.path("status").asString()).isEqualTo("CLOSED"));
         assertThat(coreOutbox(trail, ORDER_DECIDED, deal)).as("E2.7: решений о создании заявки на отрезке нет")
                 .hasSize(decided);
-        assertThat(trail.database(Party.TRADING_CORE).query("select s.status, s.deal_tranche_id "
+        assertThat(trail.database(Party.TRADING_CORE).query("select s.status "
                         + "from deal_strategy_action_states s join strategy_actions a on a.id = s.strategy_action_id "
                         + "join deals d on d.id = s.deal_id where d.internal_id = ? and a.action_type = 'EXIT_ACTION'",
-                deal)).as("E2.7: закрытие шлёт исполнение объявленного действия выхода — одно, уровня сделки")
-                .hasSize(1)
-                .allSatisfy(row -> {
-                    assertThat(row.get("deal_tranche_id")).isNull();
-                    assertThat(row.get("status")).isIn("SUBMITTED", "COMPLETED");
-                });
+                deal)).as("E2.7: действие сделки исполнителем действий не запускалось — строки исполнения нет")
+                .isEmpty();
     }
 
     // ---------------------------------------------------------------- ходы и чтения
@@ -395,13 +406,14 @@ class ExitCascadePathTest {
 
     private static Map<String, Object> secondLeg() {
         return trail.database(Party.TRADING_CORE)
-                .query("select close_reason from orders where external_id = ?", SECOND_ORDER).getFirst();
+                .query("select close_reason from orders where "
+                        + Trail.BY_DEAL + " and external_id = ?", trail.account(), SECOND_ORDER).getFirst();
     }
 
     private static Map<String, Object> attached() {
         return trail.database(Party.TRADING_CORE).query("select a.internal_id, a.close_reason from "
-                + "attached_algo_orders a join orders o on o.id = a.order_id where o.external_id = ?",
-                Trail.EXTERNAL_ORDER).getFirst();
+                + "attached_algo_orders a join orders o on o.id = a.order_id where o." + Trail.BY_DEAL
+                + " and o.external_id = ?", trail.account(), Trail.EXTERNAL_ORDER).getFirst();
     }
 
     /** Метка общей последовательности строк исполнения — обе таблицы берут её одну. */
@@ -414,7 +426,8 @@ class ExitCascadePathTest {
 
     private static List<Object> systemActionsSince(Long mark) {
         return trail.database(Party.TRADING_CORE)
-                .query("select system_action_type from deal_system_action_states where id > ?", mark).stream()
+                .query("select system_action_type from deal_system_action_states where "
+                        + Trail.BY_DEAL + " and id > ?", trail.account(), mark).stream()
                 .map(row -> row.get("system_action_type"))
                 .toList();
     }

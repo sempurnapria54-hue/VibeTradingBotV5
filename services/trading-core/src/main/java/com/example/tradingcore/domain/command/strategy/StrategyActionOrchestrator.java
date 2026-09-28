@@ -1,7 +1,6 @@
 package com.example.tradingcore.domain.command.strategy;
 
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -99,7 +98,8 @@ public class StrategyActionOrchestrator {
      * (docs/components/models/ServiceCommand.md).
      *
      * <p><b>Ожидающая повтора строка отдаёт команду только по наступлении
-     * времени попытки.</b> Завершённые и отказавшие терминальны: новая
+     * времени попытки</b> — со стадии, которую называет исполнитель типа.
+     * Завершённые и отказавшие терминальны: новая
      * надобность — новая строка, и заводит её не этот проход.
      */
     public ActionPlan plan(StrategyStep step, StrategyAction action, DealActionState state,
@@ -109,7 +109,7 @@ public class StrategyActionOrchestrator {
             log.warn("No executor supports action actionKey={} type={}", action.getKey(), action.getActionType());
             return ActionPlan.nothing();
         }
-        DealActionState anchor = anchor(action, state, dealContext, tranche);
+        DealActionState anchor = anchor(executor, action, state, dealContext, tranche);
         if (isNull(anchor)) {
             return ActionPlan.nothing();
         }
@@ -120,9 +120,17 @@ public class StrategyActionOrchestrator {
      * Строка исполнения под действие: заведённая — та же, ожидающая
      * повтора — перевзведённая по наступлении времени, отсутствующая —
      * новая. Пусто ровно в одном случае: повтор ещё ждёт отката.
+     *
+     * <p><b>Стадию перевзвода называет исполнитель типа, а не этот
+     * выбор.</b> Прежняя редакция возвращала строку в планирование всегда —
+     * и отправка заведённой ноги, упавшая на обрыве, проходила заново
+     * расчёт и преконтроль, где плановый риск этой же ноги уже учтён:
+     * преконтроль её блокировал, и нога оставалась неотправленной навсегда
+     * (docs/lifecycles/DealActionState.md §«Повтор возвращает исполнение на
+     * стадию факта»).
      */
-    private DealActionState anchor(StrategyAction action, DealActionState state, DealContext dealContext,
-                                   DealTranche tranche) {
+    private DealActionState anchor(StrategyActionExecutor executor, StrategyAction action,
+                                   DealActionState state, DealContext dealContext, DealTranche tranche) {
         if (isNull(state)) {
             return createPlanned(action, dealContext, tranche);
         }
@@ -132,7 +140,7 @@ public class StrategyActionOrchestrator {
         if (isFalse(retryDue(state))) {
             return null;
         }
-        state.setStatus(DealActionStateStatus.PLANNED);
+        state.setStatus(executor.retryStage(state));
         return dealActionStateDataService.save(state);
     }
 
@@ -142,17 +150,18 @@ public class StrategyActionOrchestrator {
     }
 
     /**
-     * Новая строка стратегийного исполнения. Транш и номер эпизода
-     * непусты у потраншевого объявления и пусты у агрегатного: пустой
-     * транш участвует в отборе как пустой, а не как «любой».
+     * Новая строка стратегийного исполнения — всегда потраншевая: пакет
+     * шага сделки исполнителями действий не запускается, его выход
+     * исполняет сворачивание (docs/rules/no-partial-close.md §«Две
+     * законные формы полного выхода»).
      */
     private DealActionState createPlanned(StrategyAction action, DealContext dealContext, DealTranche tranche) {
         DealActionState state = new DealActionState();
         state.setDealId(dealContext.getDeal().getId());
         state.setActionKind(ActionKind.STRATEGY);
         state.setStrategyActionId(action.getId());
-        state.setDealTrancheId(nonNull(tranche) ? tranche.getId() : null);
-        state.setTrancheEpisodeSeq(nonNull(tranche) ? tranche.getEpisodeSeq() : null);
+        state.setDealTrancheId(tranche.getId());
+        state.setTrancheEpisodeSeq(tranche.getEpisodeSeq());
         state.setStatus(DealActionStateStatus.PLANNED);
         DealActionState saved = dealActionStateDataService.save(state);
         dealContext.register(saved);

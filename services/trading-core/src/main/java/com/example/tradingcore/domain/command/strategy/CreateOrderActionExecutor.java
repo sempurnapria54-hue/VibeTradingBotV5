@@ -23,6 +23,7 @@ import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.util.RiskMath;
 import com.example.tradingcore.domain.calc.CalculationContextFactory;
 import com.example.tradingcore.domain.command.DealActionState;
+import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
@@ -34,6 +35,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
@@ -53,6 +55,7 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>Команд не исполняет и статуса сделки не двигает</b> — отдаёт план.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CreateOrderActionExecutor implements StrategyActionExecutor {
@@ -79,6 +82,12 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
         };
     }
 
+    /** Заведённая нога — факт: повтор идёт с её отправки, а не с нового расчёта. */
+    @Override
+    public DealActionStateStatus retryStage(DealActionState state) {
+        return state.creationRetryStage();
+    }
+
     /**
      * Первая стадия: посчитать параметры, прогнать преконтроль и собрать
      * команду заведения локальной ноги.
@@ -88,9 +97,23 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
      * относится, и звать преконтроль на ней значило бы блокировать снятие
      * риска блок-сетом, заведённым против его набора
      * (docs/rules/risk-validator-scope.md).
+     *
+     * <p><b>Второй риск-создающий вход сделки за проход не решается.</b>
+     * Потолки считаются графом, собранным до решений прохода, и нога,
+     * решённая соседним траншем, в нём ещё не стои́т: оба входа прошли бы
+     * одновременный, кумулятивный и катастрофический потолки порознь.
+     * Строка остаётся запланированной и решается следующим проходом, чей
+     * граф ногу первого уже несёт (docs/rules/risk-policy.md §«Живое
+     * меряется от живой экспозиции»).
      */
     private ActionPlan planCreation(StrategyOrderAction action, DealActionState state,
                                     DealContext dealContext, DealTranche tranche) {
+        boolean riskCreating = isNotTrue(action.getPositionReducingOnly());
+        if (riskCreating && isTrue(dealContext.riskCreatingEntryDecidedBesides(state))) {
+            log.debug("Risk-creating entry already decided this pass, deferred dealActionStateId={}",
+                    state.getId());
+            return ActionPlan.nothing();
+        }
         CalculationContext context = contextFactory.build(dealContext, action, tranche);
         StrategyActionCalculationResult result = calculator.calculate(context);
         if (isFalse(result.isSuccess())) {
@@ -102,11 +125,12 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
         if (skipped.isPresent()) {
             return skipped.get();
         }
-        if (isNotTrue(action.getPositionReducingOnly())) {
+        if (riskCreating) {
             Optional<ActionPlan> blocked = riskGate.gate(calculated, dealContext, tranche);
             if (blocked.isPresent()) {
                 return blocked.get();
             }
+            dealContext.markRiskCreatingEntryDecided(state);
         }
         exitRoundingReader.journalRoundedToFull(calculated, context, state, dealContext, tranche);
         return ActionPlan.of(ServiceCommand.builder()

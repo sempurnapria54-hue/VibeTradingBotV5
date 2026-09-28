@@ -24,6 +24,7 @@ import com.example.tradingbot.domain.model.core.algo_order.Trigger;
 import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
 import com.example.tradingcore.domain.calc.CalculationContextFactory;
 import com.example.tradingcore.domain.command.DealActionState;
+import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
@@ -95,6 +96,12 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
             case SUBMITTED -> refresh(state);
             default -> ActionPlan.nothing();
         };
+    }
+
+    /** Заведённая заявка — факт: повтор идёт с её отправки, а не с нового расчёта. */
+    @Override
+    public DealActionStateStatus retryStage(DealActionState state) {
+        return state.creationRetryStage();
     }
 
     private ActionPlan planCreation(StrategyAlgoOrderAction action, DealActionState state,

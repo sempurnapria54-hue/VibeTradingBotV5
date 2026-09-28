@@ -35,6 +35,34 @@ public class AnomalyReportDataService {
                 severity.name(), since, until);
     }
 
+    /**
+     * У стоящей по ключу строки жива серия наблюдений, и последнее её
+     * наблюдение не моложе {@code observedUntil}
+     * (docs/components/AnomalyJob.md §«Такт и гистерезис»).
+     */
+    @Transactional(readOnly = true)
+    public Boolean existsSeries(Long exchangeAccountId, Long instrumentId, String subjectExternalId,
+                                String code, AnomalyReport.Severity severity,
+                                OffsetDateTime since, OffsetDateTime observedUntil) {
+        return repository.existsSeries(exchangeAccountId, instrumentId, subjectExternalId, code,
+                severity.name(), since, observedUntil);
+    }
+
+    /** Продлить серию стоящей по ключу строки моментом наблюдения. */
+    @Transactional
+    public void markObserved(Long exchangeAccountId, Long instrumentId, String subjectExternalId,
+                             String code, AnomalyReport.Severity severity,
+                             OffsetDateTime since, OffsetDateTime observedAt) {
+        repository.markObserved(exchangeAccountId, instrumentId, subjectExternalId, code,
+                severity.name(), since, observedAt);
+    }
+
+    /** Прервать серии счёта, которых проход, начатый в этот момент, не продлил. */
+    @Transactional
+    public void breakSeries(Long exchangeAccountId, OffsetDateTime passStartedAt) {
+        repository.breakSeries(exchangeAccountId, passStartedAt);
+    }
+
     /** Отчёт с этим кодом по этой сущности-предмету уже заведён. */
     @Transactional(readOnly = true)
     public Boolean existsForSubject(String code, String subjectExternalId) {

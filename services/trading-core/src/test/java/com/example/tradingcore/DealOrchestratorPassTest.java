@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
@@ -35,6 +36,7 @@ import com.example.tradingcore.domain.safety.HoldRung;
 import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
+import com.example.tradingcore.domain.safety.KillSwitchService;
 import com.example.tradingcore.exception.CredentialsRejectedException;
 import com.example.tradingcore.exception.DealShutdownEdgeException;
 import com.example.tradingcore.exception.ExternalInvariantViolationException;
@@ -83,6 +85,7 @@ class DealOrchestratorPassTest {
     private final DealStateMachine dealStateMachine = mock(DealStateMachine.class);
     private final ServiceCommandExecutor serviceCommandExecutor = mock(ServiceCommandExecutor.class);
     private final HoldService holdService = mock(HoldService.class);
+    private final KillSwitchService killSwitchService = mock(KillSwitchService.class);
 
     // --- энфорсмент жёсткой ступени ---------------------------------------
 
@@ -150,6 +153,44 @@ class DealOrchestratorPassTest {
         job().tick();
 
         verify(dealStatusEdgeService, never()).enforceHardRung(any(), any());
+    }
+
+    /**
+     * Проход, применивший ребро энфорсмента, снимает риск уведённой сделки
+     * контекстом прохода и раньше машины: жёсткая ступень — это и увод, и
+     * снятие, а каскад реакции сделку, ставшую активной после него, не
+     * видит. Без этого шага живая позиция такой сделки не снималась никем.
+     */
+    @Test
+    void thePassThatMovedTheDealTearsItsRiskDown() {
+        DealContext context = context(Deal.Status.ACTIVE, coveredTranche());
+        stubPass(context, DealTransition.stay());
+        when(dealDataService.findIdsUnderAccountRung(List.of(DEAL_ID))).thenReturn(List.of(DEAL_ID));
+        when(dealStatusEdgeService.enforceHardRung(any(), any())).thenReturn(Boolean.TRUE);
+
+        job().tick();
+
+        InOrder order = inOrder(dealContextService, killSwitchService, dealStateMachine);
+        order.verify(dealContextService).build(context.getDeal());
+        order.verify(killSwitchService).fireDeal(context);
+        order.verify(dealStateMachine).run(context);
+    }
+
+    /**
+     * Ребро не применилось — сделка уже стояла в ошибке, и её увёл прежний
+     * ход: снятие не повторяется каждым проходом, иначе неподтверждённое
+     * закрытие уходило бы на площадку на каждом тике без предела.
+     */
+    @Test
+    void aPassThatDidNotMoveTheDealDoesNotTearItDown() {
+        DealContext context = context(Deal.Status.ERROR, coveredTranche());
+        stubPass(context, DealTransition.stay());
+        when(dealDataService.findIdsUnderAccountRung(List.of(DEAL_ID))).thenReturn(List.of(DEAL_ID));
+        when(dealStatusEdgeService.enforceHardRung(any(), any())).thenReturn(Boolean.FALSE);
+
+        job().tick();
+
+        verify(killSwitchService, never()).fireDeal(any());
     }
 
     // --- выделенные перехватчики ------------------------------------------
@@ -272,6 +313,54 @@ class DealOrchestratorPassTest {
 
         verify(dealDataService).applyErrorEdge(DEAL_ID);
         verify(holdService, never()).raise(any(), any());
+    }
+
+    /**
+     * Недоступность соседа по ярусу на сборке контекста пропускает проход
+     * целиком: сделка в ошибку не уходит, ступень не поднимается, машина
+     * не гоняется. Пойманный общим перехватчиком, отказ уводил бы в ошибку
+     * каждую живую сделку на плановой выкатке соседа
+     * (docs/rules/runtime-error-classification.md §«Отказ соседа по ярусу —
+     * свой класс, и сделку в ошибку он не уводит»).
+     */
+    @Test
+    void aTierPeerFailureOnTheContextSkipsThePass() {
+        DealContext context = context(Deal.Status.ACTIVE, coveredTranche());
+        when(dealDataService.findActive(any())).thenReturn(new ArrayList<>(List.of(context.getDeal())));
+        when(dealContextService.build(context.getDeal()))
+                .thenThrow(new PeerServiceUnavailableException("market-data is down", null));
+
+        job().tick();
+
+        verify(dealDataService, never()).applyErrorEdge(any());
+        verify(dealStateMachine, never()).run(any());
+        verify(holdService, never()).raise(any(), any());
+    }
+
+    /**
+     * Молчащий коннектор на исполнении команды — тот же пропуск: сделка в
+     * ошибку не уходит, переход не применяется (docs/rules/runtime-error-classification.md
+     * §«Молчащий коннектор классифицируется этим же классом»). Ступень,
+     * затребованная уже вычисленным переходом, поднимается, как после всякой
+     * неуспешной команды: она реакция на состояние, а не на успех отправки.
+     */
+    @Test
+    void aSilentConnectorOnTheCommandDefersTheTransitionWithoutError() {
+        DealTranche tranche = coveredTranche();
+        DealContext context = context(Deal.Status.ACTIVE, tranche);
+        HoldSignal requested = HoldSignal.exchangeAccount(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED);
+        stubPass(context, DealTransition.commands(List.of(command()))
+                .withTrancheEdges(List.of(new TrancheEdge(tranche, DealTranche.Status.CLOSED, null)))
+                .withRung(requested));
+        when(serviceCommandExecutor.execute(any(), any()))
+                .thenThrow(new PeerServiceUnavailableException("connector transport error", null));
+
+        job().tick();
+
+        verify(dealDataService, never()).applyErrorEdge(any());
+        verify(dealTrancheDataService, never()).save(any());
+        verify(dealStatusEdgeService, never()).applyPassEdge(any(), any(), any());
+        verify(holdService).raise(requested, context);
     }
 
     /**
@@ -448,7 +537,7 @@ class DealOrchestratorPassTest {
         return new DealOrchestratorJob(properties, new JobExecutionGuard(), dealDataService,
                 dealTrancheDataService, dealContextService, dealStatusEdgeService, systemActionExecutor,
                 dealStateMachine, serviceCommandExecutor, holdService,
-                new HardRungShutdownReasonResolver(dealDataService));
+                new HardRungShutdownReasonResolver(dealDataService), killSwitchService);
     }
 
     /** Выборка из одной сделки, её контекст и заданный исход машины. */

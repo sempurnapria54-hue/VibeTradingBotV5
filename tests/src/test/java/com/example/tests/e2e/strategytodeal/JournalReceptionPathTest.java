@@ -2,6 +2,7 @@ package com.example.tests.e2e.strategytodeal;
 
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Substrate;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Json;
@@ -56,14 +57,14 @@ class JournalReceptionPathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("e6");
+        trail = SharedStand.dealPath(JournalReceptionPathTest.class);
         trail.commonPreconditions();
     }
 
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(JournalReceptionPathTest.class);
         }
     }
 
@@ -112,8 +113,8 @@ class JournalReceptionPathTest {
         String dealId = trail.openDeal();
         trail.entrySubmitted();
         trail.relayCore();
-        Long coreOutbox = trail.database(Party.TRADING_CORE).count("outbox_events");
-        Long ownerOutbox = trail.database(Party.STRATEGIES).count("outbox_events");
+        Long coreOutbox = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long ownerOutbox = trail.rows(Party.STRATEGIES, "outbox_events");
         trail.forgetTraces();
 
         Database audit = trail.database(Party.AUDIT);
@@ -143,11 +144,12 @@ class JournalReceptionPathTest {
                     .as("E6.1: содержимое доставлено как есть").isEqualTo(Json.tree(record.value()));
         });
         assertThat(trail.database(Party.STATISTICS).query(
-                "select event_id from incident_facts where event_type like 'STRATEGY%'"))
+                "select event_id from incident_facts where "
+                        + Trail.BY_TENANT + " and event_type like 'STRATEGY%'", trail.tenant()))
                 .as("E6.1: строк классов владельца определений у статистики нет").isEmpty();
-        assertThat(trail.database(Party.TRADING_CORE).count("outbox_events"))
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events"))
                 .as("E6.1: приём журнала ядру следствий не возвращает").isEqualTo(coreOutbox);
-        assertThat(trail.database(Party.STRATEGIES).count("outbox_events"))
+        assertThat(trail.rows(Party.STRATEGIES, "outbox_events"))
                 .as("E6.1: приём журнала владельцу следствий не возвращает").isEqualTo(ownerOutbox);
         for (Party party : List.of(Party.TRADING_CORE, Party.STRATEGIES, Party.CONNECTOR)) {
             assertThat(trail.accesses(party)).as("E6.1: приём журнала к стороне " + party.module() + " не ходит")
@@ -169,7 +171,7 @@ class JournalReceptionPathTest {
         String incompleteId = UUID.randomUUID().toString();
         incomplete.put("eventId", incompleteId);
         Long incompleteOffset = trail.endOffset(Substrate.STRATEGY_TOPIC);
-        Long incidents = trail.database(Party.STATISTICS).count("incident_facts");
+        Long incidents = trail.rows(Party.STATISTICS, "incident_facts");
 
         trail.produce(Substrate.STRATEGY_TOPIC, activation.key(), activation.value(), incomplete);
         trail.moveDefinition(first, "INACTIVE");
@@ -186,7 +188,7 @@ class JournalReceptionPathTest {
         assertThat(audit.query("select id from audit_records where strategy_internal_id = ? and event_type = ?",
                 second, "STRATEGY_ACTIVATED")).as("E6.2: строки следующей записи нет — приём по паре остановлен")
                 .isEmpty();
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E6.2: следа у статистики нет")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E6.2: следа у статистики нет")
                 .isEqualTo(incidents);
         Trail.await("E6.2: ядро неполную запись пропустило и смещение продвинуло",
                 () -> trail.committedOffset(CORE_GROUP, Substrate.STRATEGY_TOPIC) > incompleteOffset);

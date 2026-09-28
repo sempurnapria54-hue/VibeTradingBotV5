@@ -32,6 +32,7 @@ import com.example.strategies.api.model.strategy.StrategyMarketPhaseRuleApiModel
 import com.example.strategies.api.model.strategy.StrategyMarketPhaseSettingApiModel;
 import com.example.strategies.api.model.strategy.StrategyMarketStructureSettingApiModel;
 import com.example.strategies.api.model.strategy.StrategyOrderActionApiModel;
+import com.example.strategies.api.model.strategy.StrategyPositionActionApiModel;
 import com.example.strategies.api.model.strategy.StrategyStepApiModel;
 import com.example.strategies.api.model.strategy.StrategyTrancheApiModel;
 import com.example.tradingbot.domain.util.DomainMath;
@@ -902,6 +903,7 @@ public class StrategyDefinitionValidator {
             for (int index = 0; index < steps.size(); index++) {
                 String stepPath = path + ".stepsByStatus[" + status + "][" + index + "]";
                 validateDealLevelStepType(steps.get(index), stepPath, violations);
+                validateDealLevelActions(steps.get(index), stepPath, violations);
                 validateStep(steps.get(index), stepPath, indicatorTypes, structureKeys, actionKeys, violations);
             }
         });
@@ -921,6 +923,32 @@ public class StrategyDefinitionValidator {
         }
         violations.add(path + ".stepType STRATEGY_DEAL_LEVEL_STEP_OUT_OF_SCOPE: "
                 + "агрегатная поверхность допускает только EXIT и FAIL_SAFE, объявлено " + step.getStepType());
+    }
+
+    /**
+     * Пакет шага уровня сделки несёт только действие выхода — вид
+     * {@code POSITION}, тип {@code EXIT_ACTION}. Шаг этого уровня работает
+     * РЕБРОМ: сработав, он уводит сделку в координированный выход, а пакет
+     * исполнителями действий не запускается — объявленный выход исполняет
+     * сворачивание. Действие иного типа или вида здесь молча не делало бы
+     * ничего (docs/rules/no-partial-close.md §«Две законные формы полного
+     * выхода»; дом правила — docs/rules/strategy-validation.md).
+     */
+    private void validateDealLevelActions(StrategyStepApiModel step, String path, List<String> violations) {
+        if (isEmpty(step.getActions())) {
+            return;
+        }
+        List<StrategyActionApiModel> actions = step.getActions();
+        for (int index = 0; index < actions.size(); index++) {
+            StrategyActionApiModel action = actions.get(index);
+            Boolean positionKind = action instanceof StrategyPositionActionApiModel;
+            if (isTrue(positionKind) && StrategyActionType.EXIT_ACTION.name().equals(action.getActionType())) {
+                continue;
+            }
+            violations.add(path + ".actions[" + index + "] STRATEGY_DEAL_LEVEL_ACTION_OUT_OF_SCOPE: "
+                    + "пакет шага уровня сделки допускает только выход позиции (POSITION, EXIT_ACTION), объявлено "
+                    + action.getActionType() + (isTrue(positionKind) ? "" : " вне вида POSITION"));
+        }
     }
 
     /** Ключ действия уникален в рамках детали (через шаги ОБОИХ уровней) — правила валидации 1-2. */

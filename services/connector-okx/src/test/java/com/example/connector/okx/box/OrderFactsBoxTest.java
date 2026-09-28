@@ -98,6 +98,19 @@ class OrderFactsBoxTest extends SharedConnectorBox {
     }
 
     @Test
+    @DisplayName("B3.9 — «заявки не существует» от площадки — тоже пусто, а не отказ")
+    void b3_9_theExchangeOrderDoesNotExistCodeMeansEmptyNotFailure() {
+        exchange.answers(OkxConstants.TRADE_ORDER_PATH,
+                Okx.failure(OkxConstants.ORDER_NOT_EXIST_CODE, "Order does not exist"));
+
+        Answer single = get(account(LOOKUP + "&internalId=" + Bodies.ORDER_INTERNAL_ID));
+
+        assertThat(single.status()).isEqualTo(200);
+        assertThat(single.body()).isBlank();
+        assertThat(exchange.requests(OkxConstants.TRADE_ORDER_PATH)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("B3.4 — неизвестный сырой статус роняет весь ответ и несёт причину полем")
     void b3_4_anUnknownRawStatusDropsTheWholeAnswerAndCarriesItsReason() {
         exchange.answers(OkxConstants.TRADE_ORDERS_PENDING_PATH, Okx.ok(

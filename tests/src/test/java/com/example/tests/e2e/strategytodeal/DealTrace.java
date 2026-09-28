@@ -39,7 +39,7 @@ final class DealTrace {
 
     /** Сделка поверхностью ядра — единственный её читатель вне ядра. */
     static JsonNode dealRead(Trail trail, String dealId) {
-        Trail.Answer answer = trail.call(Party.TRADING_CORE, "GET", Trail.CORE + "/deals/" + dealId, Trail.TENANT,
+        Trail.Answer answer = trail.call(Party.TRADING_CORE, "GET", Trail.CORE + "/deals/" + dealId, trail.tenant(),
                 null);
         assertThat(answer.status()).as("чтение сделки " + dealId + " — " + answer.body()).isEqualTo(200);
         return Json.tree(answer.body());

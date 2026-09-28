@@ -3,6 +3,7 @@ package com.example.tests.e2e.exitandclose;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Side;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
@@ -42,10 +43,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * (.claude/tests/cases/e2e-exit-and-close.md §«E1 — Экспозиция в зеркале и
  * инициатива выхода»).
  *
- * <p><b>Ветви одного состояния разводятся свежим развёртыванием ядра:</b>
+ * <p><b>Ветви одного состояния разводятся свежей парой «тенант, счёт»:</b>
  * {@code E1.2}, {@code E1.3} и {@code E1.5} стоят на состоянии {@code E1.1}, и
  * каждая уводит сделку необратимо, поэтому {@code E1.3} и {@code E1.5}
- * проходят пролог и {@code E1.1} заново на ядре, поднятом на пустой базе;
+ * проходят пролог и {@code E1.1} заново на свежей паре;
  * {@code E1.4} продолжает сделку {@code E1.3}.
  */
 @Tag("e2e")
@@ -63,7 +64,7 @@ class ExitInitiativePathTest {
 
     @BeforeAll
     static void openTrail() {
-        trail = Trail.open("x1");
+        trail = SharedStand.dealPath(ExitInitiativePathTest.class);
         trail.factSeriesStartedYesterday();
         trail.commonPreconditions();
     }
@@ -71,7 +72,7 @@ class ExitInitiativePathTest {
     @AfterAll
     static void closeTrail() {
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(ExitInitiativePathTest.class);
         }
     }
 
@@ -81,10 +82,11 @@ class ExitInitiativePathTest {
     void e1_1_theObservedPositionGivesTheMirrorAnEpisodeAndTheTrancheExposure() {
         deal = walkToFilledEntry(trail);
         Database core = trail.database(Party.TRADING_CORE);
-        assertThat(core.count("positions")).as("предусловие E1.1: экспозиции в зеркале нет").isZero();
-        Long outbox = core.count("outbox_events");
-        Long journal = trail.database(Party.AUDIT).count("audit_records");
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
+        assertThat(trail.rows(Party.TRADING_CORE, "positions"))
+                .as("предусловие E1.1: экспозиции в зеркале нет").isZero();
+        Long outbox = trail.rows(Party.TRADING_CORE, "outbox_events");
+        Long journal = trail.rows(Party.AUDIT, "audit_records");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
         String size = filledSize(trail);
         trail.forgetTraces();
 
@@ -103,7 +105,7 @@ class ExitInitiativePathTest {
                 .extracting(Side.Access::path)
                 .contains("/api/v1/accounts/" + trail.account() + "/positions/instrument");
         List<Map<String, Object>> episodes = core.query(
-                "select status, direction, external_size from positions");
+                "select status, direction, external_size from positions where " + Trail.BY_DEAL, trail.account());
         assertThat(episodes).as("E1.1: в зеркале появился один эпизод позиции").hasSize(1);
         assertThat(episodes.getFirst().get("status")).as("E1.1: эпизод живой").isEqualTo("ACTIVE");
         assertThat(plain(episodes.getFirst().get("external_size"))).as("E1.1: размер — из ответа стаба")
@@ -113,11 +115,11 @@ class ExitInitiativePathTest {
         assertThat(read.path("status").asString()).as("E1.1: сделка активна").isEqualTo("ACTIVE");
         assertThat(plain(read.path("tranches").get(0).path("exposure").decimalValue()))
                 .as("E1.1: экспозиция транша равна налившемуся объёму входной ноги").isEqualTo(size);
-        assertThat(core.count("outbox_events")).as("E1.1: наблюдение факта класса события не имеет")
+        assertThat(trail.rows(Party.TRADING_CORE, "outbox_events")).as("E1.1: наблюдение факта класса события не имеет")
                 .isEqualTo(outbox);
-        assertThat(trail.database(Party.AUDIT).count("audit_records")).as("E1.1: у журнала следа нет")
+        assertThat(trail.rows(Party.AUDIT, "audit_records")).as("E1.1: у журнала следа нет")
                 .isEqualTo(journal);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E1.1: у статистики следа нет")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E1.1: у статистики следа нет")
                 .isEqualTo(facts);
         assertThat(trail.accesses(Party.STRATEGIES)).as("E1.1: к владельцу определений обращений нет").isEmpty();
     }
@@ -127,7 +129,7 @@ class ExitInitiativePathTest {
     @DisplayName("E1.2 — Шаг EXIT уровня сделки уводит в координированный выход, и события остановки на этом ребре нет")
     void e1_2_theDealLevelExitStepLeadsToCoordinatedExitWithoutAShutdownEvent() {
         Integer journal = journalOf(trail, deal).size();
-        Long facts = trail.database(Party.STATISTICS).count("incident_facts");
+        Long facts = trail.rows(Party.STATISTICS, "incident_facts");
         trail.marketPhaseIs("BEAR_TREND");
 
         passUntilLeaves(trail, deal, "ACTIVE");
@@ -142,7 +144,7 @@ class ExitInitiativePathTest {
         assertThat(coreOutbox(trail, DEAL_SHUTDOWN_INITIATED, deal))
                 .as("E1.2: строки outbox класса остановки сделки нет").isEmpty();
         assertThat(journalOf(trail, deal)).as("E1.2: новых строк журнала о сделке нет").hasSize(journal);
-        assertThat(trail.database(Party.STATISTICS).count("incident_facts")).as("E1.2: фактов у статистики нет")
+        assertThat(trail.rows(Party.STATISTICS, "incident_facts")).as("E1.2: фактов у статистики нет")
                 .isEqualTo(facts);
         assertThat(commands).as("E1.2: на проходе смены статуса команд площадке ещё нет").isEmpty();
     }
@@ -155,8 +157,9 @@ class ExitInitiativePathTest {
         deal = walkToFilledEntry(trail);
         standAtExposure(trail, deal);
         String definition = String.valueOf(trail.database(Party.STRATEGIES)
-                .query("select internal_id from strategies where status = 'ACTIVE'").getFirst().get("internal_id"));
-        Long dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
+                .query("select internal_id from strategies where exchange_account_internal_id = ?"
+                        + " and status = 'ACTIVE'", trail.account()).getFirst().get("internal_id"));
+        Long dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
 
         Answer deleted = trail.moveDefinition(definition, "DELETED");
         trail.relayOwner();
@@ -195,7 +198,7 @@ class ExitInitiativePathTest {
                 .contains("STRATEGY_DELETED");
         assertThat(instant(row.get("occurred_at"))).as("E1.3: и тем же моментом происшествия")
                 .isEqualTo(instant(shutdown.getFirst().get("occurred_at")));
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E1.3: сделочного факта нет")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E1.3: сделочного факта нет")
                 .isEqualTo(dealFacts);
         assertThat(trail.database(Party.STATISTICS).query("select event_id from incident_facts where event_id = ?",
                 event)).as("E1.3: факта происшествия нет — класс остановки не несом").isEmpty();
@@ -206,11 +209,12 @@ class ExitInitiativePathTest {
     @Order(4)
     @DisplayName("E1.4 — Перезапись причины на ребре в ошибочное состояние даёт вторую строку журнала о той же сделке")
     void e1_4_rewritingTheReasonOnTheErrorEdgeGivesASecondJournalRow() {
-        Long dealFacts = trail.database(Party.STATISTICS).count("deal_facts");
+        Long dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
 
         Answer raised = raiseHalt(trail, "FULL");
         Trail.await("E1.4: жёсткая ступень счёта поднята", () -> isFalse(trail.database(Party.TRADING_CORE)
-                .query("select event_id from outbox_events where event_type = ?", HOLD_RAISED).isEmpty()));
+                .query("select event_id from outbox_events where "
+                        + Trail.BY_TENANT + " and event_type = ?", trail.tenant(), HOLD_RAISED).isEmpty()));
         trail.orchestrate();
         trail.relayCore();
 
@@ -236,7 +240,7 @@ class ExitInitiativePathTest {
         assertThat(trail.database(Party.STATISTICS).query("select event_id from incident_facts where event_id in "
                         + "(?, ?)", shutdown.get(0).get("event_id"), shutdown.get(1).get("event_id")))
                 .as("E1.4: счётчиков по классу остановки нет").isEmpty();
-        assertThat(trail.database(Party.STATISTICS).count("deal_facts")).as("E1.4: число сделок им не двигается")
+        assertThat(trail.rows(Party.STATISTICS, "deal_facts")).as("E1.4: число сделок им не двигается")
                 .isEqualTo(dealFacts);
     }
 
@@ -263,7 +267,8 @@ class ExitInitiativePathTest {
                 .isEmpty();
         assertThat(commands()).as("E1.5: ни одной команды площадке").isEmpty();
         String hold = String.valueOf(trail.database(Party.TRADING_CORE)
-                .query("select event_id from outbox_events where event_type = ?", HOLD_RAISED).getFirst()
+                .query("select event_id from outbox_events where "
+                        + Trail.BY_TENANT + " and event_type = ?", trail.tenant(), HOLD_RAISED).getFirst()
                 .get("event_id"));
         Map<String, Object> row = awaitJournalRow(hold);
         assertThat(row.get("deal_internal_id")).as("E1.5: строка журнала — о ступени, не о сделке").isNull();

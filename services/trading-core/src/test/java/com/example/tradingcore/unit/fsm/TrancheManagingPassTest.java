@@ -21,6 +21,7 @@ import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
+import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
 import com.example.tradingcore.domain.fsm.tranche.TrancheManagingHandler;
 import com.example.tradingcore.util.Constants;
@@ -161,6 +162,34 @@ class TrancheManagingPassTest {
         assertThat(transition.getDealErrorRequested()).isTrue();
         assertThat(transition.getHoldSignal().getCode())
                 .isEqualTo(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED);
+    }
+
+    @Test
+    @DisplayName("U20.12 — работы нет: проход добывает носителя живой защиты и позицию, позицию последней")
+    void u20_12_anIdlePassObservesTheProtectionCarrierAndThePositionLast() {
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        harness.givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
+
+        TrancheTransition transition = handle(coveredContext());
+
+        assertThat(transition.hasCommands()).as("добыча работой не считается").isFalse();
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.getObservations()).extracting(ServiceCommand::getType)
+                .as("налитая нога несёт живую встроенную защиту: её факт добывается добычей родителя")
+                .containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND,
+                        ServiceCommandType.REFRESH_POSITION_COMMAND);
+        assertThat(((RefreshOrderCommandPayload) transition.getObservations().getFirst().getPayload())
+                .getOrderId()).isEqualTo(30L);
+    }
+
+    @Test
+    @DisplayName("U20.13 — рабочий блок что-то сказал: добычи на этом проходе нет")
+    void u20_13_aSpeakingWorkBlockLeavesNoObservation() {
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        harness.givenFetch(ServiceCommandType.REFRESH_POSITION_COMMAND);
+        harness.givenWork(TrancheTransition.command(command(ServiceCommandType.CREATE_ALGO_ORDER_COMMAND)));
+
+        assertThat(handle(coveredContext()).hasObservations()).isFalse();
     }
 
     // --- сборка ------------------------------------------------------------

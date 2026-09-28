@@ -18,7 +18,9 @@ SUBMITTED -> REFRESH_ALGO_ORDER_COMMAND
 
 Стадии `CREATED` у снятия нет: локальной сущности оно не создаёт. Факт
 снятия подтверждает добыча, а не приём команды
-(`docs/rules/ack-not-runtime-truth.md`).
+(`docs/rules/ack-not-runtime-truth.md`). Повтор строки с заполненной целью
+идёт с `SUBMITTED`, а не с начала (`docs/lifecycles/DealActionState.md`
+§«Повтор возвращает исполнение на стадию факта»).
 
 ## Снятие проходит преконтроль
 

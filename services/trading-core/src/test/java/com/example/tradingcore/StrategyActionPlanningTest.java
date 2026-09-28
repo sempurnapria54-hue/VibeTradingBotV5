@@ -21,8 +21,11 @@ import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
+import com.example.tradingcore.domain.command.TargetEntityType;
 import com.example.tradingcore.domain.command.strategy.ActionPlan;
 import com.example.tradingcore.domain.command.strategy.ActionReadiness;
+import com.example.tradingcore.domain.command.strategy.CancelAlgoOrderActionExecutor;
+import com.example.tradingcore.domain.command.strategy.CreateOrderActionExecutor;
 import com.example.tradingcore.domain.command.strategy.StrategyActionExecutor;
 import com.example.tradingcore.domain.command.strategy.StrategyActionOrchestrator;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
@@ -157,6 +160,61 @@ class StrategyActionPlanningTest {
 
         assertThat(orchestrator.plan(step(action), action, waiting, dealContext(), tranche()).hasCommand()).isTrue();
         assertThat(waiting.getStatus()).isEqualTo(DealActionStateStatus.PLANNED);
+    }
+
+    /**
+     * Заведённая нога после ожидания повтора возвращается на отправку, а не
+     * в планирование.
+     *
+     * <p>Планирование прогнало бы её заново через расчёт и преконтроль, где
+     * плановый риск этой же ноги уже учтён: преконтроль блокировал её
+     * собственным весом, и отправка не состоялась бы никогда. Строка без
+     * цели — ноги ещё нет — повторяется с начала.
+     */
+    @Test
+    void aRetriedRowWithACreatedLegResumesAtItsSubmission() {
+        StrategyActionOrchestrator creating = new StrategyActionOrchestrator(
+                List.of(new CreateOrderActionExecutor(null, null, null, null)), dataService);
+        StrategyAction action = createEntry(103L);
+        DealActionState waiting = planned(103L);
+        waiting.setStatus(DealActionStateStatus.RETRY_PENDING);
+        waiting.setNextRetryAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+        assertThat(waiting.creationRetryStage()).isEqualTo(DealActionStateStatus.PLANNED);
+        waiting.targetAt(TargetEntityType.ORDER, 900L);
+        when(dataService.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ActionPlan plan = creating.plan(step(action), action, waiting, dealContext(), tranche());
+
+        assertThat(waiting.getStatus()).isEqualTo(DealActionStateStatus.CREATED);
+        assertThat(plan.getCommand().getType()).isEqualTo(ServiceCommandType.SUBMIT_ORDER_COMMAND);
+    }
+
+    /**
+     * Принятое снятие защиты после ожидания повтора возвращается на добычу
+     * исхода, а не на отправку снятия.
+     *
+     * <p>Цель у снятия ставит ребро отправки, поэтому заполненная цель и
+     * есть факт «снятие принято». Повтор с начала слал бы снятие уже снятой
+     * защиты второй раз, а после добычи, унёсшей её из живых, строка встала
+     * бы в запланированном без цели навсегда. Строка без цели — снятие не
+     * уходило — повторяется с начала.
+     */
+    @Test
+    void aRetriedRemovalWithAnAcceptedCancelResumesAtItsRefresh() {
+        StrategyActionOrchestrator removing = new StrategyActionOrchestrator(
+                List.of(new CancelAlgoOrderActionExecutor(null)), dataService);
+        StrategyAction action = cancelProtection(102L);
+        DealActionState waiting = planned(102L);
+        waiting.setStatus(DealActionStateStatus.RETRY_PENDING);
+        waiting.setNextRetryAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+        assertThat(waiting.removalRetryStage()).isEqualTo(DealActionStateStatus.PLANNED);
+        waiting.targetAt(TargetEntityType.ALGO_ORDER, 901L);
+        when(dataService.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ActionPlan plan = removing.plan(step(action), action, waiting, dealContext(), tranche());
+
+        assertThat(waiting.getStatus()).isEqualTo(DealActionStateStatus.SUBMITTED);
+        assertThat(plan.getCommand().getType()).isEqualTo(ServiceCommandType.REFRESH_ALGO_ORDER_COMMAND);
     }
 
     /** Действия, которое никто не исполняет, пакет не начинает и не планирует. */

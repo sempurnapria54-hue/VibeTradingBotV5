@@ -28,9 +28,6 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.tradingcore.domain.command.ActionKind;
-import com.example.tradingcore.domain.command.DealActionState;
-import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
@@ -58,7 +55,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Базовая сборка.</b> Сделка {@code EXIT_PENDING}, два
  * нетерминальных транша; живой эпизод есть, его риск живой; граф полон;
- * живых входных ног нет; живых агрегатных строк исполнения нет; каскад и
+ * живых входных ног нет; каскад и
  * исполнитель звеньев подменены, звенья добычи отдают свои команды.
  *
  * <p><b>Порядок выхода называется тремя ступенями:</b> при живом риске
@@ -143,17 +140,6 @@ class DealExitPendingPassTest {
         givenFinalizationCommand();
 
         assertIdle(handler.handle(contextBuilder(collapsing).build()));
-    }
-
-    @Test
-    @DisplayName("U10.6 — живая строка агрегатного исполнения: закрытие ведёт исполнитель действия")
-    void u10_6_aLiveDealLevelExecutionRowHoldsTheNetClose() {
-        DealContext context = contextBuilder(baseDeal())
-                .actionStates(List.of(dealLevelRow()))
-                .build();
-        givenFinalizationCommand();
-
-        assertIdle(handler.handle(context));
     }
 
     @Test
@@ -374,16 +360,6 @@ class DealExitPendingPassTest {
         when(systemActionExecutor.next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
                 eq(link), any()))
                 .thenReturn(Optional.of(command(link)));
-    }
-
-    /** Живая строка исполнения УРОВНЯ СДЕЛКИ: транша у неё нет. */
-    private DealActionState dealLevelRow() {
-        DealActionState state = new DealActionState();
-        state.setId(80L);
-        state.setActionKind(ActionKind.STRATEGY);
-        state.setStrategyActionId(5L);
-        state.setStatus(DealActionStateStatus.SUBMITTED);
-        return state;
     }
 
     private DealContext baseContext() {

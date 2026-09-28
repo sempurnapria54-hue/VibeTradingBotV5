@@ -23,6 +23,7 @@ import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.jobs.AnomalyJob;
 import com.example.tradingcore.domain.safety.AccountingDetectors;
 import com.example.tradingcore.domain.safety.AnomalyPassGate;
+import com.example.tradingcore.domain.safety.AnomalyReaction;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.AnomalyScan;
 import com.example.tradingcore.domain.safety.AnomalyScanReader;
@@ -46,7 +47,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 /**
@@ -84,6 +87,7 @@ class AnomalyPassTest {
     private final ExchangeSideDetectors exchangeSideDetectors = mock(ExchangeSideDetectors.class);
     private final AccountingDetectors accountingDetectors = mock(AccountingDetectors.class);
     private final DealInvariantDetectors dealInvariantDetectors = mock(DealInvariantDetectors.class);
+    private final AnomalyReaction anomalyReaction = mock(AnomalyReaction.class);
     private final DealOpeningService dealOpeningService = mock(DealOpeningService.class);
     private final AnomalyReportService reportService = mock(AnomalyReportService.class);
     private final HoldService holdService = mock(HoldService.class);
@@ -250,6 +254,56 @@ class AnomalyPassTest {
     }
 
     /**
+     * Полный проход прерывает серии гистерезиса, которых не продлил, — и
+     * момент прохода снят ДО детекции: наблюдения этого прохода его не
+     * старше и потому не прерываются. Прерывание идёт после детекции и до
+     * отметки прохода.
+     */
+    @Test
+    @DisplayName("U10.24 — полный проход: серии прерваны после детекции и до отметки, момент снят до детекции")
+    void u10_24_aCompletePassBreaksTheSeriesItDidNotExtend() {
+        givenCompletePass();
+        OffsetDateTime before = OffsetDateTime.now(ZoneOffset.UTC);
+
+        job().tick();
+
+        ArgumentCaptor<OffsetDateTime> passStartedAt = ArgumentCaptor.forClass(OffsetDateTime.class);
+        InOrder order = inOrder(dealInvariantDetectors, anomalyReaction, passGate);
+        order.verify(dealInvariantDetectors).detect(any());
+        order.verify(anomalyReaction).breakUnobservedSeries(any(), passStartedAt.capture());
+        order.verify(passGate).apply(Boolean.TRUE, account());
+        assertThat(passStartedAt.getValue()).isAfterOrEqualTo(before);
+    }
+
+    /** На неполном проходе детекторы молчат, и молчание серий не прерывает. */
+    @Test
+    @DisplayName("U10.25 — неполный проход: серии не прерываются")
+    void u10_25_anIncompletePassKeepsTheSeries() {
+        givenAccount();
+        when(scanReader.read(ACCOUNT_INTERNAL_ID)).thenReturn(scan(false));
+
+        job().tick();
+
+        verify(anomalyReaction, never()).breakUnobservedSeries(any(), any());
+    }
+
+    /**
+     * Отказ прерывания засчитывается неполнотой: непрерванная серия
+     * подтвердила бы признак, вернувшийся после чистого прохода.
+     */
+    @Test
+    @DisplayName("U10.26 — прерывание серий бросает: проход отмечен ненаблюдённым")
+    void u10_26_aFailedSeriesBreakMarksThePassAsBlind() {
+        givenCompletePass();
+        doThrow(new IllegalStateException("db is down"))
+                .when(anomalyReaction).breakUnobservedSeries(any(), any());
+
+        job().tick();
+
+        verify(passGate).apply(Boolean.FALSE, account());
+    }
+
+    /**
      * Живая позиция, не объяснимая ни одной сделкой, заводит сделку
      * восстановительной тропой тем же тиком: без этого вызова найденный
      * риск остаётся вне модели.
@@ -320,7 +374,7 @@ class AnomalyPassTest {
         return new AnomalyJob(properties, new JobExecutionGuard(), exchangeAccountDataService,
                 accountInstrumentStateDataService, instrumentDataService, dealDataService, scanReader,
                 passGate, exchangeSideDetectors, accountingDetectors, dealInvariantDetectors,
-                dealOpeningService);
+                anomalyReaction, dealOpeningService);
     }
 
     private AnomalyJobProperties properties() {

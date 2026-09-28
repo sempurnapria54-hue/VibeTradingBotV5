@@ -55,7 +55,7 @@ class RetryBackoffDelayTest {
     void u13_1_anEmptyBackoffTypeDoesNotGrow() {
         RetryPolicyService service = service(policy(10, INITIAL_DELAY, MAX_DELAY, null));
 
-        assertDelay(service, row(3, null), INITIAL_DELAY, "пустой вид отката роста не даёт (Z31)");
+        assertDelay(service, row(3), INITIAL_DELAY, "пустой вид отката роста не даёт (Z31)");
     }
 
     @Test
@@ -63,9 +63,9 @@ class RetryBackoffDelayTest {
     void u13_2_aFixedBackoffDoesNotGrow() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.FIXED));
 
-        assertDelay(service, row(1, null), INITIAL_DELAY, "первая попытка");
-        assertDelay(service, row(2, null), INITIAL_DELAY, "вторая попытка — та же задержка");
-        assertDelay(service, row(5, null), INITIAL_DELAY, "пятая попытка — та же задержка");
+        assertDelay(service, row(1), INITIAL_DELAY, "первая попытка");
+        assertDelay(service, row(2), INITIAL_DELAY, "вторая попытка — та же задержка");
+        assertDelay(service, row(5), INITIAL_DELAY, "пятая попытка — та же задержка");
     }
 
     @Test
@@ -73,7 +73,7 @@ class RetryBackoffDelayTest {
     void u13_3_theExponentIsZeroOnTheFirstAttempt() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(1, null), INITIAL_DELAY, "начальная · 2^(попытка−1)");
+        assertDelay(service, row(1), INITIAL_DELAY, "начальная · 2^(попытка−1)");
     }
 
     @Test
@@ -81,7 +81,7 @@ class RetryBackoffDelayTest {
     void u13_4_theSecondAttemptDoublesTheInitialDelay() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(2, null), INITIAL_DELAY.multipliedBy(2), "двойная начальная");
+        assertDelay(service, row(2), INITIAL_DELAY.multipliedBy(2), "двойная начальная");
     }
 
     @Test
@@ -89,7 +89,7 @@ class RetryBackoffDelayTest {
     void u13_5_theThirdAttemptQuadruplesTheInitialDelay() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(3, null), INITIAL_DELAY.multipliedBy(4), "четверная начальная");
+        assertDelay(service, row(3), INITIAL_DELAY.multipliedBy(4), "четверная начальная");
     }
 
     @Test
@@ -97,7 +97,7 @@ class RetryBackoffDelayTest {
     void u13_6_anEmptyAttemptCountIsReadAsTheFirstAttempt() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(null, null), INITIAL_DELAY, "задержка равна начальной (Z31)");
+        assertDelay(service, row(null), INITIAL_DELAY, "задержка равна начальной (Z31)");
     }
 
     @Test
@@ -105,7 +105,7 @@ class RetryBackoffDelayTest {
     void u13_7_aZeroAttemptCountDoesNotGoBelowTheFirstAttempt() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(0, null), INITIAL_DELAY, "нижняя отсечка показателя (Z31)");
+        assertDelay(service, row(0), INITIAL_DELAY, "нижняя отсечка показателя (Z31)");
     }
 
     @Test
@@ -113,7 +113,7 @@ class RetryBackoffDelayTest {
     void u13_8_aNegativeAttemptCountHitsTheSameFloor() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(-3, null), INITIAL_DELAY, "та же нижняя отсечка (Z31)");
+        assertDelay(service, row(-3), INITIAL_DELAY, "та же нижняя отсечка (Z31)");
     }
 
     @Test
@@ -121,7 +121,7 @@ class RetryBackoffDelayTest {
     void u13_9_theExponentialGrowthIsCappedByTheUpperBound() {
         RetryPolicyService service = service(policy(100, RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(10, null), MAX_DELAY, "масштабированная величина выше потолка");
+        assertDelay(service, row(10), MAX_DELAY, "масштабированная величина выше потолка");
     }
 
     @Test
@@ -130,7 +130,7 @@ class RetryBackoffDelayTest {
         RetryPolicyService service = service(policy(100, INITIAL_DELAY, null,
                 RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(4, null), INITIAL_DELAY.multipliedBy(8), "восьмикратная начальная");
+        assertDelay(service, row(4), INITIAL_DELAY.multipliedBy(8), "восьмикратная начальная");
     }
 
     @Test
@@ -138,7 +138,7 @@ class RetryBackoffDelayTest {
     void u13_11_theExponentIsBoundedAndDoesNotOverflow() {
         RetryPolicyService service = service(policy(100, RetryBackoffType.EXPONENTIAL));
 
-        assertThatCode(() -> assertDelay(service, row(1000, null), MAX_DELAY,
+        assertThatCode(() -> assertDelay(service, row(1000), MAX_DELAY,
                 "без ограничения показателя сдвиг обошёл бы верхнюю границу (Z31)"))
                 .doesNotThrowAnyException();
     }
@@ -149,7 +149,7 @@ class RetryBackoffDelayTest {
         RetryPolicyService service = service(policy(10, Duration.ofMinutes(5), Duration.ofMinutes(1),
                 RetryBackoffType.FIXED));
 
-        assertDelay(service, row(3, null), Duration.ofMinutes(5),
+        assertDelay(service, row(3), Duration.ofMinutes(5),
                 "верхняя граница объявлена величиной экспоненциального отката (Z31)");
     }
 
@@ -159,7 +159,7 @@ class RetryBackoffDelayTest {
         RetryPolicyService service = service(policy(10, null, MAX_DELAY,
                 RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(3, null), Duration.ZERO, "момент — текущий (Z31)");
+        assertDelay(service, row(3), Duration.ZERO, "момент — текущий (Z31)");
     }
 
     @Test
@@ -167,7 +167,7 @@ class RetryBackoffDelayTest {
     void u13_14_anEmptyPolicyGivesAZeroDelay() {
         RetryPolicyService service = new RetryPolicyService(new ServiceCommandRetryProperties());
 
-        assertThatCode(() -> assertDelay(service, row(3, null), Duration.ZERO,
+        assertThatCode(() -> assertDelay(service, row(3), Duration.ZERO,
                 "пустая политика момент не роняет (Z29, Z31)"))
                 .doesNotThrowAnyException();
     }
@@ -176,7 +176,7 @@ class RetryBackoffDelayTest {
     @DisplayName("U13.15 — два вызова подряд: момент строится от часов процесса")
     void u13_15_theMomentIsBuiltFromTheProcessClock() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.FIXED));
-        DealActionState row = row(1, null);
+        DealActionState row = row(1);
 
         OffsetDateTime first = service.calculateNextRetryAt(row, COMMAND);
         OffsetDateTime second = service.calculateNextRetryAt(row, COMMAND);
@@ -190,12 +190,11 @@ class RetryBackoffDelayTest {
     @DisplayName("U13.16 — строка исполнения не меняется: резолвер её сам не двигает")
     void u13_16_theExecutionRowIsLeftUntouched() {
         RetryPolicyService service = service(policy(10, RetryBackoffType.EXPONENTIAL));
-        DealActionState row = row(2, 99);
+        DealActionState row = row(2);
 
         service.calculateNextRetryAt(row, COMMAND);
 
         assertThat(row.getAttemptCount()).isEqualTo(2);
-        assertThat(row.getMaxAttempts()).isEqualTo(99);
         assertThat(row.getNextRetryAt()).as("момент пишет вызывающий, а не политика").isNull();
     }
 
@@ -205,7 +204,7 @@ class RetryBackoffDelayTest {
         RetryPolicyService service = service(policy(100, INITIAL_DELAY, Duration.ofSeconds(20),
                 RetryBackoffType.EXPONENTIAL));
 
-        assertDelay(service, row(3, null), Duration.ofSeconds(20),
+        assertDelay(service, row(3), Duration.ofSeconds(20),
                 "вторая сторона границы к U13.9 и U13.11: сравнение предъявлено обеими (Z31)");
     }
 }

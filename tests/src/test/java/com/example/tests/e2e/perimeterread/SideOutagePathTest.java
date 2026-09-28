@@ -3,6 +3,7 @@ package com.example.tests.e2e.perimeterread;
 import com.example.tests.e2e.Database;
 import com.example.tests.e2e.Json;
 import com.example.tests.e2e.Party;
+import com.example.tests.e2e.SharedStand;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
 import com.example.tests.e2e.perimeterread.Subscription.Frame;
@@ -69,8 +70,8 @@ class SideOutagePathTest {
 
     @BeforeAll
     static void walkThePrologueToAnOpenDeal() {
-        trail = Trail.openPerimeter("p11");
-        token = trail.identity().browserToken("subject-s1", "Trader One");
+        trail = SharedStand.perimeter(SideOutagePathTest.class);
+        token = trail.identity().browserToken(Subjects.fresh("subject-s1"), "Trader One");
         prologue = Prologue.walkToOpenDeal(trail, token);
         trail.stop(Party.BFF);
         trail.side(Party.BFF).set(PULSE_KEY, "1s");
@@ -83,7 +84,7 @@ class SideOutagePathTest {
             first.close();
         }
         if (nonNull(trail)) {
-            trail.close();
+            SharedStand.release(SideOutagePathTest.class);
         }
     }
 
