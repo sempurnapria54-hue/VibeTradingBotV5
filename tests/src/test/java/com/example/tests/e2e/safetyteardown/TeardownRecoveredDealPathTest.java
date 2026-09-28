@@ -263,10 +263,12 @@ class TeardownRecoveredDealPathTest {
                 .anySatisfy(request -> assertThat(instrument(request)).isEqualTo(EXTERNAL_SECOND_INSTRUMENT));
         assertThat(commands(trail)).as("E1.9: на проходе команд нет").isEmpty();
 
+        Object instrument = core.query("select instrument_id from deals where internal_id = ?", second).getFirst()
+                .get("instrument_id");
         detect(trail);
         trail.relayCore();
 
-        List<Map<String, Object>> rows = reports(trail, EXPOSURE_MISMATCH);
+        List<Map<String, Object>> rows = instrumentReports(instrument);
         assertThat(rows).as("E1.9: после первого тика строка отчёта расхождением экспозиции").hasSize(1);
         assertThat(rows.getFirst().get("severity")).as("E1.9: некритичная").isEqualTo("NON_CRITICAL");
         assertThat(rows.getFirst().get("scope")).as("E1.9: радиус счётный").isEqualTo("EXCHANGE_ACCOUNT");
@@ -286,8 +288,20 @@ class TeardownRecoveredDealPathTest {
         assertThat(content.path("code").asString()).as("E1.9: код расхождения экспозиции").isEqualTo(EXPOSURE_MISMATCH);
         assertThat(content.path("rung").asString()).as("E1.9: ступень жёсткая").isEqualTo("HARD");
         assertThat(absent(content.path("instrumentInternalId"))).as("E1.9: инструмента в содержимом нет").isTrue();
-        assertThat(reports(trail, EXPOSURE_MISMATCH).getLast().get("severity"))
+        assertThat(instrumentReports(instrument).getLast().get("severity"))
                 .as("E1.9: критичная строка отчёта тем же кодом").isEqualTo("CRITICAL");
+    }
+
+    /**
+     * Строки отчёта расхождением экспозиции по инструменту сделки-предмета.
+     * Радиус у строки счётный, а инструмент она несёт свой: сделка пролога
+     * того же счёта заводит строку тем же кодом, когда её расхождение
+     * наблюдено, и момент этого от состава набора зависит.
+     */
+    private static List<Map<String, Object>> instrumentReports(Object instrument) {
+        return reports(trail, EXPOSURE_MISMATCH).stream()
+                .filter(row -> Objects.equals(instrument, row.get("instrument_id")))
+                .toList();
     }
 
     // ---------------------------------------------------------------- чтения

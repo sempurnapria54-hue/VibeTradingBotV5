@@ -96,16 +96,16 @@ class DealErrorStateTest {
     }
 
     @Test
-    @DisplayName("U11.4 — причина закрытия уже стои́т: прежнее значение не переписывается")
-    void u11_4_anExistingCloseReasonIsNotOverwritten() {
+    @DisplayName("U11.4 — причина закрытия уже стои́т с ребра выхода: переписана аварийным закрытием")
+    void u11_4_anExitCloseReasonIsOverwrittenByTheEmergencyClose() {
         DealContext context = cleanContext();
-        context.getDeal().setCloseReason(Deal.CloseReason.RISK_CONTROL);
+        context.getDeal().setCloseReason(Deal.CloseReason.STRATEGY_EXIT);
         givenCommand(SystemActionType.FINALIZE_DEAL_ERROR_ACTION,
                 ServiceCommandType.MARK_DEAL_EMERGENCY_CLOSED_COMMAND);
 
         DealTransition transition = handler.handle(context);
 
-        assertThat(context.getDeal().getCloseReason()).isEqualTo(Deal.CloseReason.RISK_CONTROL);
+        assertThat(context.getDeal().getCloseReason()).isEqualTo(Deal.CloseReason.EMERGENCY_CLOSE);
         assertThat(commandTypes(transition))
                 .containsExactly(ServiceCommandType.MARK_DEAL_EMERGENCY_CLOSED_COMMAND);
     }

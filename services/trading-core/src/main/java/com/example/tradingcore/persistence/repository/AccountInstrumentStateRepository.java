@@ -1,6 +1,7 @@
 package com.example.tradingcore.persistence.repository;
 
 import com.example.tradingcore.persistence.model.AccountInstrumentStateEntity;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -9,7 +10,15 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Запросы по строке состояния счёта на инструменте. */
+/**
+ * Запросы по строке состояния счёта на инструменте.
+ *
+ * <p><b>Каждый точечный запрос сам ставит {@code modifiedAt} и
+ * {@code modifiedBy}:</b> мимо сущности слушатели аудита не проходят
+ * (docs/models/domain/other/Auditable.md §«Системные поля и точечная
+ * запись»); значения приходят от границы, часы и автор — те же, что у
+ * слушателя.
+ */
 public interface AccountInstrumentStateRepository extends JpaRepository<AccountInstrumentStateEntity, Long> {
 
     Optional<AccountInstrumentStateEntity> findByExchangeAccountIdAndInstrumentId(Long exchangeAccountId,
@@ -82,13 +91,16 @@ public interface AccountInstrumentStateRepository extends JpaRepository<AccountI
      */
     @Modifying
     @Query("""
-            update AccountInstrumentStateEntity s set s.safetyRung = :requested
+            update AccountInstrumentStateEntity s set s.safetyRung = :requested,
+                                                      s.modifiedAt = :modifiedAt, s.modifiedBy = :modifiedBy
             where s.exchangeAccountId = :exchangeAccountId and s.instrumentId = :instrumentId
               and s.safetyRung in :lowerRungs""")
     int raiseRung(@Param("exchangeAccountId") Long exchangeAccountId,
                   @Param("instrumentId") Long instrumentId,
                   @Param("requested") String requested,
-                  @Param("lowerRungs") Collection<String> lowerRungs);
+                  @Param("lowerRungs") Collection<String> lowerRungs,
+                  @Param("modifiedAt") OffsetDateTime modifiedAt,
+                  @Param("modifiedBy") String modifiedBy);
 
     /**
      * <b>Снятие ступени: переход ВНИЗ, гардированный НАЗВАННОЙ ступенью.</b>
@@ -103,11 +115,14 @@ public interface AccountInstrumentStateRepository extends JpaRepository<AccountI
      */
     @Modifying
     @Query("""
-            update AccountInstrumentStateEntity s set s.safetyRung = :target
+            update AccountInstrumentStateEntity s set s.safetyRung = :target,
+                                                      s.modifiedAt = :modifiedAt, s.modifiedBy = :modifiedBy
             where s.exchangeAccountId = :exchangeAccountId and s.instrumentId = :instrumentId
               and s.safetyRung = :standing""")
     int clearRung(@Param("exchangeAccountId") Long exchangeAccountId,
                   @Param("instrumentId") Long instrumentId,
                   @Param("standing") String standing,
-                  @Param("target") String target);
+                  @Param("target") String target,
+                  @Param("modifiedAt") OffsetDateTime modifiedAt,
+                  @Param("modifiedBy") String modifiedBy);
 }

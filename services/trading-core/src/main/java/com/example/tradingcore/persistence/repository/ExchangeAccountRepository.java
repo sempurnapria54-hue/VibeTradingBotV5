@@ -2,6 +2,7 @@ package com.example.tradingcore.persistence.repository;
 
 import com.example.tradingcore.persistence.model.ExchangeAccountEntity;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -10,7 +11,15 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Запросы по строке проекции биржевого счёта. */
+/**
+ * Запросы по строке проекции биржевого счёта.
+ *
+ * <p><b>Каждый точечный запрос сам ставит {@code modifiedAt} и
+ * {@code modifiedBy}:</b> мимо сущности слушатели аудита не проходят
+ * (docs/models/domain/other/Auditable.md §«Системные поля и точечная
+ * запись»); значения приходят от границы, часы и автор — те же, что у
+ * слушателя.
+ */
 public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccountEntity, Long> {
 
     Optional<ExchangeAccountEntity> findByInternalId(String internalId);
@@ -76,11 +85,14 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
      */
     @Modifying
     @Query("""
-            update ExchangeAccountEntity a set a.riskBase = :riskBase, a.riskBaseCurrency = :currency
+            update ExchangeAccountEntity a set a.riskBase = :riskBase, a.riskBaseCurrency = :currency,
+                                               a.modifiedAt = :modifiedAt, a.modifiedBy = :modifiedBy
             where a.id = :id and a.riskBase is null""")
     int applyRiskBase(@Param("id") Long id,
                       @Param("riskBase") BigDecimal riskBase,
-                      @Param("currency") String currency);
+                      @Param("currency") String currency,
+                      @Param("modifiedAt") OffsetDateTime modifiedAt,
+                      @Param("modifiedBy") String modifiedBy);
 
     /**
      * Счета, доступные торговле, — по реестровому статусу проекции.
@@ -107,16 +119,27 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
      */
     @Modifying
     @Query("""
-            update ExchangeAccountEntity a set a.consecutiveLossCount = a.consecutiveLossCount + 1
+            update ExchangeAccountEntity a set a.consecutiveLossCount = a.consecutiveLossCount + 1,
+                                               a.modifiedAt = :modifiedAt, a.modifiedBy = :modifiedBy
             where a.id = :id""")
-    int incrementConsecutiveLossCount(@Param("id") Long id);
+    int incrementConsecutiveLossCount(@Param("id") Long id,
+                                      @Param("modifiedAt") OffsetDateTime modifiedAt,
+                                      @Param("modifiedBy") String modifiedBy);
 
-    /** Серия обнуляется ценово-прибыльной сделкой; иных операндов обнуления нет. */
+    /**
+     * Серия обнуляется ценово-прибыльной сделкой; иных операндов обнуления нет.
+     *
+     * <p>Гард «серия не нулевая»: обнуление нуля ничего не меняет, и запись
+     * его сдвигала бы момент изменения строки без изменения.
+     */
     @Modifying
     @Query("""
-            update ExchangeAccountEntity a set a.consecutiveLossCount = 0
-            where a.id = :id""")
-    int resetConsecutiveLossCount(@Param("id") Long id);
+            update ExchangeAccountEntity a set a.consecutiveLossCount = 0,
+                                               a.modifiedAt = :modifiedAt, a.modifiedBy = :modifiedBy
+            where a.id = :id and a.consecutiveLossCount <> 0""")
+    int resetConsecutiveLossCount(@Param("id") Long id,
+                                  @Param("modifiedAt") OffsetDateTime modifiedAt,
+                                  @Param("modifiedBy") String modifiedBy);
 
     /**
      * Счёт наблюдений safety-сети: ненаблюдённый проход увеличивает счёт
@@ -129,16 +152,29 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
      */
     @Modifying
     @Query("""
-            update ExchangeAccountEntity a set a.blindPassCount = a.blindPassCount + 1
+            update ExchangeAccountEntity a set a.blindPassCount = a.blindPassCount + 1,
+                                               a.modifiedAt = :modifiedAt, a.modifiedBy = :modifiedBy
             where a.id = :id""")
-    int incrementBlindPassCount(@Param("id") Long id);
+    int incrementBlindPassCount(@Param("id") Long id,
+                                @Param("modifiedAt") OffsetDateTime modifiedAt,
+                                @Param("modifiedBy") String modifiedBy);
 
-    /** Наблюдённый проход сбрасывает счёт слепоты в ноль. */
+    /**
+     * Наблюдённый проход сбрасывает счёт слепоты в ноль.
+     *
+     * <p>Гард «счёт не нулевой» держит момент изменения строки: чистый
+     * проход идёт каждым тактом, и запись уже нулевого счёта сдвигала бы
+     * {@code modifiedAt} на каждом — он означал бы «последний проход», а не
+     * «последнее изменение».
+     */
     @Modifying
     @Query("""
-            update ExchangeAccountEntity a set a.blindPassCount = 0
-            where a.id = :id""")
-    int resetBlindPassCount(@Param("id") Long id);
+            update ExchangeAccountEntity a set a.blindPassCount = 0,
+                                               a.modifiedAt = :modifiedAt, a.modifiedBy = :modifiedBy
+            where a.id = :id and a.blindPassCount <> 0""")
+    int resetBlindPassCount(@Param("id") Long id,
+                            @Param("modifiedAt") OffsetDateTime modifiedAt,
+                            @Param("modifiedBy") String modifiedBy);
 
     /** Текущий счёт слепоты ПРОЕКЦИЕЙ поля — операнд предела, не строка счёта. */
     @Query("select a.blindPassCount from ExchangeAccountEntity a where a.id = :id")
@@ -157,11 +193,14 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
      */
     @Modifying
     @Query("""
-            update ExchangeAccountEntity a set a.safetyRung = :requested
+            update ExchangeAccountEntity a set a.safetyRung = :requested,
+                                               a.modifiedAt = :modifiedAt, a.modifiedBy = :modifiedBy
             where a.id = :id and a.safetyRung in :lowerRungs""")
     int raiseRung(@Param("id") Long id,
                   @Param("requested") String requested,
-                  @Param("lowerRungs") Collection<String> lowerRungs);
+                  @Param("lowerRungs") Collection<String> lowerRungs,
+                  @Param("modifiedAt") OffsetDateTime modifiedAt,
+                  @Param("modifiedBy") String modifiedBy);
 
     /**
      * <b>Снятие ступени: переход ВНИЗ, гардированный НАЗВАННОЙ ступенью.</b>
@@ -176,9 +215,12 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
      */
     @Modifying
     @Query("""
-            update ExchangeAccountEntity a set a.safetyRung = :target
+            update ExchangeAccountEntity a set a.safetyRung = :target,
+                                               a.modifiedAt = :modifiedAt, a.modifiedBy = :modifiedBy
             where a.id = :id and a.safetyRung = :standing""")
     int clearRung(@Param("id") Long id,
                   @Param("standing") String standing,
-                  @Param("target") String target);
+                  @Param("target") String target,
+                  @Param("modifiedAt") OffsetDateTime modifiedAt,
+                  @Param("modifiedBy") String modifiedBy);
 }

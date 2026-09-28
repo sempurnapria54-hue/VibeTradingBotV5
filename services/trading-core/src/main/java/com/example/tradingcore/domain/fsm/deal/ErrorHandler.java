@@ -1,6 +1,5 @@
 package com.example.tradingcore.domain.fsm.deal;
 
-import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -78,12 +77,14 @@ public class ErrorHandler implements DealHandler {
      * {@code EMERGENCY_CLOSE}, той же транзакцией, которой затребует
      * ребро: терминальное звено причину не пишет, оно ребро применяет
      * (docs/lifecycles/Deal.md).
+     *
+     * <p><b>Пишет безусловно</b> — и поверх причины, записанной ребром
+     * выхода: итоговая причина сделки, прошедшей ошибочное состояние,
+     * определяется на этом ребре, а прерванный выход её уже не объясняет.
      */
     private DealTransition emergencyTerminal(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
-        if (isNull(deal.getCloseReason())) {
-            deal.setCloseReason(Deal.CloseReason.EMERGENCY_CLOSE);
-        }
+        deal.setCloseReason(Deal.CloseReason.EMERGENCY_CLOSE);
         if (isTrue(deal.isTerminal())) {
             return DealTransition.stay();
         }

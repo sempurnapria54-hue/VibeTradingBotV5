@@ -64,7 +64,8 @@ public interface AnomalyReportRepository extends JpaRepository<AnomalyReportEnti
 
     /** Продлить серию стоящей по ключу строки моментом наблюдения. */
     @Modifying
-    @Query("update AnomalyReportEntity r set r.lastObservedAt = :observedAt "
+    @Query("update AnomalyReportEntity r set r.lastObservedAt = :observedAt, "
+            + "r.modifiedAt = :modifiedAt, r.modifiedBy = :modifiedBy "
             + "where r.exchangeAccountId = :exchangeAccountId "
             + "and ((:instrumentId is null and r.instrumentId is null) or r.instrumentId = :instrumentId) "
             + "and ((:subject is null and r.subjectExternalId is null) or r.subjectExternalId = :subject) "
@@ -75,17 +76,22 @@ public interface AnomalyReportRepository extends JpaRepository<AnomalyReportEnti
                       @Param("code") String code,
                       @Param("severity") String severity,
                       @Param("since") OffsetDateTime since,
-                      @Param("observedAt") OffsetDateTime observedAt);
+                      @Param("observedAt") OffsetDateTime observedAt,
+                      @Param("modifiedAt") OffsetDateTime modifiedAt,
+                      @Param("modifiedBy") String modifiedBy);
 
     /**
      * Прервать серии счёта, которых проход не продлил: последнее
      * наблюдение раньше начала прохода.
      */
     @Modifying
-    @Query("update AnomalyReportEntity r set r.lastObservedAt = null "
+    @Query("update AnomalyReportEntity r set r.lastObservedAt = null, "
+            + "r.modifiedAt = :modifiedAt, r.modifiedBy = :modifiedBy "
             + "where r.exchangeAccountId = :exchangeAccountId and r.lastObservedAt < :passStartedAt")
     void breakSeries(@Param("exchangeAccountId") Long exchangeAccountId,
-                     @Param("passStartedAt") OffsetDateTime passStartedAt);
+                     @Param("passStartedAt") OffsetDateTime passStartedAt,
+                     @Param("modifiedAt") OffsetDateTime modifiedAt,
+                     @Param("modifiedBy") String modifiedBy);
 
     /**
      * Носитель ключа ПРОИСШЕСТВИЯ, привязанного к сущности-предмету: отчёт

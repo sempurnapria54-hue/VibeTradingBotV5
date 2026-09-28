@@ -20,6 +20,13 @@ import org.springframework.data.repository.query.Param;
  * §Персистентность): строка создаётся раньше, чем наблюдается факт,
  * поэтому запретом на запись их выразить нельзя, а охрана, оставленная
  * вызывающему, держится ровно до второго вызывающего.
+ *
+ * <p><b>Каждый точечный запрос сам ставит {@code modifiedAt} и
+ * {@code modifiedBy}:</b> мимо сущности слушатели аудита не проходят, и без
+ * этого изменение, сделанное запросом, не было бы записано ни в одной колонке
+ * (docs/models/domain/other/Auditable.md §«Системные поля и точечная
+ * запись»). Значения приходят от границы, а не из запроса: часы и автор те
+ * же, что у слушателя.
  */
 public interface DealRepository extends JpaRepository<DealEntity, Long> {
 
@@ -169,12 +176,15 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      */
     @Modifying
     @Query("""
-            update DealEntity d set d.status = :errorStatus, d.shutdownReason = :shutdownReason
+            update DealEntity d set d.status = :errorStatus, d.shutdownReason = :shutdownReason,
+                                    d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
             where d.id = :dealId and d.status in :activeStatuses""")
     int enforceHardRung(@Param("dealId") Long dealId,
                         @Param("shutdownReason") String shutdownReason,
                         @Param("errorStatus") String errorStatus,
-                        @Param("activeStatuses") Collection<String> activeStatuses);
+                        @Param("activeStatuses") Collection<String> activeStatuses,
+                        @Param("modifiedAt") OffsetDateTime modifiedAt,
+                        @Param("modifiedBy") String modifiedBy);
 
     /**
      * Ребро в {@code ERROR} <b>без причины</b> — общий запрос обеих троп,
@@ -197,11 +207,14 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      */
     @Modifying
     @Query("""
-            update DealEntity d set d.status = :errorStatus
+            update DealEntity d set d.status = :errorStatus,
+                                    d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
             where d.id = :dealId and d.status in :activeStatuses""")
     int applyErrorEdge(@Param("dealId") Long dealId,
                        @Param("errorStatus") String errorStatus,
-                       @Param("activeStatuses") Collection<String> activeStatuses);
+                       @Param("activeStatuses") Collection<String> activeStatuses,
+                       @Param("modifiedAt") OffsetDateTime modifiedAt,
+                       @Param("modifiedBy") String modifiedBy);
 
     /**
      * Применение статусного ребра прохода: статус и обе причины.
@@ -219,13 +232,16 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
     @Modifying
     @Query("""
             update DealEntity d
-               set d.status = :status, d.shutdownReason = :shutdownReason, d.closeReason = :closeReason
+               set d.status = :status, d.shutdownReason = :shutdownReason, d.closeReason = :closeReason,
+                   d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
              where d.id = :dealId and d.status = :fromStatus""")
     int applyStatusEdge(@Param("dealId") Long dealId,
                         @Param("status") String status,
                         @Param("shutdownReason") String shutdownReason,
                         @Param("closeReason") String closeReason,
-                        @Param("fromStatus") String fromStatus);
+                        @Param("fromStatus") String fromStatus,
+                        @Param("modifiedAt") OffsetDateTime modifiedAt,
+                        @Param("modifiedBy") String modifiedBy);
 
     /**
      * <b>Терминальное ребро сделки: статус и причина закрытия одним
@@ -256,12 +272,15 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      */
     @Modifying
     @Query("""
-            update DealEntity d set d.status = :status, d.closeReason = :closeReason
+            update DealEntity d set d.status = :status, d.closeReason = :closeReason,
+                                    d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
             where d.id = :dealId and d.status in :fromStatuses""")
     int applyTerminalEdge(@Param("dealId") Long dealId,
                           @Param("status") String status,
                           @Param("closeReason") String closeReason,
-                          @Param("fromStatuses") Collection<String> fromStatuses);
+                          @Param("fromStatuses") Collection<String> fromStatuses,
+                          @Param("modifiedAt") OffsetDateTime modifiedAt,
+                          @Param("modifiedBy") String modifiedBy);
 
     /**
      * <b>Итоговое число сделки вместе с четвёркой признаков отбора — одним
@@ -290,7 +309,8 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
                set d.resultProfit = :resultProfit, d.resultProfitCurrency = :resultProfitCurrency,
                    d.closeOutcome = :closeOutcome, d.reconciliationStatus = :reconciliationStatus,
                    d.breakdownIncomplete = :breakdownIncomplete,
-                   d.riskBenchmarkAvailability = :riskBenchmarkAvailability
+                   d.riskBenchmarkAvailability = :riskBenchmarkAvailability,
+                   d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
              where d.id = :dealId and d.resultProfit is null""")
     int applyResultAndFeatures(@Param("dealId") Long dealId,
                                @Param("resultProfit") BigDecimal resultProfit,
@@ -298,7 +318,9 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
                                @Param("closeOutcome") String closeOutcome,
                                @Param("reconciliationStatus") String reconciliationStatus,
                                @Param("breakdownIncomplete") String breakdownIncomplete,
-                               @Param("riskBenchmarkAvailability") String riskBenchmarkAvailability);
+                               @Param("riskBenchmarkAvailability") String riskBenchmarkAvailability,
+                               @Param("modifiedAt") OffsetDateTime modifiedAt,
+                               @Param("modifiedBy") String modifiedBy);
 
     /**
      * <b>Четвёрка чисел риска — точечным запросом.</b> Пересчёт идёт
@@ -310,6 +332,11 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      * описательны, и их свежесть на сделке, уведённой каскадом ступени в
      * {@code ERROR}, не вредна — вредна была бы запись статуса, которой
      * здесь нет.
+     *
+     * <p><b>Гард — хоть одно число отличается от стоящего.</b> Пересчёт идёт
+     * каждым проходом, и запись тех же чисел двигала бы момент изменения
+     * строки на каждом — {@code modifiedAt} означал бы «последний пересчёт»,
+     * а не «последнее изменение».
      */
     @Modifying
     @Query("""
@@ -317,13 +344,20 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
                set d.plannedRiskAmount = :plannedRiskAmount,
                    d.incurredRiskAmount = :incurredRiskAmount,
                    d.currentRiskAmount = :currentRiskAmount,
-                   d.protectionRelievedRiskAmount = :protectionRelievedRiskAmount
-             where d.id = :dealId""")
+                   d.protectionRelievedRiskAmount = :protectionRelievedRiskAmount,
+                   d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
+             where d.id = :dealId
+               and (d.plannedRiskAmount is distinct from :plannedRiskAmount
+                    or d.incurredRiskAmount is distinct from :incurredRiskAmount
+                    or d.currentRiskAmount is distinct from :currentRiskAmount
+                    or d.protectionRelievedRiskAmount is distinct from :protectionRelievedRiskAmount)""")
     int applyRiskNumbers(@Param("dealId") Long dealId,
                          @Param("plannedRiskAmount") BigDecimal plannedRiskAmount,
                          @Param("incurredRiskAmount") BigDecimal incurredRiskAmount,
                          @Param("currentRiskAmount") BigDecimal currentRiskAmount,
-                         @Param("protectionRelievedRiskAmount") BigDecimal protectionRelievedRiskAmount);
+                         @Param("protectionRelievedRiskAmount") BigDecimal protectionRelievedRiskAmount,
+                         @Param("modifiedAt") OffsetDateTime modifiedAt,
+                         @Param("modifiedBy") String modifiedBy);
 
     /**
      * Порог доказанного покрытия двигается только вперёд: число
@@ -333,11 +367,14 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      */
     @Modifying
     @Query("""
-            update DealEntity d set d.coverageProvenThrough = :observedAt
+            update DealEntity d set d.coverageProvenThrough = :observedAt,
+                                    d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
             where d.id = :dealId
               and (d.coverageProvenThrough is null or d.coverageProvenThrough < :observedAt)""")
     int advanceCoverageProvenThrough(@Param("dealId") Long dealId,
-                                     @Param("observedAt") OffsetDateTime observedAt);
+                                     @Param("observedAt") OffsetDateTime observedAt,
+                                     @Param("modifiedAt") OffsetDateTime modifiedAt,
+                                     @Param("modifiedBy") String modifiedBy);
 
     /**
      * Write-once нижней границы окна линковки движений: заполненная
@@ -347,10 +384,13 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      */
     @Modifying
     @Query("""
-            update DealEntity d set d.billsWindowBegin = :observedAt
+            update DealEntity d set d.billsWindowBegin = :observedAt,
+                                    d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
             where d.id = :dealId and d.billsWindowBegin is null""")
     int applyBillsWindowBegin(@Param("dealId") Long dealId,
-                              @Param("observedAt") OffsetDateTime observedAt);
+                              @Param("observedAt") OffsetDateTime observedAt,
+                              @Param("modifiedAt") OffsetDateTime modifiedAt,
+                              @Param("modifiedBy") String modifiedBy);
 
     /**
      * Метка «движения добыты по …» двигается только вперёд: откат назад
@@ -358,11 +398,14 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      */
     @Modifying
     @Query("""
-            update DealEntity d set d.billsFetchedThrough = :fetchedThrough
+            update DealEntity d set d.billsFetchedThrough = :fetchedThrough,
+                                    d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
             where d.id = :dealId
               and (d.billsFetchedThrough is null or d.billsFetchedThrough < :fetchedThrough)""")
     int advanceBillsFetchedThrough(@Param("dealId") Long dealId,
-                                   @Param("fetchedThrough") OffsetDateTime fetchedThrough);
+                                   @Param("fetchedThrough") OffsetDateTime fetchedThrough,
+                                   @Param("modifiedAt") OffsetDateTime modifiedAt,
+                                   @Param("modifiedBy") String modifiedBy);
 
     /**
      * Write-once базы риска: охрана адресует не конкуренцию писателей, а
@@ -371,10 +414,13 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      */
     @Modifying
     @Query("""
-            update DealEntity d set d.plannedRiskEquityBase = :equityBase
+            update DealEntity d set d.plannedRiskEquityBase = :equityBase,
+                                    d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
             where d.id = :dealId and d.plannedRiskEquityBase is null""")
     int applyPlannedRiskEquityBase(@Param("dealId") Long dealId,
-                                   @Param("equityBase") BigDecimal equityBase);
+                                   @Param("equityBase") BigDecimal equityBase,
+                                   @Param("modifiedAt") OffsetDateTime modifiedAt,
+                                   @Param("modifiedBy") String modifiedBy);
 
     /**
      * Write-once валюты риска — той же природы, что и база: снимок
@@ -384,8 +430,11 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      */
     @Modifying
     @Query("""
-            update DealEntity d set d.plannedRiskCurrency = :currency
+            update DealEntity d set d.plannedRiskCurrency = :currency,
+                                    d.modifiedAt = :modifiedAt, d.modifiedBy = :modifiedBy
             where d.id = :dealId and d.plannedRiskCurrency is null""")
     int applyPlannedRiskCurrency(@Param("dealId") Long dealId,
-                                 @Param("currency") String currency);
+                                 @Param("currency") String currency,
+                                 @Param("modifiedAt") OffsetDateTime modifiedAt,
+                                 @Param("modifiedBy") String modifiedBy);
 }

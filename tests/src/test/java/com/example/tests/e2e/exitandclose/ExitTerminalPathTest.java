@@ -318,16 +318,12 @@ class ExitTerminalPathTest {
      * увела её в ошибочное состояние раньше, чем выход снял риск. Снимает
      * риск аварийное снятие ступени; площадка отражает его сценариями.
      *
-     * <p>Красна по находке {@code F10} документа: аварийный обработчик пишет
-     * причину закрытия, только когда она пуста, и сделка несёт причину
-     * выхода, а дом ребра — «аварийное закрытие»
-     * (.claude/work/backlog.md §«Аварийный терминал оставляет причину
-     * закрытия, записанную ребром выхода»). Ассерт причины стои́т последним:
-     * прочие выходы клетки прогон с меткой проверяет до него.
+     * <p>Причина закрытия у такой сделки — аварийная, хотя стоя́ла с ребра
+     * выхода: писатель аварийного ребра пишет её безусловно
+     * (docs/lifecycles/Deal.md §«Причина закрытия — писатель и момент»).
      */
     @Test
     @Order(5)
-    @Tag("debt")
     @DisplayName("E5.3 — Аварийный терминал: число «неисчислимо» едет пустым, и исход у события другой")
     void e5_3_theEmergencyTerminalCarriesTheUncomputableNumberAsAbsent() {
         trail.exchange().forgetScenarios();
@@ -340,18 +336,23 @@ class ExitTerminalPathTest {
         trail.relayCore();
         definition = deleteDefinition(trail);
         passUntilLeaves(trail, deal, "ACTIVE");
-        Answer raised = raiseHalt(trail, "FULL");
-        assertThat(raised.status()).as("предусловие E5.3: жёсткая ступень поднята — " + raised.body())
-                .isEqualTo(202);
-        trail.passUntil("сделка в ошибочном состоянии", () -> Objects.equals("ERROR",
-                dealRead(trail, deal).path("status").asString()));
         trail.relayCore();
         Long facts = trail.rows(Party.STATISTICS, "deal_facts");
         trail.forgetTraces();
+        Answer raised = raiseHalt(trail, "FULL");
+        assertThat(raised.status()).as("предусловие E5.3: жёсткая ступень поднята — " + raised.body())
+                .isEqualTo(202);
 
+        // Ребро в ошибочное состояние и аварийный терминал сходятся в одном
+        // проходе, когда отсутствие риска доказано уже на нём, — ошибочное
+        // состояние поверхностью не наблюдается. В терминал ведёт только оно,
+        // а прохождение предусловия пинит причина остановки, записанная ребром.
         trail.passUntil("аварийный терминал", () -> Objects.equals("EMERGENCY_CLOSED",
                 dealRead(trail, deal).path("status").asString()));
         trail.relayCore();
+        assertThat(trail.database(Party.TRADING_CORE).query("select shutdown_reason from deals where id = ?", dealId)
+                .getFirst().get("shutdown_reason")).as("предусловие E5.3: сделку в ошибочное состояние увела ступень")
+                .isEqualTo("EXCHANGE_HOLD");
 
         List<LoggedRequest> reads = trail.exchange().requests().stream()
                 .filter(request -> Objects.equals("GET", request.getMethod().getName()))
