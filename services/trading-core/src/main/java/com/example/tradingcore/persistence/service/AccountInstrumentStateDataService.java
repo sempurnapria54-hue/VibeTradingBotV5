@@ -1,6 +1,5 @@
 package com.example.tradingcore.persistence.service;
 
-import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.mapping.AccountInstrumentStateMapper;
@@ -50,7 +49,7 @@ public class AccountInstrumentStateDataService {
 
     private final AccountInstrumentStateRepository repository;
     private final AccountInstrumentStateMapper mapper;
-    private final ActorProvider actorProvider;
+    private final PointWriteAudit audit;
 
     /**
      * Поднять ступень пары до запрошенной; {@code true} — переход
@@ -67,9 +66,9 @@ public class AccountInstrumentStateDataService {
     public Boolean raiseRung(Long exchangeAccountId, Long instrumentId, Instrument.SafetyRung requested) {
         repository.insertIfAbsent(exchangeAccountId, instrumentId,
                 Instrument.SafetyRung.ACTIVE.name(), Instrument.MarginMode.ISOLATED.name(),
-                actorProvider.currentActor());
+                audit.moment(), audit.writer());
         return repository.raiseRung(exchangeAccountId, instrumentId, requested.name(),
-                lowerRungs(requested)) > 0;
+                lowerRungs(requested), audit.moment(), audit.writer()) > 0;
     }
 
     /**
@@ -79,7 +78,8 @@ public class AccountInstrumentStateDataService {
     @Transactional
     public Boolean clearRung(Long exchangeAccountId, Long instrumentId,
                              Instrument.SafetyRung standing, Instrument.SafetyRung target) {
-        return repository.clearRung(exchangeAccountId, instrumentId, standing.name(), target.name()) > 0;
+        return repository.clearRung(exchangeAccountId, instrumentId, standing.name(), target.name(),
+                audit.moment(), audit.writer()) > 0;
     }
 
     /**
@@ -159,7 +159,7 @@ public class AccountInstrumentStateDataService {
     public AccountInstrumentState getRequiredByPair(Long exchangeAccountId, Long instrumentId) {
         repository.insertIfAbsent(exchangeAccountId, instrumentId,
                 Instrument.SafetyRung.ACTIVE.name(), Instrument.MarginMode.ISOLATED.name(),
-                actorProvider.currentActor());
+                audit.moment(), audit.writer());
         return repository.findByExchangeAccountIdAndInstrumentId(exchangeAccountId, instrumentId)
                 .map(mapper::persistenceToDomain)
                 .orElseThrow(() -> new IllegalStateException(

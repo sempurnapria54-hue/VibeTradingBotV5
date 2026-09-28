@@ -82,7 +82,6 @@ class StrictReconciliationBoxTest extends LiveDealBox {
         assertThat(dealStatus()).isEqualTo("EXIT_PENDING");
         fullHalt(ACCOUNT);
         assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
-        Object rungStandingSince = accountRow().get("modified_at");
         Long raisedOnce = countEvents(HOLD_RAISED);
 
         passesUntilDealTerminal();
@@ -90,10 +89,13 @@ class StrictReconciliationBoxTest extends LiveDealBox {
         // Сигнал мягкой ступени того же радиуса случился: сверка аварийного
         // терминала расходится сверх допуска.
         assertThat(dealRow().get("reconciliation_status")).isEqualTo("MISMATCHED");
-        // Понижения нет: ступень та же, строка счёта не переставлялась,
-        // второго факта подъёма нет — понижает только снятие.
+        // Понижения нет: ступень та же, второго факта подъёма нет — понижает
+        // только снятие. Момент изменения строки счёта здесь не операнд: её
+        // законно двигают и другие точечные записи торгового состояния —
+        // серия убытков на терминале, счёт слепых проходов
+        // (docs/models/domain/other/Auditable.md §«Системные поля и точечная
+        // запись»).
         assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
-        assertThat(accountRow().get("modified_at")).isEqualTo(rungStandingSince);
         assertThat(countEvents(HOLD_RAISED)).isEqualTo(raisedOnce);
     }
 }

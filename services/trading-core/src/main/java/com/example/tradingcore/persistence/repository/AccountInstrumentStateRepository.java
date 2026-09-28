@@ -38,7 +38,8 @@ public interface AccountInstrumentStateRepository extends JpaRepository<AccountI
      * <p><b>Аудит проставляется здесь же:</b> нативная вставка слушателей
      * JPA не проходит, поэтому автор и момент записываются явно — иначе у
      * строки не было бы названного писателя
-     * (docs/rules/writer-named-for-every-value.md).
+     * (docs/rules/writer-named-for-every-value.md). Момент приходит от
+     * границы, а не часами базы: шкала у него та же, что у слушателя.
      */
     @Modifying
     @Query(nativeQuery = true, value = """
@@ -47,13 +48,14 @@ public interface AccountInstrumentStateRepository extends JpaRepository<AccountI
                  created_at, created_by, modified_at, modified_by)
             values
                 (:exchangeAccountId, :instrumentId, :safetyRung, :marginMode,
-                 now(), :writer, now(), :writer)
+                 :writtenAt, :writer, :writtenAt, :writer)
             on conflict (exchange_account_id, instrument_id) do nothing
             """)
     void insertIfAbsent(@Param("exchangeAccountId") Long exchangeAccountId,
                         @Param("instrumentId") Long instrumentId,
                         @Param("safetyRung") String safetyRung,
                         @Param("marginMode") String marginMode,
+                        @Param("writtenAt") OffsetDateTime writtenAt,
                         @Param("writer") String writer);
 
     /**

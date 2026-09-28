@@ -35,6 +35,7 @@ public class ExchangeAccountDataService {
 
     private final ExchangeAccountRepository repository;
     private final ExchangeAccountMapper mapper;
+    private final PointWriteAudit audit;
 
     /**
      * Сводит строку проекции с реестром владельца: заводит недостающую,
@@ -62,7 +63,7 @@ public class ExchangeAccountDataService {
      */
     @Transactional
     public void applyRiskBase(Long id, BigDecimal riskBase, String currency) {
-        repository.applyRiskBase(id, riskBase, currency);
+        repository.applyRiskBase(id, riskBase, currency, audit.moment(), audit.writer());
     }
 
     /**
@@ -76,10 +77,10 @@ public class ExchangeAccountDataService {
     @Transactional
     public void applyLossStreak(Long id, Boolean increment) {
         if (Boolean.TRUE.equals(increment)) {
-            repository.incrementConsecutiveLossCount(id);
+            repository.incrementConsecutiveLossCount(id, audit.moment(), audit.writer());
             return;
         }
-        repository.resetConsecutiveLossCount(id);
+        repository.resetConsecutiveLossCount(id, audit.moment(), audit.writer());
     }
 
     /**
@@ -96,7 +97,8 @@ public class ExchangeAccountDataService {
      */
     @Transactional
     public Boolean raiseRung(Long id, ExchangeAccount.SafetyRung requested) {
-        return repository.raiseRung(id, requested.name(), lowerRungs(requested)) > 0;
+        return repository.raiseRung(id, requested.name(), lowerRungs(requested),
+                audit.moment(), audit.writer()) > 0;
     }
 
     /**
@@ -107,7 +109,7 @@ public class ExchangeAccountDataService {
     @Transactional
     public Boolean clearRung(Long id, ExchangeAccount.SafetyRung standing,
                              ExchangeAccount.SafetyRung target) {
-        return repository.clearRung(id, standing.name(), target.name()) > 0;
+        return repository.clearRung(id, standing.name(), target.name(), audit.moment(), audit.writer()) > 0;
     }
 
     /**
@@ -225,10 +227,10 @@ public class ExchangeAccountDataService {
     @Transactional
     public Integer markPass(Long id, Boolean observed) {
         if (isTrue(observed)) {
-            repository.resetBlindPassCount(id);
+            repository.resetBlindPassCount(id, audit.moment(), audit.writer());
             return COUNTER_START;
         }
-        repository.incrementBlindPassCount(id);
+        repository.incrementBlindPassCount(id, audit.moment(), audit.writer());
         return repository.findBlindPassCount(id).orElse(COUNTER_START);
     }
 

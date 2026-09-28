@@ -16,6 +16,9 @@ import com.example.tradingcore.mapping.AccountInstrumentStateMapper;
 import com.example.tradingcore.persistence.model.AccountInstrumentStateEntity;
 import com.example.tradingcore.persistence.repository.AccountInstrumentStateRepository;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
+import com.example.tradingcore.persistence.service.PointWriteAudit;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -36,7 +39,9 @@ class AccountInstrumentStateTest {
     private final AccountInstrumentStateMapper mapper = mock(AccountInstrumentStateMapper.class);
 
     private final AccountInstrumentStateDataService dataService =
-            new AccountInstrumentStateDataService(repository, mapper, new ActorProvider());
+            new AccountInstrumentStateDataService(repository, mapper,
+                    new PointWriteAudit(() -> Optional.of(new ActorProvider().currentActor()),
+                            () -> Optional.of(OffsetDateTime.now(ZoneOffset.UTC))));
 
     /**
      * Строка заводится СТАРТОВЫМИ значениями, и каждое названо: ступени нет
@@ -51,7 +56,7 @@ class AccountInstrumentStateTest {
 
         verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT),
                 eq(Instrument.SafetyRung.ACTIVE.name()), eq(Instrument.MarginMode.ISOLATED.name()),
-                eq(SYSTEM_PRINCIPAL));
+                any(), eq(SYSTEM_PRINCIPAL));
         assertThat(state.getLeverage()).isNull();
         assertThat(state.isMarginIsolated()).isTrue();
         assertThat(state.hasStandingSafetyRung()).isFalse();
@@ -75,7 +80,7 @@ class AccountInstrumentStateTest {
         try {
             dataService.getRequiredByPair(ACCOUNT, INSTRUMENT);
 
-            verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT), any(), any(), eq("holder"));
+            verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT), any(), any(), any(), eq("holder"));
         } finally {
             SecurityContextHolder.clearContext();
         }
@@ -97,7 +102,7 @@ class AccountInstrumentStateTest {
         try {
             dataService.raiseRung(ACCOUNT, INSTRUMENT, Instrument.SafetyRung.ENTRY_BLOCKED);
 
-            verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT), any(), any(), eq("holder"));
+            verify(repository).insertIfAbsent(eq(ACCOUNT), eq(INSTRUMENT), any(), any(), any(), eq("holder"));
         } finally {
             SecurityContextHolder.clearContext();
         }

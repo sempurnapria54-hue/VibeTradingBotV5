@@ -11,6 +11,7 @@ import com.example.tradingcore.mapping.ExchangeAccountMapperImpl;
 import com.example.tradingcore.persistence.model.ExchangeAccountEntity;
 import com.example.tradingcore.persistence.repository.ExchangeAccountRepository;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
+import com.example.tradingcore.persistence.service.PointWriteAudit;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -52,7 +53,8 @@ class ExchangeAccountProjectionWriterTest {
     private final ExchangeAccountRepository repository = mock(ExchangeAccountRepository.class);
     private final ExchangeAccountMapper mapper = new ExchangeAccountMapperImpl();
     private final ExchangeAccountDataService dataService =
-            new ExchangeAccountDataService(repository, mapper);
+            new ExchangeAccountDataService(repository, mapper,
+                    new PointWriteAudit(() -> Optional.of("writer"), () -> Optional.of(PROJECTED_AT)));
 
     @Test
     void tradingStateSurvivesTheProjectionUpdate() {

@@ -15,6 +15,7 @@ public class AnomalyReportDataService {
 
     private final AnomalyReportRepository repository;
     private final AnomalyReportMapper mapper;
+    private final PointWriteAudit audit;
 
     @Transactional
     public AnomalyReport save(AnomalyReport report) {
@@ -54,13 +55,13 @@ public class AnomalyReportDataService {
                              String code, AnomalyReport.Severity severity,
                              OffsetDateTime since, OffsetDateTime observedAt) {
         repository.markObserved(exchangeAccountId, instrumentId, subjectExternalId, code,
-                severity.name(), since, observedAt);
+                severity.name(), since, observedAt, audit.moment(), audit.writer());
     }
 
     /** Прервать серии счёта, которых проход, начатый в этот момент, не продлил. */
     @Transactional
     public void breakSeries(Long exchangeAccountId, OffsetDateTime passStartedAt) {
-        repository.breakSeries(exchangeAccountId, passStartedAt);
+        repository.breakSeries(exchangeAccountId, passStartedAt, audit.moment(), audit.writer());
     }
 
     /** Отчёт с этим кодом по этой сущности-предмету уже заведён. */

@@ -49,6 +49,7 @@ public class DealDataService {
 
     private final DealRepository repository;
     private final DealMapper mapper;
+    private final PointWriteAudit audit;
 
     /**
      * Завести строку сделки; возвращается сведённая модель с
@@ -201,7 +202,7 @@ public class DealDataService {
     @Transactional
     public Boolean enforceHardRung(Long dealId, Deal.ShutdownReason shutdownReason) {
         return repository.enforceHardRung(dealId, shutdownReason.name(), Deal.Status.ERROR.name(),
-                CASCADE_SOURCE_STATUSES) > 0;
+                CASCADE_SOURCE_STATUSES, audit.moment(), audit.writer()) > 0;
     }
 
     /**
@@ -215,7 +216,8 @@ public class DealDataService {
      */
     @Transactional
     public Boolean applyErrorEdge(Long dealId) {
-        return repository.applyErrorEdge(dealId, Deal.Status.ERROR.name(), CASCADE_SOURCE_STATUSES) > 0;
+        return repository.applyErrorEdge(dealId, Deal.Status.ERROR.name(), CASCADE_SOURCE_STATUSES,
+                audit.moment(), audit.writer()) > 0;
     }
 
     /**
@@ -229,7 +231,8 @@ public class DealDataService {
     @Transactional
     public Boolean applyStatusEdge(Deal deal, Deal.Status fromStatus) {
         return repository.applyStatusEdge(deal.getId(), deal.getStatus().name(),
-                name(deal.getShutdownReason()), name(deal.getCloseReason()), fromStatus.name()) > 0;
+                name(deal.getShutdownReason()), name(deal.getCloseReason()), fromStatus.name(),
+                audit.moment(), audit.writer()) > 0;
     }
 
     /**
@@ -248,7 +251,8 @@ public class DealDataService {
     public Boolean applyTerminalEdge(Deal deal, List<Deal.Status> fromStatuses) {
         return repository.applyTerminalEdge(deal.getId(), deal.getStatus().name(),
                 name(deal.getCloseReason()),
-                fromStatuses.stream().map(Enum::name).collect(Collectors.toList())) > 0;
+                fromStatuses.stream().map(Enum::name).collect(Collectors.toList()),
+                audit.moment(), audit.writer()) > 0;
     }
 
     /**
@@ -261,7 +265,7 @@ public class DealDataService {
         return repository.applyResultAndFeatures(deal.getId(), deal.getResultProfit(),
                 deal.getResultProfitCurrency(), name(deal.getCloseOutcome()),
                 name(deal.getReconciliationStatus()), name(deal.getBreakdownIncomplete()),
-                name(deal.getRiskBenchmarkAvailability())) > 0;
+                name(deal.getRiskBenchmarkAvailability()), audit.moment(), audit.writer()) > 0;
     }
 
     /** Записать четвёрку чисел риска, сведённых пересчётом. */
@@ -269,7 +273,7 @@ public class DealDataService {
     public void applyRiskNumbers(Deal deal) {
         repository.applyRiskNumbers(deal.getId(), deal.getPlannedRiskAmount(),
                 deal.getIncurredRiskAmount(), deal.getCurrentRiskAmount(),
-                deal.getProtectionRelievedRiskAmount());
+                deal.getProtectionRelievedRiskAmount(), audit.moment(), audit.writer());
     }
 
     /**
@@ -306,30 +310,30 @@ public class DealDataService {
     /** Двигает порог доказанного покрытия вперёд по наблюдённому моменту. */
     @Transactional
     public void advanceCoverageProvenThrough(Long dealId, OffsetDateTime observedAt) {
-        repository.advanceCoverageProvenThrough(dealId, observedAt);
+        repository.advanceCoverageProvenThrough(dealId, observedAt, audit.moment(), audit.writer());
     }
 
     /** Ставит нижнюю границу окна линковки движений, если её ещё нет. */
     @Transactional
     public void applyBillsWindowBegin(Long dealId, OffsetDateTime observedAt) {
-        repository.applyBillsWindowBegin(dealId, observedAt);
+        repository.applyBillsWindowBegin(dealId, observedAt, audit.moment(), audit.writer());
     }
 
     /** Двигает метку «движения добыты по …» вперёд по времени источника прохода. */
     @Transactional
     public void advanceBillsFetchedThrough(Long dealId, OffsetDateTime fetchedThrough) {
-        repository.advanceBillsFetchedThrough(dealId, fetchedThrough);
+        repository.advanceBillsFetchedThrough(dealId, fetchedThrough, audit.moment(), audit.writer());
     }
 
     /** Фиксирует базу риска первым сайзингом сделки, если она ещё не зафиксирована. */
     @Transactional
     public void applyPlannedRiskEquityBase(Long dealId, BigDecimal equityBase) {
-        repository.applyPlannedRiskEquityBase(dealId, equityBase);
+        repository.applyPlannedRiskEquityBase(dealId, equityBase, audit.moment(), audit.writer());
     }
 
     /** Фиксирует валюту риска первым сайзингом сделки, если она ещё не зафиксирована. */
     @Transactional
     public void applyPlannedRiskCurrency(Long dealId, String currency) {
-        repository.applyPlannedRiskCurrency(dealId, currency);
+        repository.applyPlannedRiskCurrency(dealId, currency, audit.moment(), audit.writer());
     }
 }

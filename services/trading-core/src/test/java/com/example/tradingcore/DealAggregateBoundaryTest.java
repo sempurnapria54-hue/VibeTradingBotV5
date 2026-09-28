@@ -21,8 +21,12 @@ import com.example.tradingcore.persistence.repository.DealRepository;
 import com.example.tradingcore.persistence.repository.DealTrancheRepository;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.DealTrancheDataService;
+import com.example.tradingcore.persistence.service.PointWriteAudit;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
@@ -43,12 +47,16 @@ class DealAggregateBoundaryTest {
     private static final Long ACCOUNT_ID = 7L;
     private static final Long INSTRUMENT_ID = 42L;
     private static final Long DEAL_ID = 100L;
+    private static final OffsetDateTime WRITTEN_AT = OffsetDateTime.of(2026, 9, 28, 12, 0, 0, 0, ZoneOffset.UTC);
+    private static final String WRITER = "writer";
 
     private final DealRepository dealRepository = mock(DealRepository.class);
     private final DealTrancheRepository trancheRepository = mock(DealTrancheRepository.class);
     private final DealMapper dealMapper = new DealMapperImpl();
     private final DealTrancheMapper trancheMapper = new DealTrancheMapperImpl();
-    private final DealDataService dealDataService = new DealDataService(dealRepository, dealMapper);
+    private final PointWriteAudit audit =
+            new PointWriteAudit(() -> Optional.of(WRITER), () -> Optional.of(WRITTEN_AT));
+    private final DealDataService dealDataService = new DealDataService(dealRepository, dealMapper, audit);
     private final DealTrancheDataService trancheDataService =
             new DealTrancheDataService(trancheRepository, trancheMapper);
 
@@ -80,6 +88,11 @@ class DealAggregateBoundaryTest {
      * исходных статусов</b>: гард и есть то, чем терминал разведён с
      * каскадом жёсткой ступени, и потерять его — значит вернуть молчаливую
      * перезапись каскада.
+     *
+     * <p>С ним уезжают автор и момент записи: точечный запрос слушателей
+     * аудита не проходит, и без них изменение не было бы записано ни в
+     * одной колонке (docs/models/domain/other/Auditable.md §«Системные поля
+     * и точечная запись»).
      */
     @Test
     void theTerminalEdgeCarriesItsFromStatusesIntoTheQuery() {
@@ -87,14 +100,14 @@ class DealAggregateBoundaryTest {
         deal.setId(DEAL_ID);
         deal.setStatus(Deal.Status.CLOSED);
         deal.setCloseReason(Deal.CloseReason.STRATEGY_EXIT);
-        when(dealRepository.applyTerminalEdge(anyLong(), any(), any(), any())).thenReturn(1);
+        when(dealRepository.applyTerminalEdge(anyLong(), any(), any(), any(), any(), any())).thenReturn(1);
 
         assertThat(dealDataService.applyTerminalEdge(deal,
                 List.of(Deal.Status.ACTIVE, Deal.Status.EXIT_PENDING))).isTrue();
 
         verify(dealRepository).applyTerminalEdge(DEAL_ID, Deal.Status.CLOSED.name(),
                 Deal.CloseReason.STRATEGY_EXIT.name(),
-                List.of(Deal.Status.ACTIVE.name(), Deal.Status.EXIT_PENDING.name()));
+                List.of(Deal.Status.ACTIVE.name(), Deal.Status.EXIT_PENDING.name()), WRITTEN_AT, WRITER);
     }
 
     /**
@@ -106,7 +119,7 @@ class DealAggregateBoundaryTest {
         Deal deal = new Deal();
         deal.setId(DEAL_ID);
         deal.setStatus(Deal.Status.CLOSED);
-        when(dealRepository.applyTerminalEdge(anyLong(), any(), any(), any())).thenReturn(0);
+        when(dealRepository.applyTerminalEdge(anyLong(), any(), any(), any(), any(), any())).thenReturn(0);
 
         assertThat(dealDataService.applyTerminalEdge(deal, List.of(Deal.Status.ACTIVE))).isFalse();
     }
@@ -125,14 +138,14 @@ class DealAggregateBoundaryTest {
         deal.setResultProfitCurrency("USDT");
         deal.setCloseOutcome(Deal.CloseOutcome.LIQUIDATION);
         deal.setRiskBenchmarkAvailability(Deal.RiskBenchmarkAvailability.MISSING);
-        when(dealRepository.applyResultAndFeatures(anyLong(), any(), any(), any(), any(), any(), any()))
+        when(dealRepository.applyResultAndFeatures(anyLong(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 
         assertThat(dealDataService.applyResultAndFeatures(deal)).isTrue();
 
         verify(dealRepository).applyResultAndFeatures(DEAL_ID, new BigDecimal("-12.5"), "USDT",
                 Deal.CloseOutcome.LIQUIDATION.name(), null, null,
-                Deal.RiskBenchmarkAvailability.MISSING.name());
+                Deal.RiskBenchmarkAvailability.MISSING.name(), WRITTEN_AT, WRITER);
     }
 
     /**

@@ -61,7 +61,7 @@
 
 ## Периферийные статусы `Instrument` — онбординговый `HOLD`, `ERROR`-recovery, повторный онбординг, `CLOSED`
 
-<!-- backlog: владелец=market-data; оживит=вопрос:ORCH-Q1|фаза:6:открыта; закрыто-когда=нет-грепа:"здесь\s+не\s+описываются"@docs/lifecycles/Instrument.md -->
+<!-- backlog: владелец=market-data; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"здесь\s+не\s+описываются"@docs/lifecycles/Instrument.md -->
 
 **Что сделать.** Описать в lifecycle периферийные статусы онбординга и
 координацию всех троп (онбординг × safety) одним lifecycle.
@@ -144,7 +144,7 @@
 
 ## Снятие ограничения `MARK`-only — по измеренному базису
 
-<!-- backlog: владелец=tester; оживит=рубеж:prod|наблюдение:demo-прогон чёрного ящика коннектора, замеривший базис last↔mark -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Встречный якорь.** Секция несёт условие снятия, которое сама снимаемая политика прочитать не может; проверяется гейтом закрытия фазы (`.claude/skills/update-roadmap-progress.md` §«Гейт закрытия фазы») — гейт ищет якоря по этой строке-маркеру, а не по шаблону заголовка.
 
@@ -230,7 +230,7 @@
 
 ## Исполнимая форма предиката свечной целостности
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас; закрыто-когда=файл:docs/spec/candle-group-integrity.json -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=файл:docs/spec/candle-group-integrity.json -->
 
 **Задача.** Завести `docs/spec/candle-group-integrity.json` с предикатом
 целостности группы свечей и примерами; в
@@ -259,7 +259,7 @@
 
 ### Слой опровержения в продуктовом корпусе
 
-<!-- backlog: владелец=knowledge-curator; оживит=сейчас; закрыто-когда=нет-грепа:"[пс][рн][ея][жт][а-яё]*\s+редакц[а-яё]+"@docs/**/* -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"[пс][рн][ея][жт][а-яё]*\s+редакц[а-яё]+"@docs/**/* -->
 
 **Задача.** Свести обороты отсылки к прошлому состоянию («прежн… /
 снят… редакц…») и процессную арматуру (номера прогонов) в `docs/**` —
@@ -282,7 +282,7 @@ LC_ALL=C.UTF-8 grep -rnoP 'DOCS_CHECK_\d+|GAPS_CLOSE_\d+' docs/
 
 ### Позиции гигиены продуктового корпуса
 
-<!-- backlog: владелец=knowledge-curator; оживит=сейчас -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE -->
 
 Перечни находок — отчёты линз в
 `.claude/work/history/2026-09-03-phase-1-step-7-deals-and-pnl/phase-1-step-7-docs-check-30/`.
@@ -401,7 +401,7 @@ line` в том же блоке, получил `ДЕФЕКТ: имя не св�
 
 ## Свод адресных перекрёстий `docs/**` к смысловым ссылкам
 
-<!-- backlog: владелец=knowledge-curator; оживит=сейчас; закрыто-когда=нет-грепа:"§«"@docs/**/* -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"§«"@docs/**/* -->
 
 **Задача.** Свести адреса `§«…»` в продуктовом корпусе к смысловым
 ссылкам на дом: в `docs/**` внутрифайловые адресные перекрёстья не
@@ -439,7 +439,7 @@ line` в том же блоке, получил `ДЕФЕКТ: имя не св�
 
 ## Места истины схемы для таблиц без §Персистентность
 
-<!-- backlog: владелец=knowledge-curator; оживит=сейчас -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE -->
 
 **Задача.** Завести место истины схемы у четырёх таблиц, не названных ни
 в одном доке `docs/`: `memberships` (`services/auth`, миграция `V1`),
@@ -493,7 +493,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ## Риск-преконтроль — остаточные кандидаты (вернуться по наблюдениям)
 
-<!-- backlog: владелец=trading-core; оживит=фаза:4:открыта|фаза:6:открыта|наблюдение:зазор «узкий стоп → высокое плечо» в живых прогонах -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 Кандидаты скана источника, не взятые в валидатор; контракты готовы в
 `docs/integrations/okx/contracts/`. Решения — по наблюдениям бэктеста
@@ -518,7 +518,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ## `TradeGuardJob` — счётчик серии неудач по инструменту
 
-<!-- backlog: владелец=trading-core; оживит=рубеж:prod|наблюдение:серия отказов исполнения по инструменту в живых прогонах; закрыто-когда=греп:"class\s+TradeGuardJob"@services/**/*.java -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"class\s+TradeGuardJob"@services/**/*.java -->
 
 **Задача.** Джоба, считающая **историю исходов** по инструменту (граница с
 `AnomalyJob`: тот сравнивает текущее состояние с инвариантом). Спроектировать:
@@ -543,7 +543,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ## Переоценка инварианта «ликвидация за стопом» — проектирование A13
 
-<!-- backlog: владелец=trading-core; оживит=шаг:2-12:DONE|наблюдение:первый период прогонов контура (широкие стопы, дрейф цены ликвидации); закрыто-когда=греп:"A13"@services/trading-core/**/*.java -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"A13"@services/trading-core/**/*.java -->
 
 **Задача.** Единственная строка перечня детекторов без кода — `A13`.
 Спроектировать такт проверки, гистерезис против ложных срабатываний у
@@ -636,7 +636,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ## Шаг 7 (сделки и P&L) — исполнительный хвост
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:первый период живой торговли после прод-рубежа -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 Позиции хвоста шага 7 фазы 1 по предмету safety и проактивной детекции —
 каждая ниже со своим условием; общий якорь — первый период живой торговли.
@@ -656,7 +656,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ### Гистерезис детекторов аномалий — калибровка по первому периоду прогонов
 
-<!-- backlog: владелец=trading-core; оживит=шаг:2-12:DONE|наблюдение:первый период прогонов контура (счётные ложные срабатывания и пропуски) -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 **Встречный якорь.** Условие снятия разведочного режима задано событием
 после шага, назначившего числа, — первым периодом прогонов контура, — и
@@ -670,7 +670,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ### Слепота считается состоявшимися проходами, а тропа входа её не спрашивает
 
-<!-- backlog: владелец=trading-core; оживит=шаг:2-12:DONE|наблюдение:частота неисполнившихся тиков в первом периоде прогонов; закрыто-когда=греп:"observedPassAt"@services/trading-core/**/*.java|греп:"observed_pass_at"@services/trading-core/**/*.sql -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"observedPassAt"@services/trading-core/**/*.java|греп:"observed_pass_at"@services/trading-core/**/*.sql -->
 
 **Дефект.** Предел слепоты двигают только состоявшиеся проходы; тик, не
 исполнившийся вовсе (процесс не поднят, выключатель снят, отказ до гейта),
@@ -687,7 +687,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ### Хвост шага 8 (safety / AnomalyJob) — возврат по появлению носителя
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:первый запуск на счёте, число живых заявок либо число счетов — общий якорь позиций ниже -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 Позиции по предмету шага 8 — safety-лестница и джоба аномалий. Блокер у
 каждой — отсутствие носителя либо ненаступивший наблюдаемый факт
@@ -701,7 +701,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 #### Ветвь «отчёт есть, ступень не поднята» наблюдателя не имеет
 
-<!-- backlog: владелец=trading-core; оживит=сейчас -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 Нужен наблюдатель, сверяющий стоящую ступень объекта со строкой
 `AnomalyReport` природы «состояние»: мягкая тропа заводит отчёт до ребра
@@ -716,7 +716,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 #### Слепок внешнего состояния у строки прохода детекции стои́т двух чтений биржи
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:число живых заявок на счёте, при котором двойное чтение среза мерится -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 Срез уже добыт проходом, но слепок отчёта читает биржу заново.
 **Задача:** перенести срез прохода в слепок — находка (`AnomalyFinding`)
@@ -735,7 +735,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 #### Контролируемое исключение на тропе прохода детекции ловца не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас; закрыто-когда=греп:"ControlledExchangeException"@services/trading-core/src/main/java/com/example/tradingcore/domain/jobs/AnomalyJob.java -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"ControlledExchangeException"@services/trading-core/src/main/java/com/example/tradingcore/domain/jobs/AnomalyJob.java -->
 
 `AnomalyScanReader` пробрасывает `ControlledExchangeException`, опираясь на
 посылку «оно поднимает биржевую ступень 2 само»; на тропе джобы ловца нет,
@@ -747,7 +747,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 #### Отчёт с блокировкой не несёт в данных, какая сущность его вызвала
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:чтение отчётов A2/A7 потребителем без доступа к логу (фронт, журнал аудита) -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 `instId` находки `A2`/`A7` виден только в логе: ключ дедупа предмета не
 несёт по дому модели, но это про ключ, не про данные. **Задача:** предмет
@@ -767,7 +767,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ### Хенд-оффы узла Н9 (ручная поверхность safety-остановки)
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 Адресаты названы; политика живёт в домах, здесь только задача и указатель.
 
@@ -805,7 +805,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 #### Разъезд имён операндов одного поля между спеками
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас; закрыто-когда=нет-грепа:"exchangeStatusBefore"@docs/spec/loss-streak-halt.json|нет-грепа:"objectStatusBefore"@docs/spec/manual-halt.json -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"exchangeStatusBefore"@docs/spec/loss-streak-halt.json|нет-грепа:"objectStatusBefore"@docs/spec/manual-halt.json -->
 
 `docs/spec/loss-streak-halt.json` (`exchangeStatusBefore`,
 `holdStandingBefore`) против `docs/spec/manual-halt.json`
@@ -814,7 +814,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ## Операнд `episodes[].exitAt` спеки загрузки контекста сделки назван по несуществующему полю
 
-<!-- backlog: владелец=trading-core; оживит=сейчас; закрыто-когда=нет-грепа:"exitAt"@docs/spec/deal-context-load.json -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"exitAt"@docs/spec/deal-context-load.json -->
 
 **Задача.** Привести операнд `episodes[].exitAt` в
 `docs/spec/deal-context-load.json` к имени и типу предиката «положение
@@ -838,7 +838,7 @@ run-config уходит вместе с донором. Указатели сю�
 
 ## Ступень `ENTRY_BLOCKED` по несвежести ставки комиссии — писателя нет
 
-<!-- backlog: владелец=trading-core; оживит=сейчас; закрыто-когда=греп:"Hold[A-Z]\w+"@services/trading-core/src/main/**/TradeFeeRateSync*.java -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"Hold[A-Z]\w+"@services/trading-core/src/main/**/TradeFeeRateSync*.java -->
 
 **Задача.** Построить реакцию на несвежесть ставки комиссии: детектор —
 синк ставок владельца счёта (`TradeFeeRateSyncService`), реакция — мягкая
@@ -948,7 +948,7 @@ positions-history, на каком такте, что с просроченны�
 
 ## Названные ограничения кодирования шага 7 — возврат по появлению носителя
 
-<!-- backlog: владелец=trading-core; оживит=греп:"CANCEL_ATTACHED_PROTECTION_COMMAND"@services/trading-core/src/main/java/**/TrancheProtectionSwitchedHandler.java|греп:"coverageAfterCreation"@docs/spec/protection-coverage.json|греп:"REPLACE_ACTION"@services/trading-core/src/main/java/**/*.java|наблюдение:носитель позиций Т10 Т14 Т15 — назван у позиции -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 Позиции, закрытые не кодом, а называнием границы: каждой недостаёт носителя,
 которого в коде ядра нет по построению; дописывать её сейчас значило бы
@@ -996,7 +996,7 @@ positions-history, на каком такте, что с просроченны�
 
 ## Пагинация evidence-цикла и архивные звенья `REFRESH`-команд ядра
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:первый живой прогон REFRESH-контура ядра на стенде — недобор фактов в разбивке результата; закрыто-когда=греп:"orders-history-archive"@services/connector-okx/src/main/java/**/*.java -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"orders-history-archive"@services/connector-okx/src/main/java/**/*.java -->
 
 **Задача.** Звенья добычи (заявки и условные заявки pending/history,
 `positions-history`, `bills`) читают одну страницу на звено; пагинацию
@@ -1010,7 +1010,7 @@ positions-history, на каком такте, что с просроченны�
 
 ## Корроборация закрытия позиции по пустому ответу источника
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ложный CLOSED позиции от транзиентно пустого ответа positions в живом прогоне -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Задача.** Пустой ответ `positions` переводит позицию в `CLOSED` одним
 чтением (`docs/components/RefreshPositionExecutor.md`); транзиентно пустой
@@ -1022,7 +1022,7 @@ positions-history, на каком такте, что с просроченны�
 
 ## Дефекты донора, воспроизведённые портом
 
-<!-- backlog: владелец=code-writer; оживит=сейчас -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 Порт перенёс из донора то, что ретро-ревью фазы 1 называло дефектом; перечень
 донорских находок не хранится — только воспроизведённое, по сервису.
@@ -1044,7 +1044,7 @@ positions-history, на каком такте, что с просроченны�
 
 ## M1. Ревизия разделов «Чего не хранит» в мигрированных моделях
 
-<!-- backlog: владелец=knowledge-curator; оживит=сейчас; закрыто-когда=нет-грепа:"(?m)^##\s+Что\s+\S+\s+не\s+хранит"@docs/models/**/*.md -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"(?m)^##\s+Что\s+\S+\s+не\s+хранит"@docs/models/**/*.md -->
 
 **Задача.** Решить развилку: уточнить
 `.claude/decisions/negative-statements-not-fixated.md` (раздел «отрицание +
@@ -1056,7 +1056,7 @@ positions-history, на каком такте, что с просроченны�
 
 ## M2. `BalanceContainer.externalUpdatedAt` → конвенционное имя
 
-<!-- backlog: владелец=code-writer; оживит=сейчас; закрыто-когда=нет-грепа:"externalUpdatedAt"@services/common/model/domain/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"externalUpdatedAt"@services/common/model/domain/src/main/java/**/*.java -->
 
 **Задача.** Привести `externalUpdatedAt` (контейнер и валюта) и снапшоты к
 `externalModifiedAt` конвенции `docs/models/domain/other/Auditable.md` либо
@@ -1068,7 +1068,7 @@ positions-history, на каком такте, что с просроченны�
 
 ## Инфра-долг (Boot 4 миграция / рантайм-робастность)
 
-<!-- backlog: владелец=integrator; оживит=сейчас -->
+<!-- backlog: владелец=integrator; оживит=сейчас|шаг:2-12:DONE -->
 
 Зонтик долга переезда стека; позиции — подсекции со своими условиями.
 Правило-следствие «библиотека на classpath → её `spring-boot-*`
@@ -1077,7 +1077,7 @@ positions-history, на каком такте, что с просроченны�
 
 ### I2. Миграция кода на Jackson 3
 
-<!-- backlog: владелец=integrator; оживит=держатель:назначение общего хода миграции сервисов на Jackson 3; закрыто-когда=нет-грепа:"spring-boot-jackson2"@**/pom.xml -->
+<!-- backlog: владелец=integrator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"spring-boot-jackson2"@**/pom.xml -->
 
 **Задача.** Перевести код с Jackson 2 (`com.fasterxml.jackson`) на Jackson 3
 (`tools.jackson`) и снять `spring-boot-jackson2` из семи `pom.xml` (донор и
@@ -1087,7 +1087,7 @@ Jackson 2 / Jackson 3. **Причина парковки.** Ход общий д
 
 ## Средовой дефицит автономного прогона тестов
 
-<!-- backlog: владелец=integrator; оживит=сейчас; закрыто-когда=файл:mvnw -->
+<!-- backlog: владелец=integrator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=файл:mvnw -->
 
 Факты среды — дом `.claude/skills/environment-commands.md` §«Факты среды —
 проверено прогоном, не выведено». Остатки — здесь и в подсекциях.
@@ -1142,7 +1142,7 @@ Vault, кодом не решаются (`.claude/rules/tech-radar.md`, стро
 
 ## Границы спек-раннера, невыразимые на нём
 
-<!-- backlog: владелец=code-writer; оживит=сейчас; закрыто-когда=греп:"unreachableTakesForbiddenValue"@services/common/test-support/src/test/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"unreachableTakesForbiddenValue"@services/common/test-support/src/test/java/**/*.java -->
 
 Раннер переехал в `services/common/test-support` (итог —
 `.claude/work/history/2026-09-16-backlog-cleanup-before-step-12.md`), и
@@ -1164,7 +1164,7 @@ Vault, кодом не решаются (`.claude/rules/tech-radar.md`, стро
 
 ## Пересказ конъюнктов `flowsComplete` в правиле сверки
 
-<!-- backlog: владелец=knowledge-curator; оживит=сейчас -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE -->
 
 `docs/rules/pnl-reconciliation.md` (таблица «Операнд | Конъюнкты | Почему
 так») держит конъюнкты `flowsComplete` рядом с указателем на дом величины
@@ -1173,7 +1173,7 @@ Vault, кодом не решаются (`.claude/rules/tech-radar.md`, стро
 
 ## Примеры на пустой коллекции у агрегатов шести спек
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 `op: all` / `op: exists` на пустоте дают вакуумную истину и ложь, а примера
 на границе нет у `docs/spec/deal-lifecycle.json`, `protection-coverage.json`,
@@ -1185,7 +1185,7 @@ guard непустоты у каждой покрыт примером (свои
 
 ## Оси спек, выразимые популяцией и не выраженные ею
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас; закрыто-когда=греп:"populations"@docs/spec/risk-limits.json -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"populations"@docs/spec/risk-limits.json -->
 
 Класс `ИЗМЕРЕНИЕ`: перечень с примером на каждое значение строится по
 действующему контракту популяции (`rule`, `derive`, `excludes`).
@@ -1197,7 +1197,7 @@ guard непустоты у каждой покрыт примером (свои
 
 ## Добытчик операнда `standingRungRaisedManually` не назван
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас; закрыто-когда=греп:"standingRungRaisedManually"@docs/components/**/*.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"standingRungRaisedManually"@docs/components/**/*.md -->
 
 Операнд ручного холда объявлен только в `docs/spec/manual-halt.json`;
 компонент-дока-добытчика нет, резолв `callOrigin` («код
@@ -1236,7 +1236,7 @@ guard непустоты у каждой покрыт примером (свои
 
 ## Припаркованные предметные находки — `solution-designer`
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:условие возврата любого кластера ниже -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 Негейтящие находки прогонов доковой петли шага 7 фазы 1 с домом-носителем;
 полные поля — отчёты линз в
@@ -1246,7 +1246,7 @@ guard непустоты у каждой покрыт примером (свои
 
 ### Ядро сделки и FSM
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по сделке, её FSM и исполнителям -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 - `docs/components/SystemActionExecutor.md` не несёт ветви пропуска звена
   расчёта, объявленной тремя потребителями; `docs/processes/deal-management.md`
@@ -1273,7 +1273,7 @@ guard непустоты у каждой покрыт примером (свои
 
 ### Риск и сайзинг
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по риск-гейту либо сайзингу -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 - `docs/rules/risk-policy.md` §«Поактный потолок — предел, а не цель
   сайзинга»: «числа эталона» посчитаны при доле аллокации 100 %, эталон
@@ -1302,7 +1302,7 @@ guard непустоты у каждой покрыт примером (свои
 
 ### Стратегии и эталон
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по определению стратегии либо эталону -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 - `docs/spec/strategy-walkthrough.json`: case-текст описывает порядок пакета,
   недостижимый на эталоне; клейм полноты в ноте ложен на трёх шагах из
@@ -1322,7 +1322,7 @@ guard непустоты у каждой покрыт примером (свои
 
 ### Спеки и их ноты
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайшая правка перечисленных спек -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 - `docs/models/domain/aggregate/Deal.md`: три из четырёх чисел риска без
   указателя на свою величину в `docs/spec/deal-risk-numbers.json`, имена
@@ -1341,7 +1341,7 @@ guard непустоты у каждой покрыт примером (свои
 
 ## Процедура синхронизации с внешним источником пересказана в доках
 
-<!-- backlog: владелец=knowledge-curator; оживит=сейчас; закрыто-когда=нет-грепа:"Внешний источник правды"@docs/**/* -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"Внешний источник правды"@docs/**/* -->
 
 Шапка «Внешний источник правды» разошлась по продуктовым докам двумя
 редакциями, тогда как дом процедуры один —
@@ -1371,7 +1371,7 @@ LC_ALL=C.UTF-8 grep -rl 'Внешний источник правды' docs | wc
 
 ## События `auth` — производителя и темы нет
 
-<!-- backlog: владелец=code-writer; оживит=шаг:5-1:открыт|наблюдение:ближайший кодовый заход по самому auth; закрыто-когда=греп:"auth\.facts"@services/audit/src/main/resources/application.yaml -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"auth\.facts"@services/audit/src/main/resources/application.yaml -->
 
 **Что сделать.** Завести у `auth` outbox, реле и тему `auth.facts` с
 писателями четырёх классов таблицы `docs/architecture/contracts.md`
@@ -1400,7 +1400,7 @@ LC_ALL=C.UTF-8 grep -rl 'Внешний источник правды' docs | wc
 
 ## Клиенты провайдера идентичности отстают от инвентаря сервисов
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:первое развёртывание, на котором исходящий вызов strategies упрётся в неизвестного клиента, либо кодовый заход по strategies; закрыто-когда=нет-грепа:"platform-services"@deploy/base/services/strategies.yaml -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"platform-services"@deploy/base/services/strategies.yaml -->
 
 **Что сделать.** Привести `deploy/base/services/identity-realm.yaml` к
 инвентарю: реалм объявляет клиентов `web`, `market-data`, `trading-core`, а
@@ -1486,7 +1486,7 @@ LC_ALL=C.UTF-8 grep -rl 'Внешний источник правды' docs | wc
 
 ## Темы Kafka по производителям — заводятся шагами сервисов
 
-<!-- backlog: владелец=solution-designer; оживит=греп:"KafkaTemplate"@services/auth/src/main/java/**/*.java|греп:"KafkaTemplate"@services/market-data/src/main/java/**/*.java|греп:"KafkaTemplate"@services/connector-okx/src/main/java/**/*.java -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Завести тему манифестом (`KafkaTopic` Strimzi) у каждого
 объявленного производителя, у которого её ещё нет: `auth`, `market-data`,
@@ -1509,7 +1509,7 @@ LC_ALL=C.UTF-8 grep -rl 'Внешний источник правды' docs | wc
 
 ## Размеры томов данных — назначение по наблюдаемому потреблению
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:потребление томов Postgres, Kafka и Elasticsearch на стенде под торговой нагрузкой -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назначить размеры томов Postgres, Kafka и Elasticsearch
 по окружениям (`deploy/base/data/`, наложение — окружением:
@@ -1528,7 +1528,7 @@ LC_ALL=C.UTF-8 grep -rl 'Внешний источник правды' docs | wc
 
 ### Том Elasticsearch не объявлен — умолчание оператора 1 ГиБ
 
-<!-- backlog: владелец=code-writer; оживит=сейчас; закрыто-когда=греп:"volumeClaimTemplates"@deploy/base/data/elastic.yaml -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"volumeClaimTemplates"@deploy/base/data/elastic.yaml -->
 
 **Что сделать.** Объявить `volumeClaimTemplates` в
 `deploy/base/data/elastic.yaml`: без него оператор берёт умолчание 1 ГиБ,
@@ -1560,7 +1560,7 @@ LC_ALL=C.UTF-8 grep -rl 'Внешний источник правды' docs | wc
 
 ## WS-слушатель фактов исполнения — по добытому контракту каналов
 
-<!-- backlog: владелец=integrator; оживит=шаг:2-12:DONE; закрыто-когда=греп:"(?i)class\s+\w*websocket\w*"@services/connector-okx/src/main/java/**/*.java -->
+<!-- backlog: владелец=integrator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"(?i)class\s+\w*websocket\w*"@services/connector-okx/src/main/java/**/*.java -->
 
 **Что сделать.** Добыть живым прогоном против demo-площадки формы сообщений
 WS-каналов OKX (`orders`, `account`, `positions`,
@@ -1589,7 +1589,7 @@ WS — единственный механизм публикации со ст�
 
 ## Сброс кэша ключей по событию ротации
 
-<!-- backlog: владелец=code-writer; оживит=греп:"auth\.facts"@deploy/base/services/*.yaml; закрыто-когда=греп:"@KafkaListener"@services/connector-okx/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"@KafkaListener"@services/connector-okx/src/main/java/**/*.java -->
 
 **Что сделать.** Подписать коннектор на `ExchangeKeysRotated` и на
 получении звать `CachingExchangeCredentialsResolver.evict(accountInternalId)`
@@ -1606,7 +1606,7 @@ WS — единственный механизм публикации со ст�
 
 ## Срезы стакана не собираются: сбор ограничен статусом инструмента
 
-<!-- backlog: владелец=code-writer; оживит=сейчас -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести код сбора невосполнимых срезов с правилом:
 невосполнимое идёт по всему листингу и потребителя не требует
@@ -1624,7 +1624,7 @@ WS — единственный механизм публикации со ст�
 
 ## Экспорт трейсов из сервисов — приёмник есть, отправителя нет
 
-<!-- backlog: владелец=code-writer; оживит=сейчас -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Подключить экспорт OpenTelemetry в сервисах: контекст
 трейса через REST и конверт события, `tenantId` и `strategyId`
@@ -1635,7 +1635,7 @@ WS — единственный механизм публикации со ст�
 
 ## Политики сжатия и хранения гипертаблиц — по пину образа TimescaleDB
 
-<!-- backlog: владелец=code-writer; оживит=сейчас; закрыто-когда=греп:"(?i)compress"@services/market-data/src/main/resources/db/migration/*.sql -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"(?i)compress"@services/market-data/src/main/resources/db/migration/*.sql -->
 
 **Что сделать.** Миграция `market-data` с политикой сжатия старых чанков
 рядов (`docs/architecture/data-ownership.md` §«Временные ряды»). Образ
@@ -1651,7 +1651,7 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Донорские значения в расколотых перечнях общей библиотеки
 
-<!-- backlog: владелец=code-writer; оживит=сейчас; закрыто-когда=нет-грепа:"ENTRY_BLOCKED"@services/common/model/domain/src/main/java/**/Instrument.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"ENTRY_BLOCKED"@services/common/model/domain/src/main/java/**/Instrument.java -->
 
 **Что сделать.** Снять из `Instrument.Status` (`services/common/model/domain`)
 значения `ENTRY_BLOCKED` и `TRADE_BLOCKED` с предикатами
@@ -1669,7 +1669,7 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Донорские поля агрегата сделки в общей библиотеке
 
-<!-- backlog: владелец=code-writer; оживит=сейчас; закрыто-когда=нет-грепа:"List<AlgoOrder>\s+algoOrders"@services/common/model/domain/src/main/java/**/Deal.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"List<AlgoOrder>\s+algoOrders"@services/common/model/domain/src/main/java/**/Deal.java -->
 
 **Что сделать.** Снять с `Deal` (`services/common/model/domain`) поля `orders` и
 `algoOrders` с предикатами `liveOrders()`, `liveAlgoOrders()`,
@@ -1689,7 +1689,7 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Тропа переброшенного отказа фильтра у `auth`: клейм дома не исполняет ни один механизм
 
-<!-- backlog: владелец=code-writer; оживит=шаг:2-13:открыт|наблюдение:ближайший кодовый заход по auth -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Решить, чем `auth` исполняет клейм дома «отказ, произведённый
 контейнером, отвечает тем же error-DTO» на тропе, где отказ производит **звено
@@ -1745,7 +1745,7 @@ Apache-2-сборке). До политики ряды пишутся и чит�
 
 ## Тропа к брокеру у построенных соседей не объявлена ни правилом, ни автоконфигурацией
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:первое развёртывание тропы событий на стенде либо кодовый заход по trading-core, strategies или bff -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Довести тропу к брокеру у трёх построенных сторон — реле
 `trading-core`, реле `strategies`, поток `bff` — по двум осям.
@@ -1805,7 +1805,7 @@ durable-потребителя (`ReceptionKafkaConfig` у `audit` и `statistics
 
 ## Потерянное событие при неразбираемом содержимом — наблюдаемости нет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:первый живой прогон реле и потребителя на стенде|нет-грепа:"оператор Strimzi\)[^\n]*`trial`"@.claude/rules/tech-radar.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что отложено.** Куда девается сообщение, которое потребитель не смог
 разобрать: `DefaultErrorHandler` повторяет обработку и пропускает запись,
@@ -1824,7 +1824,7 @@ durable-потребителя (`ReceptionKafkaConfig` у `audit` и `statistics
 
 ## Порядок замков и планы запросов у модуля приёма — не мерены ничем
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:первый живой прогон audit либо statistics на базе (подъём стенда на этом дереве кода) -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что отложено.** Две величины, держащиеся доводом, а не замером:
 
@@ -1858,7 +1858,7 @@ durable-потребителя (`ReceptionKafkaConfig` у `audit` и `statistics
 
 ## Конверт события не разбирается читателем — та же форма, что была у ack
 
-<!-- backlog: владелец=code-writer; оживит=греп:"EventEnvelopeMessage\.class"@services/*/src/main/java/**/*.java; закрыто-когда=нет-грепа:"@Value"@services/common/model/message/src/main/java/**/EventEnvelopeMessage.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"@Value"@services/common/model/message/src/main/java/**/EventEnvelopeMessage.java -->
 
 **Что сделать.** Свести `EventEnvelopeMessage` (`services/common/model`,
 пакет `message`) к форме, которую сериализатор собирает без скрытых
@@ -1883,7 +1883,7 @@ durable-потребителя (`ReceptionKafkaConfig` у `audit` и `statistics
 
 ## Сбор ликвидаций — по добытому контракту WS-канала
 
-<!-- backlog: владелец=integrator; оживит=шаг:2-12:DONE|шаг:6-4:открыт; закрыто-когда=греп:"liquidation-orders"@docs/integrations/okx/contracts/*.md -->
+<!-- backlog: владелец=integrator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"liquidation-orders"@docs/integrations/okx/contracts/*.md -->
 
 **Что сделать.** Добыть форму сообщений WS-канала ликвидаций OKX, завести
 контракт в `docs/integrations/okx/contracts/`, доменную модель ряда и сбор
@@ -1905,7 +1905,7 @@ durable-потребителя (`ReceptionKafkaConfig` у `audit` и `statistics
 
 ## Класс события на переход строки исполнения
 
-<!-- backlog: владелец=solution-designer; оживит=греп:"проскальзыван"@docs/rules/statistics-aggregates.md|наблюдение:разбор частичного выхода, не разрешимый решениями о заявках и терминалом сделки -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Завести класс события на переход строки исполнения
 (`DealActionState`) и его содержимое, чтобы журнал объяснял уровень
@@ -1962,7 +1962,7 @@ durable-групп по две, и оживитель у темы — первы
 
 ## Экспорт метрик из сервисов — приёмник есть, отправителя нет
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:объявленный читатель метрики у сервиса без отправителя -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** У каждого сервиса без отправителя завести **реестр**
 метрик (`micrometer-registry-prometheus`), открыть эндпоинт `prometheus`
@@ -2007,7 +2007,7 @@ grep -rln 'kind: ServiceMonitor' deploy/
 
 ## Перехватчик `Exception` съедает отказ по правам у `bff` и `strategies`
 
-<!-- backlog: владелец=code-writer; оживит=шаг:5-1:открыт -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать общему `@RestControllerAdvice` обоих сервисов
 обработчик `AccessDeniedException`, пробрасывающий отказ дальше, и
@@ -2035,7 +2035,7 @@ grep -rn "ExceptionHandler(Exception.class)" services/*/src/main/java
 
 ## Таблица отказов доступа у сервисов со своей базой
 
-<!-- backlog: владелец=code-writer; оживит=шаг:5-1:открыт -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Завести таблицу `access_denials` миграцией и писателя
 строки у каждого сервиса, у которого **есть своя база** и **может
@@ -2075,7 +2075,7 @@ grep -rl 'AccessDenialService' services/*/src/main/java | cut -d/ -f2 | sort -u
 
 ## Класс события `HoldReleased` и его ручная тропа
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ход по ручной поверхности ядра, доводящий снятие ступени до писателя класса; закрыто-когда=греп:"HOLD_RELEASED"@services/common/model/domain/src/main/java/**/*.java -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"HOLD_RELEASED"@services/common/model/domain/src/main/java/**/*.java -->
 
 **Что сделать.** Завести класс события `HoldReleased`, его содержимое и
 поле актора и довести до писателя класса **уже построенную** поверхность
@@ -2102,7 +2102,7 @@ grep -rl 'AccessDenialService' services/*/src/main/java | cut -d/ -f2 | sort -u
 
 ## Решение о защите в журнале и разрез активности заявок
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:кодовый заход по исполнителям заявок trading-core -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Две позиции у счётчика `orderDecisions`
 (`docs/rules/statistics-aggregates.md` §«Счётчики происшествий — своё
@@ -2130,7 +2130,7 @@ grep -rl 'AccessDenialService' services/*/src/main/java | cut -d/ -f2 | sort -u
 
 ## Исполнимость формы ценового результата на строках агрегатов
 
-<!-- backlog: владелец=solution-designer; оживит=греп:"graphComplete"@docs/spec/statistics-aggregates.json -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Довести тождество «результат до финансирования есть сумма
 итога и накопленного финансирования под конъюнктом полноты графа» до
@@ -2214,7 +2214,7 @@ api-формах он их получает.
 
 ## Api-формы периметра без дока — хвост шага 9 фазы 2
 
-<!-- backlog: владелец=solution-designer; оживит=шаг:2-13:открыт; закрыто-когда=греп:"StreamApiModel"@docs/models/api/*.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"StreamApiModel"@docs/models/api/*.md -->
 
 **Что сделать.** Завести доки api-форм, которые периметр **порождает**
 сам: событие потока, оболочка агрегата, собственный отказ. Дом объявлен —
@@ -2248,7 +2248,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ## Справочник площадок обещан шагом 4, а схемы у `auth` нет
 
-<!-- backlog: владелец=solution-designer; оживит=шаг:5-1:открыт; закрыто-когда=греп:"create\s+table\s+(if\s+not\s+exists\s+)?exchanges"@services/auth/src/main/resources/db/migration/**/*.sql|нет-грепа:"Заводится\s+шагом\s+4\s+фазы\s+2"@docs/models/domain/core/Exchange.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"create\s+table\s+(if\s+not\s+exists\s+)?exchanges"@services/auth/src/main/resources/db/migration/**/*.sql|нет-грепа:"Заводится\s+шагом\s+4\s+фазы\s+2"@docs/models/domain/core/Exchange.md -->
 
 **Что сделать.** Свести обещание `docs/models/domain/core/Exchange.md`
 («целевую площадку заводит шаг 4 фазы 2 вместе с `auth`») и фактику базы
@@ -2275,7 +2275,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ## Строка раскладки у́же корпусной фактики у владельцев со своей базой
 
-<!-- backlog: владелец=solution-designer; оживит=сейчас -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести строку `docs/architecture/data-ownership.md`
 §Раскладка с фактическим составом базы владельца — либо дописав носители,
@@ -2319,7 +2319,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ## Образ сервиса без продвинутого тега резолвится подвижным `latest`
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:первое развёртывание stage или prod|рубеж:prod -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что.** Базовый манифест сервиса (`deploy/base/services/*.yaml`) называет
 образ **без тега**; тег приезжает блоком `images:` оверлея при продвижении.
@@ -2343,7 +2343,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ## Дедуп проверкой существования перед вставкой — построенный класс, а не точка
 
-<!-- backlog: владелец=code-writer; оживит=рубеж:prod|наблюдение:кодовый заход по персистентности trading-core или market-data -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что.** Дом идемпотентности (`docs/rules/idempotency-via-unique.md`)
 требует UNIQUE-индексов плюс безопасной вставки по ключу, **а не проверки
@@ -2381,7 +2381,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ## Отчёт ручной операции поглощается вместе с отказом журнала
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:кодовый заход по ручной поверхности ядра или контуру safety; закрыто-когда=нет-грепа:"catch\s+\(RuntimeException"@services/trading-core/src/main/java/**/ManualHaltService.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"catch\s+\(RuntimeException"@services/trading-core/src/main/java/**/ManualHaltService.java -->
 
 **Что.** Дом ручного управления объявляет: отчёт производит каждая
 применённая операция (`docs/rules/manual-halt.md` §«Наблюдаемость: ручное
@@ -2414,7 +2414,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ## Слова провода, по которым ветвится потребитель, у четырёх компонентов терминала не запинены
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:единица, правящая охрану формы провода у потребителя журнала; закрыто-когда=греп:"CoreEventType"@services/statistics/src/test/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"CoreEventType"@services/statistics/src/test/java/**/*.java -->
 
 **Что сделать.** Завести у потребителя журнала сквозную пробу той же формы,
 что `WireFormContractTest`: читать значения перечней **у построенного
@@ -2454,7 +2454,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ### Вторая ось того же стыка — ИМЕНА компонентов, а не только их значения
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:та же единица, что у родительской секции -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать той же пробой.** Собрать содержимое **настоящими формами
 публикатора** и потребовать, чтобы читатель журнала достал из него
@@ -2488,7 +2488,7 @@ ls services/bff/src/main/java/com/example/bff/api/model/stream/
 
 ### Третья ось того же стыка — команда перечня слепа к слову, уезжающему параметром
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:та же единица, что у родительской секции -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать той же пробой.** Накрыть ею и те слова провода, которые
 нативный запрос потребителя берёт **параметром**, а не литералом своего
@@ -2639,7 +2639,7 @@ query-API.
 
 ## Базы `audit` и `statistics` обязаны быть пересозданы перед подъёмом стенда
 
-<!-- backlog: владелец=integrator; оживит=наблюдение:ближайший подъём стенда на этом дереве кода -->
+<!-- backlog: владелец=integrator; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Перед первым развёртыванием этого дерева снести базы
 `audit` и `statistics` вместе с их `flyway_schema_history` и дать цепочкам
@@ -2670,7 +2670,7 @@ query-API.
 
 ## Близнецы модуля приёма у `audit` и `statistics`
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:третий durable-потребитель либо кодовый заход по модулю приёма любого из двух; закрыто-когда=файл:services/common/reception/pom.xml -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=файл:services/common/reception/pom.xml -->
 
 **Что сделать.** Разобрать, что из модуля приёма — общий артефакт, а что
 остаётся у владельца. Кандидаты предъявлены попарным сличением деревьев:
@@ -2713,7 +2713,7 @@ done
 
 ## Начало ряда фактов читается на каждые сутки окна пересчёта
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:окно пересчёта шире недели либо профиль, показавший проход пересчёта в верхушке нагрузки -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Поднять чтение начал обоих рядов
 (`AggregateRecomputeService.dayRecomputable`, операнд
@@ -2737,7 +2737,7 @@ done
 
 ## Уровень `journal` в ключе подключения `audit` пережил свою половину
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по конфигурации audit -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести ключ `audit.persistence.journal.*` к
 `audit.persistence.*` — вместе с `PersistenceProperties`, `application.yaml`
@@ -2792,7 +2792,7 @@ done
 
 ## Описание статуса счёта в api-модели `auth` перечисляет ступени чужого писателя
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по auth; закрыто-когда=нет-грепа:"TRADE_BLOCKED"@services/auth/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"TRADE_BLOCKED"@services/auth/src/main/java/**/*.java -->
 
 **Что сделать.** Привести описание поля `status` в
 `ExchangeAccountApiResponse` к реестровому перечню — `ACTIVE` и `CLOSED`.
@@ -2814,7 +2814,7 @@ done
 
 ## Клейм об отсутствии резолвера актора у `auth` пережил закрытие долга
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по кругу тенанта, счёта и ключей; закрыто-когда=нет-грепа:"резолвера актора нет"@docs/architecture/tenant-and-exchange.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"резолвера актора нет"@docs/architecture/tenant-and-exchange.md -->
 
 **Что сделать.** Снять из `docs/architecture/tenant-and-exchange.md`
 §«Пользователи и роли» клейм «ключи меняет `auth`, у которого резолвера
@@ -2846,7 +2846,7 @@ javadoc `auth`»). Разведены они не по вкусу: у полей
 
 ## Снятый клейм об акторе жив вторым носителем — в javadoc `auth`
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по самому auth; закрыто-когда=нет-грепа:"актором строк реестра идёт класс контура"@services/auth/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"актором строк реестра идёт класс контура"@services/auth/src/main/java/**/*.java -->
 
 **Что сделать.** Снять из javadoc `JpaAuditConfig` (абзац «Значение отдаёт
 общий поставщик») клейм «пока принципал у поверхности один, актором строк
@@ -2869,7 +2869,7 @@ javadoc `auth`»). Разведены они не по вкусу: у полей
 
 ## Операции ротации ключей, приостановки тенанта и отключения счёта у `auth` не построены
 
-<!-- backlog: владелец=solution-designer; оживит=шаг:5-1:открыт|наблюдение:ближайший кодовый заход по самому auth -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Решить, чем совершаются три перехода, которые корпус
 называет действующими, а поверхность `auth` не несёт ни одной операцией:
@@ -2895,7 +2895,7 @@ javadoc `auth`»). Разведены они не по вкусу: у полей
 
 ## Исход чтения счетов несуществующего тенанта не назван
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по поверхности реестра счетов auth -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать, чем отвечает `GET /api/v1/auth/exchange-accounts/tenant/{tenantInternalId}`
 на тенанта, которого не существует: пустым перечнем наравне с «счетов нет»
@@ -2917,7 +2917,7 @@ javadoc `auth`»). Разведены они не по вкусу: у полей
 
 ## Запрет на текст платформенного исключения в теле отказа дома не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=шаг:2-13:открыт|наблюдение:ближайший доковый заход по error-политике внешней поверхности -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Решить, несёт ли тело отказа поверхности текст
 платформенного исключения, и записать исход в дом. Сегодня запрет объявлен
@@ -2946,7 +2946,7 @@ javadoc `auth`»). Разведены они не по вкусу: у полей
 
 ## Исход пустого адреса хранилища секретов у `auth` не назван
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по самому auth -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать исход пустого `spring.cloud.vault.uri`
 (`VAULT_URI`) у `auth` — комментарием оси в
@@ -2978,7 +2978,7 @@ F-8 `.claude/tests/cases/auth.md`); кейс B6.4 проверяет то, чт�
 
 ## Значение заголовка `typ` у выбранного провайдера идентичности ни одним домом не названо
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:первый прогон браузерной тропы против живого провайдера идентичности; закрыто-когда=греп:"(?<![a-zA-Z])typ[^a-zA-Z]"@docs/architecture/contracts.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"(?<![a-zA-Z])typ[^a-zA-Z]"@docs/architecture/contracts.md -->
 
 **Что сделать.** Назвать домом, какое значение несёт заголовок `typ` у токена
 выбранного провайдера идентичности, и сходится ли оно с тем, что принимает
@@ -3012,7 +3012,7 @@ F-8 `.claude/tests/cases/auth.md`); кейс B6.4 проверяет то, чт�
 
 ## Привязка токена к сертификату клиента у выбранного провайдера идентичности ни одним домом не названа
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:первый прогон браузерной тропы против живого провайдера идентичности; закрыто-когда=греп:"x5t#S256"@docs/architecture/contracts.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"x5t#S256"@docs/architecture/contracts.md -->
 
 **Что сделать.** Назвать домом, выпускает ли выбранный провайдер идентичности
 токен, **привязанный к сертификату клиента** (claim `cnf.x5t#S256`, RFC 8705),
@@ -3049,7 +3049,7 @@ claim **производитель** токена, то есть провайд�
 
 ## Привязка токена к ключу предъявителя по DPoP у выбранного провайдера идентичности ни одним домом не названа
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:первый прогон браузерной тропы против живого провайдера идентичности; закрыто-когда=греп:"DPoP"@docs/architecture/contracts.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"DPoP"@docs/architecture/contracts.md -->
 
 **Что сделать.** Назвать домом, выпускает ли выбранный провайдер идентичности
 токен, **привязанный к ключу предъявителя** (claim `cnf.jkt`, RFC 9449), и —
@@ -3092,7 +3092,7 @@ claim **производитель** токена, то есть провайд�
 
 ## Клейм о втором прогоне кейсов `auth` шире того, что команда печатает
 
-<!-- backlog: владелец=tester; оживит=наблюдение:заход, пишущий код тестов auth под-шагом 3 CODE шага 12 фазы 2; закрыто-когда=греп:"единиц без исхода:"@.claude/tests/cases/auth.md -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"единиц без исхода:"@.claude/tests/cases/auth.md -->
 
 **Что сделать.** Научить команду 2 сверять реестр единиц обязательного входа
 с метками кейсов документа и печатать единицы **без исхода** — тогда полноту
@@ -3128,7 +3128,7 @@ claim **производитель** токена, то есть провайд�
 
 ## Сегодняшняя половина кейсов следа отказа доступа не выведена ни одним домом
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов market-data либо trading-core под-шагом 2 CODE шага 12 фазы 2; закрыто-когда=нет-грепа:"отказ\s+оставляет\s+запись\s+в\s+журнале"@.claude/tests/cases/*.md -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"отказ\s+оставляет\s+запись\s+в\s+журнале"@.claude/tests/cases/*.md -->
 
 **Что сделать.** Снять из кейсов следа отказа доступа у `market-data`
 (B8.11) и `trading-core` (B12.10) половину «**сегодня**: отказ оставляет
@@ -3150,7 +3150,7 @@ services/<сервис>/src/main/java` — пусто), отвечает сто�
 
 ## Кейс коннектора останавливает общий контейнер хранилища и восстановления не называет
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов connector-okx под-шагом 2 CODE шага 12 фазы 2; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/connector-okx.md -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/connector-okx.md -->
 
 **Что сделать.** Предусловие B1.7-S («контейнер Vault остановлен») привести к
 оси контура §«Кейс, разрушающий субстрат, берёт свой контейнер и свой
@@ -3183,7 +3183,7 @@ services/<сервис>/src/main/java` — пусто), отвечает сто�
 
 ## Кейсы, объявляющие общий субстрат недоступным, своего контейнера не берут
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов любого из названных ниже предметов под-шагом 2 CODE шага 12 фазы 2 -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Привести кейсы подсекций к оси контура
 `.claude/decisions/test-contour-design-pass.md` §«Кейс, разрушающий субстрат,
@@ -3205,7 +3205,7 @@ services/<сервис>/src/main/java` — пусто), отвечает сто�
 
 ### `audit`: два кейса называют исход базы, а не механизм
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов audit под-шагом 2 CODE шага 12 фазы 2; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/audit.md -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/audit.md -->
 
 Члены — в `.claude/tests/cases/audit.md`: кейс **B3.12** («база недоступна», и
 «следующий успешный такт ряды возвращает» требует её возврата) и кейс **B10.5**
@@ -3214,7 +3214,7 @@ services/<сервис>/src/main/java` — пусто), отвечает сто�
 
 ### `statistics`: два кейса того же класса на том же субстрате
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов statistics под-шагом 2 CODE шага 12 фазы 2; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/statistics.md -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/statistics.md -->
 
 Члены — в `.claude/tests/cases/statistics.md`: кейс **B3.12** («чтение состава
 пар отказывает (база недоступна)») и кейс **B11.11** («запись строки отказа
@@ -3227,7 +3227,7 @@ services/<сервис>/src/main/java` — пусто), отвечает сто�
 
 ### `bff`: единственный контейнер ящика выведен из строя формулировкой-исходом
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов bff под-шагом 2 CODE шага 12 фазы 2; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/bff.md -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/bff.md -->
 
 Член — в `.claude/tests/cases/bff.md`: кейс **B5.3**, «связь с брокером
 потеряна либо группа развалилась». Механизма кейс не называет, а одна
@@ -3239,7 +3239,7 @@ services/<сервис>/src/main/java` — пусто), отвечает сто�
 
 ### `e2e-perimeter-read`: остановленный контейнер брокера на цепочке состояний
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов e2e-perimeter-read под-шагом 2 CODE шага 12 фазы 2; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/e2e-perimeter-read.md -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"разрушающий субстрат"@.claude/tests/cases/e2e-perimeter-read.md -->
 
 Член — в `.claude/tests/cases/e2e-perimeter-read.md`: кейс **E7.2**, «контейнер
 брокера остановлен после её открытия»; возврата кейс не называет. Кейсы набора якорятся на состояния друг друга («состояние E3.1»),
@@ -3252,7 +3252,7 @@ services/<сервис>/src/main/java` — пусто), отвечает сто�
 
 ## Отрицание содержимого общего субстрата в кейсах написано абсолютной формой
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов любого предмета под-шагом 2 CODE шага 12 фазы 2 -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Привести клетки выходов к разностной форме — «новых записей
 не появилось», «строк не прибавилось» вместо «в теме ничего», «строк нет ни
@@ -3341,7 +3341,7 @@ py "$TMP/neg-form.py"
 
 ## Негатив «обязательный вход не предъявлен» в кейсах покрыт представителем, а не по единице
 
-<!-- backlog: владелец=tester; оживит=наблюдение:ревью кейсов любого предмета под-шагом 2 CODE шага 12 фазы 2 -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Перебрать реестр обязательных входов своего предмета и дать
 исход каждой единице: покрыта своей меткой либо названа непокрытой с доводом о
@@ -3439,7 +3439,7 @@ py "$TMP/req-units.py"
 
 ## Параметры чужого типа требование индикатора `market-data` принимает молча
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Сделать разбор параметров вычисления СТРОГИМ к чужим полям.
 `ComputationParamsJsonConverter#toIndicatorParams` зовёт `convertValue`, а
@@ -3468,7 +3468,7 @@ py "$TMP/req-units.py"
 
 ## Отсутствие тикера у чтения цен `market-data` отвечает не объявленным числом
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data; закрыто-когда=нет-грепа:"ResponseEntity\.ofNullable"@services/market-data/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"ResponseEntity\.ofNullable"@services/market-data/src/main/java/**/*.java -->
 
 **Что сделать.** Вернуть ветви «тикера на площадке нет» объявленное число.
 `MarketFeatureController#getPrices` отдаёт пустое значение через
@@ -3490,7 +3490,7 @@ py "$TMP/req-units.py"
 
 ## Охрана пустого служебного токена у `market-data` мертва
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Довести отказ выдачи служебной идентичности до объявленного
 класса. `ServiceTokenProvider#getTokenValue` объявляет, что пустой токен есть
@@ -3516,7 +3516,7 @@ py "$TMP/req-units.py"
 
 ## Стаб провайдера идентичности у ящиков живёт копией на дерево
 
-<!-- backlog: владелец=tester; оживит=наблюдение:третий ящик уровня 1 заводит свой стаб провайдера идентичности -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести стабы провайдера идентичности ящиков к общему носителю
 `services/common/test-support` — когда их станет три. Сегодня их два:
@@ -3546,7 +3546,7 @@ py "$TMP/req-units.py"
 
 ## Форма подписи приватного запроса площадки дома в корпусе не имеет
 
-<!-- backlog: владелец=connector-okx; оживит=наблюдение:ближайший доковый заход по connector-okx; закрыто-когда=греп:"prehash"@docs/integrations/okx/** -->
+<!-- backlog: владелец=connector-okx; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"prehash"@docs/integrations/okx/** -->
 
 **Что сделать.** Завести в апидоках OKX пассаж о форме подписываемой строки
 приватного запроса: prehash = timestamp + метод + путь(+query) + тело, подпись
@@ -3571,7 +3571,7 @@ REST)») — то есть у дока **операции**, а не у дома
 
 ## Доки коннектора называют исполнителем снятый класс донора
 
-<!-- backlog: владелец=connector-okx; оживит=наблюдение:ближайший доковый заход по connector-okx; закрыто-когда=нет-грепа:"OkxIntegrationService"@docs/** -->
+<!-- backlog: владелец=connector-okx; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"OkxIntegrationService"@docs/** -->
 
 **Что сделать.** Переписать в четырёх живых доках имя исполнителя на
 действующее: `docs/integrations/okx/rules/adapter-constants.md` §«Где
@@ -3593,7 +3593,7 @@ REST)») — то есть у дока **операции**, а не у дома
 
 ## Доменные модели уходят наружу с поверхности `market-data`
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Завести api-модели для двух форм, которые поверхность отдаёт
 доменными: справочные правила инструмента (`GET …/instruments/{internalId}/rules`)
@@ -3620,7 +3620,7 @@ REST)») — то есть у дока **операции**, а не у дома
 
 ## Клейм о том, что синк валют не пишет, опровергнут маппером обновления из листинга
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по онбордингу инструментов либо кодовый заход по market-data -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что решить.** Два дома объявляют, что валюты инструмента синк не пишет:
 `docs/components/InstrumentSyncJob.md` §Границы («валюты инструмента синк не
@@ -3643,7 +3643,7 @@ REST)») — то есть у дока **операции**, а не у дома
 
 ## Ребро `CREATED → SYNC` жизненного цикла инструмента писателя не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по онбордингу инструментов либо кодовый заход по market-data -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что решить.** `docs/lifecycles/Instrument.md` материализует онбординг-путь
 `CREATED → SYNC → CANDLES_LOADING → ACTIVE` и описывает `CREATED` как состояние
@@ -3667,7 +3667,7 @@ REST)») — то есть у дока **операции**, а не у дома
 
 ## Перечень кодов у чтения цен `market-data` у́же производимого
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data; закрыто-когда=греп:"503"@services/market-data/src/main/java/**/MarketFeatureController.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"503"@services/market-data/src/main/java/**/MarketFeatureController.java -->
 
 **Что сделать.** Дополнить `@ApiResponses` чтения цен
 (`GET …/instruments/{internalId}/prices`) кодом `503`: отказ доступа либо
@@ -3687,7 +3687,7 @@ REST)») — то есть у дока **операции**, а не у дома
 
 ## Чтение действующего листинга `market-data` идёт без окна
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data; закрыто-когда=нет-грепа:"findByStatusIn"@services/market-data/src/main/java/**/api/controller/InstrumentController.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"findByStatusIn"@services/market-data/src/main/java/**/api/controller/InstrumentController.java -->
 
 **Что сделать.** Ограничить чтение действующего листинга
 (`GET /api/v1/market-data/instruments`) окном либо пагинацией: сегодня оно
@@ -3710,7 +3710,7 @@ REST)») — то есть у дока **операции**, а не у дома
 
 ## Перечень классов отказа поверхности `market-data` дома в корпусе не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по доковому корпусу market-data либо кодовый заход по его поверхности; закрыто-когда=греп:"EXCHANGE_ACCESS_REFUSED"@docs/** -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"EXCHANGE_ACCESS_REFUSED"@docs/** -->
 
 **Что решить.** Поверхность `market-data` отдаёт три класса отказа в поле
 `code` единого error-DTO — `EXCHANGE_ACCESS_REFUSED`, `EXCHANGE_READ_FAILED`,
@@ -3736,7 +3736,7 @@ REST)») — то есть у дока **операции**, а не у дома
 
 ## Жизненный цикл единицы сбора разошёлся с построенным: два объявленных элемента без писателя
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по жизненному циклу единицы сбора либо кодовый заход по загрузке свечей -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что решить.** `docs/lifecycles/CandleGroup.md` §«Общий поток» материализует
 поток `CREATED → BACKFILL → SYNC → CHECK → ACTIVE` и статус `DELETED`
@@ -3767,7 +3767,7 @@ B3.4, находка F-7).
 
 ## Класс отказа при незаданном адресе соседа у `market-data` не объявлен
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать, каким классом отказывает чтение, когда
 `connector.base-url` не задан. Сегодня `application.yaml` объявляет только
@@ -3790,7 +3790,7 @@ F-8); прогоном исход не проверялся — контекст
 
 ## Javadoc `JobController` у `market-data` ссылается на несуществующий класс охраны
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data; закрыто-когда=нет-грепа:"marketdata.domain.jobs.JobExecutionGuard"@services/market-data/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"marketdata.domain.jobs.JobExecutionGuard"@services/market-data/src/main/java/** -->
 
 **Что сделать.** Поправить ссылку в javadoc `JobController`: охрана
 перекрывающего запуска живёт в `com.example.platform.jobs.JobExecutionGuard`
@@ -3837,7 +3837,7 @@ F-8); прогоном исход не проверялся — контекст
 
 ## Обещанный `409` на отказе блокировки у асинхронного фасада недостижим
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по дому внешней поверхности либо по форме фасада джобы -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что решить.** Дом внешней поверхности объявляет у асинхронного фасада
 ручного триггера джобы два исхода: `202` на чистом запуске и `409` на проблеме
@@ -3863,7 +3863,7 @@ F-8); прогоном исход не проверялся — контекст
 
 ## Половина синка проекций по счетам отказ одной строки не терпит
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Развести отказ одной строки и отказ прохода в половине
 реестра счетов — так же, как это уже сделано в половине каталога
@@ -3891,7 +3891,7 @@ F-8); прогоном исход не проверялся — контекст
 
 ## Доля запаса нотинала названа числом тенанта в доме валидации
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по дому валидации стратегии либо по числам риск-аппетита -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что решить.** Дом валидации объявляет: «три из пяти неравенств стоя́т на
 числах, которых владелец определений не хранит», и называет их поимённо —
@@ -3931,7 +3931,7 @@ F-8); прогоном исход не проверялся — контекст
 
 ## Гонка активаций отвечает `500` вместо объявленного `409`
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по strategies -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать поверхности `strategies` исход на нарушение частичного
 уникального индекса активной стратегии пары: сегодня отказ базы доходит до
@@ -3965,7 +3965,7 @@ grep -n "uk_strategy_active_per_account_instrument" services/strategies/src/main
 
 ## Колонки аудита каждого узла едут в снимке определения
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший заход по форме снимка определения на проводе -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что решить.** Нести ли в снимке активации колонки аудита каждого узла дерева
 (`createdAt`/`createdBy`/`modifiedAt`/`modifiedBy` — метаданные персистентности
@@ -3990,7 +3990,7 @@ grep -n "uk_strategy_active_per_account_instrument" services/strategies/src/main
 читателя, которому колонки мешают, он не гейтит ни шага, ни рубежа.
 ## Предикаты и статус снимка определения противоречат классу своего события
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по тропе публикации strategies либо по применителю копии у trading-core; закрыто-когда=греп:"@JsonIgnore"@services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/strategy/Strategy.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"@JsonIgnore"@services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/strategy/Strategy.java -->
 
 **Что сделать.** Убрать из содержимого события активации значения, которых
 форма сообщения не объявляла: предикаты rich-модели, выведенные сериализатором
@@ -4038,7 +4038,7 @@ grep -n "definition.setStatus(Strategy.Status.ACTIVE)" services/trading-core/src
 
 ## Пустой адрес соседа у `strategies` отвечает дефектом входа вызывающего
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по тропе к соседу у strategies; закрыто-когда=греп:"IllegalArgumentException"@services/strategies/src/main/java/com/example/strategies/integration/internal/api/PeerCall.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"IllegalArgumentException"@services/strategies/src/main/java/com/example/strategies/integration/internal/api/PeerCall.java -->
 
 **Что сделать.** Свести дом и код: негодный **адрес** соседа обязан отвечать
 классом недоступности соседа, а не классом негодного входа вызывающего.
@@ -4077,7 +4077,7 @@ grep -n "onIllegalArgument" services/strategies/src/main/java/com/example/strate
 
 ## Ненайденность в контексте тенанта дома не имеет и реджект-кодом не названа
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по внешней поверхности любого сервиса, читающего в контексте тенанта; закрыто-когда=греп:"читается как ненайденное"@docs/** -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"читается как ненайденное"@docs/** -->
 
 **Что сделать.** Завести дом правилу «сущность чужого тенанта читается как
 ненайденная, и тело отказа не различает «нет такой» и «есть, но чужая»» — и
@@ -4109,7 +4109,7 @@ grep -rn "Strategy not found" services/strategies/src/main/java/com/example/stra
 
 ## Перечень кодов у мутирующих точек `strategies` у́же производимого
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по strategies; закрыто-когда=греп:"responseCode = .502."@services/strategies/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"responseCode = .502."@services/strategies/src/main/java/** -->
 
 **Что сделать.** Объявить `502` в перечне кодов обеих мутирующих точек
 владельца определений — создания и смены статуса. Поверхность его
@@ -4137,7 +4137,7 @@ grep -rn "PEER_REFUSED" services/strategies/src/main/java
 
 ## Чистка опубликованных строк outbox писателя не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:первое наблюдение объёма outbox в развёрнутом окружении -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что решить.** Компонент-док реле объявляет названным ограничением, что рост
 outbox гасит **чистка опубликованных строк**, и ставит её якорем на
@@ -4174,7 +4174,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Обязательность входа журнала мерится ссылкой, а не значением
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по модулю приёма audit; закрыто-когда=греп:"isNotBlank"@services/audit/src/main/java/**/AuditRecord.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"isNotBlank"@services/audit/src/main/java/**/AuditRecord.java -->
 
 **Что сделать.** Свести предикат полноты входа (`AuditRecord.hasCompleteInput`)
 с ненулевой ссылки на непустое значение у пяти строковых полей конверта, и
@@ -4204,7 +4204,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Остановка приёма объявлена потемной, а исполняется группово
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:первый живой прогон приёма журнала на брокере -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что разобрать.** Ключ строки состояния приёма сделан **парой** «группа ×
 тема» именно затем, чтобы молчание одной темы не маскировало остановку на
@@ -4241,7 +4241,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Гасящего писателя момента разрыва в проде нет, а граница там двигается
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:тема, добавленная в подписку группы журнала после первого обнаруженного разрыва|рубеж:prod -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что разобрать.** Дом чистки объявляет, что в боевом окружении момент
 разрыва не гасит никто, и называет это верным по существу: там разрыв
@@ -4277,7 +4277,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Третья ветвь пустоты колонки радиуса дома не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по журналу аудита -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать в доме третью ветвь пустоты колонки радиуса либо
 объявить её дефектом производителя с исходом. Дом объявляет пустоту
@@ -4319,7 +4319,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Пустое значение отбора журнальной выборки даёт пустую страницу молча
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по журналу аудита -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать в доме выборки, что означает **пустое значение**
 операнда отбора по радиусу (`docs/models/domain/other/AuditRecord.md` §«Как
@@ -4356,7 +4356,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Нулевой срок хранения темы читается как хранение без предела
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по приёму durable-потребителя -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать нулевой срок хранения темы в доме операнда
 (`docs/spec/durable-reception.json`, операнд `topicRetentionMs`) либо свести
@@ -4392,7 +4392,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Отсечка отрицательного возраста последнего принятого события дома не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по приёму durable-потребителя -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать отсечку в доме величины
 (`docs/spec/durable-reception.json`, операнд `lastEventAgeMs`) и в
@@ -4426,7 +4426,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Контекст трассировки не переживает границу приёма статистики
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по приёму durable-потребителя -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать исход у контекста трассировки на границе приёма
 статистики — либо в доме её факта
@@ -4459,7 +4459,7 @@ grep -rn "published_at" services/*/src/main/resources/db/migration
 
 ## Денежный операнд, приехавший JSON-числом, теряет знаки до чтения текстом
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по приёму statistics; закрыто-когда=греп:"USE_BIG_DECIMAL_FOR_FLOATS"@services/statistics/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"USE_BIG_DECIMAL_FOR_FLOATS"@services/statistics/src/main/java/** -->
 
 **Что сделать.** Заставить разбор содержимого у чтеца статистики строить
 десятичный узел, а не двоичный: включить чтение чисел с плавающей точкой в
@@ -4496,7 +4496,7 @@ Javadoc чтеца при этом объявляет обратное — «ч�
 
 ## Одновременная замена состава рядов экспорта ожидания не имеет
 
-<!-- backlog: владелец=tester; оживит=наблюдение:первый случай расхождения рядов приёма в живом окружении -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать, что наблюдаемо у `MultiGauge#register` при
 одновременном вызове из двух потоков, — либо объявить состояние
@@ -4522,7 +4522,7 @@ Javadoc чтеца при этом объявляет обратное — «ч�
 
 ## Неизменяемость миграции живёт двумя домами, и критерий у них разный
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход, правящий либо применяющий миграцию; закрыто-когда=нет-грепа:"попавший в репозиторий, не правится"@docs/rules/persistence-representation.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"попавший в репозиторий, не правится"@docs/rules/persistence-representation.md -->
 
 **Что сделать.** Свести политику неизменяемости миграции к одному дому и одному
 критерию: либо продуктовый дом (`docs/rules/persistence-representation.md`
@@ -4558,7 +4558,7 @@ Javadoc чтеца при этом объявляет обратное — «ч�
 
 ## Дом требования о первичном ключе гипертаблицы не назначен
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход, заводящий гипертаблицу либо правящий ключ существующей; закрыто-когда=греп:"колонка разбиения"@docs/rules/persistence-representation.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"колонка разбиения"@docs/rules/persistence-representation.md -->
 
 **Что сделать.** Назначить дом требованию «всякий уникальный индекс
 гипертаблицы — включая первичный ключ — обязан нести колонку разбиения, и
@@ -4593,7 +4593,7 @@ javadoc `DealFactId`/`IncidentFactId` (`services/statistics`).
 
 ## Свои величины полноты статистика называет журнальными
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по statistics; закрыто-когда=нет-грепа:"полнот[аыуе] журнала"@services/statistics/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"полнот[аыуе] журнала"@services/statistics/src/main/java/** -->
 
 **Что сделать.** Назвать величины полноты в `statistics` своими — в описании
 поверхности, в javadoc и в именах полей выборки чтения, — и тем же ходом
@@ -4640,7 +4640,7 @@ javadoc `DealFactId`/`IncidentFactId` (`services/statistics`).
 
 ## Пустой плановый риск выпадает из знаменателя R без счётчика
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по агрегатам статистики -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что разобрать.** Дом объявляет плановый риск величиной, которая **никогда
 не пуста**: её форма — сумма по входным ногам, а на пустом множестве сумма
@@ -4682,7 +4682,7 @@ javadoc `DealFactId`/`IncidentFactId` (`services/statistics`).
 
 ## Обязательность входа факта статистики мерится ссылкой, а не значением
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по модулю приёма statistics; закрыто-когда=греп:"isNotBlank"@services/statistics/src/main/java/**/DealFact.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"isNotBlank"@services/statistics/src/main/java/**/DealFact.java -->
 
 **Что сделать.** Свести предикаты полноты входа (`DealFact.hasCompleteInput`,
 `IncidentFact.hasCompleteInput`) с ненулевой ссылки на непустое значение у
@@ -4713,7 +4713,7 @@ javadoc `DealFactId`/`IncidentFactId` (`services/statistics`).
 
 ## Флаг остановки приёма, потерянный до первого такта тика, не ложится никогда
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по модулю приёма statistics либо audit; закрыто-когда=нет-грепа:"deliveryAttempt > FIRST_ATTEMPT"@services/*/src/main/java/**/ReceptionHaltMarker.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"deliveryAttempt > FIRST_ATTEMPT"@services/*/src/main/java/**/ReceptionHaltMarker.java -->
 
 **Что сделать.** Свести писателя флага остановки
 (`ReceptionHaltMarker#failedDelivery`) с «первой доставки» на «пока флаг не
@@ -4749,7 +4749,7 @@ B2.13 (находка F-10); он красен по построению и по
 
 ## Срок билета подписки короче срока соединения, и штатный разрыв попадает вне его
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=нет-грепа:"PERIMETER_TICKET_TTL:10m"@services/bff/src/main/resources/application.yaml -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"PERIMETER_TICKET_TTL:10m"@services/bff/src/main/resources/application.yaml -->
 
 **Что сделать.** Свести два умолчания периметра так, чтобы срок билета был
 **не меньше** срока жизни соединения подписки, — либо назвать в доме
@@ -4791,7 +4791,7 @@ grep -n 'PERIMETER_TICKET_TTL\|PERIMETER_STREAM_CONNECTION_TIMEOUT' services/bff
 
 ## Неразбираемый момент происшествия роняет раздачу вместо пропуска
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=греп:"DateTimeParseException"@services/bff/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"DateTimeParseException"@services/bff/src/main/java/** -->
 
 **Что сделать.** Защитить разбор заголовка момента происшествия у слушателя
 периметра так же, как защищён разбор тела: неразобравшееся значение —
@@ -4830,7 +4830,7 @@ grep -n 'occurredAt\|OffsetDateTime.parse' services/bff/src/main/java/com/exampl
 
 ## Окно переигрывания периметра копится по тенантам без подписок и не вытесняется
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=греп:"windows\.remove"@services/bff/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"windows\.remove"@services/bff/src/main/java/** -->
 
 **Что сделать.** Дать окну переигрывания тот же признак эфемерности, что и
 кэшу членств: окно тенанта, у которого нет ни одной открытой подписки, не
@@ -4871,7 +4871,7 @@ grep -n 'windows' services/bff/src/main/java/com/example/bff/domain/stream/Strea
 
 ## Переигрывание идёт после регистрации подписки, и параллельный факт обгоняет хвост
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Сделать так, чтобы записи, положенные в провод рассылкой, не
 опережали хвост окна: собрать хвост и отдать его **до** включения подписки в
@@ -4902,7 +4902,7 @@ grep -n 'windows' services/bff/src/main/java/com/example/bff/domain/stream/Strea
 
 ## Открытие подписки периметра клиенту не подтверждается
 
-<!-- backlog: владелец=code-writer; оживит=шаг:2-13:открыт|наблюдение:ближайший кодовый заход по bff -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать открытию подписки наблюдаемое клиентом подтверждение:
 периметр обязан написать в поток что-то сразу, как только подписка
@@ -4945,7 +4945,7 @@ grep -n 'windows' services/bff/src/main/java/com/example/bff/domain/stream/Strea
 
 ## Отказ точки подписки до клиента своим классом не доезжает
 
-<!-- backlog: владелец=code-writer; оживит=шаг:2-13:открыт|наблюдение:ближайший кодовый заход по bff -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Сделать так, чтобы отказ точки подписки доезжал до клиента
 СВОИМ классом и своим числом. Чем именно — развилка владельца: снять
@@ -4995,7 +4995,7 @@ MediaType.TEXT_EVENT_STREAM_VALUE`, а браузерный `EventSource` шлё
 
 ## Плановое закрытие подписки по сроку соединения приходит отказом
 
-<!-- backlog: владелец=code-writer; оживит=шаг:2-13:открыт|наблюдение:ближайший кодовый заход по bff; закрыто-когда=греп:"\.complete\(\)"@services/bff/src/main/java/com/example/bff/domain/stream/StreamRegistry.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"\.complete\(\)"@services/bff/src/main/java/com/example/bff/domain/stream/StreamRegistry.java -->
 
 **Что сделать.** Завершать поток по истечении срока соединения САМИМ
 эмиттером: тик `onTimeout` обязан не только снять подписку из набора, но и
@@ -5031,7 +5031,7 @@ MediaType.TEXT_EVENT_STREAM_VALUE`, а браузерный `EventSource` шлё
 
 ## Клетка `E4.3` тропы периметра теряет переигранную запись под нагрузкой полного модуля
 
-<!-- backlog: владелец=tester; оживит=наблюдение:красная клетка E4.3 на прогоне модуля tests|шаг:2-12:DONE -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** По первому красному `E4.3`
 (`.claude/tests/cases/e2e-perimeter-read.md` §«E4.3 — Просроченный билет
@@ -5056,7 +5056,7 @@ MediaType.TEXT_EVENT_STREAM_VALUE`, а браузерный `EventSource` шлё
 
 ## Снятие риска у сделки без строки эпизода тратит попытку на добычу
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:ближайший доковый либо кодовый заход по аварийному снятию риска -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать в доме аварийного исполнителя, как снимается сделка
 без строки эпизода (восстановленная до первого прохода): закрытия у неё первая
@@ -5150,30 +5150,6 @@ MediaType.TEXT_EVENT_STREAM_VALUE`, а браузерный `EventSource` шлё
 **Причина парковки.** Найдено закрывающим прогоном кодового захода по
 `strategies`; дельта захода тропу не трогает, код тестов — предмет тестера.
 
-## Точечные запросы обновления не двигают колонки аудита строки
-
-<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
-
-**Что сделать.** Гардированные `update`-запросы ядра (`@Modifying`) пишут
-строку мимо аудита персистентности, и `modified_at`/`modified_by` остаются
-моментом прежнего сохранения сущностью: у торгового состояния счёта момент
-подъёма ступени не записан ни в одной колонке (находка `F9`
-`.claude/tests/cases/e2e-exit-and-close.md`, клетка `E4.5` — метка `debt`).
-Исход — либо запросы проставляют колонки аудита, либо дом называет точечную
-запись исключением и говорит, где тогда живёт момент изменения.
-
-**Дом** — `docs/models/domain/other/Auditable.md` (`modifiedAt` — время
-последнего изменения в системе); `.claude/rules/codestyle.md` §«Auditable по
-слоям» (системные поля проставляет persistence).
-
-**Единицы — репозитории ядра с точечной записью**, перечень выводится командой;
-у прочих сервисов тот же греп по их дереву — ориентир, клейма полноты над ним
-нет:
-
-```bash
-grep -rl '@Modifying' services/trading-core/src/main/java
-```
-
 ## Действие транша с парой вида и типа без исполнителя проходит создание
 
 <!-- backlog: владелец=strategies; оживит=сейчас|шаг:2-12:DONE -->
@@ -5200,7 +5176,7 @@ grep -rl '@Modifying' services/trading-core/src/main/java
 
 ## Отправка условной заявки ищет её по клиентскому идентификатору только на повторе
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ответ площадки на поиск несуществующей условной заявки либо ближайший кодовый заход по отправке условной заявки -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Искать условную заявку по клиентскому идентификатору перед
 всякой отправкой с пустым биржевым, а не только на повторе, — как это делает
@@ -5295,7 +5271,7 @@ grep -rl '@Modifying' services/trading-core/src/main/java
 
 ## Класс отказа постановки площадкой домом не объявлен
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по классификации рантайм-ошибок -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать в доме классификации класс явного отказа площадки на
 постановке заявки (код словаря площадки в подтверждении приёма): ретраибелен
@@ -5314,7 +5290,7 @@ grep -rl '@Modifying' services/trading-core/src/main/java
 
 ## Допустимые шаги статуса транша не сверяет ни валидатор, ни отбор шага
 
-<!-- backlog: владелец=solution-designer; оживит=шаг:2-13:открыт|наблюдение:ближайший дизайн-заход по валидации определений либо по отбору шага транша -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Решить, чей это контракт — перечни «Допустимые шаги» в
 компонент-доках обработчиков транша: сверять тип шага со статусом, под которым
@@ -5366,7 +5342,7 @@ grep -rl '@Modifying' services/trading-core/src/main/java
 
 ## Периметр пересылает браузеру заголовки соединения владельца, и ответ не разбирается
 
-<!-- backlog: владелец=code-writer; оживит=шаг:2-13:открыт|наблюдение:ближайший кодовый заход по bff -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Не пересылать браузеру заголовки соединения, пришедшие от
 владельца (`Transfer-Encoding`, `Connection`, `Keep-Alive` и прочие hop-by-hop),
@@ -5391,7 +5367,7 @@ grep -rl '@Modifying' services/trading-core/src/main/java
 
 ## Отказ соседа на создании определения не оставляет записи в журнале владельца
 
-<!-- backlog: владелец=code-writer; оживит=шаг:2-13:открыт|наблюдение:ближайший кодовый заход по strategies -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Сделать так, чтобы отказ чтения соседа на создании
 определения — недоступность ядра и его осознанный отказ — оставлял запись в
@@ -5413,7 +5389,7 @@ grep -rl '@Modifying' services/trading-core/src/main/java
 
 ## Запись в брошенную подписку роняет рассылку и повторяет доставку
 
-<!-- backlog: владелец=code-writer; оживит=шаг:2-13:открыт|наблюдение:ближайший кодовый заход по bff -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Сделать тропу восстановления записи в поток такой, чтобы
 отказ одной подписки не выходил за пределы её записи: ни из рассылки факта, ни
@@ -5442,7 +5418,7 @@ thread attempted to use the AsyncContext after an error…»). Отказ вых
 
 ## Отказ доступа у периметра не оставляет ни лога, ни метрики
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать периметру обе замены, которые правило называет вместо
 персистентной строки: строку лога на каждом отказе доступа и ряд частоты
@@ -5490,7 +5466,7 @@ grep -n 'exposure' services/bff/src/main/resources/application.yaml
 
 ## Отказ владельца членств по клиенту токена доезжает браузеру как внутренний
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=греп:"RestClientResponseException"@services/bff/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"RestClientResponseException"@services/bff/src/main/java/** -->
 
 **Что сделать.** Дать клиенту резолва обработку **ответа-отказа** соседа, а не
 только отказа транспорта: `403` владельца членств обязан доехать до браузера
@@ -5529,7 +5505,7 @@ grep -n "requireBrowserToken" services/auth/src/main/java/com/example/auth/api/c
 
 ## Переговорные заголовки содержимого периметр обещает шире, чем пересылает
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=греп:"HttpHeaders\.ACCEPT"@services/bff/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"HttpHeaders\.ACCEPT"@services/bff/src/main/java/** -->
 
 **Что сделать.** Свести закрытый перечень пересылаемых заголовков с тем, что
 о нём сказано: либо добавить принимаемый тип к пересылаемым, либо назвать
@@ -5566,7 +5542,7 @@ grep -n 'forwardedHeaders' -A 20 services/bff/src/main/java/com/example/bff/api/
 
 ## Состав билета подписки в доме у́же построенного
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по дому контрактов периметра; закрыто-когда=греп:"собственный срок"@docs/architecture/contracts.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"собственный срок"@docs/architecture/contracts.md -->
 
 **Что сделать.** Свести перечень состава билета в доме с построенным: назвать
 третье поле — собственный срок билета — либо сказать, что «и только их»
@@ -5602,7 +5578,7 @@ grep -n 'FIELD_COUNT\|String.join' services/bff/src/main/java/com/example/bff/do
 
 ## Пустой перечень тем периметра разбирается как одна тема с пустым именем
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=нет-грепа:"'\$\{perimeter.stream.topics\}'.split"@services/bff/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"'\$\{perimeter.stream.topics\}'.split"@services/bff/src/main/java/** -->
 
 **Что сделать.** Читать незаданный перечень тем признаком, а не значением:
 пустая ось должна давать **отсутствие подписки**, а не подписку на тему с
@@ -5643,7 +5619,7 @@ grep -n 'PERIMETER_STREAM_TOPICS' services/bff/src/main/resources/application.ya
 
 ### Пустой адрес брокера у периметра: javadoc обещает молчание, а подъём отказывает
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=греп:"setAutoStartup"@services/bff/src/main/java/**|нет-грепа:"слушатель не соединяется"@services/bff/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"setAutoStartup"@services/bff/src/main/java/**|нет-грепа:"слушатель не соединяется"@services/bff/src/main/java/** -->
 
 **Что сделать.** Свести поведение пустой оси адреса брокера
 (`broker.bootstrap-servers` ← `KAFKA_BOOTSTRAP_SERVERS`) и его описание к
@@ -5673,7 +5649,7 @@ grep -rn 'setAutoStartup' services/bff/src/main/java services/trading-core/src/m
 
 ## Смещение цены от границы диапазона: дом называет ширину, код — долю границы
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по дому расчёта цены размещения|вопрос:STRAT-Q4 -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать дом смещения у диапазонной базы и свести к нему
 вторую сторону: либо код считает долю ширины диапазона, либо строка формулы
@@ -5704,7 +5680,7 @@ grep -rn 'setAutoStartup' services/bff/src/main/java services/trading-core/src/m
 
 ## Пустая сторона смещения означает в доме отсутствие смещения, а в коде — вычитание
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по расчёту цены размещения -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести две редакции: либо пустая сторона гасит смещение,
 как объявлено домом, либо дом называет умолчание, которое исполняет код, и
@@ -5736,7 +5712,7 @@ grep -rn 'setAutoStartup' services/bff/src/main/java services/trading-core/src/m
 
 ## Резолв базы размещения от цены входа дома в продуктовом корпусе не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по расчёту цены; закрыто-когда=греп:"ENTRY_PRICE"@docs/components/PriceCalculator.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"ENTRY_PRICE"@docs/components/PriceCalculator.md -->
 
 **Что сделать.** Завести пассаж о резолве базы «от цены входа» у дома
 расчёта цены: факт эпизода, иначе налив своей ноги, иначе плановая цена — и
@@ -5765,7 +5741,7 @@ grep -rn 'setAutoStartup' services/bff/src/main/java services/trading-core/src/m
 
 ## Отказ ступени защитной лестницы в доме-спеке у́же, чем в коде
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по дому размера защитной ступени -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести популяцию отказа: либо величина `ladderStepRejected`
 в `docs/spec/order-sizing.json` мерит обе величины — объявленную долю и
@@ -5796,7 +5772,7 @@ grep -rn 'setAutoStartup' services/bff/src/main/java services/trading-core/src/m
 
 ## Временная ошибка расчёта писателя не имеет, а ядро по ней ветвится
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по классификации отказов расчёта; закрыто-когда=греп:"CalculationError\.temporary"@services/common/strategy-engine/src/main/java/** -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"CalculationError\.temporary"@services/common/strategy-engine/src/main/java/** -->
 
 **Что сделать.** Решить, какие отказы расчёта временны́ — нехватка
 наблюдения (значение индикатора не посчитано, структура не построена, цены
@@ -5829,7 +5805,7 @@ grep -rn 'setAutoStartup' services/bff/src/main/java services/trading-core/src/m
 
 ## Трейлинг абсолютным откатом объявляем, а величины отката у объявления нет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по блоку настроек трейлинга -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести перечень типов условия с составом блока настроек:
 либо у настроек трейлинга появляется абсолютная величина отката, либо тип
@@ -5858,7 +5834,7 @@ grep -rn 'setAutoStartup' services/bff/src/main/java services/trading-core/src/m
 
 ## Дом округления цен называет одну сторону из трёх и округляет цену, которая не округляется
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по расчёту цены; закрыто-когда=греп:"сторон[аеуы] округления"@docs/components/PriceCalculator.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"сторон[аеуы] округления"@docs/components/PriceCalculator.md -->
 
 **Что сделать.** Развести в `docs/components/PriceCalculator.md` §Округление
 три стороны округления цены —
@@ -5885,7 +5861,7 @@ U5.2, U6.1, U6.2, U6.11.
 
 ## Перечня кодов контролируемой ошибки расчёта нет ни в одном доме
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по расчётному слою движка стратегий; закрыто-когда=греп:"MISSING_DISTANCE"@docs/** -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"MISSING_DISTANCE"@docs/** -->
 
 **Что сделать.** Решить, где живёт перечень кодов контролируемой ошибки
 расчёта, и завести его: либо у модели ошибки
@@ -5916,7 +5892,7 @@ U5.2, U6.1, U6.2, U6.11.
 
 ## Перечни режима и назначения цены расчёта в доке у́же построенного
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший доковый заход по результату расчёта цены; закрыто-когда=греп:"рыночный ориентир"@docs/components/models/CalculatedPrice.md -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"рыночный ориентир"@docs/components/models/CalculatedPrice.md -->
 
 **Что сделать.** Привести два перечня дока к построенному: назвать режим
 «расчёт не требуется» и назначение «рыночный ориентир заявки».
@@ -5937,7 +5913,7 @@ U2.1, U3.1, U11.1, U11.4.
 
 ## Исход выхода объявлен по режиму, а защитная ступень идёт тем же режимом без исхода
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший доковый заход по результату расчёта размера; закрыто-когда=греп:"ступен"@docs/components/models/CalculatedSize.md -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"ступен"@docs/components/models/CalculatedSize.md -->
 
 **Что сделать.** Уточнить в доме модели, что исход выхода несёт **класс
 действия**, а не режим: у защитной ступени режим тот же «только
@@ -5959,7 +5935,7 @@ U2.1, U3.1, U11.1, U11.4.
 
 ## Режим размера `FULL_CLOSE` не имеет ни писателя, ни читателя
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по расчёту размера; закрыто-когда=нет-грепа:"FULL_CLOSE"@services/common/strategy-engine/src/main/java/com/example/strategy/engine/calc/SizeMode.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"FULL_CLOSE"@services/common/strategy-engine/src/main/java/com/example/strategy/engine/calc/SizeMode.java -->
 
 **Что сделать.** Снять значение либо назвать его писателя: полное закрытие
 позиции идёт market-close'ом мимо расчёта размера
@@ -5981,7 +5957,7 @@ U2.1, U3.1, U11.1, U11.4.
 
 ## Порог хода читается из операнда, а объявляется плоским полем правила
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по слою условий движка стратегий; закрыто-когда=греп:"getPercents"@services/common/strategy-engine/src/main/java/com/example/strategy/engine/condition/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"getPercents"@services/common/strategy-engine/src/main/java/com/example/strategy/engine/condition/** -->
 
 **Что сделать.** Свести две формы объявления порога к одной: интерпретатор
 читает плоское поле `percents` правила, как велит контракт авторинга, —
@@ -6023,7 +5999,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Источник цены у ценового операнда условия интерпретатором не читается
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по грамматике ценового операнда условия -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Выбрать дом: либо интерпретатор резолвит объявленный
 источник цены, как это делает расчёт цены размещения, — и тогда контекст
@@ -6066,7 +6042,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Кроссовер с ценовым операндом ложен всегда: предыдущей цены в контексте нет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по контексту оценки условий; закрыто-когда=греп:"previousPrice"@services/common/strategy-engine/src/main/java/com/example/strategy/engine/condition/** -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"previousPrice"@services/common/strategy-engine/src/main/java/com/example/strategy/engine/condition/** -->
 
 **Что сделать.** Либо завести в контексте оценки предыдущую цену и
 наполнять её у всех трёх сборщиков, либо отвергать созданием пересечение и
@@ -6100,7 +6076,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Предикат фазы игнорирует оператор, а создание его требует
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по слою условий движка стратегий -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести две стороны: либо интерпретатор читает оператор
 правила фазы, как читает его зеркальное правило структуры, либо создание
@@ -6135,7 +6111,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Тип `CANDLE_CLOSED` константно истинен, а объявлен защитой от look-ahead
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по грамматике условий входа -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Либо завести операнд закрытия свечи объявленного
 таймфрейма и считать предикат от него, либо снять тип из перечня и из
@@ -6170,7 +6146,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Элементы грамматики условий, объявленные перечнями и не исполняемые интерпретатором
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по грамматике условий -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Пройти оба перечня грамматики и на каждый неисполняемый
 элемент дать исход: реализация, отказ создания либо снятие из перечня.
@@ -6207,7 +6183,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Пустое условие истинно, и у клаузы фазы это даёт безусловную фазу
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по клаузам классификации фазы -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать семантике пустого условия дом в продуктовом корпусе —
 и отдельно решить, законна ли пустая клауза классификации фазы: если нет,
@@ -6236,7 +6212,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Интерпретатор бросает там, где объявлена консервативная ложь
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по слою условий движка стратегий -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Закрыть все четыре тропы, на которых интерпретатор бросает
 вместо ложного предиката, и выбрать рубеж для каждой: разбор литерала —
@@ -6284,7 +6260,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Гейт покрытия операндов ядра не мерит предыдущую половину
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:ближайший кодовый заход по сборке рыночных фич ядра -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Научить гейт покрытия мерить **обе** половины сравнения у
 условий, которые читают прошлое, — либо объявить, что пересечение на
@@ -6316,7 +6292,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Пустой признак полноты графа охрану доказанного отсутствия риска не поднимает
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по гейту терминала сделки -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Поднять охрану на пустом признаке наравне с ложным:
 читать «граф предъявлен целиком» истиной только там, где признак
@@ -6351,7 +6327,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Контракт аварийного терминала гейт мерит одним конъюнктом из двух
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по гейту переходов сделки -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести две стороны: либо гейт перехода мерит оба
 конъюнкта аварийного контракта, либо спека объявляет, что второй конъюнкт
@@ -6386,7 +6362,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Запасная причина закрытия транша UNKNOWN домом объявлена ненаписуемой
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по дому причины закрытия транша -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать дом: либо перечень значений терминального ребра
 транша признаёт запасное значение и объявляет его старшинство, либо
@@ -6416,7 +6392,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Дом обработчика активной сделки называет его исполнителем двух чужих проверок
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по обработчику активной сделки -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Развести перечень входных проверок по исполнителям: то,
 что энфорсит петля до обработчика, назвать её предметом со ссылкой; то,
@@ -6442,7 +6418,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Неиспользуемый коллаборатор диспозиции у двух обработчиков транша
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по обработчикам транша; закрыто-когда=нет-грепа:"TrancheActionDisposition disposition"@services/trading-core/**/Tranche*[zh]edHandler.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"TrancheActionDisposition disposition"@services/trading-core/**/Tranche*[zh]edHandler.java -->
 
 **Что сделать.** Снять внедрённое поле либо ввести вызов, ради которого
 оно внедрено, — у **обоих** обработчиков.
@@ -6470,7 +6446,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Затребованная каскадом ступень теряется на двух исходах прохода активной сделки
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по обработчику активной сделки -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать дом: доносится ли затребованная траншем ступень до
 вызывающего на всех исходах прохода сделки, — и свести код с ответом.
@@ -6497,7 +6473,7 @@ U10.13 из дома и пометил её `@Tag("debt")`
 
 ## Судьба команд при отвергнутом статусном ребре дома в корпусе не имеет
 
-<!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайший доковый заход по машинам FSM; закрыто-когда=греп:"отвергнут"@docs/components/DealStateMachine.md -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"отвергнут"@docs/components/DealStateMachine.md -->
 
 **Что сделать.** Завести пассаж в компонент-доке машины сделки (и ссылку у
 машины транша) о том, что отвергнутое матрицей ребро снимает статус и
@@ -6520,7 +6496,7 @@ U6.7, U6.8, U15.4, U25.12.
 
 ## Имя `cleanTerminalContract` у спеки и у гейта называет разные конъюнкции
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший заход по гейту переходов сделки -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Развести имена: либо метод гейта называется ветвью
 композиции, которой он и является, либо спека вносит в одноимённую величину
@@ -6545,7 +6521,7 @@ U6.7, U6.8, U15.4, U25.12.
 
 ## Восемь кодов риск-проверки не производит ни один класс ядра
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по слою риска торгового ядра -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** По каждому из восьми значений решить одно из двух: завести
 производителя, объявленного домом, либо снять значение из перечня — и
@@ -6596,7 +6572,7 @@ done
 
 ## Предупредительный исход риск-проверки не производит ни одна фабрика
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по слою риска торгового ядра -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Либо завести проверку, дающую предупреждение, либо снять
 предупредительный род из карты реакций, из перечня исходов и из узла-гейта
@@ -6646,7 +6622,7 @@ grep -rn 'RiskCheckStatus\.\(WARNING\|PASSED\)' --include=*.java services/*/src/
 
 ## Дом состава риск-проверок не называет код незаданного числа риск-аппетита
 
-<!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайший доковый заход по преконтролю риска; закрыто-когда=греп:"RISK_APPETITE_NOT_CONFIGURED"@docs/components/RiskValidator.md -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"RISK_APPETITE_NOT_CONFIGURED"@docs/components/RiskValidator.md -->
 
 **Что сделать.** Внести код в таблицы состава проверок: в fail-fast —
 строкой о незаданном максимальном риске на сделку, в накопительную —
@@ -6676,7 +6652,7 @@ grep -rn 'RiskCheckStatus\.\(WARNING\|PASSED\)' --include=*.java services/*/src/
 
 ## Ветка снятия защиты мерит два предиката из объявленного домом набора
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по преконтролю риска -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Развести два носителя: либо объявить точку входа снятия
 защиты своим набором проверок и назвать, почему потолки на ней не
@@ -6707,7 +6683,7 @@ grep -rn 'RiskCheckStatus\.\(WARNING\|PASSED\)' --include=*.java services/*/src/
 
 ## Пустой признак полноты графа преконтроль читает как предъявленный
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по преконтролю риска либо по слою защитных ступеней; закрыто-когда=нет-грепа:"isFalse\([a-zA-Z]*[Cc]ontext\.getGraphComplete"@services/trading-core/src/main/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"isFalse\([a-zA-Z]*[Cc]ontext\.getGraphComplete"@services/trading-core/src/main/**/*.java -->
 
 **Что сделать.** Перевести **всех** читателей признака полноты графа на
 отсутствие истины — ту же форму, которой читает его писатель четвёрки
@@ -6762,7 +6738,7 @@ grep -rn 'getGraphComplete()' --include=*.java services/trading-core/src/main
 
 ## Статус подтверждённого снятия риска ставится и на неподтверждённом
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по слою защитных ступеней; закрыто-когда=нет-грепа:"advanceSafely\(report, AnomalyReport\.Status\.KILL_SWITCH_EXECUTED\)"@services/trading-core/src/main/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"advanceSafely\(report, AnomalyReport\.Status\.KILL_SWITCH_EXECUTED\)"@services/trading-core/src/main/**/*.java -->
 
 **Что сделать.** Ставить статус снятия риска только по подтверждённому
 исходу: перенести перевод за развилку подтверждения либо сделать его
@@ -6803,7 +6779,7 @@ grep -rn 'KILL_SWITCH_EXECUTED' --include=*.java services/trading-core/src/main
 
 ## Доминирование биржевых ступеней над инструментными реакциями энфорсера не имеет
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по слою защитных ступеней -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Сделать стоящую счётную ступень операндом инструментной
 реакции: запрос у́же стоящей счётной ступени обязан поглощаться, как
@@ -6864,7 +6840,7 @@ grep -rn 'getSafetyRung\|SafetyRung\.' --include=*.java services/trading-core/sr
 
 ## Карв-аут возврата инструмента в онбординговый статус неисполним и писателя не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по ручной поверхности остановки либо по лестнице инструмента -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Владельцу — назвать дом: либо снять карв-аут из трёх
 носителей, либо назвать писателя, которым «ступень затёрла онбординг»
@@ -6916,7 +6892,7 @@ grep -rn 'онбординг' docs/rules/manual-halt.md docs/lifecycles/Instrume
 
 ## Четыре таблицы маппинга отрицают поле, которое их модели несут
 
-<!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайший доковый заход по connector-okx -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Привести четыре строки таблиц маппинга к моделям: сегодня
 каждая объявляет, что биржевое имя инструмента в домен не идёт, а домен
@@ -6956,7 +6932,7 @@ grep -rn 'externalInstrumentId' docs/models/mapping/ docs/models/domain/core/
 
 ## Инвентарь тикера отрицает поле, которое второй переход того же ответа использует
 
-<!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайший доковый заход по connector-okx; закрыто-когда=греп:"vol24h`.{0,40}да"@docs/models/integrations/okx/TickerOkxResponse.md -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"vol24h`.{0,40}да"@docs/models/integrations/okx/TickerOkxResponse.md -->
 
 **Что сделать.** Внести `vol24h` в таблицу используемых полей инвентаря
 тикера и снять его из перечня «не входят в DTO»; в доке маппинга
@@ -7001,7 +6977,7 @@ grep -n 'vol24h' services/connector-okx/src/main/java/com/example/connector/okx/
 
 ## Формулы и вырожденные дефолты индикаторов дома в корпусе не имеют
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по расчётному слою рыночных данных -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Завести дом формулы каждому вычисляемому индикатору —
 спеку с примерами — и оставить в доменном доке имя величины со ссылкой.
@@ -7049,7 +7025,7 @@ grep -rn -i 'wilder\|EMA(\|SMA(\|Боллинджер\|стохаст' docs/
 
 ## Подтверждённый пробой структуру не переклассифицирует и считается на любом типе
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по структуре рынка -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести расчёт структуры и дом её семантики: либо ввести
 переклассификацию по подтверждённому пробою и гейт события по наличию
@@ -7088,7 +7064,7 @@ grep -n -A16 'MarketStructure resolve' services/market-data/src/main/java/com/ex
 
 ## Подтверждение уровня касаниями к выдаваемым уровням структуры не применяется
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по структуре рынка -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести состав выдаваемых уровней с домом: либо
 группировать пивоты в уровни по посчитанному толерансу и отдавать наружу
@@ -7129,7 +7105,7 @@ grep -n -A16 'MarketStructure resolve' services/market-data/src/main/java/com/ex
 
 ## Момент подтверждения структуры равен концу окна всегда
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по структуре рынка; закрыто-когда=нет-грепа:"setConfirmedAt\(windowEndAt\)"@services/market-data/src/main/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"setConfirmedAt\(windowEndAt\)"@services/market-data/src/main/**/*.java -->
 
 **Что сделать.** Вычислять момент подтверждения структуры по
 свидетельству, которое её подтвердило — последнему бару удержания у пробоя
@@ -7178,7 +7154,7 @@ grep -rn 'setConfirmedAt(windowEndAt)' services/market-data/src/main/java/
 
 ## От чего процент у буфера пробоя, два носителя называют по-разному
 
-<!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайший доковый заход по структуре рынка -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести два носителя к одному: назвать в доме семантики,
 от чего берётся процент буфера подтверждения пробоя, и привести к нему
@@ -7207,7 +7183,7 @@ grep -rn 'setConfirmedAt(windowEndAt)' services/market-data/src/main/java/
 
 ## Кумулятивный OBV считается от начала окна прохода, а не истории
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по расчётному слою рыночных данных -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Развести кумулятивный индикатор и оконные: либо продолжать
 сумму от последнего записанного значения идентичности, либо объявить
@@ -7244,7 +7220,7 @@ grep -n -A16 'public Integer saveValues' services/market-data/src/main/java/com/
 
 ## Параметры требования вычисления доезжают до вычислителя непроверенными
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Проверять параметры требования на входе рыночных данных —
 присутствие и положительность периодов, порядок быстрого и медленного
@@ -7282,7 +7258,7 @@ grep -rn 'Map<String, Object> params' services/market-data/src/main/java/com/exa
 
 ## Непроставленный объём свечи читается нулём, и исключения этой арифметике дом не заводил
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по расчётному слою рыночных данных -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Выбрать сторону и записать её: либо внести эту арифметику
 в перечень названных исключений дома отсутствия — с той же проверкой
@@ -7319,7 +7295,7 @@ grep -n -A4 'private BigDecimal volumeOf' services/market-data/src/main/java/com
 
 ## Пробой обнаруживается только хвостом окна
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по структуре рынка -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести детекцию пробоя и дом его семантики: либо искать
 удержание по всему окну и брать моментом подтверждения бар, на котором оно
@@ -7361,7 +7337,7 @@ grep -n -A12 'private MarketBreakoutEvent detectBreakout' services/market-data/s
 
 ## Живой эпизод сделки резолвится шире, чем объявлено домом
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по контексту прохода ядра -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести предикат живого эпизода сделки и объявленное
 определение живого эпизода к одному ответу: либо предикат сужается до
@@ -7405,7 +7381,7 @@ grep -n -A12 'private MarketBreakoutEvent detectBreakout' services/market-data/s
 
 ## Множитель нового закрытого бара дома в корпусе не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по загрузке свечей -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать в доме группы свечей, через сколько длительностей
 бара после открытия последней загруженной свечи считается подошедшим
@@ -7433,7 +7409,7 @@ javadoc домом не бывает (`.claude/rules/parking-address.md`). Ве�
 
 ## Справочник компонентов индикатора указан домом у файла, который его не несёт
 
-<!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайший заход по контракту авторинга условия; закрыто-когда=греп:"MACD_LINE"@docs/rules/strategy-condition-contract.md -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"MACD_LINE"@docs/rules/strategy-condition-contract.md -->
 
 **Что сделать.** Свести указатель и дом: либо внести перечень «тип
 индикатора → допустимые адресуемые компоненты» в названный дом, либо
@@ -7463,7 +7439,7 @@ javadoc домом не бывает (`.claude/rules/parking-address.md`). Ве�
 
 ## Справочник компонентов индикатора роняет проход на пустом типе
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по общей доменной библиотеке либо красный прогон кейсов уровня 2; закрыто-когда=нет-грепа:"ALLOWED.getOrDefault"@services/common/model/domain/src/main/java/com/example/tradingbot/domain/util/IndicatorComponents.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"ALLOWED.getOrDefault"@services/common/model/domain/src/main/java/com/example/tradingbot/domain/util/IndicatorComponents.java -->
 
 **Что сделать.** Сделать обе точки справочника безопасными к пустому типу:
 пустой тип индикатора обязан давать пустое множество компонентов и ложный
@@ -7495,7 +7471,7 @@ javadoc домом не бывает (`.claude/rules/parking-address.md`). Ве�
 
 ## Перевод типа сработавшей защиты в причину выхода транша дома не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по терминальным рёбрам транша -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Внести в дом ребра выхода транша отображение «тип условия
 сработавшей защиты → причина закрытия», порядок чтения носителей защиты и
@@ -7530,7 +7506,7 @@ javadoc, а javadoc домом не бывает (`.claude/rules/parking-address
 
 ## Правило живого риска и спека покрытия расходятся о трейлинге
 
-<!-- backlog: владелец=knowledge-curator; оживит=шаг:2-12:DONE | наблюдение:ближайший заход по защите и покрытию; закрыто-когда=нет-грепа:"цена активации пуста"@docs/rules/live-risk-protection.md -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"цена активации пуста"@docs/rules/live-risk-protection.md -->
 
 **Что сделать.** Свести строку трейлинга в таблице
 `docs/rules/live-risk-protection.md` §«Что считается защитой» к тому, что
@@ -7560,7 +7536,7 @@ javadoc, а javadoc домом не бывает (`.claude/rules/parking-address
 
 ## Формула середины спреда живёт у дока перевода
 
-<!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайший заход по ценовым источникам размещения -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Перенести объявление середины спреда к владельцу
 величины, оставив у дока перевода строку со ссылкой.
@@ -7590,7 +7566,7 @@ runtime-док (`docs/components/models/MarketPriceData.md`) формулы не
 
 ## Матрица рёбер обычной заявки не исполняется ни одним носителем
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший заход по жизненному циклу заявки -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать величине `orderTransitionAllowed` исполнителя: либо
 охрану на самой доменной модели, как у двух её соседей, либо названный
@@ -7624,7 +7600,7 @@ runtime-док (`docs/components/models/MarketPriceData.md`) формулы не
 
 ## Отказ применения активации у ядра теряет её молча
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:кодовый заход по потребителю определений у trading-core -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать приёму определений у ядра объявленный исход отказа
 применения — и на состоянии «проекции счёта либо инструмента ещё нет», и на
@@ -7665,7 +7641,7 @@ runtime-док (`docs/components/models/MarketPriceData.md`) формулы не
 
 ## Раскладка миграций расколота: половина дерева кладёт их в корень локации
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:заведение модуля сквозного набора либо кодовый заход, добавляющий миграцию сервису; закрыто-когда=нет-файла:services/trading-core/src/main/resources/db/migration/V1__trading_core_baseline.sql -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-файла:services/trading-core/src/main/resources/db/migration/V1__trading_core_baseline.sql -->
 
 **Что сделать.** Свести раскладку миграций к одной форме — подкаталог имени
 владельца внутри локации, — и объявить её там, где живут конвенции схемы.
@@ -7706,7 +7682,7 @@ find services -path '*/src/main/resources/db/migration/*' -name 'V1__*.sql'
 
 ## Исход неполного конверта у потребителя определений ядра домом не объявлен
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:кодовый заход по потребителю определений у trading-core либо первый сквозной прогон тропы активации -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Объявить исход неполного конверта у **третьего** durable-
 потребителя — потребителя определений у `trading-core` — там, где объявлены
@@ -7740,7 +7716,7 @@ find services -path '*/src/main/resources/db/migration/*' -name 'V1__*.sql'
 
 ## Публичные чтения коннектора у ядра объявлены одним исключением, а их два
 
-<!-- backlog: владелец=connector-okx; оживит=наблюдение:кодовый заход по границе коннектора либо первый сквозной прогон тропы выхода; закрыто-когда=нет-грепа:"Одну из них зовёт"@docs/components/IntegrationService.md -->
+<!-- backlog: владелец=connector-okx; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"Одну из них зовёт"@docs/components/IntegrationService.md -->
 
 **Что сделать.** Привести клаузу исключения к фактике: назвать **обе**
 публичные операции, которые зовёт `trading-core`, — время площадки и свечу
@@ -7779,7 +7755,7 @@ grep -n 'public \w\+ get\(IndexCandleAt\|ServerTime\)' \
 
 ## Имя индекса пары котировки собирает доменный код ядра конкатенацией
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:кодовый заход по исполнителю добычи движений либо заведение второй площадки; закрыто-когда=нет-грепа:"indexInstrumentId = "@services/trading-core/src/main/**/*.java -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"indexInstrumentId = "@services/trading-core/src/main/**/*.java -->
 
 **Что сделать.** Назвать сторону, которая строит имя индекса пары котировки,
 и дом его конвенции; сегодня имя собирает доменный код ядра склейкой двух
@@ -7809,7 +7785,7 @@ grep -n 'public \w\+ get\(IndexCandleAt\|ServerTime\)' \
 
 ## Инструментный фильтр запроса движений объявлен домом и не существует
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:кодовый заход по исполнителю добычи движений либо первый сквозной прогон тропы выхода; закрыто-когда=нет-грепа:"Фильтр запроса — диапазон времени"@docs/components/RefreshBillsExecutor.md -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"Фильтр запроса — диапазон времени"@docs/components/RefreshBillsExecutor.md -->
 
 **Что сделать.** Свести объявление фильтра запроса к фактике: чтение движений
 аккаунт-широкое и сужается **только** предикатом линковки.
@@ -7835,7 +7811,7 @@ grep -n 'public \w\+ get\(IndexCandleAt\|ServerTime\)' \
 
 ## Поверхность торгового состояния отдаёт факт стоящей ступени пары, а не саму ступень
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:кодовый заход по ручной поверхности safety-остановки либо первый сквозной прогон тропы аварийного сворачивания; закрыто-когда=нет-грепа:"private List<String> instrumentInternalIdsWithStandingRung"@services/trading-core/src/main/**/*.java -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"private List<String> instrumentInternalIdsWithStandingRung"@services/trading-core/src/main/**/*.java -->
 
 **Что сделать.** Отдавать вместе с идентичностью инструмента **ступень**,
 которая на паре стои́т, — либо назвать иного читателя, из которого держатель
@@ -7873,7 +7849,7 @@ grep -n 'public \w\+ get\(IndexCandleAt\|ServerTime\)' \
 
 ## Таблица детекторов аномалий разорвана прозой на две, и вторая без шапки
 
-<!-- backlog: владелец=trading-core; оживит=наблюдение:ближайшая правка перечня детекторов либо кодовый заход по проактивной детекции -->
+<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Вынести разбор операнда `A6` из середины таблицы — под неё,
 к прочим разборам строк, — чтобы перечень детекторов оставался одной
@@ -7902,7 +7878,7 @@ markdown обрывает таблицу на нём: строки `A7`-`A13` р
 
 ## Идентичность последнего события при пересоздании подписки принимается только заголовком
 
-<!-- backlog: владелец=bff; оживит=шаг:2-13:открыт|наблюдение:ближайший заход по тропе потока периметра -->
+<!-- backlog: владелец=bff; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать идентичности последнего полученного события форму
 приёма, доступную браузеру при **пересоздании** подписки, — либо параметром
@@ -7943,7 +7919,7 @@ markdown обрывает таблицу на нём: строки `A7`-`A13` р
 
 ## Радиус потока переживает срок кэша членств на два порядка
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:появление производителя события смены членства либо ближайшая правка калибровок тропы потока -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать домом, чем держится радиус тенанта у **открытой**
 подписки, и сойтись ли ему со сроком кэша членств. Сегодня величина есть, а
@@ -7980,7 +7956,7 @@ markdown обрывает таблицу на нём: строки `A7`-`A13` р
 
 ## Дочитывание после разрыва опирается на момент, который периметр мог подставить
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по записи разрыва либо по дочитыванию истории фронтом -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать клиенту нижнюю границу дочитывания, не выводимую из
 показанных ему моментов, — полем записи разрыва либо признаком подставленного
@@ -8016,7 +7992,7 @@ markdown обрывает таблицу на нём: строки `A7`-`A13` р
 
 ## Ингресс окружения исполнять некому: контроллера нет ни в манифестах, ни на стенде
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:код мишени `smoke` под-шагом 3 либо первая проверка поверхности снаружи кластера; закрыто-когда=греп:"IngressClass"@deploy/**/*.yaml -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"IngressClass"@deploy/**/*.yaml -->
 
 **Что сделать.** Завести контроллер ингресса в манифестах окружения и
 встречную сетевую политику к периметру от него — либо объявить, что вход
@@ -8052,7 +8028,7 @@ grep -rn 'IngressClass\|ingressClassName\|ingress-nginx' deploy/ tools/stand/  #
 
 ## Предъявителя-человека на стенде не существует ни одним манифестом
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:код мишени `smoke` под-шагом 3 либо первая проверка поверхности снаружи кластера -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать окружению способ выдать токен человека: субъекта в
 реалме плюс тропу к точке выдачи снаружи — либо объявить, что предъявителя у
@@ -8091,7 +8067,7 @@ grep -rn 'kind: Ingress' deploy/base/data/keycloak.yaml   # пусто
 
 ## Публичные чтения коннектора контура площадки не несут
 
-<!-- backlog: владелец=connector-okx; оживит=наблюдение:ближайший кодовый заход по клиенту площадки либо первый прогон дыма против demo -->
+<!-- backlog: владелец=connector-okx; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Решить, выражается ли контур у публичного чтения, — и либо
 ставить заголовок демо-контура публичному клиенту, либо объявить в доме, что
@@ -8125,7 +8101,7 @@ grep -rn 'SIMULATED_HEADER' services/connector-okx/src/main/java
 
 ## Авторитета возврата счёта у прогона снаружи кластера нет
 
-<!-- backlog: владелец=tester; оживит=наблюдение:код мишени `smoke` под-шагом 3 -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать дыму способ спросить **площадку**, чист ли счёт после
 прогона, — либо объявить, чем авторитет заменён, и принять цену.
@@ -8157,7 +8133,7 @@ grep -n 'connector-okx' deploy/base/services/bff.yaml    # пусто: пары 
 
 ## Пустой исход прохода предвходовая проверка читает как ложное условие входа
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по предвходовой проверке транша; закрыто-когда=греп:"SKIP_ACTION"@services/trading-core/src/main/java/com/example/tradingcore/domain/fsm/tranche/TranchePrecheckHandler.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"SKIP_ACTION"@services/trading-core/src/main/java/com/example/tradingcore/domain/fsm/tranche/TranchePrecheckHandler.java -->
 
 **Что сделать.** Развести у предвходовой проверки два пустых исхода прохода:
 «работы не нашлось» и «работа не состоялась по сработавшему контролю». Первый
@@ -8197,7 +8173,7 @@ grep -n 'connector-okx' deploy/base/services/bff.yaml    # пусто: пары 
 
 ## Перечня классов отказа поверхности ядра нет ни в одном доме
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший заход по внешней поверхности ядра либо появление второго ветвящегося потребителя; закрыто-когда=греп:"INVALID_REQUEST"@docs/**/*.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"INVALID_REQUEST"@docs/**/*.md -->
 
 **Что сделать.** Решить, где живёт перечень значений поля `code` единого
 error-DTO у поверхности `trading-core`, и завести его там — либо объявить, что
@@ -8221,7 +8197,7 @@ error-DTO у поверхности `trading-core`, и завести его т�
 
 ## Четвёртая ветвь сравнения смещений дома не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по приёму durable-потребителя -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать в доме четвёртую ветвь сравнения смещений на
 назначении партиций либо объявить её невозможной с доводом. Дом говорит:
@@ -8261,7 +8237,7 @@ error-DTO у поверхности `trading-core`, и завести его т�
 
 ## Мёртвая копия перечня кодов ручной операции у `audit`
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по audit; закрыто-когда=нет-грепа:"ManualOperation"@services/audit/src/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"ManualOperation"@services/audit/src/**/*.java -->
 
 **Что сделать.** Снять `Constants.ManualOperation` из
 `services/audit/src/main/java/com/example/audit/util/Constants.java`.
@@ -8284,7 +8260,7 @@ error-DTO у поверхности `trading-core`, и завести его т�
 
 ## Счёт отвержений вопроса чтения в javadoc выборки меньше действительного
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по audit; закрыто-когда=нет-грепа:"Три отвержения вопроса"@services/audit/src/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"Три отвержения вопроса"@services/audit/src/**/*.java -->
 
 **Что сделать.** Привести клейм javadoc
 `JournalReadService#rejectUnlessAcceptable` к действительному числу поводов:
@@ -8304,7 +8280,7 @@ error-DTO у поверхности `trading-core`, и завести его т�
 
 ## Порядок границ окна домом ни одной читающей поверхности не назван
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по читающим поверхностям; закрыто-когда=греп:"раньше левой"@docs/rules/statistics-aggregates.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"раньше левой"@docs/rules/statistics-aggregates.md -->
 
 **Что сделать.** Назвать в домах ограничений отбора повод отвержения «правая
 граница окна раньше левой» — и у агрегатной выборки
@@ -8334,7 +8310,7 @@ error-DTO у поверхности `trading-core`, и завести его т�
 
 ## Пустая рассчитанная цена у преконтроля роняет разыменование, хотя соседняя проверка её охраняет
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по преконтролю риска; закрыто-когда=нет-грепа:"checkStopLossSide\(calculatedAction\.getSourceAction\(\), price\.getStopLossPrice\(\)"@services/trading-core/src/main/java/com/example/tradingcore/domain/command/risk/RiskValidator.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"checkStopLossSide\(calculatedAction\.getSourceAction\(\), price\.getStopLossPrice\(\)"@services/trading-core/src/main/java/com/example/tradingcore/domain/command/risk/RiskValidator.java -->
 
 **Что сделать.** Свести трактовку пустой рассчитанной цены к одной внутри
 метода: либо охранять её на входе (как охраняет проверка ставки), либо
@@ -8365,7 +8341,7 @@ grep -n 'nonNull(price)\|price\.get' services/trading-core/src/main/java/com/exa
 
 ## Эффект разрешающей реакции с предупреждением дома в корпусе не имеет
 
-<!-- backlog: владелец=knowledge-curator; оживит=наблюдение:ближайший доковый заход по узлу-гейту риска; закрыто-когда=греп:"предупрежд"@docs/components/ActionRiskGate.md -->
+<!-- backlog: владелец=knowledge-curator; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"предупрежд"@docs/components/ActionRiskGate.md -->
 
 **Что сделать.** Внести эффект разрешающей реакции с предупреждением в дом
 узла — что она оставляет запись в журнале и что этим её действие
@@ -8400,7 +8376,7 @@ grep -rn -i 'предупрежд' docs/components/ActionRiskGate.md docs/compon
 
 ## Живая входная нога отбирается двумя разными предикатами в одном пакете
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по преконтролю риска; закрыто-когда=греп:"Order.Type.ENTRY"@services/trading-core/src/main/java/com/example/tradingcore/domain/command/risk/RiskValidator.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"Order.Type.ENTRY"@services/trading-core/src/main/java/com/example/tradingcore/domain/command/risk/RiskValidator.java -->
 
 **Что сделать.** Свести отбор входных ног преконтроля к тому же
 предикату, которым отбирает их писатель четвёрки чисел риска: по
@@ -8442,7 +8418,7 @@ grep -n 'public static List<Order> entryLegs' -A 8 services/trading-core/src/mai
 
 ## Отчёт доведения заводится и там, где дом его не заводит
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по слою защитных ступеней -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести число строк отчёта у ручной полной постановки и её
 доведения к тому, что объявляют дом координатора и спека: строка заводится,
@@ -8496,7 +8472,7 @@ grep -n 'Строку журнала доведение заводит не вс
 
 ## Гейт полноты прохода объявлен не зовущим фабрику, которой и пишет подпредельную строку
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по проактивной детекции; закрыто-когда=нет-грепа:"Журнальную фабрику `exchangeAccountJournal` детектор \*\*не\*\* зовёт"@docs/components/AnomalyJob.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"Журнальную фабрику `exchangeAccountJournal` детектор \*\*не\*\* зовёт"@docs/components/AnomalyJob.md -->
 
 **Что сделать.** Оговорить клейм радиусом его действия: журнальную счётную
 фабрику гейт не зовёт **для подъёма ступени**; подпредельную строку он пишет
@@ -8538,7 +8514,7 @@ grep -n 'Журнальную фабрику' -B 6 docs/components/AnomalyJob.md
 
 ## Журнальная ветвь ручного снятия мертва, а её сигнал несёт чужой радиус
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по ручной поверхности safety-остановки; закрыто-когда=нет-грепа:"HoldSignal.instrumentJournal\(Constants.Hold.MANUAL_HALT_CLEARED\)"@services/trading-core/src/main/java/com/example/tradingcore/domain/safety/ManualHaltService.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"HoldSignal.instrumentJournal\(Constants.Hold.MANUAL_HALT_CLEARED\)"@services/trading-core/src/main/java/com/example/tradingcore/domain/safety/ManualHaltService.java -->
 
 **Что сделать.** Убрать из `ManualHaltService.journal` недостижимую ветвь
 писателя состояния и перестать собирать на месте вызова сигнал, радиус
@@ -8574,7 +8550,7 @@ grep -n 'MANUAL_HALT_CLEARED\|private void journal\|scopedJournalSignal' service
 
 ## Снимки отчёта счёт-широкой реакции несут только поля счёта
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший дизайн-заход по отчёту происшествия либо первый разбор прогона счёт-широкой реакции -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Решить, чем наблюдаем живой риск счёт-широкой реакции: дать
 её отчёту материал (снимок по объектам радиуса, а не по инструменту
@@ -8614,7 +8590,7 @@ grep -n "снимок" docs/components/SafetyHoldCoordinator.md
 
 ## Согласованность доли дистанции со способом расчёта уровня созданием не проверяется
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по валидатору определений либо красный прогон кейсов уровня 2; закрыто-когда=греп:"distancePercents"@services/strategies/src/main/java/com/example/strategies/domain/validation/StrategyDefinitionValidator.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"distancePercents"@services/strategies/src/main/java/com/example/strategies/domain/validation/StrategyDefinitionValidator.java -->
 
 **Что сделать.** Ввести в `StrategyDefinitionValidator#validateStopLoss`
 обе ветви объявленного предиката: у безубытка доля дистанции не
@@ -8655,7 +8631,7 @@ LC_ALL=C.UTF-8 grep -n "distanceDeclaredWhenNeeded" docs/spec/stop-distance.json
 
 ## Код незаданного числа риск-аппетита у валидатора определений без общего префикса
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по валидатору определений либо красный прогон кейсов уровня 2; закрыто-когда=греп:"STRATEGY_RISK_APPETITE_NOT_CONFIGURED"@services/strategies/src/main/java/com/example/strategies/domain/validation/StrategyDefinitionValidator.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"STRATEGY_RISK_APPETITE_NOT_CONFIGURED"@services/strategies/src/main/java/com/example/strategies/domain/validation/StrategyDefinitionValidator.java -->
 
 **Что сделать.** Привести код отказа в
 `StrategyDefinitionValidator#validateWithinGlobal` к полному имени
@@ -8688,7 +8664,7 @@ LC_ALL=C.UTF-8 grep -rn "RISK_APPETITE_NOT_CONFIGURED" services --include=*.java
 
 ## Описание признака переоткрытия объявляет умолчание, отвергаемое валидатором
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по api-моделям определения стратегии; закрыто-когда=нет-грепа:"не допускает"@services/strategies/src/main/java/com/example/strategies/api/model/strategy/StrategyTrancheApiModel.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"не допускает"@services/strategies/src/main/java/com/example/strategies/api/model/strategy/StrategyTrancheApiModel.java -->
 
 **Что сделать.** Переписать описание поля `positionReopenAllowed` в
 `StrategyTrancheApiModel` под действующее правило: признак объявляется
@@ -8720,7 +8696,7 @@ LC_ALL=C.UTF-8 grep -n "REOPEN_NOT_DECLARED" services/strategies/src/main/java/c
 
 ## Оператор и таймфрейм правила классификации фазы перечнем не проверяются
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по валидатору определений либо красный прогон кейсов уровня 2 -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Сверять значения перечней оператора и таймфрейма в
 разборе правила классификации фазы — так же, как их сверяет разбор
@@ -8757,7 +8733,7 @@ LC_ALL=C.UTF-8 grep -n "private void validatePhaseConditionRule(" -A 14 services
 
 ## Реджект действия без объявленного источника уровня не производится
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по валидатору определений либо красный прогон кейсов уровня 2; закрыто-когда=греп:"STRATEGY_LEVEL_SOURCE_NOT_DECLARED"@services/strategies/src/main/java/com/example/strategies/domain/validation/StrategyDefinitionValidator.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"STRATEGY_LEVEL_SOURCE_NOT_DECLARED"@services/strategies/src/main/java/com/example/strategies/domain/validation/StrategyDefinitionValidator.java -->
 
 **Что сделать.** Ввести проверку обратного состояния к уже построенной:
 защитное действие, **ставящее** уровень, объявляет его источник — блок
@@ -8793,7 +8769,7 @@ LC_ALL=C.UTF-8 grep -n "actionsSettingLevelWithoutSource" -A 4 docs/spec/strateg
 
 ## Контракт операндов по типу правила условия дома не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по контракту авторинга условий либо красный прогон кейсов уровня 2; закрыто-когда=нет-грепа:"strategy-condition-authoring-contract"@services/strategies/src/main/**/*.java -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"strategy-condition-authoring-contract"@services/strategies/src/main/**/*.java -->
 
 **Что сделать.** Завести дом минимальному контракту операндов по типу
 правила условия — какой тип чего требует — и перевести на него javadoc
@@ -8836,7 +8812,7 @@ LC_ALL=C.UTF-8 grep -n "операнды опциональны" docs/rules/stra
 
 ## Разделитель склейки нарушений встречается внутри члена отказа создания
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по валидатору определений; закрыто-когда=нет-грепа:"лежит в \(0"@services/strategies/src/main/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"лежит в \(0"@services/strategies/src/main/**/*.java -->
 
 **Что сделать.** Убрать разделитель склейки из текста члена: записать
 диапазон доли без точки с запятой (например, «больше нуля и не выше ста»
@@ -8875,7 +8851,7 @@ LC_ALL=C.UTF-8 grep -n 'String.join("; ", violations)' services/strategies/src/m
 
 ## Ответ владельца членств периметр не сверяет, и пустой тенант расходится по тропам
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=греп:"isBlank"@services/bff/src/main/java/com/example/bff/domain/TenantContextResolver.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"isBlank"@services/bff/src/main/java/com/example/bff/domain/TenantContextResolver.java -->
 
 **Что сделать.** Дать выводу контекста охрану **содержимого** членства: членство
 с пустым тенантом отвергается отказом того же класса, что и пустой перечень, —
@@ -8915,7 +8891,7 @@ grep -n 'requireSeparatorFree' -A 4 services/bff/src/main/java/com/example/bff/d
 
 ## Три класса отказа на тропе разбора билета подписки
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff; закрыто-когда=греп:"NumberFormatException"@services/bff/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"NumberFormatException"@services/bff/src/main/java/** -->
 
 **Что сделать.** Свести все охраны разбора билета к одному классу отказа:
 неразбираемый момент негодности и момент вне диапазона отвечают тем же
@@ -8954,7 +8930,7 @@ grep -n 'onIllegalArgument\|onUnexpected' services/bff/src/main/java/com/example
 
 ## Отказ резолва членств кэшем не поглощается, и дом ветви молчит
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по тропе контекста периметра -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Назвать в доме, чем периметр отвечает на **отказ** добычи
 членств: сохраняется ли отрицательный исход, на какой срок и что он делает с
@@ -8992,7 +8968,7 @@ grep -n 'Состояния периметр не держит' -A 12 docs/archi
 
 ## Снятие последней подписки тенанта уносит подписку, открытую одновременно
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по тропе потока периметра; закрыто-когда=нет-грепа:"subscriptions\.remove\(tenantId"@services/bff/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"subscriptions\.remove\(tenantId"@services/bff/src/main/java/** -->
 
 **Что сделать.** Сделать снятие последнего эмиттера тенанта атомарным
 относительно открытия: снимать отображение условной операцией по **составу**
@@ -9033,7 +9009,7 @@ grep -n 'computeIfAbsent' services/bff/src/main/java/com/example/bff/domain/stre
 
 ## Клейм `PerimeterProperties` об отказе на незаданном держится у одной оси из пяти
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать осям окружения периметра ту же охрану, что уже несёт
 секрет билета: незаданное либо бессмысленное значение отвечает отказом при
@@ -9085,7 +9061,7 @@ grep -rln 'ConfigurationProperties' --include=*.java services/*/src/main/java | 
 
 ## Охрана потолка подписок читает набор, а не счёт, и нулевой потолок пропускает первую подписку
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по bff | наблюдение:красный прогон кейсов уровня 2 -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести охрану потолка с тем, что объявляет её дом: открытие
 сверх потолка отвечает отказом при **любом** потолке, включая нулевой. Форма —
@@ -9116,7 +9092,7 @@ grep -rln 'ConfigurationProperties' --include=*.java services/*/src/main/java | 
 
 ## Различитель гранулярности комиссии считается по прореженной области, а спека — по непрореженной
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по сверке результата сделки | наблюдение:красный прогон кейсов уровня 2 -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести область различителя гранулярности комиссии с той,
 которую объявляет её дом: предикат считается по строкам расчётной валюты
@@ -9161,7 +9137,7 @@ py -c "import json;d=json.load(open('docs/spec/pnl-reconciliation.json',encoding
 
 ## Пустая сумма движения в сверке читается нулём, а спека отказывает
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по сверке результата сделки | наблюдение:ближайшая правка обязательности колонки суммы движения -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести две стороны одного клейма: либо исполнимая форма
 перестаёт объявлять отказ там, где реализация читает пустое нулём, либо
@@ -9194,7 +9170,7 @@ grep -n 'amount  *numeric' services/trading-core/src/main/resources/db/migration
 
 ## Охрана полноты графа у итога и у торгового исхода читает пустое значение по-разному
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по признакам терминального ребра | наблюдение:красный прогон кейсов уровня 2 -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Сделать охрану полноты графа у торгового исхода закрытия
 такой же, какой она объявлена: пустой признак обязан вести в корзину
@@ -9233,7 +9209,7 @@ grep -n 'isFalse(dealContext.getGraphComplete())' services/trading-core/src/main
 
 ## Пустой статус родителя у резолва встроенной защиты роняет разыменование
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по резолву встроенной защиты | наблюдение:красный прогон кейсов уровня 2 -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать резолву состояния встроенной защиты ту же охрану
 пустого статуса родителя, которую уже несёт публичный гейт цикла добычи, —
@@ -9267,7 +9243,7 @@ grep -n 'switch (parentStatus)' -B 6 services/trading-core/src/main/java/com/exa
 
 ## Журнальный отчёт признаков терминала пишется той же транзакцией, что и сам терминал
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по признакам терминального ребра | наблюдение:первый сквозной прогон тропы выхода -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Дать клейму «терминал журнальным отчётом не блокируется»
 механизм, который его держит: отдельная транзакция у журнальной записи либо
@@ -9308,7 +9284,7 @@ grep -n 'Transactional' services/trading-core/src/main/java/com/example/tradingc
 
 ## Актором записей `market-data` пишется имя сервиса, а не класс хода
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data; закрыто-когда=нет-грепа:"WRITER = \"market-data\""@services/market-data/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"WRITER = \"market-data\""@services/market-data/src/main/java/** -->
 
 **Что сделать.** Перевести резолв актора записей `market-data` на общий
 поставщик (`ActorProvider` из `services/common/platform`) и тем же ходом
@@ -9349,7 +9325,7 @@ javadoc `com.example.platform.util.Constants.Audit.SYSTEM_PRINCIPAL`.
 
 ## Неразбираемое тело ответа соседа читается как недоступность
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core либо strategies -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Развести в разборе отказа соседа по ярусу транспортный
 отказ и отказ **разбора тела**: первый — недоступность соседа, второй — наш
@@ -9387,7 +9363,7 @@ grep -rn 'catch (RestClientException' -B 8 --include=*.java services/*/src/main/
 
 ## Отказ добычи служебного токена приходит чужим классом
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core, strategies либо market-data -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Довести клейм провайдера служебного токена «пустой токен —
 отказ, а не анонимный вызов» до всех ветвей отказа: неизвестная регистрация,
@@ -9425,7 +9401,7 @@ grep -rn 'isNull(client)' -B 6 -A 6 --include=*.java services/*/src/main/java/**
 
 ## Мёртвая половина охраны провайдера служебного токена
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core, strategies либо market-data; закрыто-когда=нет-грепа:"isNull\(client\.getAccessToken\(\)\)"@services/**/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"isNull\(client\.getAccessToken\(\)\)"@services/**/src/main/java/** -->
 
 **Что сделать.** Снять вторую половину охраны провайдера служебного токена
 (`isNull(client.getAccessToken())`) у всех трёх копий — либо назвать, чем
@@ -9448,7 +9424,7 @@ grep -rn 'isNull(client)' -B 6 -A 6 --include=*.java services/*/src/main/java/**
 
 ## Класс отказа третьей копии провайдера токена дома не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший кодовый заход по market-data -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что решить.** Назвать, каким классом отказывает добыча **служебного
 токена** у `market-data`. Сегодня она отказывает `ExchangeReadException`,
@@ -9485,7 +9461,7 @@ grep -rn 'isNull(client)' -B 6 -A 6 --include=*.java services/*/src/main/java/**
 
 ## Аноним на тропе отказа авторизации уходит в строку именем
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по общему артефакту периметра -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Охранить анонимную аутентификацию в резолве принятого
 принципала у точки входа отказа авторизации — тем же признаком, которым её
@@ -9520,7 +9496,7 @@ grep -n 'public String currentActor' -A 9 services/common/platform/src/main/java
 
 ## Javadoc порта писателя следа называет не тот механизм спроса
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по общему артефакту периметра; закрыто-когда=нет-грепа:"ObjectProvider"@services/common/platform/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"ObjectProvider"@services/common/platform/src/main/java/** -->
 
 **Что сделать.** Свести javadoc порта писателя следа отказа с кодом точки
 входа: порт объявляет, что реализация спрашивается через `ObjectProvider`, а
@@ -9545,7 +9521,7 @@ grep -n 'public String currentActor' -A 9 services/common/platform/src/main/java
 
 ## Охраны от бросающего писателя следа у точки входа отказа нет
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по общему артефакту периметра -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Выбрать сторону и закрыть: либо точка входа отказа
 (`AccessDenialHandler`) охраняет себя от отказа писателя следа сама, либо
@@ -9572,7 +9548,7 @@ grep -n 'public String currentActor' -A 9 services/common/platform/src/main/java
 
 ## Javadoc копий формы периметра разошёлся, и у одной из них он несёт дом поведения
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core либо strategies -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести javadoc копий `PeerCall` и
 `AsyncActorContextConfigurer` к одному тексту, а пассаж «класс отказа у
@@ -9668,7 +9644,7 @@ py tools/peer-copy-check.py
 
 ## Клауза о неудостоверённом присутствии в доме области значений актора отсутствует
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по модели аудируемости либо по общему артефакту периметра; закрыто-когда=греп:"неудостоверённ"@docs/models/domain/other/Auditable.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"неудостоверённ"@docs/models/domain/other/Auditable.md -->
 
 **Что сделать.** Внести в дом области значений актора третью форму
 неудостоверённого — **предъявленное, но не удостоверённое присутствие**
@@ -9711,7 +9687,7 @@ grep -rn 'анонимн\|Аноним\|AnonymousAuth' docs/models/domain/other/
 
 ## Единый error-DTO поверхности читателем не восстанавливается
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по общей api-модели либо по коду тестов, разбирающему тело отказа; закрыто-когда=нет-грепа:"private final String code"@services/common/model/api/src/main/java/com/example/tradingbot/api/model/ErrorApiResponse.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"private final String code"@services/common/model/api/src/main/java/com/example/tradingbot/api/model/ErrorApiResponse.java -->
 
 **Что сделать.** Привести форму единого error-DTO к одной из двух законных
 (`.claude/rules/codestyle.md` §«Неизменяемое значение, пересекающее
@@ -9759,7 +9735,7 @@ grep -rln 'record \|@NoArgsConstructor' --include=*.java services/common/model/a
 
 ## Класс отказа соседа по ярусу на `4xx` дома в `docs/**` не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по классификации рантайм-ошибок; закрыто-когда=греп:"осознанный отказ соседа"@docs/rules/runtime-error-classification.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"осознанный отказ соседа"@docs/rules/runtime-error-classification.md -->
 
 **Что сделать.** Назвать в доме классификации **положительный** класс отказа
 соседа по ярусу домена на `4xx` — «осознанный отказ соседа есть наш дефект,
@@ -9795,7 +9771,7 @@ grep -rn 'осознанно\|4xx' --include=PeerCall.java --include=PeerReadExc
 
 ## Последняя ошибка строки исполнения дома в `docs/**` не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по строке исполнения либо политике повторов; закрыто-когда=греп:"RetryError"@docs/** -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"RetryError"@docs/** -->
 
 **Что сделать.** Завести дом форме последней ошибки повторяемой операции —
 трём её компонентам (исходный код, сообщение, классификация), форме хранения
@@ -9823,7 +9799,7 @@ grep -n 'last_error' services/trading-core/src/main/resources/db/migration/V1__t
 
 ## Изъятия двух копий конвертера навеса правил инструмента асимметричны
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core либо market-data; закрыто-когда=греп:"getExternalTakerFeeRate"@services/trading-core/src/main/java/com/example/tradingcore/mapping/InstrumentExternalRulesJsonConverter.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"getExternalTakerFeeRate"@services/trading-core/src/main/java/com/example/tradingcore/mapping/InstrumentExternalRulesJsonConverter.java -->
 
 **Что сделать.** Свести изъятия двух копий конвертера навеса справочных
 правил инструмента к одному правилу: обе изымают **и** идентификатор
@@ -9860,7 +9836,7 @@ grep -n 'JsonIgnore' -A 2 services/market-data/src/main/java/com/example/marketd
 
 ## Переименование аксессора формы навеса теряет записанное молча
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший дизайн-заход по представлению навеса в БД -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что застал названный заход** (код проб конвертеров навеса, 2026-09-19).
 Первая альтернатива построена **частично**: состав ключей сверяется со списком,
@@ -9898,7 +9874,7 @@ grep -rl 'com\.fasterxml\.jackson' services/common/model/domain/src/main/java
 
 ## Конвертер навеса уровней стакана берёт общий маппер без копии
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data; закрыто-когда=греп:"objectMapper.copy"@services/market-data/src/main/java/com/example/marketdata/mapping/OrderBookLevelJsonConverter.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"objectMapper.copy"@services/market-data/src/main/java/com/example/marketdata/mapping/OrderBookLevelJsonConverter.java -->
 
 **Что сделать.** Привести конвертер навеса уровней книги заявок к форме шести
 его соседей: брать **копию** общего маппера и ставить ей политику непустых
@@ -9922,7 +9898,7 @@ grep -n 'objectMapper' services/market-data/src/main/java/com/example/marketdata
 
 ## Расхождение колонки-дискриминатора и тела параметров навеса читается молча
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по представлению в БД; закрыто-когда=греп:"соответстви"@docs/rules/persistence-representation.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"соответстви"@docs/rules/persistence-representation.md -->
 
 **Что сделать.** Назвать в доме полиморфного навеса
 (`docs/rules/persistence-representation.md` §«Полиморфный JSONB»), что
@@ -9942,7 +9918,7 @@ grep -n 'objectMapper' services/market-data/src/main/java/com/example/marketdata
 
 ## Отключение таймстампов длительности у конвертера навеса стратегии операнда не имеет
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core либо strategies; закрыто-когда=нет-грепа:"WRITE_DURATIONS_AS_TIMESTAMPS"@services/strategies/src/main/java/com/example/strategies/mapping/StrategyJsonConverter.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"WRITE_DURATIONS_AS_TIMESTAMPS"@services/strategies/src/main/java/com/example/strategies/mapping/StrategyJsonConverter.java -->
 
 **Что сделать.** Снять у обеих копий конвертера навеса дерева стратегии
 отключение таймстампов длительности вместе с обещающим его пассажем javadoc —
@@ -9968,7 +9944,7 @@ grep -n 'expiration_duration' services/strategies/src/main/resources/db/migratio
 
 ## Поверхность каталога отдаёт доменную форму навеса, минуя изъятие примеси
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data; закрыто-когда=нет-грепа:"ResponseEntity<InstrumentExternalRules>"@services/market-data/src/main/java/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"ResponseEntity<InstrumentExternalRules>"@services/market-data/src/main/java/** -->
 
 **Что сделать.** Отдавать справочные правила инструмента наружу **своей
 api-моделью**, а не доменной формой навеса, — либо назвать в доме, что
@@ -9995,7 +9971,7 @@ api-форма (`.claude/rules/codestyle.md` §«Маппинг»).
 
 ## Доменный предикат уезжает в колонку JSONB-навеса вместе с полями
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший дизайн-заход по представлению навеса в БД -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что застал названный заход** (код проб конвертеров навеса, 2026-09-19).
 Оба следствия предъявлены прогоном, а не чтением: ключ `live` наблюдается в
@@ -10051,7 +10027,7 @@ grep -n 'public Boolean isLive' services/common/model/domain/src/main/java/com/e
 
 ## Упорядочение ключей карт у канонического маппера параметров вычисления операнда не имеет
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по market-data; закрыто-когда=нет-грепа:"ORDER_MAP_ENTRIES_BY_KEYS"@services/market-data/src/main/java/com/example/marketdata/mapping/ComputationParamsJsonConverter.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"ORDER_MAP_ENTRIES_BY_KEYS"@services/market-data/src/main/java/com/example/marketdata/mapping/ComputationParamsJsonConverter.java -->
 
 **Что сделать.** Снять у канонического маппера параметров вычисления
 включение упорядочения ключей карт — либо назвать форму, которая карту несёт.
@@ -10084,7 +10060,7 @@ grep -rn 'paramsToCanonical' services/market-data/src/main/java --include=*.java
 
 ## Javadoc формы параметров структуры рынка ссылается на несуществующий пассаж
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый либо доковый заход по параметрам структуры рынка; закрыто-когда=нет-грепа:"Strategy\.md \(.MarketStructureParams\)"@services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/strategy/setting/MarketStructureParams.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=нет-грепа:"Strategy\.md \(.MarketStructureParams\)"@services/common/model/domain/src/main/java/com/example/tradingbot/domain/model/aggregate/strategy/setting/MarketStructureParams.java -->
 
 **Что сделать.** Либо завести пассаж о форме параметров структуры рынка в
 доке, на который она ссылается, либо перевести ссылку на тот пассаж, который
@@ -10118,7 +10094,7 @@ grep -c 'MarketStructureParams' docs/models/domain/aggregate/Strategy.md
 
 ## Отказ доступа у ядра не оставляет следа ни строкой, ни записью журнала
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core; закрыто-когда=греп:"implements AccessDenialRecorder"@services/trading-core/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"implements AccessDenialRecorder"@services/trading-core/src/main/java/**/*.java -->
 
 **Что сделать.** Завести у ядра след отказа доступа. Дом требует строку до
 ответа (`docs/rules/api-access-policy.md` §«След отказа пишет тот, у кого
@@ -10145,7 +10121,7 @@ grep -c 'MarketStructureParams' docs/models/domain/aggregate/Strategy.md
 
 ## Пустой издатель у ядра поверхность поднимает
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по trading-core -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Свести дом и код: либо ронять подъём на пустом
 `issuer-uri`, либо снять обещание из комментария оси.
@@ -10166,7 +10142,7 @@ grep -c 'MarketStructureParams' docs/models/domain/aggregate/Strategy.md
 
 ## Имя окружения у ядра объявлено и читателя не имеет
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый либо кодовый заход по осям окружения ядра -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Что сделать.** Решить, что у величины за читатель: назвать
 непостроенного и завести его — либо снять величину.
@@ -10189,7 +10165,7 @@ grep -c 'MarketStructureParams' docs/models/domain/aggregate/Strategy.md
 
 ## Потолок ожидания брокера у публикующего клиента ядра дома не имеет
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по тропе публикации ядра; закрыто-когда=греп:"MAX_BLOCK_MS_CONFIG"@services/trading-core/src/main/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"MAX_BLOCK_MS_CONFIG"@services/trading-core/src/main/** -->
 
 **Что сделать.** Объявить потолок ожидания брокера у публикующего клиента
 величиной конфигурации сервиса и назвать её калибровку — пару «задержка
@@ -10214,7 +10190,7 @@ grep -c 'MarketStructureParams' docs/models/domain/aggregate/Strategy.md
 
 ## Доминирование биржевой ступени над инструментной реакцией не исполняет ни один носитель
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по тропе проактивной детекции либо по ребру подъёма ступени; закрыто-когда=греп:"dominatedByAccountRung"@services/trading-core/src/main/java/**/*.java -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"dominatedByAccountRung"@services/trading-core/src/main/java/**/*.java -->
 
 **Что сделать.** Провести доминирование биржевой ступени одним носителем:
 инструментный сигнал на счёте, стоящем в `TRADE_BLOCKED`, ступени пары не
@@ -10251,7 +10227,7 @@ grep -c 'MarketStructureParams' docs/models/domain/aggregate/Strategy.md
 
 ## Сверки отображения со схемой на старте у двух сервисов нет вовсе
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший кодовый заход по audit либо statistics; закрыто-когда=греп:"hbm2ddl"@services/audit/src/main/** -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"hbm2ddl"@services/audit/src/main/** -->
 
 **Что сделать.** Включить проверку отображения схемой у `audit` и
 `statistics`: их фабрики сущностей объявлены явно
@@ -10327,7 +10303,7 @@ grep -rln 'LocalContainerEntityManagerFactoryBean' services/*/src/main/java
 
 ## Негейтящие находки второго круга кейсов `jsonb-overlay-roundtrip` не исполнены
 
-<!-- backlog: владелец=tester; оживит=шаг:2-12:DONE -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
 **Задача.** Исполнить три негейтящие находки апрувленного документа
 `.claude/tests/cases/jsonb-overlay-roundtrip.md`: расширить популяцию команды
@@ -10348,7 +10324,7 @@ grep -rln 'LocalContainerEntityManagerFactoryBean' services/*/src/main/java
 
 ## Перечень `Order.Type` в доке шире построенного
 
-<!-- backlog: владелец=code-writer; оживит=наблюдение:ближайший доковый заход по модели заявки -->
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
 **Задача.** Привести перечень бизнес-типа заявки в доке к построенному либо
 построить недостающее значение. `docs/models/domain/core/Order.md` называет
@@ -10365,7 +10341,7 @@ grep -rln 'LocalContainerEntityManagerFactoryBean' services/*/src/main/java
 
 ## Покрытие встроенной защитой без триггерной цены не даёт разрешимости уровня
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по реакции на устаревание данных; закрыто-когда=греп:"stopUnresolved"@docs/rules/market-data-freshness.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"stopUnresolved"@docs/rules/market-data-freshness.md -->
 
 **Задача.** Назвать в доме реакции на устаревание третью ось дискриминатора
 ветви: встроенная защита без триггерной цены даёт покрытие, но не даёт
@@ -10378,7 +10354,7 @@ grep -rln 'LocalContainerEntityManagerFactoryBean' services/*/src/main/java
 
 ## Минимум прогрева индикатора выводится из типа параметров, а не из типа индикатора
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по отображению стратегии; закрыто-когда=греп:"прогрев"@docs/models/mapping/Strategy.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"прогрев"@docs/models/mapping/Strategy.md -->
 
 **Задача.** Назвать в доме отображения, что подтип параметров индикатора
 выбирается внешним свойством (`indicatorType` настройки-владельца), а минимум
@@ -10392,7 +10368,7 @@ grep -rln 'LocalContainerEntityManagerFactoryBean' services/*/src/main/java
 
 ## Писатель «на первой попытке» теряет запись в окне недоступности цели
 
-<!-- backlog: владелец=solution-designer; оживит=наблюдение:ближайший доковый заход по правилу писателя величины; закрыто-когда=греп:"первой попытк"@docs/rules/writer-named-for-every-value.md -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE; закрыто-когда=греп:"первой попытк"@docs/rules/writer-named-for-every-value.md -->
 
 **Задача.** Назвать в правиле писателя, что окно недоступности, объявленное
 домом ограниченным, ограничено только для писателей, чьё условие —
