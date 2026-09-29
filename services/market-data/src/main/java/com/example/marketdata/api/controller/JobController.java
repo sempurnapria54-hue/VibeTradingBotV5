@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * ЗАПУСК.</b> Исход самой работы наружу не транслируется и уходит во
  * внутреннюю градацию (docs/rules/error-handling-policy.md,
  * .claude/rules/codestyle.md §«Обработка ошибок»). Перекрывающий запуск
- * гасит {@link com.example.marketdata.domain.jobs.JobExecutionGuard} —
+ * гасит {@link com.example.platform.jobs.JobExecutionGuard} —
  * молча, потому что пропуск перекрытия и есть штатное поведение.
  */
 @RestController

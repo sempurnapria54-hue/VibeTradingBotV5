@@ -190,10 +190,13 @@ class CatalogReadsBoxTest extends SharedMarketDataBox {
         tick(Tick.INDICATORS);
         stubSnapshotsOf(INSTRUMENT, 1_758_000_000_000L, "50000");
         tick(Tick.SNAPSHOTS);
+        connector.answers(ConnectorStub.pricesOf(INSTRUMENT), Feed.prices(INSTRUMENT, "50500"));
 
         List<Answer> answers = List.of(
                 get(INSTRUMENTS),
                 get(INSTRUMENTS + "/" + instrument),
+                get(INSTRUMENTS + "/" + instrument + "/rules"),
+                get(INSTRUMENTS + "/" + instrument + "/prices"),
                 get(INSTRUMENTS + "/" + instrument + "/candle-groups"),
                 get(INSTRUMENTS + "/" + instrument + "/candles?timeframe=" + HOUR
                         + "&fromMillis=0&limit=10"),
@@ -245,6 +248,53 @@ class CatalogReadsBoxTest extends SharedMarketDataBox {
         assertThat(answer.asObject().get("externalBidPrice")).isNotNull();
         assertThat(answer.asObject().get("externalInstrumentId")).isEqualTo(INSTRUMENT);
         assertThat(connector.count(ConnectorStub.pricesOf(INSTRUMENT))).isEqualTo(1);
+    }
+
+    /**
+     * Навес правил уходит наружу api-формой, а не доменной: ставки комиссии в
+     * ней нет — она атрибут счёта, и изъятие держит сама форма, а не маппер,
+     * оказавшийся на тропе (docs/models/domain/other/InstrumentExternalRules.md
+     * §«Ставка комиссии»); числовой ключ инструмента заменён идентичностью.
+     */
+    @Test
+    @DisplayName("B7.12 — навес правил наружу — своей формой, без ставки комиссии и ключа базы")
+    void b7_12_theRulesOverlayTravelsOutInItsOwnShape() {
+        String instrument = provisionInstruments(INSTRUMENT).getFirst();
+
+        Answer answer = get(INSTRUMENTS + "/" + instrument + "/rules");
+
+        assertThat(answer.status()).isEqualTo(200);
+        assertThat(answer.asObject().get("instrumentInternalId")).isEqualTo(instrument);
+        assertThat(answer.asObject()).containsKeys("externalFeeGroupId", "externalTickSize");
+        assertThat(answer.asObject()).doesNotContainKeys("externalTakerFeeRate", "instrumentId");
+    }
+
+    /**
+     * Порядок окон — по идентичности, и он же курсор: ожидание выводится
+     * сортировкой идентичностей, заведённых предусловием, а не их
+     * перечислением — идентичность назначает сервис.
+     */
+    @Test
+    @DisplayName("B7.13 — листинг отдаётся окном за курсором, и у окна есть потолок")
+    void b7_13_theListingIsGivenOutByWindowAfterTheCursor() {
+        List<String> ordered = provisionInstruments(INSTRUMENT, SECOND_INSTRUMENT, THIRD_INSTRUMENT).stream()
+                .sorted()
+                .toList();
+
+        Answer first = get(INSTRUMENTS + "?limit=2");
+        Answer second = get(INSTRUMENTS + "?after=" + ordered.get(1) + "&limit=2");
+        Answer unbounded = get(INSTRUMENTS + "?limit=50000");
+
+        assertThat(first.status()).isEqualTo(200);
+        assertThat(internalIdsOf(first)).containsExactly(ordered.get(0), ordered.get(1));
+        assertThat(second.status()).isEqualTo(200);
+        assertThat(internalIdsOf(second)).containsExactly(ordered.get(2));
+        assertThat(unbounded.status()).isEqualTo(400);
+        assertThat(unbounded.carriesErrorDto()).isTrue();
+    }
+
+    private List<Object> internalIdsOf(Answer listing) {
+        return listing.asList().stream().map(instrument -> instrument.get("internalId")).toList();
     }
 
     private void loadSeries() {

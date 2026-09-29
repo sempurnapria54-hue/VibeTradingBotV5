@@ -4,6 +4,8 @@ import static com.example.tradingcore.unit.fsm.FsmFixture.TRANCHE_ID;
 import static com.example.tradingcore.unit.fsm.FsmFixture.contextBuilder;
 import static com.example.tradingcore.unit.fsm.FsmFixture.deal;
 import static com.example.tradingcore.unit.fsm.FsmFixture.exposed;
+import static com.example.tradingcore.unit.fsm.FsmFixture.filledEntryLeg;
+import static com.example.tradingcore.unit.fsm.FsmFixture.leg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.protection;
 import static com.example.tradingcore.unit.fsm.FsmFixture.tranche;
@@ -11,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.fsm.TrancheTransitionGate;
 import java.util.List;
@@ -40,7 +43,7 @@ class TrancheRiskAndTerminalContractTest {
     void u14_1_anEntryUnderAnActiveDealIsNotRiskCreatingUnderCollapse() {
         Deal active = deal(Deal.Status.ACTIVE, bareTranche());
 
-        assertThat(gate.riskCreatingUnderCollapse(active, DealTranche.Status.ENTRY_SUBMITTED)).isFalse();
+        assertThat(gate.riskCreatingUnderCollapse(active, bareTranche(), DealTranche.Status.ENTRY_SUBMITTED)).isFalse();
     }
 
     @Test
@@ -49,7 +52,7 @@ class TrancheRiskAndTerminalContractTest {
         DealTranche subject = bareTranche();
         DealContext context = contextBuilder(deal(Deal.Status.EXIT_PENDING, subject)).build();
 
-        Boolean creating = gate.riskCreatingUnderCollapse(context.getDeal(),
+        Boolean creating = gate.riskCreatingUnderCollapse(context.getDeal(), subject,
                 DealTranche.Status.ENTRY_SUBMITTED);
         Boolean allowed;
         List<String> messages;
@@ -69,7 +72,7 @@ class TrancheRiskAndTerminalContractTest {
     void u14_3_anExitTargetUnderCollapseIsNotRiskCreating() {
         Deal collapsing = deal(Deal.Status.EXIT_PENDING, bareTranche());
 
-        assertThat(gate.riskCreatingUnderCollapse(collapsing, DealTranche.Status.EXIT_PENDING)).isFalse();
+        assertThat(gate.riskCreatingUnderCollapse(collapsing, bareTranche(), DealTranche.Status.EXIT_PENDING)).isFalse();
     }
 
     @Test
@@ -77,7 +80,7 @@ class TrancheRiskAndTerminalContractTest {
     void u14_4_anErrorStatusIsOutsideTheCollapseWindowByUnreachability() {
         Deal failing = deal(Deal.Status.ERROR, bareTranche());
 
-        assertThat(gate.riskCreatingUnderCollapse(failing, DealTranche.Status.ENTRY_SUBMITTED)).isFalse();
+        assertThat(gate.riskCreatingUnderCollapse(failing, bareTranche(), DealTranche.Status.ENTRY_SUBMITTED)).isFalse();
     }
 
     @Test
@@ -150,6 +153,40 @@ class TrancheRiskAndTerminalContractTest {
 
         assertThat(gate.terminalContract(managed, Boolean.TRUE)).isFalse();
         assertThat(gate.transitionAllowed(context, managed, DealTranche.Status.EXIT_PENDING)).isTrue();
+    }
+
+    @Test
+    @DisplayName("U14.13 — из предвходовой проверки под сворачиванием, вход уже отправлен: ребро догоняет факт")
+    void u14_13_aSubmittedEntryCatchesUpFromPrecheckUnderCollapse() {
+        DealTranche candidate = tranche(TRANCHE_ID, DealTranche.Status.PRECHECK);
+        candidate.getOrders().add(filledEntryLeg(30L, TRANCHE_ID, "1"));
+        DealContext context = contextBuilder(deal(Deal.Status.EXIT_PENDING, candidate)).build();
+
+        assertThat(gate.riskCreatingUnderCollapse(context.getDeal(), candidate,
+                DealTranche.Status.ENTRY_SUBMITTED)).isFalse();
+        assertThat(gate.transitionAllowed(context, candidate, DealTranche.Status.ENTRY_SUBMITTED)).isTrue();
+    }
+
+    @Test
+    @DisplayName("U14.14 — из предвходовой проверки под сворачиванием, нога только заведена: набор риска")
+    void u14_14_aLocallyCreatedEntryStaysRiskCreatingUnderCollapse() {
+        DealTranche candidate = tranche(TRANCHE_ID, DealTranche.Status.PRECHECK);
+        candidate.getOrders().add(leg(30L, TRANCHE_ID, Order.Status.CREATED, Boolean.FALSE, "0"));
+        Deal collapsing = deal(Deal.Status.EXIT_PENDING, candidate);
+
+        assertThat(gate.riskCreatingUnderCollapse(collapsing, candidate, DealTranche.Status.ENTRY_SUBMITTED))
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("U14.15 — переоткрытие под сворачиванием при отправленной живой ноге: исключение его не берёт")
+    void u14_15_aReopenUnderCollapseStaysRiskCreatingDespiteASubmittedLeg() {
+        DealTranche managed = bareTranche();
+        managed.getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
+        Deal collapsing = deal(Deal.Status.EXIT_PENDING, managed);
+
+        assertThat(gate.riskCreatingUnderCollapse(collapsing, managed, DealTranche.Status.ENTRY_SUBMITTED))
+                .isTrue();
     }
 
     /** Транш сопровождения без налива, ног и защит. */

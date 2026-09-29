@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingcore.config.ProjectionSyncProperties;
 import com.example.tradingcore.domain.service.RegistryProjectionService;
 import com.example.tradingcore.exception.PeerReadException;
 import com.example.tradingcore.integration.internal.api.AuthReadClient;
@@ -47,6 +48,9 @@ class InstrumentProjectionPassTest {
     private static final OffsetDateTime PROJECTED_AT = OffsetDateTime.of(
             2026, 9, 5, 12, 0, 0, 0, ZoneOffset.UTC);
 
+    /** Окно чтения листинга: у проходов теста листинг в него помещается целиком. */
+    private static final Integer WINDOW = 10;
+
     private final AuthReadClient authReadClient = mock(AuthReadClient.class);
     private final MarketDataReadClient marketDataReadClient = mock(MarketDataReadClient.class);
     private final ExchangeAccountDataService accountDataService = mock(ExchangeAccountDataService.class);
@@ -55,14 +59,15 @@ class InstrumentProjectionPassTest {
             mock(TenantRiskAppetiteDataService.class);
     private final ExchangeAccountMapper accountMapper = new ExchangeAccountMapperImpl();
     private final InstrumentMapper instrumentMapper = new InstrumentMapperImpl();
+    private final ProjectionSyncProperties properties = projectionSync();
 
     private final RegistryProjectionService service = new RegistryProjectionService(
             authReadClient, marketDataReadClient, accountDataService, instrumentDataService,
-            riskAppetiteDataService, accountMapper, instrumentMapper);
+            riskAppetiteDataService, accountMapper, instrumentMapper, properties);
 
     @Test
     void ownerUnavailableStopsThePass() {
-        when(marketDataReadClient.getInstruments()).thenReturn(List.of(
+        when(marketDataReadClient.getInstruments(null, WINDOW)).thenReturn(List.of(
                 listed("i-1"), listed("i-2"), listed("i-3")));
         when(marketDataReadClient.getInstrumentRules("i-1")).thenReturn(new InstrumentExternalRules());
         when(marketDataReadClient.getInstrumentRules("i-2"))
@@ -76,7 +81,7 @@ class InstrumentProjectionPassTest {
 
     @Test
     void singleRowRefusalDoesNotStopThePass() {
-        when(marketDataReadClient.getInstruments()).thenReturn(List.of(
+        when(marketDataReadClient.getInstruments(null, WINDOW)).thenReturn(List.of(
                 listed("i-1"), listed("i-2"), listed("i-3")));
         when(marketDataReadClient.getInstrumentRules(anyString())).thenReturn(new InstrumentExternalRules());
         when(marketDataReadClient.getInstrumentRules("i-2"))
@@ -90,7 +95,7 @@ class InstrumentProjectionPassTest {
 
     @Test
     void markDoesNotMoveWhenRulesWereNotRead() {
-        when(marketDataReadClient.getInstruments()).thenReturn(List.of(listed("i-1")));
+        when(marketDataReadClient.getInstruments(null, WINDOW)).thenReturn(List.of(listed("i-1")));
         when(marketDataReadClient.getInstrumentRules("i-1"))
                 .thenThrow(new PeerReadException("rules read failed"));
 
@@ -105,13 +110,19 @@ class InstrumentProjectionPassTest {
      */
     @Test
     void absentRulesAreProjectedAsEmpty() {
-        when(marketDataReadClient.getInstruments()).thenReturn(List.of(listed("i-1")));
+        when(marketDataReadClient.getInstruments(null, WINDOW)).thenReturn(List.of(listed("i-1")));
         when(marketDataReadClient.getInstrumentRules("i-1")).thenReturn(null);
 
         Integer projected = service.synchronizeInstruments(PROJECTED_AT);
 
         assertThat(projected).isEqualTo(1);
         verify(instrumentDataService).upsertProjection(any(), eq(null), eq(PROJECTED_AT));
+    }
+
+    private static ProjectionSyncProperties projectionSync() {
+        ProjectionSyncProperties properties = new ProjectionSyncProperties();
+        properties.setListingWindow(WINDOW);
+        return properties;
     }
 
     private InstrumentMarketDataResponse listed(String internalId) {

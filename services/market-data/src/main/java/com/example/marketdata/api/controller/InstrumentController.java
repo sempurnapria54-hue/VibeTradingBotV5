@@ -4,13 +4,14 @@ import com.example.marketdata.api.model.CandleApiResponse;
 import com.example.marketdata.api.model.CandleGroupApiResponse;
 import com.example.marketdata.api.model.CandleHistoryApiQuery;
 import com.example.marketdata.api.model.InstrumentApiResponse;
+import com.example.marketdata.api.model.InstrumentExternalRulesApiResponse;
+import com.example.marketdata.api.model.InstrumentListingApiQuery;
 import com.example.marketdata.mapping.MarketDataApiMapper;
 import com.example.marketdata.persistence.service.CandleDataService;
 import com.example.marketdata.persistence.service.CandleGroupDataService;
 import com.example.marketdata.persistence.service.InstrumentDataService;
 import com.example.marketdata.persistence.service.InstrumentExternalRulesDataService;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -55,10 +56,22 @@ public class InstrumentController {
     private final CandleDataService candleDataService;
     private final MarketDataApiMapper apiMapper;
 
-    @Operation(summary = "Действующий листинг каталога")
+    /**
+     * Действующий листинг окном за курсором.
+     *
+     * <p><b>Безлимитного чтения листинга нет:</b> его потолок — величина
+     * площадки, а не наша, и растёт её решением. Весь листинг читается
+     * обходом окон, пока окно не окажется короче предела.
+     */
+    @Operation(summary = "Действующий листинг каталога окном")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Окно листинга"),
+            @ApiResponse(responseCode = "400", description = "Предел окна вне допустимого")
+    })
     @GetMapping
-    public List<InstrumentApiResponse> getInstruments() {
-        return apiMapper.domainToApiInstruments(instrumentDataService.findByStatusIn(LISTED_STATUSES));
+    public List<InstrumentApiResponse> getInstruments(@Valid @ParameterObject InstrumentListingApiQuery window) {
+        return apiMapper.domainToApiInstruments(
+                instrumentDataService.findListedWindow(LISTED_STATUSES, window.getAfter(), window.getLimit()));
     }
 
     @Operation(summary = "Инструмент каталога")
@@ -85,10 +98,14 @@ public class InstrumentController {
             @ApiResponse(responseCode = "400", description = "Инструмента с таким идентификатором нет")
     })
     @GetMapping("/{internalId}/rules")
-    public ResponseEntity<InstrumentExternalRules> getInstrumentRules(@PathVariable String internalId) {
+    public ResponseEntity<InstrumentExternalRulesApiResponse> getInstrumentRules(@PathVariable String internalId) {
         Long instrumentId = instrumentDataService.getRequiredIdByInternalId(internalId);
         return rulesDataService.findByInstrumentId(instrumentId)
-                .map(ResponseEntity::ok)
+                .map(apiMapper::domainToApi)
+                .map(response -> {
+                    response.setInstrumentInternalId(internalId);
+                    return ResponseEntity.ok(response);
+                })
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 

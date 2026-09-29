@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -43,7 +42,6 @@ class ConnectionExpiryBoxTest extends BffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B3.9 — Соединение закрывается по своему сроку штатно")
     void b3_9_theConnectionIsClosedOnItsOwnTermGracefully() {
         authAnswersOneMembership();
@@ -53,10 +51,8 @@ class ConnectionExpiryBoxTest extends BffBox {
             abandoned.awaitClosed(CONNECTION_TIMEOUT.plusSeconds(20));
 
             // Закрытие штатное: тип содержимого — провод, код — успех, и
-            // ни одной записи об ошибке в провод не ушло. Сегодня красно:
-            // наблюдено 401 — тик по сроку снимает подписку из набора, но
-            // сам emitter не завершает, и каркас отвечает отказом по
-            // таймауту (находка F-13 документа кейсов).
+            // ни одной записи об ошибке в провод не ушло. Незавершённый
+            // реестром поток каркас разрешил бы отказом по таймауту.
             assertThat(abandoned.status()).isEqualTo(200);
             assertThat(abandoned.contentType()).startsWith("text/event-stream");
             assertThat(abandoned.frames()).isEmpty();

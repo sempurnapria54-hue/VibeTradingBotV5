@@ -1,19 +1,16 @@
 package com.example.bff.domain.jobs;
 
-import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
-import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.bff.api.model.StreamRecordApiModel;
 import com.example.bff.config.PerimeterProperties;
 import com.example.bff.domain.stream.StreamRegistry;
+import com.example.bff.integration.internal.event.ConsumerLivenessProvider;
 import com.example.bff.util.Constants;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Collection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
-import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -34,8 +31,8 @@ import org.springframework.stereotype.Component;
  * подписки на темы, доказывал бы ровно то, что в периметре тикает
  * таймер: потребитель мёртв, событий нет, а картина выглядит живой —
  * то самое состояние, против которого пульс и заведён. Поэтому тик
- * молчит, пока хотя бы один слушатель не запущен либо остался без
- * назначенных партиций (потеря связи с брокером снимает назначение).
+ * молчит, пока хотя бы один слушатель не жив; что это значит, держит
+ * {@link ConsumerLivenessProvider}.
  *
  * <p><b>Стороны разведены:</b> испускает пульс периметр, показывает его
  * отсутствие фронт (шаг 12 фазы 2) — и это вход шага фронта, а не
@@ -53,6 +50,7 @@ public class StreamPulseJob {
 
     private final StreamRegistry streamRegistry;
     private final KafkaListenerEndpointRegistry listenerRegistry;
+    private final ConsumerLivenessProvider consumerLivenessProvider;
     private final PerimeterProperties properties;
 
     /** Тик пульса; период — ось окружения, не хардкод. */
@@ -64,27 +62,10 @@ public class StreamPulseJob {
         if (isFalse(streamRegistry.hasSubscriptions())) {
             return;
         }
-        if (isFalse(isConsumingLive())) {
+        if (isFalse(consumerLivenessProvider.isLive(listenerRegistry.getListenerContainers()))) {
             return;
         }
         streamRegistry.broadcast(new StreamRecordApiModel(null, Constants.StreamRecords.PULSE,
                 OffsetDateTime.now(ZoneOffset.UTC), null));
-    }
-
-    /**
-     * Живость потребления: слушатели запущены и держат назначенные
-     * партиции. Пустое назначение означает, что группа развалилась либо
-     * связи с брокером нет, — и молчание пульса тогда честно.
-     */
-    private Boolean isConsumingLive() {
-        Collection<MessageListenerContainer> containers = listenerRegistry.getListenerContainers();
-        if (isEmpty(containers)) {
-            return Boolean.FALSE;
-        }
-        return containers.stream().allMatch(this::isLive);
-    }
-
-    private Boolean isLive(MessageListenerContainer container) {
-        return isTrue(container.isRunning()) && isFalse(isEmpty(container.getAssignedPartitions()));
     }
 }

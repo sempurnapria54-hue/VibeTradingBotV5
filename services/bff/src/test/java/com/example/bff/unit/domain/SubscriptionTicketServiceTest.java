@@ -15,7 +15,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.bff.domain.SubscriptionTicket;
 import com.example.bff.domain.SubscriptionTicketService;
 import com.example.bff.exception.TicketRejectedException;
-import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
@@ -353,29 +352,27 @@ class SubscriptionTicketServiceTest {
     }
 
     /**
-     * Клейм «негодность наружу не различается» держится недостижимостью,
-     * а не кодом: разбор момента негодности лежит ПОСЛЕ проверки подписи
-     * и отвечает своим классом (находка `F2`).
+     * Клейм «негодность наружу не различается» держится кодом, а не
+     * недостижимостью: разбор момента негодности лежит после проверки
+     * подписи, и нечисловое поле отвечает тем же классом отказа билета.
      */
     @Test
-    @DisplayName("U2.15 — нечисловой момент негодности отвечает не классом билета")
-    void u2_15_aNonNumericExpiryAnswersWithAnotherClass() {
+    @DisplayName("U2.15 — нечисловой момент негодности отвечает классом билета")
+    void u2_15_aNonNumericExpiryAnswersWithTheTicketClass() {
         String forged = forge(SECRET, SUBJECT, TENANT, "не-число");
 
         assertThatThrownBy(() -> service().verify(forged))
-                .isInstanceOf(NumberFormatException.class)
-                .isNotInstanceOf(TicketRejectedException.class);
+                .isInstanceOf(TicketRejectedException.class);
     }
 
-    /** Третий класс отказа на той же тропе — та же находка `F2`. */
+    /** Момент вне диапазона — тот же класс, а не третий. */
     @Test
-    @DisplayName("U2.16 — момент негодности вне диапазона отвечает третьим классом")
-    void u2_16_anOutOfRangeExpiryAnswersWithAThirdClass() {
+    @DisplayName("U2.16 — момент негодности вне диапазона отвечает классом билета")
+    void u2_16_anOutOfRangeExpiryAnswersWithTheTicketClass() {
         String forged = forge(SECRET, SUBJECT, TENANT, String.valueOf(Long.MAX_VALUE));
 
         assertThatThrownBy(() -> service().verify(forged))
-                .isInstanceOf(DateTimeException.class)
-                .isNotInstanceOf(TicketRejectedException.class);
+                .isInstanceOf(TicketRejectedException.class);
     }
 
     /** Охраны непустоты полей у разбора нет: пустой субъект возвращается как есть. */

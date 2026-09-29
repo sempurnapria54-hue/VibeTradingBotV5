@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -35,22 +34,14 @@ class UnavailableIdentityBoxTest extends MarketDataBox {
     }
 
     /**
-     * Ожидание взято из дома: добытчик токена объявляет, что пустой токен
-     * есть ОТКАЗ, а не анонимный вызов, и отказ этот — класса чтения
-     * ({@code ServiceTokenProvider} javadoc;
-     * docs/architecture/contracts.md §«Контекст тенанта в вызове»).
-     *
-     * <p>Сегодня до объявленной охраны исполнение не доходит: менеджер
-     * авторизованных клиентов бросает СВОЁ исключение раньше, чем
-     * добытчик успевает проверить пустоту, и наружу отказ уходит
-     * неклассифицированным — то есть охрана мертва, а читатель получает
-     * не тот класс. Находка {@code F-12}; долг —
-     * `.claude/work/backlog.md` §«Охрана пустого служебного токена у
-     * `market-data` мертва». Вторая половина клетки ЗЕЛЕНА: к соседу без
-     * заголовка идентичности не уходит ни один запрос.
+     * Пустой токен есть ОТКАЗ, а не анонимный вызов, и отказ этот — класса
+     * доступа: недобытая идентичность одинакова для всех инструментов, и
+     * вызывающему её повтор имеет смысл не сразу ({@code ServiceTokenProvider}
+     * javadoc; docs/architecture/services/market-data.md §«Какие вызовы
+     * делает и какие принимает»). К соседу без заголовка идентичности не
+     * уходит ни один запрос.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B8.13 — недоступная служебная идентичность — отказ, а не анонимный вызов")
     void b8_13_anUnavailableServiceIdentityIsAFailureNotAnAnonymousCall() {
         // Каталог ставится прямой записью: тропа его заведения сама ходит
@@ -63,7 +54,7 @@ class UnavailableIdentityBoxTest extends MarketDataBox {
         Answer answer = get(INSTRUMENTS + "/MD-B8-13/prices");
 
         assertThat(answer.carriesErrorDto()).isTrue();
-        assertThat(answer.errorCode()).isEqualTo("EXCHANGE_READ_FAILED");
+        assertThat(answer.errorCode()).isEqualTo("EXCHANGE_ACCESS_REFUSED");
         assertThat(connector.count(ConnectorStub.pricesOf(INSTRUMENT))).isEqualTo(0);
     }
 }

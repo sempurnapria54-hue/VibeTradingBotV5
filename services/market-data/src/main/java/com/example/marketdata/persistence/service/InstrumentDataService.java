@@ -1,5 +1,6 @@
 package com.example.marketdata.persistence.service;
 
+import static java.util.Objects.isNull;
 import static java.util.stream.Collectors.toList;
 
 import com.example.marketdata.mapping.InstrumentMapper;
@@ -107,6 +108,21 @@ public class InstrumentDataService {
                 .findByExchangeCodeAndStatusInAndIdGreaterThanOrderByIdAsc(
                         exchangeCode, names(statuses), cursorId, PageRequest.of(0, limit))
                 .stream()
+                .map(mapper::persistenceToDomain)
+                .collect(toList());
+    }
+
+    /**
+     * Окно действующего листинга наружу: за курсором {@code internalId},
+     * порядком по нему же; пустой курсор — окно от начала.
+     */
+    @Transactional(readOnly = true)
+    public List<Instrument> findListedWindow(Collection<Instrument.Status> statuses, String after, Integer limit) {
+        PageRequest window = PageRequest.of(0, limit);
+        List<InstrumentEntity> entities = isNull(after)
+                ? repository.findByStatusInOrderByInternalIdAsc(names(statuses), window)
+                : repository.findByStatusInAndInternalIdGreaterThanOrderByInternalIdAsc(names(statuses), after, window);
+        return entities.stream()
                 .map(mapper::persistenceToDomain)
                 .collect(toList());
     }

@@ -148,6 +148,9 @@ neighbours:
 projection-sync:
   enabled: true
   cron: ${PROJECTION_SYNC_CRON:0 */5 * * * *}
+  # Окно чтения листинга: не больше потолка окна у поверхности market-data
+  # (InstrumentListingApiQuery, 1000).
+  listing-window: 500
 
 # Синк ставок комиссии счетов (docs/models/domain/other/TradeFeeRate.md).
 # Такт РЕДКИЙ намеренно: комиссионный тир счёта меняется по своей оси —

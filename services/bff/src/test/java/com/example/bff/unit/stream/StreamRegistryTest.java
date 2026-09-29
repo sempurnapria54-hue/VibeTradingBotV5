@@ -13,8 +13,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.bff.domain.stream.StreamRegistry;
 import com.example.bff.util.Constants;
 import java.io.IOException;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -43,10 +47,16 @@ class StreamRegistryTest {
     private static final String TENANT = "tenant-7";
     private static final String OTHER_TENANT = "tenant-8";
 
-    /** Первое открытие: подписка есть, а в провод до первого факта не уходит ничего. */
+    /** Кругов у клеток одновременности: точки между двумя ходами у предмета нет. */
+    private static final Integer CONCURRENT_ROUNDS = 500;
+
+    /**
+     * Первое открытие: подписка есть, и в провод уходит подтверждение
+     * открытия — комментарий протокола, но ни одной записи.
+     */
     @Test
-    @DisplayName("U5.1 — первое открытие заводит подписку и ничего не пишет")
-    void u5_1_theFirstOpenRegistersASubscriptionAndWritesNothing() {
+    @DisplayName("U5.1 — первое открытие заводит подписку и пишет только подтверждение")
+    void u5_1_theFirstOpenRegistersASubscriptionAndWritesOnlyTheConfirmation() {
         StreamRegistry registry = registry();
 
         RecordingEmitterChannel channel = subscribe(registry, TENANT, null);
@@ -57,6 +67,10 @@ class StreamRegistryTest {
         assertThat(framesOf(channel))
                 .as("до первого факта в провод не уходит ни одной записи")
                 .isEmpty();
+        assertThat(channel.written()).singleElement()
+                .extracting(item -> String.valueOf(item.getData()))
+                .as("открытие подтверждено комментарием протокола")
+                .isEqualTo(":" + Constants.StreamRecords.OPENED_COMMENT + "\n\n");
     }
 
     /** Нижняя сторона границы: ровно потолок открытий проходит целиком. */
@@ -85,7 +99,7 @@ class StreamRegistryTest {
                 .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 
         registry.publish(TENANT, fact("E1"));
-        assertThat(first.attempts() + second.attempts())
+        assertThat(framesOf(first).size() + framesOf(second).size())
                 .as("набор тенанта не вырос: запись получили ровно две заведённые подписки")
                 .isEqualTo(2);
     }
@@ -176,12 +190,10 @@ class StreamRegistryTest {
 
     /**
      * Нулевой потолок: ожидание взято из дома («сверх потолка открытие
-     * отвечает отказом»), и сегодня оно красно — охрана читает НАБОР, а
-     * не счёт, и отсутствие набора принимает за свободное место. Первая
-     * подписка тенанта проходит при любом потолке.
+     * отвечает отказом»). Потолок сравнивается со СЧЁТОМ открытых, и
+     * отсутствие набора есть счёт ноль, а не свободное место.
      */
     @Test
-    @Tag("debt")
     @DisplayName("U5.9 — нулевой потолок отвергает первое же открытие")
     void u5_9_aZeroCeilingRefusesTheVeryFirstOpening() {
         StreamRegistry registry = new StreamRegistry(properties(3, 0));
@@ -189,6 +201,64 @@ class StreamRegistryTest {
         assertThatThrownBy(() -> registry.open(TENANT, null))
                 .as("сравнение нестрогое: ноль открытых уже не меньше нуля")
                 .isInstanceOf(ResponseStatusException.class);
+        assertThat(registry.hasSubscriptions())
+                .as("отказ подписки не заводит, и набора у тенанта нет")
+                .isFalse();
+    }
+
+    /**
+     * Снятие последней подписки и открытие новой идут одновременно. Точки
+     * между ними у предмета нет, поэтому вход повторён: кругов достаточно,
+     * чтобы прежняя форма снятия — отображение уходило по ссылке набора —
+     * теряла новую подписку хотя бы раз.
+     */
+    @Test
+    @DisplayName("U5.10 — подписка, открытая одновременно со снятием последней, остаётся в наборе")
+    void u5_10_aSubscriptionOpenedAlongsideTheLastRemovalStaysRegistered() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < CONCURRENT_ROUNDS; round++) {
+                StreamRegistry registry = registry();
+                RecordingEmitterChannel leaving = subscribe(registry, TENANT, null);
+                CyclicBarrier start = new CyclicBarrier(2);
+
+                Future<?> removal = pool.submit(() -> {
+                    await(start);
+                    leaving.fireCompletion();
+                });
+                Future<RecordingEmitterChannel> opening = pool.submit(() -> {
+                    await(start);
+                    return subscribe(registry, TENANT, null);
+                });
+                removal.get();
+                RecordingEmitterChannel arrived = opening.get();
+
+                registry.publish(TENANT, fact("E" + round));
+                assertThat(framesOf(arrived))
+                        .as("круг %s: новая подписка в наборе и получила следующую запись", round)
+                        .hasSize(1);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /**
+     * Истечение срока соединения завершает поток САМИМ реестром: иначе
+     * каркас разрешил бы истёкший запрос отказом, и подписка без единой
+     * записи получила бы документ отказа вместо штатно закрытого потока.
+     */
+    @Test
+    @DisplayName("U5.11 — истечение срока соединения завершает поток штатно")
+    void u5_11_aConnectionTimeoutCompletesTheStreamGracefully() {
+        StreamRegistry registry = registry();
+        RecordingEmitterChannel expiring = subscribe(registry, TENANT, null);
+
+        expiring.fireTimeout();
+
+        assertThat(expiring.completed()).as("поток завершён реестром").isTrue();
+        assertThat(expiring.completedWith()).as("и завершён штатно, а не ошибкой").isNull();
+        assertThat(registry.hasSubscriptions()).as("подписка снята тем же ходом").isFalse();
     }
 
     /** Факт уходит всем открытым подпискам тенанта и каждой по одному разу. */
@@ -205,7 +275,7 @@ class StreamRegistryTest {
         assertThat(framesOf(second)).as("вторая — тоже ровно одну").hasSize(1);
     }
 
-    /** Публикация тенанту без подписок молчалива, а окно при этом наполняется. */
+    /** Публикация тенанту без подписок молчалива и окна не заводит. */
     @Test
     @DisplayName("U8.2 — факт тенанта без подписок в провод не уходит")
     void u8_2_aFactOfATenantWithoutSubscriptionsGoesNowhere() {
@@ -216,9 +286,10 @@ class StreamRegistryTest {
                 .doesNotThrowAnyException();
 
         RecordingEmitterChannel late = subscribe(registry, TENANT, "E1");
-        assertThat(framesOf(late))
-                .as("окно наполнилось: позиция нашлась, и хвост после неё пуст")
-                .isEmpty();
+        assertThat(framesOf(late)).singleElement()
+                .extracting(SseFrame::eventName)
+                .as("окна факт не завёл: позиция не нашлась, и поток сообщает разрыв")
+                .isEqualTo(Constants.StreamRecords.GAP);
     }
 
     /** Радиус рассылки — тенант: чужой факт в поток не идёт. */
@@ -404,5 +475,59 @@ class StreamRegistryTest {
 
         assertThat(framesOf(healthy)).as("подписка другого тенанта получает свои факты").hasSize(1);
         assertThat(registry.hasSubscriptions()).as("и остаётся открытой").isTrue();
+    }
+
+    /** Отказ самого завершения оборвавшейся подписки из публикации не выходит. */
+    @Test
+    @DisplayName("U9.7 — отказ завершения оборвавшейся подписки не роняет публикацию факта")
+    void u9_7_aFailingCompletionDoesNotBreakThePublication() {
+        StreamRegistry registry = new StreamRegistry(properties(3, 3));
+        RecordingEmitterChannel broken = subscribe(registry, TENANT, null);
+        RecordingEmitterChannel healthy = subscribe(registry, TENANT, null);
+        registry.publish(TENANT, fact("E0"));
+        broken.failWith(new IOException("сессия оборвалась"));
+        broken.failCompletionWith(new IllegalStateException("запрос уже закрыт контейнером"));
+
+        assertThatCode(() -> registry.publish(TENANT, fact("E1")))
+                .as("слушатель темы отказа не видит и факта не повторяет")
+                .doesNotThrowAnyException();
+
+        assertThat(broken.completedWith())
+                .as("завершение с ошибкой попытано")
+                .isInstanceOf(IOException.class);
+        assertThat(framesOf(healthy))
+                .as("живая подписка получила оба факта по разу")
+                .extracting(SseFrame::id).containsExactly("E0", "E1");
+        assertThat(framesOf(subscribe(registry, TENANT, "E0")))
+                .as("окно держит факт один раз")
+                .extracting(SseFrame::id).containsExactly("E1");
+    }
+
+    /** Тот же отказ на рассылке записи периметра наружу не выходит. */
+    @Test
+    @DisplayName("U9.8 — отказ завершения оборвавшейся подписки не роняет рассылку пульса")
+    void u9_8_aFailingCompletionDoesNotBreakThePulse() {
+        StreamRegistry registry = registry();
+        RecordingEmitterChannel broken = subscribe(registry, TENANT, null);
+        RecordingEmitterChannel healthy = subscribe(registry, OTHER_TENANT, null);
+        broken.failWith(new IOException("сессия оборвалась"));
+        broken.failCompletionWith(new IllegalStateException("запрос уже закрыт контейнером"));
+
+        assertThatCode(() -> registry.broadcast(perimeterRecord(Constants.StreamRecords.PULSE)))
+                .as("тик пульса отказа не видит")
+                .doesNotThrowAnyException();
+
+        assertThat(framesOf(healthy))
+                .as("подписка другого тенанта пульс получила")
+                .extracting(SseFrame::eventName).containsExactly(Constants.StreamRecords.PULSE);
+    }
+
+    /** Встать у барьера; прерывание прогона — отказ клетки, а не её исход. */
+    private static void await(CyclicBarrier barrier) {
+        try {
+            barrier.await();
+        } catch (InterruptedException | BrokenBarrierException failure) {
+            throw new IllegalStateException("Барьер клетки не пройден", failure);
+        }
     }
 }

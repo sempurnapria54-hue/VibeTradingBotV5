@@ -12,7 +12,6 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -118,7 +117,6 @@ class ConfigurationAxesBoxTest extends SharedBffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B10.6 — Перечень тем подписки — ось окружения, и пустой он подписки не даёт")
     void b10_6_theTopicListIsAnAxisAndEmptyGivesNoSubscription() {
         // Одна тема: записи второй в провод не уходят.
@@ -134,9 +132,7 @@ class ConfigurationAxesBoxTest extends SharedBffBox {
         }
 
         // Пустой перечень: поверхность поднимается и отвечает, подписки нет
-        // ни на одну тему. Сегодня красно: пустое значение разбирается как
-        // одна тема с пустым именем, и слушатель заводится и отказывает
-        // (находка F-8 документа кейсов).
+        // ни на одну тему — слушатель не заводится вовсе.
         // Зонда назначения у этой реплики нет: слушать ей нечего, и зонд
         // ждал бы записи, которой не доехать.
         try (ConfigurableApplicationContext empty = Replica.launch(Map.of(BffSubstrate.STREAM_TOPICS_KEY, ""))) {

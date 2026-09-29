@@ -101,5 +101,29 @@ public class Constants {
 
         /** Явный разрыв: поток продолжен не с той позиции, что просил клиент. */
         public static final String GAP = "PERIMETER_GAP";
+
+        /**
+         * Текст комментария протокола, которым подписка подтверждает
+         * открытие. Записью он не является: класса не несёт, в окно не
+         * кладётся, и клиент протокола его не показывает.
+         */
+        public static final String OPENED_COMMENT = "PERIMETER_OPENED";
+    }
+
+    /** Имена, которыми клиент брокера называет связь с координатором группы. */
+    @UtilityClass
+    public static class ConsumerMetrics {
+
+        /**
+         * Возраст последнего сердцебиения координатору группы, в секундах;
+         * {@code -1}, пока клиент не послал ни одного.
+         */
+        public static final String LAST_HEARTBEAT_SECONDS_AGO = "last-heartbeat-seconds-ago";
+
+        /**
+         * Возраст последней успешной ребалансировки группы, в секундах;
+         * {@code -1}, пока участник не вступил в группу ни разу.
+         */
+        public static final String LAST_REBALANCE_SECONDS_AGO = "last-rebalance-seconds-ago";
     }
 }

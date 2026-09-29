@@ -217,7 +217,6 @@ class TenantContextPathTest {
 
     @Test
     @Order(6)
-    @Tag("debt")
     @DisplayName("E1.3 — Служебная идентичность тенанта не заводит")
     void e1_3_aServiceIdentityProvisionsNoTenant() {
         String serviceToken = trail.identity().issuedServiceToken();

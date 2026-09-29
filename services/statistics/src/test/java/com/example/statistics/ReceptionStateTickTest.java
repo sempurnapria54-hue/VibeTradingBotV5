@@ -16,6 +16,7 @@ import com.example.statistics.domain.model.PairLagOperands;
 import com.example.statistics.domain.model.ReceptionPairMoments;
 import com.example.statistics.domain.service.ReceptionStateSyncService;
 import com.example.statistics.integration.internal.event.ConsumerLagProvider;
+import com.example.statistics.integration.internal.event.ConsumerLivenessProvider;
 import com.example.statistics.integration.internal.event.TopicRetentionProvider;
 import com.example.statistics.metrics.ReceptionMetrics;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
@@ -25,12 +26,16 @@ import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.MessageListenerContainer;
 
@@ -47,7 +52,7 @@ import org.springframework.kafka.listener.MessageListenerContainer;
  * где ничего не измерялось.
  *
  * <p><b>Операнды разведены и проверяются раздельно:</b> назначенные
- * партиции — операнд живости, объявленная подписка — операнд состава. Тема,
+ * партиции — конъюнкт живости, объявленная подписка — операнд состава. Тема,
  * отданная другой реплике той же группы, у этой пуста, и состав по
  * назначению снял бы ей признак подписки при живой подписке.
  *
@@ -63,6 +68,10 @@ class ReceptionStateTickTest {
     private static final String SECOND_TOPIC = "strategies.facts";
     private static final Long WEEK_MS = 604_800_000L;
 
+    /** Возраст сердцебиения координатору: свежий и старше срока сессии умолчания (45 с). */
+    private static final Double FRESH_HEARTBEAT_SECONDS = 1.0;
+    private static final Double LOST_HEARTBEAT_SECONDS = 60.0;
+
     private static final String THRESHOLD_SERIES = "statistics_reception_lag_alert_threshold_ms";
     private static final String UNCONSUMED_SERIES = "statistics_reception_unconsumed_records";
 
@@ -73,8 +82,10 @@ class ReceptionStateTickTest {
     private final PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
     private final ReceptionMetrics metrics = new ReceptionMetrics(registry);
     private final ReceptionProperties properties = properties();
+    private final ConsumerLivenessProvider livenessProvider =
+            new ConsumerLivenessProvider(new DefaultKafkaConsumerFactory<>(Map.of()));
     private final ReceptionStateJob job = new ReceptionStateJob(
-            properties, listenerRegistry, syncService, retentionProvider, lagProvider, metrics);
+            properties, listenerRegistry, syncService, retentionProvider, lagProvider, livenessProvider, metrics);
 
     @Test
     @DisplayName("Подписка из двух тем — состав пар из двух тем")
@@ -116,7 +127,7 @@ class ReceptionStateTickTest {
     }
 
     @Test
-    @DisplayName("Назначенных партиций нет — тик молчит: группа развалилась либо связи с брокером нет")
+    @DisplayName("Назначенных партиций нет — тик молчит: группа развалилась")
     void anEmptyAssignmentWritesNothing() {
         container(Boolean.TRUE, List.of(CORE_TOPIC), List.of());
 
@@ -124,6 +135,26 @@ class ReceptionStateTickTest {
 
         verify(syncService, never()).syncSubscription(anyString(), any(), any(OffsetDateTime.class));
         assertThat(exportedSeries()).isEmpty();
+    }
+
+    /**
+     * У остановленного брокера клиент назначения не теряет: запущенный
+     * контейнер с непустым назначением живым не считается, пока координатор
+     * молчит дольше срока сессии (находка {@code F7} тропы периметра).
+     */
+    @Test
+    @DisplayName("Связи с координатором нет дольше срока сессии — тик молчит при непустом назначении")
+    void aLostCoordinatorWritesNothingDespiteTheAssignment() {
+        givenMeasuredPair(CORE_TOPIC);
+        container(Boolean.TRUE, List.of(CORE_TOPIC), List.of(new TopicPartition(CORE_TOPIC, 0)),
+                LOST_HEARTBEAT_SECONDS);
+
+        job.tick();
+
+        verify(syncService, never()).syncSubscription(anyString(), any(), any(OffsetDateTime.class));
+        assertThat(exportedSeries())
+                .as("ряды величины пропадают целиком, а не остаются от прошлого такта")
+                .isEmpty();
     }
 
     @Test
@@ -272,9 +303,20 @@ class ReceptionStateTickTest {
     }
 
     private void container(Boolean running, List<String> declaredTopics, List<TopicPartition> assigned) {
+        container(running, declaredTopics, assigned, FRESH_HEARTBEAT_SECONDS);
+    }
+
+    private void container(Boolean running, List<String> declaredTopics, List<TopicPartition> assigned,
+                           Double heartbeatSeconds) {
         MessageListenerContainer container = mock(MessageListenerContainer.class);
         when(container.isRunning()).thenReturn(running);
         when(container.getAssignedPartitions()).thenReturn(assigned);
+        Metric heartbeat = mock(Metric.class);
+        when(heartbeat.metricValue()).thenReturn(heartbeatSeconds);
+        Map<String, Map<MetricName, ? extends Metric>> byClient = Map.of("client", Map.of(
+                new MetricName("last-heartbeat-seconds-ago", "consumer-coordinator-metrics", "", Map.of()),
+                heartbeat));
+        when(container.metrics()).thenReturn(byClient);
         when(container.getContainerProperties())
                 .thenReturn(new ContainerProperties(declaredTopics.toArray(new String[0])));
         when(listenerRegistry.getListenerContainers()).thenReturn(List.of(container));

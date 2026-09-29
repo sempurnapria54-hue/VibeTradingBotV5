@@ -10,14 +10,22 @@ import static com.example.bff.unit.stream.StreamFixture.subscribe;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.bff.api.model.StreamRecordApiModel;
+import com.example.bff.config.PerimeterProperties;
 import com.example.bff.domain.stream.StreamRegistry;
 import com.example.bff.util.Constants;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.RecordingEmitterChannel;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Окно переигрывания и явный разрыв — группы `U6` и `U7` документа
@@ -40,11 +48,17 @@ class StreamReplayTest {
     private static final String TENANT = "tenant-7";
     private static final String OTHER_TENANT = "tenant-8";
 
+    /** Потолок реестра с держащей подпиской: она не отнимает места у клетки. */
+    private static final Integer HELD_CEILING = 8;
+
+    /** Кругов у клетки одновременности: точки между двумя ходами у предмета нет. */
+    private static final Integer CONCURRENT_ROUNDS = 500;
+
     /** Единственный факт в окне: позиция на нём даёт пустой хвост, а не разрыв. */
     @Test
     @DisplayName("U6.1 — позиция на единственном факте окна даёт пустой хвост")
     void u6_1_aPositionOnTheOnlyFactYieldsAnEmptyTail() {
-        StreamRegistry registry = registry();
+        StreamRegistry registry = heldRegistry(TENANT);
         registry.publish(TENANT, fact("E1"));
 
         RecordingEmitterChannel channel = subscribe(registry, TENANT, "E1");
@@ -58,7 +72,7 @@ class StreamReplayTest {
     @Test
     @DisplayName("U6.2 — окно держит последние записи, вытесненная позиция даёт разрыв")
     void u6_2_theWindowKeepsTheLastRecordsAndAnEvictedPositionYieldsAGap() {
-        StreamRegistry registry = registry();
+        StreamRegistry registry = heldRegistry(TENANT);
         publishFacts(registry, TENANT, "E1", "E2", "E3", "E4");
 
         RecordingEmitterChannel survived = subscribe(registry, TENANT, "E2");
@@ -77,7 +91,7 @@ class StreamReplayTest {
     @Test
     @DisplayName("U6.3 — окна двух тенантов раздельны и каждое хранит свой порядок")
     void u6_3_theWindowsOfTwoTenantsAreSeparate() {
-        StreamRegistry registry = registry();
+        StreamRegistry registry = heldRegistry(TENANT, OTHER_TENANT);
         registry.publish(TENANT, fact("A1"));
         registry.publish(OTHER_TENANT, fact("B1"));
         registry.publish(TENANT, fact("A2"));
@@ -91,30 +105,72 @@ class StreamReplayTest {
     }
 
     /**
-     * Окно заводится на всякой публикации, а не на подписке. Сегодня это
-     * названный долг: окно тенанта, никогда не открывавшего подписки, не
-     * вытесняется ничем (`.claude/work/backlog.md` §«Окно переигрывания
-     * периметра копится по тенантам без подписок и не вытесняется»).
+     * Окно заводит подписка, а не публикация: тенанту, у которого подписки
+     * нет и не было, помнить нечего, и позиция на его факте даёт разрыв.
      */
     @Test
-    @DisplayName("U6.4 — факт тенанта без подписок в провод не идёт, а окно наполняет")
-    void u6_4_aFactOfATenantWithoutSubscriptionsStillFillsTheWindow() {
+    @DisplayName("U6.4 — факт тенанта без подписок окна не заводит")
+    void u6_4_aFactOfATenantWithoutSubscriptionsOpensNoWindow() {
         StreamRegistry registry = registry();
 
         registry.publish(TENANT, fact("E1"));
         registry.publish(TENANT, fact("E2"));
 
         RecordingEmitterChannel late = subscribe(registry, TENANT, "E1");
-        assertThat(idsOf(late))
-                .as("окно наполнялось всё это время — хвост после названной позиции нашёлся")
-                .containsExactly("E2");
+        assertThat(framesOf(late)).singleElement()
+                .extracting(SseFrame::eventName)
+                .as("окна не было — позиции в нём нет, и поток сообщает разрыв")
+                .isEqualTo(Constants.StreamRecords.GAP);
+    }
+
+    /**
+     * Последнюю подписку окно переживает: пересоздание подписки клиентом
+     * продолжает поток с названной позиции.
+     */
+    @Test
+    @DisplayName("U6.9 — окно переживает последнюю подписку в пределах срока билета")
+    void u6_9_theWindowOutlivesTheLastSubscriptionWithinTheTicketTerm() {
+        StreamRegistry registry = registry();
+        RecordingEmitterChannel gone = subscribe(registry, TENANT, null);
+        publishFacts(registry, TENANT, "E1", "E2");
+        gone.fireCompletion();
+        registry.publish(TENANT, fact("E3"));
+
+        RecordingEmitterChannel recreated = subscribe(registry, TENANT, "E1");
+
+        assertThat(idsOf(recreated))
+                .as("факт, доехавший между подписками, окно сохранило")
+                .containsExactly("E2", "E3");
+    }
+
+    /**
+     * Срок окна без подписок — срок билета: по его истечении окно уходит, и
+     * позиция в нём больше не находится.
+     */
+    @Test
+    @DisplayName("U6.10 — окно без подписок уходит по сроку билета")
+    void u6_10_aWindowWithoutSubscriptionsIsEvictedAfterTheTicketTerm() {
+        PerimeterProperties expiring = properties(3, 2);
+        expiring.getTicket().setTtl(Duration.ZERO);
+        StreamRegistry registry = new StreamRegistry(expiring);
+        RecordingEmitterChannel gone = subscribe(registry, TENANT, null);
+        registry.publish(TENANT, fact("E1"));
+        gone.fireCompletion();
+
+        registry.publish(TENANT, fact("E2"));
+        RecordingEmitterChannel late = subscribe(registry, TENANT, "E1");
+
+        assertThat(framesOf(late)).singleElement()
+                .extracting(SseFrame::eventName)
+                .as("окно ушло со сроком — ни позиции, ни факта после неё")
+                .isEqualTo(Constants.StreamRecords.GAP);
     }
 
     /** В окно кладёт публикация факта, а не рассылка записи периметра. */
     @Test
     @DisplayName("U6.5 — запись периметра окна не меняет")
     void u6_5_aPerimeterRecordDoesNotTouchTheWindow() {
-        StreamRegistry registry = registry();
+        StreamRegistry registry = heldRegistry(TENANT);
         registry.publish(TENANT, fact("E1"));
 
         registry.broadcast(perimeterRecord(Constants.StreamRecords.PULSE));
@@ -129,7 +185,7 @@ class StreamReplayTest {
     @Test
     @DisplayName("U6.6 — запись разрыва в окно не кладётся")
     void u6_6_theGapRecordIsNotPutIntoTheWindow() {
-        StreamRegistry registry = registry();
+        StreamRegistry registry = heldRegistry(TENANT);
         registry.publish(TENANT, fact("E1"));
 
         subscribe(registry, TENANT, "нет-такой-позиции");
@@ -214,7 +270,7 @@ class StreamReplayTest {
     @Test
     @DisplayName("U7.5 — первая невытесненная позиция даёт хвост, а не разрыв")
     void u7_5_theFirstSurvivingPositionYieldsATail() {
-        StreamRegistry registry = registry();
+        StreamRegistry registry = heldRegistry(TENANT);
         publishFacts(registry, TENANT, "E1", "E2", "E3", "E4");
 
         RecordingEmitterChannel channel = subscribe(registry, TENANT, "E2");
@@ -335,10 +391,66 @@ class StreamReplayTest {
         assertThat(record.occurredAt()).as("момент отправки — не раньше начала прогона").isAfterOrEqualTo(before);
     }
 
+    /**
+     * Открытие с позицией и публикация факта идут одновременно. Точки между
+     * регистрацией подписки и переигрыванием у предмета нет, поэтому вход
+     * повторён; при любом порядке двух ходов провод обязан нести хвост и
+     * новый факт в порядке доставки и ровно по разу. Наблюдатель
+     * подключается после обоих ходов: записи, отданные до подключения,
+     * каркас держит в своей очереди в порядке отдачи.
+     */
+    @Test
+    @DisplayName("U7.13 — факт, принятый во время открытия, не обгоняет хвоста окна")
+    void u7_13_aFactAcceptedDuringTheOpeningDoesNotOvertakeTheTail() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < CONCURRENT_ROUNDS; round++) {
+                StreamRegistry registry = held(new StreamRegistry(properties(5, 2)), TENANT);
+                publishFacts(registry, TENANT, "E1", "E2", "E3");
+                CyclicBarrier start = new CyclicBarrier(2);
+
+                Future<SseEmitter> opening = pool.submit(() -> {
+                    await(start);
+                    return registry.open(TENANT, "E1");
+                });
+                Future<?> publication = pool.submit(() -> {
+                    await(start);
+                    registry.publish(TENANT, fact("E4"));
+                });
+                publication.get();
+                RecordingEmitterChannel channel = RecordingEmitterChannel.attachedTo(opening.get());
+
+                assertThat(idsOf(channel))
+                        .as("круг %s: хвост окна, затем новый факт, каждый по разу", round)
+                        .containsExactly("E2", "E3", "E4");
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     /** Окно тенанта, наполненное фактами `E1`, `E2`, `E3` в этом порядке. */
     private StreamRegistry filledRegistry() {
-        StreamRegistry registry = registry();
+        StreamRegistry registry = heldRegistry(TENANT);
         publishFacts(registry, TENANT, "E1", "E2", "E3");
+        return registry;
+    }
+
+    /**
+     * Реестр базовой сборки, у названных тенантов которого открыто по
+     * подписке: окно заводит подписка, а не запись, и наполняется оно,
+     * пока тенанту есть кому показывать. Потолок шире базового — держащая
+     * подписка места у клетки не занимает.
+     */
+    private StreamRegistry heldRegistry(String... tenantIds) {
+        return held(new StreamRegistry(properties(3, HELD_CEILING)), tenantIds);
+    }
+
+    /** Открыть у названных тенантов по подписке первого подключения. */
+    private StreamRegistry held(StreamRegistry registry, String... tenantIds) {
+        for (String tenantId : tenantIds) {
+            registry.open(tenantId, null);
+        }
         return registry;
     }
 
@@ -355,5 +467,14 @@ class StreamReplayTest {
                         .isEqualTo(FACT_TYPE))
                 .map(SseFrame::id)
                 .toList();
+    }
+
+    /** Встать у барьера; прерывание прогона — отказ клетки, а не её исход. */
+    private static void await(CyclicBarrier barrier) {
+        try {
+            barrier.await();
+        } catch (InterruptedException | BrokenBarrierException failure) {
+            throw new IllegalStateException("Барьер клетки не пройден", failure);
+        }
     }
 }

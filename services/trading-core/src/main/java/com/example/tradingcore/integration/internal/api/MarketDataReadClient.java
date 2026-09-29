@@ -7,6 +7,7 @@ import com.example.tradingcore.integration.internal.api.model.MarketFeatureReadR
 import com.example.tradingcore.util.Constants;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -16,11 +17,9 @@ import org.springframework.web.client.RestClient;
  * Чтение каталога инструментов у {@code market-data}
  * (docs/architecture/contracts.md §«Синхронные вызовы»).
  *
- * <p><b>Листинг читается целиком, и это названное ограничение.</b>
- * Поверхность владельца пагинации не имеет, а строить окно без курсора на
- * стороне читателя нельзя; объём ограничен предметом — действующий
- * листинг одной площадки. Условие пересмотра — вторая площадка (фаза 3)
- * (docs/models/domain/core/Instrument.md §«Проекция у торгового ядра»).
+ * <p><b>Листинг читается окном за курсором</b>, а обход окон ведёт
+ * вызывающий (docs/models/domain/core/Instrument.md §«Проекция у
+ * торгового ядра»).
  *
  * <p><b>Правила отдаются ПОИНСТРУМЕНТНО, и второго способа у владельца
  * нет.</b> Навес может быть ещё не материализован, и владелец отвечает
@@ -53,10 +52,13 @@ public class MarketDataReadClient {
         this.clientRegistrationId = properties.getMarketData().getClientRegistrationId();
     }
 
-    /** Действующий листинг каталога. */
-    public List<InstrumentMarketDataResponse> getInstruments() {
+    /** Окно действующего листинга за курсором; пустой курсор — окно от начала. */
+    public List<InstrumentMarketDataResponse> getInstruments(String after, Integer limit) {
         return PeerCall.execute(PEER, "instruments", () -> restClient.get()
-                .uri("/api/v1/market-data/instruments")
+                .uri(builder -> builder.path("/api/v1/market-data/instruments")
+                        .queryParamIfPresent("after", Optional.ofNullable(after))
+                        .queryParam("limit", limit)
+                        .build())
                 .header(HttpHeaders.AUTHORIZATION, bearer())
                 .retrieve()
                 .body(INSTRUMENT_LIST));

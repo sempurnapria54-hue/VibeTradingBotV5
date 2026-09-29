@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -160,7 +159,6 @@ class ReceptionBoxTest extends SharedBffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B6.6 — Неразбираемый момент происшествия раздачу НЕ останавливает")
     void b6_6_anUnreadableOccurrenceMomentDoesNotStopDelivery() {
         String tenant = "TE6";
@@ -175,10 +173,8 @@ class ReceptionBoxTest extends SharedBffBox {
 
             assertThat(stream.ids()).containsExactly("e-b6-6-open", "e-b6-6-good");
             // Пропуск, а не отказ: слушатель не бросает, и повторных
-            // доставок первой записи нет. Сегодня красно: разбор момента не
-            // защищён, отказ уходит из слушателя наружу, и обработчик
-            // повторяет доставку, пока не откажется от записи (находка F-2
-            // документа кейсов).
+            // доставок первой записи нет: отказ разбора момента, вышедший
+            // из слушателя, вернул бы запись обработчику на повтор.
             assertThat(AppLog.since(mark)).doesNotContain("ListenerExecutionFailedException");
         }
     }

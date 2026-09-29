@@ -509,9 +509,13 @@ class PerimeterIntegrityPathTest {
         return Objects.equals("Bearer " + token, request.getHeader("Authorization"));
     }
 
-    /** Чтения сборки контекста ядра: синк проекций на прологе и раскладка фич на проходе. */
+    /**
+     * Чтения сборки контекста ядра: синк проекций на прологе и раскладка фич на проходе.
+     * Сравнивается путь без параметров: листинг ядро читает окном, и курсор с пределом
+     * едут параметрами запроса.
+     */
     private static Boolean coreBuildsContext(LoggedRequest request) {
-        String call = request.getMethod().getName() + " " + request.getUrl();
+        String call = request.getMethod().getName() + " " + request.getUrl().split("\\?")[0];
         return Set.of("GET " + Trail.PEER_INSTRUMENTS, "GET " + Trail.PEER_INSTRUMENTS + "/" + Trail.INSTRUMENT
                 + "/rules", "POST " + Trail.PEER_FEATURES).contains(call);
     }

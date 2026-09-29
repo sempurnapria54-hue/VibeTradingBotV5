@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -60,8 +59,8 @@ class SubscriptionCeilingBoxTest extends BffBox {
 
     /**
      * Сколько раз клетка {@code B3.7} пишет в только что закрытую подписку:
-     * отказ записи у построенного — гонка (F-14), и вход повторяется, пока
-     * проявление не станет практически неизбежным.
+     * отказ записи в закрытую — гонка с контейнером, и вход повторяется,
+     * чтобы исход не зависел от того, кто её выиграл.
      */
     private static final Integer ROUNDS = 50;
 
@@ -72,7 +71,6 @@ class SubscriptionCeilingBoxTest extends BffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B3.5 — Потолок подписок тенанта: сверх него — отказ «слишком много запросов»")
     void b3_5_beyondTheCeilingTheOpeningIsRefused() {
         authAnswers(Bodies.memberships(CEILING_TENANT, ROLE));
@@ -93,12 +91,9 @@ class SubscriptionCeilingBoxTest extends BffBox {
                 assertThat(beyond.carriesStream()).isFalse();
                 assertThat(beyond.carriesErrorDto()).isTrue();
                 // Отказ — часть контракта, а не отказ доступа: класс
-                // отличается от отказа контура. Сегодня красно: наблюдено
-                // ACCESS_UNAUTHENTICATED — отказ точки подписки не
-                // рендерится вовсе, потому что `produces` провода не
-                // принимает JSON единого error-DTO (находка F-12
-                // документа кейсов), и клиент получает отказ КОНТУРА с
-                // тропы обработки ошибки.
+                // отличается от отказа контура. Точка подписки производит
+                // только провод, и отказ доезжает своим классом лишь
+                // потому, что тип его содержимого поставлен явно.
                 assertThat(beyond.errorCode()).isEqualTo(REQUEST_REJECTED);
                 assertThat(beyond.errorCode()).isNotEqualTo(UNAUTHENTICATED);
                 assertThat(beyond.errorMessage()).contains("подписок тенанта больше");
@@ -152,7 +147,6 @@ class SubscriptionCeilingBoxTest extends BffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B3.7 — Закрытая подписка освобождает место под потолком")
     void b3_7_aClosedSubscriptionFreesItsPlace() {
         authAnswers(Bodies.memberships(RELEASE_TENANT, ROLE));
@@ -162,9 +156,8 @@ class SubscriptionCeilingBoxTest extends BffBox {
         try (Subscription surviving = openedStreamOf(RELEASE_TENANT, ticket, "e-b3-7-first")) {
             expected.add("e-b3-7-first");
             // Ход «открыть вторую, закрыть её, записать» повторяется: отказ
-            // записи в закрытую подписку у построенного — ГОНКА с
-            // контейнером (находка F-14 документа кейсов), и одиночный вход
-            // проявлял бы её с вероятностью, а не всякий раз.
+            // записи в закрытую подписку — ГОНКА с контейнером, и одиночный
+            // вход спрашивал бы её исход с вероятностью, а не всякий раз.
             for (int round = 0; round < ROUNDS; round++) {
                 String opening = "e-b3-7-open-" + round;
                 String after = "e-b3-7-after-" + round;
@@ -186,9 +179,9 @@ class SubscriptionCeilingBoxTest extends BffBox {
                 expected.add("e-b3-7-last");
                 assertThat(opened.status()).isEqualTo(200);
                 assertThat(opened.carriesStream()).isTrue();
-                // Повторной доставки прежних записей нет: сегодня красно —
-                // отказ из тропы восстановления уходит из слушателя, и
-                // обработчик доставляет запись заново, в том числе
+                // Повторной доставки прежних записей нет: отказ тропы
+                // восстановления, вышедший из слушателя, вернул бы запись
+                // обработчику, и тот доставил бы её заново — в том числе
                 // подписке, открытой ПОСЛЕ неё.
                 assertThat(opened.ids()).containsExactly("e-b3-7-last");
             }

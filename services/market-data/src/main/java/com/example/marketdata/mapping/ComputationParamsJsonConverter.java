@@ -15,6 +15,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.Stochastic
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -37,16 +38,28 @@ import org.springframework.stereotype.Component;
  * <p><b>Тег подтипа в payload не дублируется:</b> подтип параметров
  * восстанавливается по типу индикатора строки-владельца
  * (docs/rules/persistence-representation.md).
+ *
+ * <p><b>Разбор ЗАПРОСА строг к чужим полям, разбор СТРОКИ реестра — нет.</b>
+ * Маппер контекста чужие поля молча пропускает, и тело {@code {"fastPeriod":
+ * 12}} под заявленный {@code ATR} разобралось бы в параметры с пустым
+ * периодом: идентичность завелась бы «наполовину», а отказ пришёл бы у тика
+ * расчёта, то есть у того, кто её не заказывал. Поэтому тело требования,
+ * которое не разбирается под заявленный тип, отказывает на входе. Строку
+ * реестра писали мы сами, и строгость там отказывала бы на собственной
+ * истории после всякого сужения формы.
  */
 @Component
 public class ComputationParamsJsonConverter {
 
     private final ObjectMapper objectMapper;
+    private final ObjectMapper requestMapper;
     private final ObjectMapper canonicalMapper;
 
     public ComputationParamsJsonConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy()
                 .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
+        this.requestMapper = objectMapper.copy()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.canonicalMapper = buildCanonicalMapper(objectMapper);
     }
 
@@ -119,7 +132,7 @@ public class ComputationParamsJsonConverter {
 
     private <T> T convert(Object raw, Class<T> type) {
         try {
-            return objectMapper.convertValue(raw, type);
+            return requestMapper.convertValue(raw, type);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Computation params do not match declared type: " + type.getSimpleName(), e);
         }

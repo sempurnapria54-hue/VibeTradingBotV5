@@ -3,13 +3,13 @@ package com.example.audit.domain.jobs;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
-import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.audit.config.ReceptionProperties;
 import com.example.audit.domain.model.PairLagOperands;
 import com.example.audit.domain.model.ReceptionPairMoments;
 import com.example.audit.domain.service.ReceptionStateSyncService;
 import com.example.audit.integration.internal.event.ConsumerLagProvider;
+import com.example.audit.integration.internal.event.ConsumerLivenessProvider;
 import com.example.audit.integration.internal.event.TopicRetentionProvider;
 import com.example.audit.metrics.JournalReceptionMetrics;
 import java.time.OffsetDateTime;
@@ -72,6 +72,7 @@ public class ReceptionStateJob {
     private final ReceptionStateSyncService receptionStateSyncService;
     private final TopicRetentionProvider topicRetentionProvider;
     private final ConsumerLagProvider consumerLagProvider;
+    private final ConsumerLivenessProvider consumerLivenessProvider;
     private final JournalReceptionMetrics receptionMetrics;
 
     /**
@@ -83,6 +84,13 @@ public class ReceptionStateJob {
      * ряд от прошлого такта утверждал бы измеренное там, где ничего не
      * измерялось (docs/components/ReceptionStateJob.md §«Молчание тика
      * уносит и порог, и это уже покрыто»).
+     *
+     * <p><b>Такт молчит, когда приём не жив</b> — операнд держит
+     * {@link ConsumerLivenessProvider}. Тик, бьющийся по расписанию
+     * независимо от живости приёма, доказывал бы ровно то, что в сервисе
+     * тикает таймер: строка обновляется, возраст мал, предикат свежести
+     * истинен — и непрерывность утверждается в состоянии, о котором не
+     * известно ничего.
      *
      * <p><b>Отказ посреди такта уносит ряды и уходит наружу.</b>
      * Проглоченный, он оставил бы наблюдателю картину прошлого такта под
@@ -96,7 +104,7 @@ public class ReceptionStateJob {
             return;
         }
         Collection<MessageListenerContainer> containers = listenerRegistry.getListenerContainers();
-        if (isFalse(isReceptionLive(containers))) {
+        if (isFalse(consumerLivenessProvider.isLive(containers))) {
             receptionMetrics.forget();
             return;
         }
@@ -147,27 +155,6 @@ public class ReceptionStateJob {
                     consumerLagProvider.unconsumedRecords(containers, pair.getTopic()).orElse(null)));
         }
         return operands;
-    }
-
-    /**
-     * Живость приёма: контейнеры запущены и держат назначенные партиции.
-     *
-     * <p><b>Это несущее свойство, а не оптимизация.</b> Тик, бьющийся по
-     * расписанию независимо от живости приёма, доказывал бы ровно то, что
-     * в сервисе тикает таймер: строка обновляется, возраст мал, предикат
-     * свежести истинен — и непрерывность утверждается в состоянии, о
-     * котором не известно ничего. Пустое назначение означает, что группа
-     * развалилась либо связи с брокером нет.
-     */
-    private Boolean isReceptionLive(Collection<MessageListenerContainer> containers) {
-        if (isEmpty(containers)) {
-            return Boolean.FALSE;
-        }
-        return containers.stream().allMatch(this::isLive);
-    }
-
-    private Boolean isLive(MessageListenerContainer container) {
-        return isTrue(container.isRunning()) && isFalse(isEmpty(container.getAssignedPartitions()));
     }
 
     /**

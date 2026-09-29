@@ -43,7 +43,10 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    /** Площадка отказала в доступе либо исчерпан лимит: повтор имеет смысл не сразу. */
+    /**
+     * Отказано в доступе — площадкой либо в служебной идентичности — или
+     * исчерпан лимит: повтор имеет смысл не сразу.
+     */
     @ExceptionHandler(ExchangeAccessException.class)
     public ResponseEntity<ErrorApiResponse> onExchangeAccess(ExchangeAccessException failure) {
         return response(HttpStatus.SERVICE_UNAVAILABLE, "EXCHANGE_ACCESS_REFUSED", failure.getMessage());

@@ -5,6 +5,7 @@ import static com.example.tradingcore.unit.fsm.FsmFixture.TRANCHE_ID;
 import static com.example.tradingcore.unit.fsm.FsmFixture.balance;
 import static com.example.tradingcore.unit.fsm.FsmFixture.contextBuilder;
 import static com.example.tradingcore.unit.fsm.FsmFixture.deal;
+import static com.example.tradingcore.unit.fsm.FsmFixture.filledEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.leg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.livePosition;
@@ -189,6 +190,27 @@ class TranchePrecheckPassTest {
 
         assertThat(transition.getNextStatus()).isEqualTo(DealTranche.Status.CLOSED);
         assertThat(transition.getCloseReason()).isEqualTo(DealTranche.CloseReason.STRATEGY_EXIT);
+        harness.verifyWorkPassNotRun();
+    }
+
+    @Test
+    @DisplayName("U17.17 — сделка сворачивается, вход отправлен и налит, строка ждёт повтора: ребро в отправленный вход")
+    void u17_17_aCollapsingDealMovesASubmittedEntryOnInsteadOfClosingIt() {
+        DealTranche candidate = precheckTranche();
+        candidate.getOrders().add(filledEntryLeg(30L, TRANCHE_ID, "1"));
+        Deal collapsing = deal(Deal.Status.EXIT_PENDING, candidate);
+        collapsing.setCloseReason(Deal.CloseReason.STRATEGY_EXIT);
+        DealContext context = contextBuilder(collapsing)
+                .balanceContainer(balance(minutesAgo(0)))
+                .actionStates(new ArrayList<>(List.of(
+                        strategyRow(5L, TRANCHE_ID, 1, DealActionStateStatus.RETRY_PENDING))))
+                .build();
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.getNextStatus()).isEqualTo(DealTranche.Status.ENTRY_SUBMITTED);
+        assertThat(transition.getCloseReason()).isNull();
+        assertThat(transition.hasCommands()).isFalse();
         harness.verifyWorkPassNotRun();
     }
 

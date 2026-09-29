@@ -8,6 +8,7 @@ import com.example.bff.exception.TicketRejectedException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.Base64;
 import javax.crypto.Mac;
@@ -99,10 +100,28 @@ public class SubscriptionTicketService {
         if (fields.length != FIELD_COUNT) {
             throw new TicketRejectedException("Состав билета не тот");
         }
-        if (Instant.ofEpochSecond(Long.parseLong(fields[2])).isBefore(Instant.now())) {
+        if (expiresAt(fields[2]).isBefore(Instant.now())) {
             throw new TicketRejectedException("Срок билета истёк");
         }
         return new SubscriptionTicket(fields[0], fields[1]);
+    }
+
+    /**
+     * Момент негодности билета.
+     *
+     * <p><b>Неразбираемое поле и момент вне диапазона отвечают тем же
+     * классом, что подпись и срок.</b> Оба хода лежат после проверки
+     * подписи, и сегодня предъявитель до них не доходит; но клейм
+     * «негодность наружу не различается» держится кодом, а не тем, что
+     * писатель билета один: второй писатель либо ротация секрета иначе
+     * открыли бы две формы отказа там, где объявлена одна.
+     */
+    private Instant expiresAt(String field) {
+        try {
+            return Instant.ofEpochSecond(Long.parseLong(field));
+        } catch (NumberFormatException | DateTimeException failure) {
+            throw new TicketRejectedException("Срок билета не разбирается");
+        }
     }
 
     /**

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,7 +33,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Подписка, наполнившая окно, остаётся ОТКРЫТОЙ до конца клетки.</b>
  * Закрытая клиентом подписка остаётся в наборе сервера до первой записи в
- * неё, а эта запись у построенного есть гонка с контейнером (находка F-14):
+ * неё, а эта запись — гонка с контейнером:
  * следующая запись тенанта попала бы в неё, и исход клетки зависел бы от
  * того, кто гонку выиграл.
  *
@@ -160,7 +159,6 @@ class ReplayWindowBoxTest extends SharedBffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B4.9 — Окно тенанта без подписок не наполняется")
     void b4_9_theWindowOfATenantWithoutSubscriptionsIsNotFilled() {
         String idleTenant = "TR9";
@@ -179,12 +177,9 @@ class ReplayWindowBoxTest extends SharedBffBox {
             publishDealOpened(barrierTenant, "e-b4-9-barrier");
             barrier.awaitFrames(2);
 
-            // Ожидание из дома: записей, положенных до существования
-            // подписки, окно не держит — держать их не для кого, и ответ на
-            // позицию первой из них есть разрыв. Сегодня красно: окно
-            // наполняется для всякого тенанта, чья запись доехала, и
-            // переигрывается тому, кто на неё не подписывался (находка F-3
-            // документа кейсов).
+            // Записей, положенных до существования подписки, окно не
+            // держит — держать их не для кого: окно заводит подписка, а не
+            // запись, и ответ на позицию первой из них есть разрыв.
             try (Subscription resumed = subscribe(idleTicket, "e-b4-9-1")) {
                 resumed.awaitFrames(1);
                 assertThat(resumed.types().getFirst()).isEqualTo(GAP);

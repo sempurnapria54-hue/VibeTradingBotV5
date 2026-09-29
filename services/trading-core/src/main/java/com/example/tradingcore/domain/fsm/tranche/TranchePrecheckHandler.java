@@ -83,8 +83,13 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
         // (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша»).
         // Транш не ждёт конца сворачивания, а закрывается: ожидание оставило бы
         // нетерминальный транш, и выходная проверка сделки не сошлась бы никогда.
+        // Вход уже отправлен — терминала отсюда нет: нога живая либо налитая
+        // несёт риск, и транш уходит через отправленный вход в выход, где ногу
+        // снимает дочистка, а экспозицию гасит закрытие сделки.
         if (isTrue(deal.isCollapsing())) {
-            return TrancheTransition.close(disposition.inheritedCloseReason(deal));
+            return isTrue(tranche.entrySubmitted())
+                    ? TrancheTransition.moveTo(DealTranche.Status.ENTRY_SUBMITTED)
+                    : TrancheTransition.close(disposition.inheritedCloseReason(deal));
         }
         // Свежий снимок средств обеспечивается ДО работы: на этой итерации
         // обработчик ни преконтроля, ни создания заявки не запускает

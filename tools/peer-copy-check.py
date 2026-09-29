@@ -39,6 +39,8 @@ TC = "services/trading-core/src/main/java/com/example/tradingcore"
 ST = "services/strategies/src/main/java/com/example/strategies"
 AU = "services/audit/src/main/java/com/example/audit"
 SA = "services/statistics/src/main/java/com/example/statistics"
+BF = "services/bff/src/main/java/com/example/bff"
+MD = "services/market-data/src/main/java/com/example/marketdata"
 
 # --- реестр объявленных семейств копий ----------------------------------
 # `различия` — шаблоны строк ИСПОЛНЯЕМОГО тела, расхождение которых
@@ -59,6 +61,7 @@ FAMILIES = [
         "пути": [
             TC + "/config/AsyncActorContextConfigurer.java",
             ST + "/config/AsyncActorContextConfigurer.java",
+            MD + "/config/AsyncActorContextConfigurer.java",
         ],
         "различия": [],
     },
@@ -116,6 +119,18 @@ FAMILIES = [
         "пути": [
             AU + "/integration/internal/event/ConsumerLagProvider.java",
             SA + "/integration/internal/event/ConsumerLagProvider.java",
+        ],
+        "различия": [],
+    },
+    {
+        # Третий член — периметр: он не durable-потребитель, но измеритель
+        # живости у него той же формы (docs/architecture/contracts.md
+        # §«Пульс отражает живость ПОТРЕБИТЕЛЯ, а не планировщика»).
+        "имя": "ConsumerLivenessProvider — живость потребления",
+        "пути": [
+            AU + "/integration/internal/event/ConsumerLivenessProvider.java",
+            SA + "/integration/internal/event/ConsumerLivenessProvider.java",
+            BF + "/integration/internal/event/ConsumerLivenessProvider.java",
         ],
         "различия": [],
     },

@@ -123,17 +123,24 @@ class ComputationParamsJsonConverterTest extends JsonbOverlayProbe {
                 .hasCauseInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * Сырая форма — тело требования, и читатель у неё один: поверхность
+     * требования. Поле чужого подтипа там не отбрасывается, а отказывает —
+     * иначе идентичность завелась бы с пустым операндом, и отказ пришёл бы
+     * у тика расчёта (находка {@code F-10} `.claude/tests/cases/market-data.md`).
+     */
     @Test
-    @DisplayName("U9.7 — неизвестное поле сырой формы отброшено: охраны состава у конвертера нет")
-    void u9_7_anUnknownFieldOfTheRawShapeIsDropped() {
+    @DisplayName("U9.7 — неизвестное поле сырой формы отказывает своим классом с именем целевого")
+    void u9_7_anUnknownFieldOfTheRawShapeIsRefused() {
         Map<String, Object> raw = new LinkedHashMap<>();
         raw.put("timeframe", "ONE_HOUR");
         raw.put("warmup", 50);
         raw.put("period", 14);
         raw.put("smoothing", "wilder");
 
-        assertThat(converter.toIndicatorParams(raw, IndicatorValue.Type.ATR))
-                .usingRecursiveComparison().isEqualTo(atrParams());
+        assertThatThrownBy(() -> converter.toIndicatorParams(raw, IndicatorValue.Type.ATR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("AtrParams");
     }
 
     @Test
@@ -146,7 +153,7 @@ class ComputationParamsJsonConverterTest extends JsonbOverlayProbe {
     }
 
     @Test
-    @DisplayName("U9.9 — у параметров структуры рынка своя пара входов, тип не участвует")
+    @DisplayName("U9.9 — у параметров структуры рынка своя пара входов, тип не участвует, чужое поле отказывает")
     void u9_9_marketStructureParamsHaveTheirOwnPairOfEntries() {
         MarketStructureParams params = marketStructureParams();
 
@@ -159,6 +166,11 @@ class ComputationParamsJsonConverterTest extends JsonbOverlayProbe {
                 .usingRecursiveComparison().isEqualTo(params);
         assertThat(converter.toMarketStructureParams(raw))
                 .usingRecursiveComparison().isEqualTo(params);
+
+        raw.put("period", 14);
+        assertThatThrownBy(() -> converter.toMarketStructureParams(raw))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("MarketStructureParams");
     }
 
     @Test

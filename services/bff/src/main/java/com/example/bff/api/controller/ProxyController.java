@@ -3,6 +3,7 @@ package com.example.bff.api.controller;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.bff.domain.TenantContext;
 import com.example.bff.domain.TenantContextResolver;
@@ -109,18 +110,27 @@ public class ProxyController {
 
     /**
      * Заголовки, уходящие владельцу: токен предъявителя, контекст
-     * тенанта и переговорные заголовки содержимого.
+     * тенанта и два переговорных заголовка содержимого — тип содержимого
+     * запроса и принимаемый браузером тип ответа.
      *
      * <p><b>Перечень закрытый, а не «всё кроме».</b> Транспортные
      * заголовки исходного соединения (длина, кодировка, хост)
      * относятся к нему, а не к пересылаемому запросу, и пересланные
      * ломали бы второе соединение.
+     *
+     * <p><b>Принимаемый тип пересылается как есть</b>: ответ идёт формой
+     * владельца, и согласует её владелец с тем, что просил браузер, а не
+     * с умолчанием исходящего клиента.
      */
     private HttpHeaders forwardedHeaders(HttpServletRequest request, TenantContext context, String bearer) {
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.AUTHORIZATION, bearer);
         headers.set(Constants.ContextHeaders.TENANT_ID, context.tenantId());
         headers.set(Constants.ContextHeaders.TENANT_ROLE, context.role());
+        String accept = request.getHeader(HttpHeaders.ACCEPT);
+        if (isNotBlank(accept)) {
+            headers.set(HttpHeaders.ACCEPT, accept);
+        }
         String contentType = request.getContentType();
         if (isBlank(contentType)) {
             return headers;

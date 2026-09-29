@@ -29,6 +29,17 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
                                                                     Pageable pageable);
 
     /**
+     * Первое окно действующего листинга наружу. Порядок по {@code internalId}:
+     * он же курсор следующего окна, а числовой ключ поверхность не отдаёт.
+     */
+    List<InstrumentEntity> findByStatusInOrderByInternalIdAsc(Collection<String> statuses, Pageable pageable);
+
+    /** Окно действующего листинга наружу за курсором {@code internalId}. */
+    List<InstrumentEntity> findByStatusInAndInternalIdGreaterThanOrderByInternalIdAsc(Collection<String> statuses,
+                                                                                    String after,
+                                                                                    Pageable pageable);
+
+    /**
      * Окно листинга ЗА курсором — популяция обновления справочных правил.
      * Правила площадка отдаёт поинструментно, полный обход не помещается
      * в бюджет лимитов, а окно от начала обновляло бы вечно один и тот же

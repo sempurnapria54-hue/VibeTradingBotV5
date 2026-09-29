@@ -96,6 +96,14 @@ public abstract class ReceptionFormContract {
                 .contains("ReceptionStateCompletenessQueries — три запроса полноты");
     }
 
+    @Test
+    @DisplayName("U15.12 — семейство провайдера живости объявлено в реестре копий")
+    void u15_12_theConsumerLivenessFamilyIsDeclared() throws IOException {
+        assertThat(copyRegistry())
+                .as("копий три — третья у периметра, и операнд у всех измерителей живости один")
+                .contains("ConsumerLivenessProvider — живость потребления");
+    }
+
     // --- U16: чего предмет не делает --------------------------------------
 
     @Test
@@ -133,7 +141,7 @@ public abstract class ReceptionFormContract {
     }
 
     @Test
-    @DisplayName("U16.12 — часы процесса читают ровно два класса дерева из девяти")
+    @DisplayName("U16.12 — часы процесса читают ровно два класса дерева из десяти")
     void u16_12_exactlyTwoClassesReadTheProcessClock() throws IOException {
         List<Path> reading = new ArrayList<>();
         for (Path source : subjectSources()) {
@@ -143,10 +151,10 @@ public abstract class ReceptionFormContract {
         }
 
         assertThat(subjectSources())
-                .as("популяция предмета в своём дереве — девять классов")
-                .hasSize(9);
+                .as("популяция предмета в своём дереве — десять классов")
+                .hasSize(10);
         assertThat(reading)
-                .as("прочие семь получают моменты полями строки и аргументом устаревания")
+                .as("прочие восемь получают моменты полями строки, аргументом устаревания либо возрастом метрики")
                 .containsExactlyInAnyOrderElementsOf(clockReadingSources());
     }
 

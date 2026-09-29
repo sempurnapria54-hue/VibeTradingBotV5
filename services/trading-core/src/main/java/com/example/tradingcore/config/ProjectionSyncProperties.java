@@ -26,4 +26,11 @@ public class ProjectionSyncProperties {
 
     /** Тик синка проекций включён. */
     private Boolean enabled = Boolean.TRUE;
+
+    /**
+     * Окно чтения листинга у владельца каталога. Не больше потолка окна
+     * его поверхности — иначе владелец отвергает каждое чтение, и
+     * проекция каталога не сводится ни одним тиком.
+     */
+    private Integer listingWindow;
 }

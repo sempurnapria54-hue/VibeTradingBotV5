@@ -34,6 +34,7 @@ class ReceptionFormTest extends ReceptionFormContract {
                 EVENT.resolve("ReceptionHaltMarker.java"),
                 EVENT.resolve("TopicRetentionProvider.java"),
                 EVENT.resolve("ConsumerLagProvider.java"),
+                EVENT.resolve("ConsumerLivenessProvider.java"),
                 METRICS.resolve("JournalReceptionMetrics.java"));
     }
 

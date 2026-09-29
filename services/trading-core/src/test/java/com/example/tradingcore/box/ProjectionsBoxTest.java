@@ -35,6 +35,15 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
     /** Имя третьего инструмента у площадки. */
     private static final String THIRD_EXTERNAL_INSTRUMENT = "SOL-USDT-SWAP";
 
+    /** Третий счёт: им наблюдается, что обход идёт дальше негодной строки. */
+    private static final String THIRD_ACCOUNT = "A3";
+
+    /** Тенант третьего счёта: его место под числа риск-аппетита заводит тот же проход. */
+    private static final String SECOND_TENANT = "T2";
+
+    /** Контур, которого нет в доменном перечне: перевод строки реестра на нём отказывает. */
+    private static final String UNKNOWN_CONTOUR = "PAPER";
+
     /** Путь правил инструмента у владельца каталога. */
     private static final String RULES = "/rules";
 
@@ -176,6 +185,32 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
         // Сделок в ошибку не уводится: недоступность соседа по ярусу —
         // свой класс отказа.
         assertThat(rows.countWhere("deals", "status", "ERROR")).isZero();
+    }
+
+    @Test
+    @DisplayName("B10.14 — отказ по одному счёту стоит один счёт")
+    void aRefusalOnOneAccountCostsExactlyThatAccount() {
+        auth.answers(PEER_ACCOUNTS, Feed.array(
+                Feed.account(ACCOUNT, TENANT, "DEMO", "ACTIVE"),
+                Feed.account(SECOND_ACCOUNT, TENANT, UNKNOWN_CONTOUR, "ACTIVE"),
+                Feed.account(THIRD_ACCOUNT, SECOND_TENANT, "DEMO", "ACTIVE")));
+        marketData.answers(PEER_INSTRUMENTS, Feed.emptyArray());
+        Integer mark = AppLog.mark();
+
+        tick(Tick.REGISTRY_PROJECTIONS);
+
+        // Контур, которого ядро не знает, стоит ровно свою строку: счета
+        // до неё и после неё сведены.
+        assertThat(rows.countWhere("exchange_accounts", "internal_id", ACCOUNT)).isEqualTo(1L);
+        assertThat(rows.countWhere("exchange_accounts", "internal_id", SECOND_ACCOUNT)).isZero();
+        assertThat(rows.countWhere("exchange_accounts", "internal_id", THIRD_ACCOUNT)).isEqualTo(1L);
+        // Место под числа риск-аппетита заводится после обхода — и
+        // заведено у тенанта, чей счёт стоял ЗА негодной строкой.
+        assertThat(rows.countWhere("tenant_risk_appetites", "tenant_internal_id", SECOND_TENANT))
+                .isEqualTo(1L);
+        assertThat(AppLog.since(mark))
+                .contains("Exchange account projection failed for " + SECOND_ACCOUNT)
+                .doesNotContain("Exchange account projection sync failed");
     }
 
     @Test

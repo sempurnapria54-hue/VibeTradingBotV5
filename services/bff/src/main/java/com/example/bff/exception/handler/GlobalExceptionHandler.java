@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponse;
@@ -37,6 +38,14 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * две — токен и билет, — а формат отказа один: иначе у поверхности
  * появился бы второй формат ровно на той тропе, которую периметр и
  * заводит.
+ *
+ * <p><b>Тип содержимого отказа ставится явно, а не согласуется.</b>
+ * Точка подписки производит только {@code text/event-stream}, и браузерный
+ * {@code EventSource} только его и принимает; согласование ответа об
+ * ошибке не нашло бы для JSON-тела представления, и отказ потолка ушёл бы
+ * на контейнерную тропу — клиент прочитал бы отказ доступа вместо своего
+ * класса. Предъявленный тип согласование минует, и единый error-DTO
+ * доезжает с любой точки поверхности.
  *
  * <p><b>Отказ владельца не выдаётся за отказ автора:</b> недоступность —
  * {@code 503}, повторить осмысленно
@@ -99,8 +108,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleExceptionInternal(Exception failure, Object body,
                                                              HttpHeaders headers, HttpStatusCode statusCode,
                                                              WebRequest request) {
+        HttpHeaders jsonHeaders = new HttpHeaders();
+        jsonHeaders.putAll(headers);
+        jsonHeaders.setContentType(MediaType.APPLICATION_JSON);
         return new ResponseEntity<>(errorBody("REQUEST_NOT_ACCEPTED", detailOf(failure, body)),
-                headers, statusCode);
+                jsonHeaders, statusCode);
     }
 
     /** Пояснение контейнера; пусто — его не было, и выдумывать его нечем. */
@@ -115,7 +127,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private ResponseEntity<ErrorApiResponse> response(HttpStatus status, String code, String message) {
-        return ResponseEntity.status(status).body(errorBody(code, message));
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(errorBody(code, message));
     }
 
     private ErrorApiResponse errorBody(String code, String message) {

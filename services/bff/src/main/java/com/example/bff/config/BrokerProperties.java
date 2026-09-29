@@ -1,5 +1,7 @@
 package com.example.bff.config;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -30,16 +32,24 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @Getter
 @Setter
-@ConfigurationProperties(prefix = "broker")
+@ConfigurationProperties(prefix = BrokerProperties.PREFIX)
 public class BrokerProperties {
+
+    /** Корень ключей тропы к брокеру. */
+    public static final String PREFIX = "broker";
 
     /**
      * Адрес брокера. Пустое означает, что тропа потребления не
-     * настроена: слушатель не соединяется, пульс молчит — и молчание
-     * тогда честно (docs/components/… см. {@code StreamPulseJob}).
+     * настроена: слушатель не заводится, пульс молчит — и молчание
+     * тогда честно ({@link StreamConsumptionCondition}).
      */
     private String bootstrapServers;
 
     /** Имя группы потребителя — своё у каждой реплики (см. шапку класса). */
     private String groupId;
+
+    /** Задан ли адрес брокера: им, вместе с перечнем тем, решается заведение слушателя. */
+    public Boolean isConfigured() {
+        return isNotBlank(bootstrapServers);
+    }
 }

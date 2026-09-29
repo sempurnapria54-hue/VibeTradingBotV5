@@ -11,10 +11,14 @@ import com.example.bff.config.PerimeterProperties;
 import com.example.bff.domain.SubscriptionTicketService;
 import com.example.bff.domain.jobs.StreamPulseJob;
 import com.example.bff.domain.stream.StreamRegistry;
+import com.example.bff.integration.internal.event.ConsumerLivenessProvider;
 import com.example.bff.util.Constants;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -53,6 +58,10 @@ class StreamPulseTest {
     private static final String STREAM_PATH = "/api/v1/bff/stream";
     private static final String SUBJECT = "user-42";
     private static final String PULSE_EVENT = "event:" + Constants.StreamRecords.PULSE;
+
+    /** Возраст сердцебиения координатору: свежий и старше срока сессии умолчания (45 с). */
+    private static final Double FRESH_HEARTBEAT_SECONDS = 1.0;
+    private static final Double LOST_HEARTBEAT_SECONDS = 60.0;
 
     @Autowired
     private WebApplicationContext context;
@@ -95,8 +104,8 @@ class StreamPulseTest {
     }
 
     /**
-     * Назначенных партиций нет — связь с брокером потеряна либо группа
-     * развалилась; событий не будет, и пульс молчит.
+     * Назначенных партиций нет — группа развалилась; событий не будет, и
+     * пульс молчит.
      */
     @Test
     @DisplayName("Слушатель без назначенных партиций — пульса нет")
@@ -104,6 +113,22 @@ class StreamPulseTest {
         MvcResult result = openStream();
 
         pulseOver(containerThat(true, Set.of()), true).beat();
+
+        assertThat(result.getResponse().getContentAsString()).doesNotContain(PULSE_EVENT);
+    }
+
+    /**
+     * У остановленного брокера клиент назначения не теряет: запущенный
+     * слушатель с непустым назначением живым не считается, пока координатор
+     * молчит дольше срока сессии (находка {@code F7} тропы периметра).
+     */
+    @Test
+    @DisplayName("Связи с координатором нет дольше срока сессии — пульса нет при непустом назначении")
+    void aLostCoordinatorSilencesThePulseDespiteTheAssignment() throws Exception {
+        MvcResult result = openStream();
+
+        pulseOver(containerThat(true, Set.of(new TopicPartition("trading-core.facts", 0)),
+                LOST_HEARTBEAT_SECONDS), true).beat();
 
         assertThat(result.getResponse().getContentAsString()).doesNotContain(PULSE_EVENT);
     }
@@ -116,7 +141,7 @@ class StreamPulseTest {
         KafkaListenerEndpointRegistry empty = mock(KafkaListenerEndpointRegistry.class);
         when(empty.getListenerContainers()).thenReturn(List.of());
 
-        new StreamPulseJob(streamRegistry, empty, propertiesWithPulse(true)).beat();
+        new StreamPulseJob(streamRegistry, empty, liveness(), propertiesWithPulse(true)).beat();
 
         assertThat(result.getResponse().getContentAsString()).doesNotContain(PULSE_EVENT);
     }
@@ -142,13 +167,30 @@ class StreamPulseTest {
     private StreamPulseJob pulseOver(MessageListenerContainer container, Boolean pulseEnabled) {
         KafkaListenerEndpointRegistry listeners = mock(KafkaListenerEndpointRegistry.class);
         when(listeners.getListenerContainers()).thenReturn(List.of(container));
-        return new StreamPulseJob(streamRegistry, listeners, propertiesWithPulse(pulseEnabled));
+        return new StreamPulseJob(streamRegistry, listeners, liveness(), propertiesWithPulse(pulseEnabled));
+    }
+
+    /** Провайдер живости над фабрикой без объявленного срока сессии — берётся умолчание клиента. */
+    private ConsumerLivenessProvider liveness() {
+        return new ConsumerLivenessProvider(new DefaultKafkaConsumerFactory<>(Map.of()));
     }
 
     private MessageListenerContainer containerThat(Boolean running, Set<TopicPartition> assignments) {
+        return containerThat(running, assignments, FRESH_HEARTBEAT_SECONDS);
+    }
+
+    private MessageListenerContainer containerThat(Boolean running, Set<TopicPartition> assignments,
+                                                   Double heartbeatSeconds) {
         MessageListenerContainer container = mock(MessageListenerContainer.class);
         when(container.isRunning()).thenReturn(running);
         when(container.getAssignedPartitions()).thenReturn(assignments);
+        Metric heartbeat = mock(Metric.class);
+        when(heartbeat.metricValue()).thenReturn(heartbeatSeconds);
+        Map<String, Map<MetricName, ? extends Metric>> byClient = Map.of("client", Map.of(
+                new MetricName(Constants.ConsumerMetrics.LAST_HEARTBEAT_SECONDS_AGO, "consumer-coordinator-metrics",
+                        "", Map.of()),
+                heartbeat));
+        when(container.metrics()).thenReturn(byClient);
         return container;
     }
 

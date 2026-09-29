@@ -1,6 +1,5 @@
 package com.example.marketdata.api.model;
 
-import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
 import lombok.Getter;
@@ -36,7 +35,7 @@ public class MarketFeatureBundleApiResponse {
     private Map<String, MarketStructureApiResponse> structures;
 
     @Schema(description = "Цены момента; пусто — не спрашивались либо площадка отказала")
-    private MarketPriceData marketPriceData;
+    private MarketPriceDataApiResponse marketPriceData;
 
     @Schema(description = "Фаза рынка по клаузам читателя; пусто — клауз не передано")
     private MarketPhaseApiResponse marketPhase;

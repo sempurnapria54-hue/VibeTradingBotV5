@@ -1,5 +1,8 @@
 package com.example.marketdata.integration.internal.api;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 import com.example.marketdata.config.ConnectorProperties;
 import com.example.marketdata.exception.ExchangeAccessException;
 import com.example.marketdata.exception.ExchangeReadException;
@@ -41,6 +44,15 @@ import org.springframework.web.client.RestClientResponseException;
  * попадает ({@code docs/models/domain/other/Candle.md}). Поэтому здесь
  * фильтра нет и быть не должно: второй фильтр по признаку, которого в
  * ответе уже нет, был бы фикцией.
+ *
+ * <p><b>Незаданный адрес коннектора — отказ ЧТЕНИЯ, а не негодный вход.</b>
+ * Умолчания у адреса нет намеренно (незаданное означает отказ), и тропа,
+ * зовущая соседа, отказывает на вызове, а не на подъёме. Классом отказа
+ * служит {@link ExchangeReadException}: соседа не достать ни по какому
+ * адресу, и для вызывающего это та же недоступность зависимости, что и
+ * обрыв транспорта, — «повтори позже», а не «чини запрос». Без охраны
+ * несобираемый адрес отказывал раньше вызова классом библиотеки, и наружу
+ * отказ уходил негодным входом, то есть указывал на вызывающего.
  */
 @Component
 public class ExchangeReadClient {
@@ -56,12 +68,14 @@ public class ExchangeReadClient {
 
     private final RestClient restClient;
     private final ServiceTokenProvider tokenProvider;
+    private final Boolean addressConfigured;
 
     public ExchangeReadClient(RestClient.Builder restClientBuilder,
                               ServiceTokenProvider tokenProvider,
                               ConnectorProperties properties) {
         this.restClient = restClientBuilder.baseUrl(properties.getBaseUrl()).build();
         this.tokenProvider = tokenProvider;
+        this.addressConfigured = isNotBlank(properties.getBaseUrl());
     }
 
     /** Листинг инструментов площадки по типу инструмента. */
@@ -178,6 +192,9 @@ public class ExchangeReadClient {
      * (docs/processes/snapshot-collection.md §«Отказ на проходе»).
      */
     private <T> T call(String endpoint, Supplier<T> read) {
+        if (isFalse(addressConfigured)) {
+            throw new ExchangeReadException("Connector address is not configured [" + endpoint + "]");
+        }
         try {
             return read.get();
         } catch (RestClientResponseException e) {

@@ -9,7 +9,8 @@ import com.example.platform.exception.PeerServiceUnavailableException;
  * <p><b>Отделено от {@link PeerServiceUnavailableException} по границе,
  * которую провёл дом класса:</b> недоступностью там названы таймаут,
  * обрыв и {@code 5xx}
- * (docs/rules/runtime-error-classification.md). Всё, что сосед отверг
+ * (docs/rules/runtime-error-classification.md §«Осознанный отказ соседа —
+ * наш дефект, и повтором он не лечится»). Всё, что сосед отверг
  * осознанно, — неверный запрос либо ненастроенная идентичность, то есть
  * наш дефект: повтор тем же запросом даст тот же отказ.
  */

@@ -154,15 +154,11 @@ class AccessContourBoxTest extends SharedMarketDataBox {
      * ({@code @ApiResponses} точки цен;
      * docs/components/MarketPriceDataService.md §Поведение).
      *
-     * <p>Сегодня та же ветвь отвечает {@code 404}: пустое значение
-     * уходит в {@code ResponseEntity.ofNullable}, а он на пустоте даёт
-     * «не найдено», а не «нет содержимого». Читатель, ветвящийся по
-     * объявленному контракту, отсутствия тикера не распознаёт. Находка
-     * {@code F-11}; долг — `.claude/work/backlog.md` §«Отсутствие тикера
-     * у чтения цен `market-data` отвечает не объявленным числом».
+     * <p>Прежде та же ветвь отвечала {@code 404} — числом несуществующего
+     * инструмента, и читатель по контракту точки отсутствия тикера не
+     * распознавал (находка {@code F-11}, закрыта).
      */
     @Test
-    @Tag("debt")
     @DisplayName("B8.9 — тикера на площадке нет — это пустота, а не отказ")
     void b8_9_noTickerOnTheExchangeIsEmptinessNotAFailure() {
         String instrument = provisionInstruments(INSTRUMENT).getFirst();

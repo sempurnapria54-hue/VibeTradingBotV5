@@ -3,11 +3,12 @@ package com.example.marketdata.integration.internal.api;
 import static java.util.Objects.isNull;
 
 import com.example.marketdata.config.ConnectorProperties;
-import com.example.marketdata.exception.ExchangeReadException;
+import com.example.marketdata.exception.ExchangeAccessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.stereotype.Component;
 
 /**
@@ -22,6 +23,12 @@ import org.springframework.stereotype.Component;
  * <p><b>Пустой токен — отказ, а не анонимный вызов.</b> Коннектор закрыт
  * по умолчанию, и уйти к нему без токена значило бы получить отказ на
  * его стороне с причиной, неотличимой от «ключи отвергнуты».
+ *
+ * <p><b>Всякий отказ добычи — отказ доступа</b>
+ * ({@link ExchangeAccessException}; docs/architecture/services/market-data.md
+ * §«Какие вызовы делает и какие принимает»): недобытая идентичность
+ * одинакова для всех инструментов прохода, и проход она прекращает.
+ * Класс библиотеки наружу не уходит — по нему вызывающий не ветвится.
  */
 @Component
 @RequiredArgsConstructor
@@ -35,14 +42,22 @@ public class ServiceTokenProvider {
 
     /** Значение bearer-токена для вызова коннектора. */
     public String getTokenValue() {
-        OAuth2AuthorizeRequest request = OAuth2AuthorizeRequest
-                .withClientRegistrationId(properties.getClientRegistrationId())
-                .principal(PRINCIPAL_NAME)
-                .build();
-        OAuth2AuthorizedClient client = authorizedClientManager.authorize(request);
-        if (isNull(client) || isNull(client.getAccessToken())) {
-            throw new ExchangeReadException("Service identity token is not available for connector call");
+        OAuth2AuthorizedClient client = authorize();
+        if (isNull(client)) {
+            throw new ExchangeAccessException("Service identity token is not available for connector call");
         }
         return client.getAccessToken().getTokenValue();
+    }
+
+    /** Запрос выдачи; отказ библиотеки переводится в класс отказа доступа. */
+    private OAuth2AuthorizedClient authorize() {
+        try {
+            return authorizedClientManager.authorize(OAuth2AuthorizeRequest
+                    .withClientRegistrationId(properties.getClientRegistrationId())
+                    .principal(PRINCIPAL_NAME)
+                    .build());
+        } catch (OAuth2AuthorizationException | IllegalArgumentException e) {
+            throw new ExchangeAccessException("Service identity token is not available for connector call", e);
+        }
     }
 }

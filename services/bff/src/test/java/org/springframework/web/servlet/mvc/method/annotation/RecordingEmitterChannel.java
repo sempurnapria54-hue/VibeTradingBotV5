@@ -45,6 +45,9 @@ public class RecordingEmitterChannel implements ResponseBodyEmitter.Handler {
     /** Отказ доставки по требованию кейса; пусто — доставка проходит. */
     private IOException failure;
 
+    /** Отказ самого завершения с ошибкой; пусто — завершение проходит. */
+    private RuntimeException completionFailure;
+
     private Runnable timeoutCallback;
     private Consumer<Throwable> errorCallback;
     private Runnable completionCallback;
@@ -71,6 +74,14 @@ public class RecordingEmitterChannel implements ResponseBodyEmitter.Handler {
     /** Отказывать на каждой следующей записи — вход группы `U9`. */
     public void failWith(IOException failure) {
         this.failure = failure;
+    }
+
+    /**
+     * Отказывать и на завершении с ошибкой — то, что делает контейнер,
+     * уже закрывший запрос: вход клеток `U9.7`, `U9.8`.
+     */
+    public void failCompletionWith(RuntimeException completionFailure) {
+        this.completionFailure = completionFailure;
     }
 
     /** Всё, что ушло в провод, в порядке отдачи. */
@@ -131,6 +142,9 @@ public class RecordingEmitterChannel implements ResponseBodyEmitter.Handler {
     public void completeWithError(Throwable failure) {
         completed = Boolean.TRUE;
         completedWith = failure;
+        if (nonNull(completionFailure)) {
+            throw completionFailure;
+        }
     }
 
     @Override

@@ -25,6 +25,9 @@ import org.junit.jupiter.api.Test;
  */
 class CatalogSyncBoxTest extends SharedMarketDataBox {
 
+    /** Субъект служебного токена, под которым ящик подаёт ручные тики. */
+    private static final String PRINCIPAL = "service-account-vibetrading";
+
     @Test
     @DisplayName("B2.1 — первый тик зеркалит листинг в каталог")
     void b2_1_theFirstTickMirrorsTheListingIntoTheCatalog() {
@@ -160,6 +163,25 @@ class CatalogSyncBoxTest extends SharedMarketDataBox {
         assertThat(after.get("external_quote_currency")).isEqualTo(before.get("external_quote_currency"));
         assertThat(after.get("external_settlement_currency"))
                 .isEqualTo(before.get("external_settlement_currency"));
+    }
+
+    /**
+     * Актор строки — тот, кто инициировал ход, а не сервис, который её
+     * записал (docs/models/domain/other/Auditable.md §«Область значений
+     * актора»). Ручной тик порождён предъявленным принципалом, а работа идёт
+     * в треде асинхронного фасада: без переноса контекста строка получила бы
+     * класс контура молча, а прежде — имя сервиса, которого область не знает.
+     */
+    @Test
+    @DisplayName("B2.11 — строка, заведённая ручным тиком, несёт имя предъявленного принципала")
+    void b2_11_aRowMadeByAManualTickCarriesThePresentedPrincipal() {
+        stubListing(INSTRUMENT);
+
+        tick(Tick.INSTRUMENT_SYNC);
+
+        Map<String, Object> row = rows.row("instruments", "external_id", INSTRUMENT);
+        assertThat(row.get("created_by")).isEqualTo(PRINCIPAL);
+        assertThat(row.get("modified_by")).isEqualTo(PRINCIPAL);
     }
 
     private void stubListing(String... externalIds) {

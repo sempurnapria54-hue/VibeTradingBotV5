@@ -8,6 +8,7 @@ import com.example.bff.api.model.StreamRecordApiModel;
 import com.example.bff.config.PerimeterProperties;
 import com.example.bff.util.Constants;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
@@ -45,6 +46,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * <p><b>Записи периметра идентичности не несут.</b> Пульс и разрыв —
  * не факты; дай им идентичность, и браузер стал бы просить продолжения
  * с записи, которой в потоке фактов не существует.
+ *
+ * <p><b>Окно эфемерно и со сроком, как и кэш членств.</b> Реплика читает
+ * темы всех тенантов, и окно, заводимое на всякую доехавшую запись, росло
+ * бы числом тенантов системы. Поэтому окно заводит ПОДПИСКА, а не запись:
+ * тенанту, у которого подписки нет и не было, помнить нечего. Последнюю
+ * подписку окно переживает на срок билета — ровно на столько, сколько
+ * длится пересоздание подписки клиентом, — и по его истечении уходит.
  */
 @Slf4j
 @Component
@@ -57,6 +65,9 @@ public class StreamRegistry {
     /** Окно переигрывания по тенанту: последние факты в порядке доставки. */
     private final Map<String, Deque<StreamRecordApiModel>> windows = new ConcurrentHashMap<>();
 
+    /** С какого момента у тенанта с окном нет ни одной открытой подписки. */
+    private final Map<String, Instant> unsubscribedSince = new ConcurrentHashMap<>();
+
     private final PerimeterProperties properties;
 
     /**
@@ -68,25 +79,40 @@ public class StreamRegistry {
      * @return поток, в который реплика будет писать записи
      */
     public SseEmitter open(String tenantId, String lastEventId) {
-        requireRoomFor(tenantId);
         SseEmitter emitter = new SseEmitter(properties.getStream().getConnectionTimeout().toMillis());
         emitter.onCompletion(() -> remove(tenantId, emitter));
-        emitter.onTimeout(() -> remove(tenantId, emitter));
+        emitter.onTimeout(() -> expire(tenantId, emitter));
         emitter.onError(failure -> remove(tenantId, emitter));
-        subscriptions.computeIfAbsent(tenantId, key -> new CopyOnWriteArraySet<>()).add(emitter);
-        replay(tenantId, lastEventId, emitter);
+        evictExpiredWindows();
+        Deque<StreamRecordApiModel> window = windowOf(tenantId);
+        unsubscribedSince.remove(tenantId);
+        synchronized (window) {
+            register(tenantId, emitter);
+            confirm(emitter);
+            replay(window, lastEventId, emitter);
+        }
         return emitter;
     }
 
     /**
      * Разослать факт открытым подпискам тенанта и положить его в окно.
      *
+     * <p>Тенанту без подписки и без окна факт не нужен никому: ни
+     * рассылать, ни держать для продолжения его некому, и окна он не
+     * заводит.
+     *
      * @param tenantId тенант-владелец факта
      * @param record   запись в форме периметра
      */
     public void publish(String tenantId, StreamRecordApiModel record) {
-        remember(tenantId, record);
-        send(tenantId, record);
+        if (isFalse(subscriptions.containsKey(tenantId)) && isFalse(windows.containsKey(tenantId))) {
+            return;
+        }
+        Deque<StreamRecordApiModel> window = windowOf(tenantId);
+        synchronized (window) {
+            remember(window, record);
+            send(tenantId, record);
+        }
     }
 
     /**
@@ -102,21 +128,49 @@ public class StreamRegistry {
     }
 
     /**
-     * Отказ при исчерпанном потолке подписок тенанта.
+     * Завести подписку в набор тенанта — либо отказать при исчерпанном
+     * потолке.
      *
      * <p>Подписки живут в памяти реплики, и число их задаёт тот, кто их
      * открывает, — не наш пользователь. Без потолка одна сессия,
      * открывающая поток в цикле, съедала бы память периметра, через
      * который идёт весь трафик браузера.
+     *
+     * <p><b>Сверка с потолком и добавление — одна операция над
+     * отображением тенанта.</b> Потолок сравнивается со СЧЁТОМ открытых, и
+     * отсутствие набора есть счёт ноль, а не свободное место: иначе нулевой
+     * потолок пропускал бы первую подписку каждого тенанта. Снятие
+     * последней подписки ({@link #remove}) идёт тем же путём, и подписка,
+     * открытая одновременно со снятием, в снятый набор не попадает.
      */
-    private void requireRoomFor(String tenantId) {
-        Set<SseEmitter> emitters = subscriptions.get(tenantId);
-        if (isNull(emitters)) {
-            return;
-        }
-        if (emitters.size() >= properties.getStream().getMaxSubscriptionsPerTenant()) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "Открытых подписок тенанта больше, чем допускает потолок");
+    private void register(String tenantId, SseEmitter emitter) {
+        subscriptions.compute(tenantId, (key, emitters) -> {
+            Set<SseEmitter> opened = isNull(emitters) ? new CopyOnWriteArraySet<>() : emitters;
+            if (opened.size() >= properties.getStream().getMaxSubscriptionsPerTenant()) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Открытых подписок тенанта больше, чем допускает потолок");
+            }
+            opened.add(emitter);
+            return opened;
+        });
+    }
+
+    /**
+     * Подтверждение открытия — комментарием протокола, а не записью.
+     *
+     * <p>Заголовки ответа уходят клиенту вместе с первым, что написано в
+     * поток; без подтверждения тенант без фактов держал бы браузер в
+     * состоянии «подключаюсь» до первого такта пульса, и «подключён, но
+     * тихо» было бы неотличимо от «не подключился». Записью подтверждение
+     * не делается: запись несёт класс, а комментарий клиент протокола не
+     * показывает и в окно он не попадает.
+     */
+    private void confirm(SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().comment(Constants.StreamRecords.OPENED_COMMENT));
+        } catch (IOException | IllegalStateException failure) {
+            log.debug("A subscription is closed while confirming the opening", failure);
+            complete(emitter, failure);
         }
     }
 
@@ -129,12 +183,18 @@ public class StreamRegistry {
      * Переигрывание с названной позиции либо явный разрыв.
      *
      * <p>Первое подключение разрыва не получает: терять ему нечего.
+     *
+     * <p><b>Идёт под замком окна тенанта, как и рассылка факта.</b>
+     * Подписка к этому ходу уже в наборе, и факт, принятый между
+     * регистрацией и переигрыванием, ушёл бы в провод раньше хвоста —
+     * клиент получил бы {@code E4, E2, E3}, а восстановить порядок ему
+     * нечем: порядкового номера у записи нет.
      */
-    private void replay(String tenantId, String lastEventId, SseEmitter emitter) {
+    private void replay(Deque<StreamRecordApiModel> window, String lastEventId, SseEmitter emitter) {
         if (isBlank(lastEventId)) {
             return;
         }
-        List<StreamRecordApiModel> tail = tailAfter(tenantId, lastEventId);
+        List<StreamRecordApiModel> tail = tailAfter(window, lastEventId);
         if (isNull(tail)) {
             write(emitter, gap());
             return;
@@ -147,32 +207,32 @@ public class StreamRegistry {
      *
      * @return хвост, если идентичность в окне нашлась; пусто — не нашлась
      */
-    private List<StreamRecordApiModel> tailAfter(String tenantId, String lastEventId) {
-        Deque<StreamRecordApiModel> window = windows.get(tenantId);
-        if (isNull(window)) {
-            return null;
-        }
-        synchronized (window) {
-            List<StreamRecordApiModel> snapshot = new ArrayList<>(window);
-            int position = -1;
-            for (int index = 0; index < snapshot.size(); index++) {
-                if (Objects.equals(lastEventId, snapshot.get(index).id())) {
-                    position = index;
-                    break;
-                }
+    private List<StreamRecordApiModel> tailAfter(Deque<StreamRecordApiModel> window, String lastEventId) {
+        List<StreamRecordApiModel> snapshot = new ArrayList<>(window);
+        int position = -1;
+        for (int index = 0; index < snapshot.size(); index++) {
+            if (Objects.equals(lastEventId, snapshot.get(index).id())) {
+                position = index;
+                break;
             }
-            return position < 0 ? null : snapshot.subList(position + 1, snapshot.size()).stream()
-                    .collect(Collectors.toList());
         }
+        return position < 0 ? null : snapshot.subList(position + 1, snapshot.size()).stream()
+                .collect(Collectors.toList());
     }
 
-    private void remember(String tenantId, StreamRecordApiModel record) {
-        Deque<StreamRecordApiModel> window = windows.computeIfAbsent(tenantId, key -> new ArrayDeque<>());
-        synchronized (window) {
-            window.addLast(record);
-            while (window.size() > properties.getStream().getReplayWindow()) {
-                window.removeFirst();
-            }
+    /**
+     * Окно тенанта — оно же замок его потока: положить факт в окно и
+     * переиграть хвост новой подписке есть два хода над одним предметом,
+     * и порядок между ними держит один замок.
+     */
+    private Deque<StreamRecordApiModel> windowOf(String tenantId) {
+        return windows.computeIfAbsent(tenantId, key -> new ArrayDeque<>());
+    }
+
+    private void remember(Deque<StreamRecordApiModel> window, StreamRecordApiModel record) {
+        window.addLast(record);
+        while (window.size() > properties.getStream().getReplayWindow()) {
+            window.removeFirst();
         }
     }
 
@@ -198,19 +258,70 @@ public class StreamRegistry {
             emitter.send(event);
         } catch (IOException | IllegalStateException failure) {
             log.debug("A subscription is closed while writing type={}", record.type(), failure);
-            emitter.completeWithError(failure);
+            complete(emitter, failure);
         }
     }
 
+    /**
+     * Завершение оборвавшейся подписки. Отказ самого завершения (контейнер
+     * уже закрыл запрос) остаётся здесь: вышедший из рассылки, он вернул бы
+     * факт слушателю темы на повтор — факт лёг бы в окно второй раз, а при
+     * исчерпанных повторах не дошёл бы ни до одной сессии.
+     */
+    private void complete(SseEmitter emitter, Throwable failure) {
+        try {
+            emitter.completeWithError(failure);
+        } catch (RuntimeException completionFailure) {
+            log.debug("A broken subscription fails to complete", completionFailure);
+        }
+    }
+
+    /**
+     * Срок соединения истёк: подписка снимается и поток ЗАВЕРШАЕТСЯ
+     * штатно. Незавершённый, он достался бы каркасу, и тот разрешил бы
+     * истёкший запрос отказом — у подписки, не получившей ни одной записи,
+     * клиент прочитал бы документ отказа вместо штатно закрытого потока.
+     */
+    private void expire(String tenantId, SseEmitter emitter) {
+        remove(tenantId, emitter);
+        emitter.complete();
+    }
+
+    /**
+     * Снятие подписки; опустевший набор уходит тем же ходом над
+     * отображением, и с этого момента окно тенанта живёт свой срок.
+     */
     private void remove(String tenantId, SseEmitter emitter) {
-        Set<SseEmitter> emitters = subscriptions.get(tenantId);
-        if (isNull(emitters)) {
-            return;
-        }
-        emitters.remove(emitter);
-        if (emitters.isEmpty()) {
-            subscriptions.remove(tenantId, emitters);
-        }
+        subscriptions.computeIfPresent(tenantId, (key, emitters) -> {
+            emitters.remove(emitter);
+            if (emitters.isEmpty()) {
+                unsubscribedSince.put(key, Instant.now());
+                return null;
+            }
+            return emitters;
+        });
+        evictExpiredWindows();
+    }
+
+    /**
+     * Вытеснение окон, переживших последнюю подписку тенанта дольше срока
+     * билета. Идёт на открытии и снятии подписки — ходах, меняющих состав
+     * подписок, — и обходит только тенантов без подписок.
+     *
+     * <p>Окно уходит, только если отметка снята ЭТИМ ходом: подписка,
+     * открытая тенантом одновременно, отметку снимает сама, и её окно
+     * остаётся.
+     */
+    private void evictExpiredWindows() {
+        Instant expiredBefore = Instant.now().minus(properties.getTicket().getTtl());
+        unsubscribedSince.forEach((tenantId, since) -> {
+            if (since.isAfter(expiredBefore)) {
+                return;
+            }
+            if (unsubscribedSince.remove(tenantId, since)) {
+                windows.remove(tenantId);
+            }
+        });
     }
 
     /** Явный разрыв: позиция клиента в окне не нашлась. */

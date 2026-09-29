@@ -140,7 +140,8 @@ public class Constants {
     }
 
     /**
-     * Имена, которыми клиент брокера называет свой лаг.
+     * Имена, которыми клиент брокера называет свой лаг и связь с
+     * координатором группы.
      *
      * <p><b>Берётся ровно {@code records-lag}, а не {@code records-lag-max}
      * и не {@code records-lag-avg}.</b> Первый — попартиционный и несёт
@@ -157,6 +158,18 @@ public class Constants {
 
         /** Метка темы у попартиционного лага. */
         public static final String TOPIC_TAG = "topic";
+
+        /**
+         * Возраст последнего сердцебиения координатору группы, в секундах;
+         * {@code -1}, пока клиент не послал ни одного.
+         */
+        public static final String LAST_HEARTBEAT_SECONDS_AGO = "last-heartbeat-seconds-ago";
+
+        /**
+         * Возраст последней успешной ребалансировки группы, в секундах;
+         * {@code -1}, пока участник не вступил в группу ни разу.
+         */
+        public static final String LAST_REBALANCE_SECONDS_AGO = "last-rebalance-seconds-ago";
     }
 
     /**

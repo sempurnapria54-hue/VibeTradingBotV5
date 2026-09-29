@@ -1,9 +1,9 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.action;
 
 /**
- * Общий тип действия стратегии. Допустимые значения по видам:
- * заявка и условная заявка — {@code CREATE_ACTION} / {@code REPLACE_ACTION}
- * / {@code CANCEL_ACTION}; позиция — только {@code EXIT_ACTION}.
+ * Общий тип действия стратегии. Какие значения допустимы у какого вида
+ * действия — перечень пар в docs/models/domain/aggregate/Strategy.md
+ * §Действия; пару вне него отвергает создание определения.
  *
  * <p><b>Маркер уровня — суффикс {@code _ACTION}</b>, а не уникальные
  * основы: действие стратегии есть уровень абстракции НАД командой

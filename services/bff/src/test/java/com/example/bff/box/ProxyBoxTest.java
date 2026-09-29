@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -274,7 +273,6 @@ class ProxyBoxTest extends SharedBffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B8.13 — Переговорные заголовки содержимого пересылаются владельцу")
     void b8_13_negotiationHeadersAreForwarded() {
         authAnswersOneMembership();
@@ -282,10 +280,8 @@ class ProxyBoxTest extends SharedBffBox {
 
         Answer answer = getWith(DEALS, token(), Map.of("Accept", "application/xml"));
 
-        // Ожидание из дома: принимаемое браузера уходит владельцу, и тот
-        // согласует ответ с ним. Сегодня красно: перечень пересылаемого
-        // несёт только тип содержимого, а `Accept` уходит умолчанием
-        // исходящего клиента (находка F-6 документа кейсов).
+        // Принимаемое браузера уходит владельцу, и тот согласует ответ с
+        // ним, а не с умолчанием исходящего клиента.
         LoggedRequest forwarded = owners.single(OwnerStub.TRADING_CORE, DEALS);
         assertThat(forwarded.getHeader("Accept")).isEqualTo("application/xml");
         assertThat(answer.status()).isEqualTo(200);

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -190,15 +189,11 @@ class RequirementsBoxTest extends SharedMarketDataBox {
      * восстанавливается по типу строки-владельца
      * (docs/rules/persistence-representation.md).
      *
-     * <p>Сегодня поля чужого типа принимаются МОЛЧА: Boot гасит
-     * {@code FAIL_ON_UNKNOWN_PROPERTIES}, и {@code convertValue} строит
-     * параметры с пустым периодом вместо отказа — идентичность заводится,
-     * а расчёт по ней падать будет у другого тика. Находка {@code F-10};
-     * долг — `.claude/work/backlog.md` §«Параметры чужого типа требование
-     * индикатора `market-data` принимает молча».
+     * <p>Поле чужого типа отказывает на входе, а не отбрасывается: иначе
+     * идентичность завелась бы с пустым периодом, и расчёт по ней падал бы у
+     * другого тика (находка {@code F-10}, закрыта).
      */
     @Test
-    @Tag("debt")
     @DisplayName("B1.10 — параметры, не разбирающиеся под заявленный тип")
     void b1_10_parametersThatDoNotParseUnderTheDeclaredType() {
         Answer answer = post(INDICATORS,

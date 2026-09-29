@@ -121,18 +121,20 @@ class TenantContextResolverTest {
     }
 
     /**
-     * Сверки ответа соседа нет ни одной: пустой тенант проходит вывод
-     * целиком (находка `F1`). Состояние недостижимо при исправном
+     * Содержимое единственного членства сверяется: членство без тенанта
+     * отвечает тем же отказом, что и пустой перечень, — пустой радиус
+     * дальше по тропе не уходит. Состояние недостижимо при исправном
      * владельце членств — его форма тенанта несёт.
      */
     @Test
-    @DisplayName("U4.6 — членство с пустым тенантом отдаёт контекст с пустым тенантом")
-    void u4_6_aMembershipWithoutATenantYieldsAnEmptyTenantContext() {
+    @DisplayName("U4.6 — членство с пустым тенантом отвечает отказом, а не контекстом")
+    void u4_6_aMembershipWithoutATenantIsRefused() {
         AuthMembershipClient client = clientReturning(new MembershipApiModel("m-1", null, "OWNER"));
 
-        TenantContext context = resolverOver(client).resolve(SUBJECT, BEARER);
-
-        assertThat(context.tenantId()).as("пустота проходит дальше по тропе").isNull();
+        assertThatThrownBy(() -> resolverOver(client).resolve(SUBJECT, BEARER))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(failure -> ((ResponseStatusException) failure).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     /** Роль едет с первого дня и вывода не задевает ни в одной ветви. */

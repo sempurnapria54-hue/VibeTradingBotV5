@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -41,8 +40,8 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
 
     /**
      * Сколько раз клетка {@code B3.8} обрывает подписку перед записью:
-     * отказ записи у построенного — гонка (F-14), и вход повторяется, пока
-     * проявление не станет практически неизбежным.
+     * отказ записи в оборванную — гонка с контейнером, и вход повторяется,
+     * чтобы исход не зависел от того, кто её выиграл.
      */
     private static final Integer ROUNDS = 50;
 
@@ -133,10 +132,9 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
             assertThat(byToken.frames()).isEmpty();
             // КЛАСС отказа здесь не утверждается, и это не послабление:
             // предмет клетки — что провод не открылся, а формат отказа —
-            // предмет группы B9. Наблюдено: 500 с телом каркаса, без
-            // нашего класса вовсе (находка F-12 документа кейсов: отказ на
-            // тропе подписки не рендерится, потому что `produces` провода
-            // не принимает JSON).
+            // предмет группы B9. Наблюдено 401 классом обработчика
+            // поверхности: тип содержимого отказа поставлен явно, и
+            // `produces` провода его не отвергает.
             assertThat(byToken.status()).isGreaterThanOrEqualTo(400);
         }
 
@@ -151,7 +149,6 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B3.8 — Оборванная подписка не лишает данных остальные")
     void b3_8_anAbortedSubscriptionDoesNotStarveTheOthers() {
         String tenant = "TS8";
@@ -161,9 +158,9 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
 
         try (Subscription surviving = openedStreamOf(tenant, ticket, "e-b3-8-first")) {
             expected.add("e-b3-8-first");
-            // Обрыв повторяется: отказ записи в оборванную подписку у
-            // построенного — ГОНКА с контейнером (находка F-14 документа
-            // кейсов), и одиночный вход проявлял бы её с вероятностью.
+            // Обрыв повторяется: отказ записи в оборванную подписку —
+            // ГОНКА с контейнером, и одиночный вход спрашивал бы её исход с
+            // вероятностью.
             for (int round = 0; round < ROUNDS; round++) {
                 String opening = "e-b3-8-open-" + round;
                 String after = "e-b3-8-after-" + round;
@@ -183,13 +180,32 @@ class StreamSubscriptionBoxTest extends SharedBffBox {
             }
 
             // Приём события не роняется: каждая запись доехала до выжившей
-            // ровно однажды. Сегодня красно — отказ из тропы
-            // восстановления уходит из слушателя, и обработчик доставляет
-            // запись заново.
+            // ровно однажды — отказ тропы восстановления, вышедший из
+            // слушателя, вернул бы запись обработчику на повтор.
             publishDealOpened(tenant, "e-b3-8-last");
             expected.add("e-b3-8-last");
             surviving.awaitFrames(expected.size());
             assertThat(surviving.ids()).containsExactlyElementsOf(expected);
+        }
+    }
+
+    @Test
+    @DisplayName("B3.12 — Открытие подтверждается клиенту без единой записи")
+    void b3_12_theOpeningIsConfirmedWithoutAnyRecord() {
+        String tenant = "TS12";
+        authAnswers(Bodies.memberships(tenant, ROLE));
+        String ticket = issuedTicket();
+
+        // Фактов у тенанта нет, и пульс в прогоне не бьётся: ответ открытия
+        // может прийти только подтверждением. Без него заголовки ждали бы
+        // первой записи, и ожидание ответа упёрлось бы в потолок.
+        try (Subscription quiet = subscribe(ticket)) {
+            assertThat(quiet.status()).isEqualTo(200);
+            assertThat(quiet.carriesStream()).isTrue();
+            // Подтверждение — комментарий протокола, а не запись: в проводе
+            // записей нет ни одной.
+            assertThat(quiet.frames()).isEmpty();
+            assertThat(quiet.isOpen()).isTrue();
         }
     }
 

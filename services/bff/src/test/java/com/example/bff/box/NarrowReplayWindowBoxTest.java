@@ -44,7 +44,7 @@ class NarrowReplayWindowBoxTest extends BffBox {
         String ticket = issuedTicket();
         // Пять записей при ширине три: первые две вытеснены. Наполнившая
         // окно подписка остаётся открытой до конца клетки — брошенная, она
-        // ловила бы гонку F-14 на следующей записи тенанта.
+        // ловила бы гонку с контейнером на следующей записи тенанта.
         try (Subscription filling = openedStreamOf(TENANT_OF_CELL, ticket, "e-b4-4-1")) {
             publishDealOpened(TENANT_OF_CELL, "e-b4-4-2");
             publishDealOpened(TENANT_OF_CELL, "e-b4-4-3");

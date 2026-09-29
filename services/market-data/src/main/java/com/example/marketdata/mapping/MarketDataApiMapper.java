@@ -7,9 +7,11 @@ import com.example.marketdata.api.model.CandleGroupApiResponse;
 import com.example.marketdata.api.model.IndicatorConfigApiResponse;
 import com.example.marketdata.api.model.IndicatorValueApiResponse;
 import com.example.marketdata.api.model.InstrumentApiResponse;
+import com.example.marketdata.api.model.InstrumentExternalRulesApiResponse;
 import com.example.marketdata.api.model.MarketFeatureBundleApiResponse;
 import com.example.marketdata.api.model.MarketOrderBookApiResponse;
 import com.example.marketdata.api.model.MarketPhaseApiResponse;
+import com.example.marketdata.api.model.MarketPriceDataApiResponse;
 import com.example.marketdata.api.model.MarketPriceLevelApiResponse;
 import com.example.marketdata.api.model.MarketStructureApiResponse;
 import com.example.marketdata.api.model.MarketStructureConfigApiResponse;
@@ -19,6 +21,7 @@ import com.example.marketdata.domain.model.IndicatorConfig;
 import com.example.marketdata.domain.model.MarketFeatureBundle;
 import com.example.marketdata.domain.model.MarketStructureConfig;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.indicator.AtrValue;
@@ -31,6 +34,7 @@ import com.example.tradingbot.domain.model.trade.indicator.ObvValue;
 import com.example.tradingbot.domain.model.trade.indicator.RsiValue;
 import com.example.tradingbot.domain.model.trade.indicator.StochasticValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketOrderBook;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketTicker;
 import com.example.tradingbot.domain.model.trade.market_snapshot.OrderBookLevel;
@@ -131,6 +135,10 @@ public interface MarketDataApiMapper {
     OrderBookLevelApiResponse domainToApi(OrderBookLevel level);
 
     MarketTickerApiResponse domainToApi(MarketTicker ticker);
+
+    InstrumentExternalRulesApiResponse domainToApi(InstrumentExternalRules rules);
+
+    MarketPriceDataApiResponse domainToApi(MarketPriceData prices);
 
     MarketPhaseApiResponse domainToApi(MarketPhase phase);
 

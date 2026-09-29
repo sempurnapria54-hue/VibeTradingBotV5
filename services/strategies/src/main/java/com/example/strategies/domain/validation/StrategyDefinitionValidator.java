@@ -69,6 +69,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -86,9 +87,9 @@ import org.springframework.web.server.ResponseStatusException;
  * ключей настроек/действий, разрешённость ссылок в рамках детали,
  * «ровно одна деталь на каждую фазу», матрица политика×фаза,
  * sanity warmup-override, минимальный per-ruleType контракт операндов
- * (дозаполняется инкрементально). Семантика действий (REPLACE/CANCEL ↔
- * виды, partial-exit) и торгово-суждённые диапазоны —
- * отложены до шагов 4/7 / activate (422):
+ * (дозаполняется инкрементально), пара «вид, тип» действия
+ * (docs/models/domain/aggregate/Strategy.md §Действия). Торгово-суждённые
+ * диапазоны — отложены до activate (422):
  * docs/decisions/strategy-materialization-and-validation.md.
  * Per-field презенс и числовые границы держит Bean Validation на
  * api-моделях. Warmup-floor — упрощённый минимум шага 2; настоящий
@@ -139,6 +140,23 @@ public class StrategyDefinitionValidator {
             AlgoOrder.ConditionType.OCO_FULL.name(),
             AlgoOrder.ConditionType.TRAILING_PERCENTS.name(),
             AlgoOrder.ConditionType.TRAILING_VALUE.name());
+
+    /**
+     * Типы, допустимые у каждого вида действия шага транша
+     * (docs/models/domain/aggregate/Strategy.md §Действия). Замещение
+     * оставлено заявке и условной заявке, хотя исполнителя замещения в ядре
+     * нет: это названное ограничение со своим возвратом, а не пара без
+     * исполнителя, объявленная по ошибке.
+     */
+    private static final Map<Class<? extends StrategyActionApiModel>, Set<StrategyActionType>> TYPES_BY_KIND =
+            Map.of(
+                    StrategyOrderActionApiModel.class,
+                    EnumSet.of(StrategyActionType.CREATE_ACTION, StrategyActionType.REPLACE_ACTION),
+                    StrategyAlgoOrderActionApiModel.class,
+                    EnumSet.of(StrategyActionType.CREATE_ACTION, StrategyActionType.REPLACE_ACTION,
+                            StrategyActionType.CANCEL_ACTION),
+                    StrategyPositionActionApiModel.class,
+                    EnumSet.of(StrategyActionType.EXIT_ACTION));
 
     /** Допустимые sourceType операндов в контексте классификации фазы (без MARKET_PHASE и runtime-сделки). */
     private static final Set<String> PHASE_ALLOWED_SOURCE_TYPES = Set.of(
@@ -890,8 +908,9 @@ public class StrategyDefinitionValidator {
             tranche.getStepsByStatus().forEach((status, steps) -> {
                 validateEnum(DealTranche.Status.class, status, tranchePath + ".stepsByStatus key", violations);
                 for (int index = 0; index < steps.size(); index++) {
-                    validateStep(steps.get(index), tranchePath + ".stepsByStatus[" + status + "][" + index + "]",
-                            indicatorTypes, structureKeys, actionKeys, violations);
+                    String stepPath = tranchePath + ".stepsByStatus[" + status + "][" + index + "]";
+                    validateTrancheActionPairs(steps.get(index), stepPath, violations);
+                    validateStep(steps.get(index), stepPath, indicatorTypes, structureKeys, actionKeys, violations);
                 }
             });
         });
@@ -948,6 +967,33 @@ public class StrategyDefinitionValidator {
             violations.add(path + ".actions[" + index + "] STRATEGY_DEAL_LEVEL_ACTION_OUT_OF_SCOPE: "
                     + "пакет шага уровня сделки допускает только выход позиции (POSITION, EXIT_ACTION), объявлено "
                     + action.getActionType() + (isTrue(positionKind) ? "" : " вне вида POSITION"));
+        }
+    }
+
+    /**
+     * Пара «вид, тип» действия шага транша принадлежит перечню допустимых.
+     * Пару вне перечня ядро не исполняет: оркестратор действий не находит
+     * ей исполнителя, читает действие неприменимым и пропускает молча —
+     * объявленное поведение не исполнялось бы без отказа. Тип вне перечня
+     * здесь не повторяется: его отвергает разбор перечня. Пакет шага сделки
+     * сужен строже и проверяется {@code validateDealLevelActions} (дом
+     * правила — docs/rules/strategy-validation.md).
+     */
+    private void validateTrancheActionPairs(StrategyStepApiModel step, String path, List<String> violations) {
+        if (isEmpty(step.getActions())) {
+            return;
+        }
+        List<StrategyActionApiModel> actions = step.getActions();
+        for (int index = 0; index < actions.size(); index++) {
+            StrategyActionApiModel action = actions.get(index);
+            StrategyActionType type = EnumUtils.getEnum(StrategyActionType.class, action.getActionType());
+            Set<StrategyActionType> allowed = TYPES_BY_KIND.getOrDefault(action.getClass(),
+                    EnumSet.noneOf(StrategyActionType.class));
+            if (isNull(type) || allowed.contains(type)) {
+                continue;
+            }
+            violations.add(path + ".actions[" + index + "] STRATEGY_ACTION_KIND_TYPE_UNSUPPORTED: "
+                    + "у этого вида действия допустимы " + allowed + ", объявлено " + type);
         }
     }
 

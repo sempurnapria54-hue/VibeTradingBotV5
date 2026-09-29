@@ -6,9 +6,13 @@ import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Чтение членств предъявителя у владельца «кто есть кто»
@@ -59,6 +63,30 @@ public class AuthMembershipClient {
         } catch (ResourceAccessException failure) {
             log.error("The identity owner did not answer the membership resolution path={}", RESOLVE_PATH, failure);
             throw new PeerServiceUnavailableException("Владелец членств недоступен", failure);
+        } catch (RestClientResponseException failure) {
+            throw refusalOf(failure);
         }
+    }
+
+    /**
+     * Ответ-отказ владельца — его решение, а не наш дефект.
+     *
+     * <p><b>Отказ предъявителю доезжает классом отказа доступа:</b> токен,
+     * выданный не браузерной тропой, владелец членств отвергает, и это
+     * ответ о предъявителе. <b>Отказ сервера владельца</b> — недоступность
+     * соседа: повторить осмысленно. Прочие ответы-отказы значат, что
+     * вызов собран не так, — это наш дефект, и он уходит как есть.
+     */
+    private RuntimeException refusalOf(RestClientResponseException failure) {
+        HttpStatusCode status = failure.getStatusCode();
+        log.error("The identity owner refused the membership resolution path={} status={}",
+                RESOLVE_PATH, status.value());
+        if (status.isSameCodeAs(HttpStatus.UNAUTHORIZED) || status.isSameCodeAs(HttpStatus.FORBIDDEN)) {
+            return new ResponseStatusException(HttpStatus.FORBIDDEN, "Владелец членств отверг предъявителя");
+        }
+        if (status.is5xxServerError()) {
+            return new PeerServiceUnavailableException("Владелец членств отвечает отказом сервера", failure);
+        }
+        return failure;
     }
 }

@@ -93,9 +93,26 @@ public class TrancheTransitionGate {
      * ошибочное состояние — закрыта НЕДОСТИЖИМОСТЬЮ акта: FSM траншей там
      * не прогоняется вовсе (docs/processes/fsm-execution-layering.md),
      * поэтому энфорсер её не мерит и мерить не обязан.
+     *
+     * <p><b>Ребро, догоняющее уже отправленный вход, риска не набирает.</b>
+     * Из предвходовой проверки с ногой, вышедшей за локальное заведение,
+     * ребро записывает факт, случившийся до окна: риск уже на бирже, и
+     * снять его может только выход, куда транш и уходит через отправленный
+     * вход. Запрет такого ребра оставлял бы рискующий транш в предвходовой
+     * проверке, где терминал ему запрещён контрактом
+     * (docs/rules/exit-teardown-order.md). Переоткрытие исключением не
+     * является: оно возвращает транш к набору по живой ноге, а выход у
+     * сопровождения свой, прямой.
      */
-    public Boolean riskCreatingUnderCollapse(Deal deal, DealTranche.Status to) {
-        return DealTranche.Status.ENTRY_SUBMITTED.equals(to) && isTrue(deal.isCollapsing());
+    public Boolean riskCreatingUnderCollapse(Deal deal, DealTranche tranche, DealTranche.Status to) {
+        return DealTranche.Status.ENTRY_SUBMITTED.equals(to)
+                && isTrue(deal.isCollapsing())
+                && isFalse(submittedEntryCatchUp(tranche));
+    }
+
+    /** Ребро из предвходовой проверки при уже отправленной входной ноге. */
+    private Boolean submittedEntryCatchUp(DealTranche tranche) {
+        return DealTranche.Status.PRECHECK.equals(tranche.getStatus()) && isTrue(tranche.entrySubmitted());
     }
 
     /**
@@ -123,7 +140,7 @@ public class TrancheTransitionGate {
             log.warn("Tranche edge is not declared trancheId={} from={} to={}", tranche.getId(), from, to);
             return false;
         }
-        if (isTrue(riskCreatingUnderCollapse(dealContext.getDeal(), to))) {
+        if (isTrue(riskCreatingUnderCollapse(dealContext.getDeal(), tranche, to))) {
             log.warn("Tranche takes new risk under deal collapse trancheId={} to={}", tranche.getId(), to);
             return false;
         }

@@ -18,12 +18,11 @@ import org.springframework.test.context.DynamicPropertySource;
  * вовсе ({@code B9.1}), а ненастроенный адрес соседа процесс поднимает:
  * тропы, соседа не зовущие, работают, а зовущие отказывают на вызове.
  *
- * <p><b>Класса у этого отказа не объявляет ни один дом</b> (находка
- * {@code F-8}): {@code application.yaml} говорит, что незаданное
- * означает отказ, но каким классом отказывает чтение, не сказано нигде.
- * Поэтому клетка мерит то, что дом объявляет однозначно, — что запрос не
- * уходит ни на какой адрес и что тик каталога не меняет, — а класс
- * записывает в «Факт» как наблюдение.
+ * <p><b>Класс отказа — чтения, а не негодного входа</b>
+ * (docs/architecture/services/market-data.md §«Какие вызовы делает и какие
+ * принимает»): соседа не достать ни по какому адресу, и чинить надо
+ * конфигурацию окружения, а не запрос. Прежде класса не объявлял ни один
+ * дом, и отказ уходил негодным входом (находка {@code F-8}, закрыта).
  */
 class UnconfiguredConnectorAddressBoxTest extends MarketDataBox {
 
@@ -49,6 +48,7 @@ class UnconfiguredConnectorAddressBoxTest extends MarketDataBox {
         // Процесс поднялся: тропа, соседа не зовущая, отвечает штатно.
         assertThat(get(INSTRUMENTS).status()).isEqualTo(200);
         assertThat(prices.carriesErrorDto()).isTrue();
+        assertThat(prices.errorCode()).isEqualTo("EXCHANGE_READ_FAILED");
         assertThat(rows.countsByTable()).isEqualTo(before);
         assertThat(AppLog.since(mark)).contains("Instrument listing sync failed");
         // Ни один запрос не ушёл на случайный адрес: стаб коннектора

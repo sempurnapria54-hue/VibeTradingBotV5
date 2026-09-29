@@ -1,11 +1,13 @@
 package com.example.tradingcore.domain.service;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 
 import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingcore.config.ProjectionSyncProperties;
 import com.example.tradingcore.integration.internal.api.AuthReadClient;
 import com.example.tradingcore.integration.internal.api.MarketDataReadClient;
 import com.example.tradingcore.integration.internal.api.model.ExchangeAccountAuthResponse;
@@ -17,6 +19,7 @@ import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,10 +54,15 @@ public class RegistryProjectionService {
     private final TenantRiskAppetiteDataService riskAppetiteDataService;
     private final ExchangeAccountMapper accountMapper;
     private final InstrumentMapper instrumentMapper;
+    private final ProjectionSyncProperties properties;
 
     /**
      * Сводит проекцию реестра счетов с {@code auth} и заводит место под
      * числа риск-аппетита тенантов, у которых счёт появился.
+     *
+     * <p>Отказ одной строки стоит одну строку, отказ чтения реестра — проход
+     * (docs/components/RegistryProjectionJob.md §«Отказ одной строки стоит
+     * одну строку»).
      *
      * @param projectedAt момент снимка
      * @return число сведённых строк
@@ -65,12 +73,17 @@ public class RegistryProjectionService {
             log.warn("Exchange account registry is empty: no pass will start");
             return 0;
         }
+        Integer projected = 0;
         for (ExchangeAccountAuthResponse response : registered) {
-            ExchangeAccount account = accountMapper.integrationToDomain(response);
-            accountDataService.upsertProjection(account, projectedAt);
+            try {
+                projectAccount(response, projectedAt);
+                projected++;
+            } catch (RuntimeException e) {
+                log.error("Exchange account projection failed for {}", response.getInternalId(), e);
+            }
         }
         accountDataService.findTenantInternalIds().forEach(riskAppetiteDataService::ensureRow);
-        return registered.size();
+        return projected;
     }
 
     /**
@@ -85,36 +98,59 @@ public class RegistryProjectionService {
      * и такого бюджета не тратит. Разведи их — и одна метка описывала бы
      * свежую спецификацию при правилах недельной давности.
      *
-     * <p><b>Отказ по одному инструменту не двигает его метку и не роняет
-     * проход.</b> Строка остаётся со старым снимком, то есть сама себя
-     * показывает гейту свежести. Недоступность владельца — исход другого
-     * класса: она прекращает проход целиком, потому что следующие
-     * четыреста вызовов дадут тот же отказ
-     * (docs/rules/runtime-error-classification.md §«Отказ соседа по ярусу
-     * — свой класс, и сделку в ошибку он не уводит»).
+     * <p>Отказ по одному инструменту стоит один инструмент, недоступность
+     * владельца — проход (docs/components/RegistryProjectionJob.md §«Отказ
+     * одной строки стоит одну строку»).
+     *
+     * <p><b>Листинг обходится окнами за курсором</b>: целиком владелец его
+     * не отдаёт (docs/models/domain/core/Instrument.md §«Проекция у
+     * торгового ядра»). Окно сводится прежде, чем читается следующее.
      *
      * @param projectedAt момент снимка
      * @return число сведённых строк
      */
     public Integer synchronizeInstruments(OffsetDateTime projectedAt) {
-        List<InstrumentMarketDataResponse> listed = marketDataReadClient.getInstruments();
+        Integer window = properties.getListingWindow();
+        List<InstrumentMarketDataResponse> listed = marketDataReadClient.getInstruments(null, window);
         if (isEmpty(listed)) {
             log.warn("Instrument catalogue listing is empty");
             return 0;
         }
         Integer projected = 0;
-        for (InstrumentMarketDataResponse response : listed) {
-            try {
-                projectInstrument(response, projectedAt);
-                projected++;
-            } catch (PeerServiceUnavailableException e) {
-                log.error("Instrument projection stopped: catalogue owner is unavailable", e);
-                return projected;
-            } catch (RuntimeException e) {
-                log.error("Instrument projection failed for {}", response.getInternalId(), e);
+        String after = null;
+        while (isNotEmpty(listed)) {
+            for (InstrumentMarketDataResponse response : listed) {
+                try {
+                    projectInstrument(response, projectedAt);
+                    projected++;
+                } catch (PeerServiceUnavailableException e) {
+                    log.error("Instrument projection stopped: catalogue owner is unavailable", e);
+                    return projected;
+                } catch (RuntimeException e) {
+                    log.error("Instrument projection failed for {}", response.getInternalId(), e);
+                }
             }
+            if (isLastWindow(listed, window, after)) {
+                return projected;
+            }
+            after = listed.getLast().getInternalId();
+            listed = marketDataReadClient.getInstruments(after, window);
         }
         return projected;
+    }
+
+    /**
+     * Окно короче предела — последнее. Окно, чей курсор не сдвинулся, —
+     * тоже: владелец курсора не исполнил, и повтор того же окна зациклил
+     * бы тик.
+     */
+    private Boolean isLastWindow(List<InstrumentMarketDataResponse> listed, Integer window, String after) {
+        return listed.size() < window || Objects.equals(listed.getLast().getInternalId(), after);
+    }
+
+    private void projectAccount(ExchangeAccountAuthResponse response, OffsetDateTime projectedAt) {
+        ExchangeAccount account = accountMapper.integrationToDomain(response);
+        accountDataService.upsertProjection(account, projectedAt);
     }
 
     private void projectInstrument(InstrumentMarketDataResponse response, OffsetDateTime projectedAt) {

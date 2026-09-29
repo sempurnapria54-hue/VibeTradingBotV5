@@ -1,5 +1,7 @@
 package com.example.marketdata.api.controller;
 
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 
@@ -8,6 +10,7 @@ import com.example.marketdata.api.model.FeatureReadApiRequest;
 import com.example.marketdata.api.model.IndicatorValueApiResponse;
 import com.example.marketdata.api.model.MarketFeatureBundleApiResponse;
 import com.example.marketdata.api.model.MarketOrderBookApiResponse;
+import com.example.marketdata.api.model.MarketPriceDataApiResponse;
 import com.example.marketdata.api.model.MarketStructureApiResponse;
 import com.example.marketdata.api.model.MarketTickerApiResponse;
 import com.example.marketdata.domain.model.FeatureBinding;
@@ -143,21 +146,39 @@ public class MarketFeatureController {
         MarketFeatureBundleApiResponse response = apiMapper.domainToApi(
                 marketFeatureService.readFeatures(instrument, readRequest));
         response.setInstrumentInternalId(internalId);
+        if (nonNull(response.getMarketPriceData())) {
+            response.getMarketPriceData().setInstrumentInternalId(internalId);
+        }
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Цены момента инструмента.
+     *
+     * <p><b>Отсутствие тикера — пустота, а не «не найдено».</b> Ветвь пустоты
+     * отвечает объявленным {@code 204}; {@code ResponseEntity.ofNullable}
+     * отдал бы на ней {@code 404}, то есть то же число, что у несуществующего
+     * инструмента, и читатель по контракту точки её не распознал бы.
+     */
     @Operation(summary = "Цены момента инструмента: last, mark, index")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Цены получены у площадки"),
             @ApiResponse(responseCode = "204", description = "Тикера на площадке нет"),
-            @ApiResponse(responseCode = "502", description = "Площадка отказала в чтении")
+            @ApiResponse(responseCode = "400", description = "Инструмента с таким идентификатором нет"),
+            @ApiResponse(responseCode = "502", description = "Площадка отказала в чтении либо коннектор недоступен"),
+            @ApiResponse(responseCode = "503", description = "Площадка отказала в доступе либо исчерпан её лимит — повтор не сразу")
     })
     @GetMapping("/prices")
-    public ResponseEntity<MarketPriceData> getPrices(@PathVariable String internalId) {
+    public ResponseEntity<MarketPriceDataApiResponse> getPrices(@PathVariable String internalId) {
         Instrument instrument = instrumentDataService.getRequiredByInternalId(internalId);
         MarketPriceData prices = marketPriceDataService.getMarketPriceData(
                 instrument.getId(), instrument.getExternalId());
-        return ResponseEntity.ofNullable(prices);
+        if (isNull(prices)) {
+            return ResponseEntity.noContent().build();
+        }
+        MarketPriceDataApiResponse response = apiMapper.domainToApi(prices);
+        response.setInstrumentInternalId(internalId);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Последний снятый срез книги заявок")

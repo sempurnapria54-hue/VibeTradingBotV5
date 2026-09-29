@@ -44,8 +44,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code E7.1}, где факт обязан дойти и до статистики; прочим клеткам хватает
  * факта владельца определений.
  *
- * <p><b>{@code E7.2} последняя и красна по построению</b> (находка {@code F7}):
- * остановленный брокер пульса не гасит, а поднять брокер обратно нечем.
+ * <p><b>{@code E7.2} последняя:</b> поднять остановленный брокер обратно
+ * нечем. Пульс гаснет по истечении срока сессии потребителя — дольше него
+ * слушатель без связи с координатором живым не считается (находка {@code F7}
+ * закрыта).
  */
 @Tag("e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -170,7 +172,6 @@ class SideOutagePathTest {
 
     @Test
     @Order(3)
-    @Tag("debt")
     @DisplayName("E7.2 — Брокер остановлен: чтение идёт, поток молчит, и молчание наблюдаемо")
     void e7_2_theBrokerDownKeepsReadsAndSilencesTheStream() {
         warmTheCache(trail, token);

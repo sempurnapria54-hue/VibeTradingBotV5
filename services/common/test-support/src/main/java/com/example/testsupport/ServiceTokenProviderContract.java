@@ -6,8 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.exception.PeerServiceUnavailableException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,9 +18,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,8 +32,13 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 
 /**
  * Провайдер служебного токена: группы `U9`, `U12.2` и клетка `U14.5`
@@ -46,10 +54,11 @@ import org.springframework.security.oauth2.core.OAuth2Error;
  * ровно она, а не логика провайдера (.claude/rules/codestyle.md §«Тесты
  * доменных моделей»).
  *
- * <p><b>Клейм «пустой токен — отказ, а не анонимный вызов» держится одной
- * ветвью из четырёх.</b> Три остальные помечены {@code @Tag("debt")}: их
- * ожидание взято из дома, а код отказывает классами библиотеки, по которым
- * вызывающий не ветвится (находка `F3`).
+ * <p><b>Клейм «пустой токен — отказ, а не анонимный вызов» держится всеми
+ * ветвями отказа</b>, и класс у каждой — соседского яруса, а не библиотеки
+ * (docs/rules/runtime-error-classification.md §«Добыча служебного токена —
+ * часть вызова соседа»): осознанный отказ — класс своего дерева,
+ * молчание провайдера идентичности — недоступность (`U9.10`-`U9.12`).
  */
 public abstract class ServiceTokenProviderContract {
 
@@ -75,7 +84,7 @@ public abstract class ServiceTokenProviderContract {
         SecurityContextHolder.clearContext();
     }
 
-    // --- U9: живая охрана и три чужих класса ------------------------------
+    // --- U9: охрана и классы отказа добычи ---------------------------------
 
     @Test
     @DisplayName("U9.1 — добытый токен возвращается значением")
@@ -85,7 +94,7 @@ public abstract class ServiceTokenProviderContract {
     }
 
     @Test
-    @DisplayName("U9.2 — менеджер отдал пустоту: единственная живая ветвь собственной охраны")
+    @DisplayName("U9.2 — менеджер отдал пустоту: отказ собственной охраны")
     void u9_2_anEmptyAuthorizationIsRefusedByOurOwnGuard() {
         assertThatThrownBy(() -> tokenValue(managerReturning(null), REGISTRATION_ID))
                 .as("пустой токен — отказ, а не анонимный вызов")
@@ -94,8 +103,7 @@ public abstract class ServiceTokenProviderContract {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U9.4 — неизвестная регистрация: ожидание из дома — наш класс (долг F3)")
+    @DisplayName("U9.4 — неизвестная регистрация: отказ нашим классом")
     void u9_4_anUnknownRegistrationFailsWithOurOwnClass() {
         OAuth2AuthorizedClientManager manager = mock(OAuth2AuthorizedClientManager.class);
         when(manager.authorize(any())).thenThrow(
@@ -107,18 +115,17 @@ public abstract class ServiceTokenProviderContract {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U9.5 — пустой идентификатор регистрации: отказ приходит до менеджера (долг F3)")
+    @DisplayName("U9.5 — пустой идентификатор регистрации: отказ нашим классом до менеджера")
     void u9_5_anEmptyRegistrationIdFailsBeforeTheManagerIsAsked() {
         OAuth2AuthorizedClientManager manager = mock(OAuth2AuthorizedClientManager.class);
 
         assertThatThrownBy(() -> tokenValue(manager, ""))
                 .isInstanceOf(readExceptionType());
+        verifyNoInteractions(manager);
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U9.6 — провайдер идентичности отверг выдачу (долг F3)")
+    @DisplayName("U9.6 — провайдер идентичности отверг выдачу: отказ нашим классом")
     void u9_6_aRejectedIssuanceFailsWithOurOwnClass() {
         OAuth2AuthorizedClientManager manager = mock(OAuth2AuthorizedClientManager.class);
         when(manager.authorize(any())).thenThrow(new ClientAuthorizationException(
@@ -127,6 +134,40 @@ public abstract class ServiceTokenProviderContract {
         assertThatThrownBy(() -> tokenValue(manager, REGISTRATION_ID))
                 .as("класс библиотеки вызывающему чужой — по нему он не ветвится")
                 .isInstanceOf(readExceptionType());
+    }
+
+    @Test
+    @DisplayName("U9.10 — провайдер идентичности не ответил: недоступность, а не отказ")
+    void u9_10_anUnreachableIdentityProviderIsUnavailability() {
+        OAuth2AuthorizedClientManager manager = managerFailingWith(
+                new ResourceAccessException("I/O error on POST request"));
+
+        assertThatThrownBy(() -> tokenValue(manager, REGISTRATION_ID))
+                .as("перезапуск провайдера идентичности — эксплуатационное событие: проход пропускается")
+                .isInstanceOf(PeerServiceUnavailableException.class)
+                .hasMessageContaining(REGISTRATION_ID);
+    }
+
+    @Test
+    @DisplayName("U9.11 — точка токенов ответила 5xx: недоступность")
+    void u9_11_aServerErrorOfTheTokenEndpointIsUnavailability() {
+        OAuth2AuthorizedClientManager manager = managerFailingWith(HttpServerErrorException.create(
+                HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", HttpHeaders.EMPTY, new byte[0], null));
+
+        assertThatThrownBy(() -> tokenValue(manager, REGISTRATION_ID))
+                .isInstanceOf(PeerServiceUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("U9.12 — точка токенов ответила 4xx: осознанный отказ, наш класс")
+    void u9_12_aClientErrorOfTheTokenEndpointIsARefusal() {
+        OAuth2AuthorizedClientManager manager = managerFailingWith(HttpClientErrorException.create(
+                HttpStatus.UNAUTHORIZED, "Unauthorized", HttpHeaders.EMPTY, new byte[0], null));
+
+        assertThatThrownBy(() -> tokenValue(manager, REGISTRATION_ID))
+                .as("отвергнутая идентичность — наш дефект, повтором не лечится")
+                .isInstanceOf(readExceptionType())
+                .isNotInstanceOf(PeerServiceUnavailableException.class);
     }
 
     @Test
@@ -213,6 +254,18 @@ public abstract class ServiceTokenProviderContract {
     private static OAuth2AuthorizedClientManager managerReturning(OAuth2AuthorizedClient client) {
         OAuth2AuthorizedClientManager manager = mock(OAuth2AuthorizedClientManager.class);
         when(manager.authorize(any())).thenReturn(client);
+        return manager;
+    }
+
+    /**
+     * Менеджер, отказывающий так, как отказывает библиотека на транспорте
+     * точки токенов: причина — класс клиента HTTP, завёрнутый дважды.
+     */
+    private static OAuth2AuthorizedClientManager managerFailingWith(RestClientException transport) {
+        OAuth2Error error = new OAuth2Error("invalid_token_response");
+        OAuth2AuthorizedClientManager manager = mock(OAuth2AuthorizedClientManager.class);
+        when(manager.authorize(any())).thenThrow(new ClientAuthorizationException(
+                error, REGISTRATION_ID, new OAuth2AuthorizationException(error, transport)));
         return manager;
     }
 

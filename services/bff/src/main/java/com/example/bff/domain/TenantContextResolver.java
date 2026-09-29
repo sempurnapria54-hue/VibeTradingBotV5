@@ -1,6 +1,7 @@
 package com.example.bff.domain;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.bff.integration.internal.api.AuthMembershipClient;
 import com.example.bff.integration.internal.api.model.MembershipApiModel;
@@ -29,6 +30,12 @@ import org.springframework.web.server.ResponseStatusException;
  *       Ветвь отвечает отказом, а не выбирает произвольное: молчаливый
  *       выбор дал бы контекст, о котором никто не решал.</li>
  * </ul>
+ *
+ * <p><b>Содержимое единственного членства сверяется, а не принимается
+ * формой соседа:</b> членство без тенанта отвечает тем же отказом, что и
+ * пустой перечень. Пропущенное, оно расходилось бы по тропам — точка
+ * контекста отдала бы пустой тенант, а выдача билета уронила бы
+ * разыменование — и открывало бы пустой радиус пишущей тропе.
  *
  * <p><b>Фаза 5 меняет обе крайние ветви разом</b>, и обе лежат на этой
  * тропе — внешнего контракта они не трогают.
@@ -61,6 +68,10 @@ public class TenantContextResolver {
                     "Контекст тенанта не резолвится: членств больше одного, а выбора ещё нет");
         }
         MembershipApiModel membership = memberships.get(0);
+        if (isBlank(membership.tenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Контекст тенанта не резолвится: членство не называет тенанта");
+        }
         return new TenantContext(membership.tenantId(), membership.role());
     }
 }

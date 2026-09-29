@@ -38,6 +38,7 @@ final class StreamFixture {
         properties.getStream().setReplayWindow(replayWindow);
         properties.getStream().setMaxSubscriptionsPerTenant(ceiling);
         properties.getStream().setConnectionTimeout(Duration.ofMinutes(1));
+        properties.getTicket().setTtl(Duration.ofMinutes(10));
         return properties;
     }
 

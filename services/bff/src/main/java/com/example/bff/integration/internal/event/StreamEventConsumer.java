@@ -4,6 +4,8 @@ import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.bff.api.model.StreamRecordApiModel;
+import com.example.bff.config.PerimeterProperties;
+import com.example.bff.config.StreamConsumptionCondition;
 import com.example.bff.domain.stream.StreamRegistry;
 import com.example.bff.mapping.StreamEventMapper;
 import com.example.bff.util.Constants;
@@ -22,11 +24,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -53,18 +57,33 @@ import org.springframework.stereotype.Component;
  * читатель, и падение остановило бы раздачу тех классов, которые читать
  * умеем. То же с неразбираемым содержимым: поток — не решение, и
  * потерянная запись стоит одной строки лога, а остановленный поток —
- * всей картины.
+ * всей картины. Тот же исход у момента происшествия, который не
+ * разбирается.
+ *
+ * <p><b>Слушатель заводится только на настроенной тропе</b>
+ * ({@link StreamConsumptionCondition}): пустой адрес брокера либо пустой
+ * перечень тем — слушателя нет, и пульс молчит.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Conditional(StreamConsumptionCondition.class)
 public class StreamEventConsumer {
 
     private final ObjectMapper objectMapper;
     private final StreamEventMapper streamEventMapper;
     private final StreamRegistry streamRegistry;
+    private final PerimeterProperties properties;
 
-    @KafkaListener(topics = "#{'${perimeter.stream.topics}'.split(',')}")
+    /**
+     * Темы подписки — вход выражения слушателя. Пустых имён среди них нет:
+     * перечень читается признаком, а не строкой, разрезанной по запятой.
+     */
+    public String[] topics() {
+        return properties.getStream().topicNames().toArray(String[]::new);
+    }
+
+    @KafkaListener(topics = "#{__listener.topics()}")
     public void onEvent(ConsumerRecord<String, String> record) {
         String tenantId = record.key();
         String eventId = header(record, Constants.EventHeaders.EVENT_ID);
@@ -74,12 +93,15 @@ public class StreamEventConsumer {
                     record.topic(), record.offset());
             return;
         }
+        OffsetDateTime occurredAt = occurredAt(record);
+        if (isNull(occurredAt)) {
+            return;
+        }
         Object content = contentOf(eventType, record.value());
         if (isNull(content)) {
             return;
         }
-        streamRegistry.publish(tenantId, new StreamRecordApiModel(eventId, eventType,
-                occurredAt(record), content));
+        streamRegistry.publish(tenantId, new StreamRecordApiModel(eventId, eventType, occurredAt, content));
     }
 
     /**
@@ -131,10 +153,25 @@ public class StreamEventConsumer {
         }
     }
 
-    /** Момент происшествия; заголовка нет — момент раздачи. */
+    /**
+     * Момент происшествия; заголовка нет — момент раздачи. Заголовок, который
+     * не разбирается, — порча конверта, а не отсутствие значения: запись
+     * пропускается, как и неразобранное тело, и раздачу не останавливает.
+     *
+     * @return момент записи; пусто — заголовок не разобрался
+     */
     private OffsetDateTime occurredAt(ConsumerRecord<String, String> record) {
         String occurredAt = header(record, Constants.EventHeaders.OCCURRED_AT);
-        return isBlank(occurredAt) ? OffsetDateTime.now(ZoneOffset.UTC) : OffsetDateTime.parse(occurredAt);
+        if (isBlank(occurredAt)) {
+            return OffsetDateTime.now(ZoneOffset.UTC);
+        }
+        try {
+            return OffsetDateTime.parse(occurredAt);
+        } catch (DateTimeParseException failure) {
+            log.error("An event with an unreadable occurrence moment is skipped topic={} offset={}",
+                    record.topic(), record.offset(), failure);
+            return null;
+        }
     }
 
     /** Пустой заголовок означает «значения не было», а не пустую строку. */

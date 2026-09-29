@@ -54,6 +54,8 @@ spring:
 # правкой кода.
 connector:
   exchange-code: ${CONNECTOR_EXCHANGE_CODE:}
+  # Пустой адрес поднимает процесс, а тропы, зовущие коннектор, отказывают
+  # на вызове классом отказа чтения (EXCHANGE_READ_FAILED) — не негодным входом.
   base-url: ${CONNECTOR_BASE_URL:}
   client-registration-id: connector
   # Типы инструментов, чей листинг ЗЕРКАЛИТСЯ В КАТАЛОГ. Каталог полон
