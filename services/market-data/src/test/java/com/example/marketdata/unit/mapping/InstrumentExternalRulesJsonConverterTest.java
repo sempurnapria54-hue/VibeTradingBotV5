@@ -5,8 +5,8 @@ import com.example.testsupport.InstrumentRulesOverlayCopyContract;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 
 /**
- * Копия навеса справочных правил в дереве рыночных данных: изымает ставку
- * комиссии и УДЕРЖИВАЕТ идентификатор владельца — правило, обратное копии
+ * Копия навеса справочных правил в дереве рыночных данных: изымает
+ * идентификатор владельца и ставку комиссии — то же правило, что у копии
  * ядра.
  *
  * <p>Кейсы — `U7`, `U10.3` (.claude/tests/cases/jsonb-overlay-roundtrip.md).
@@ -24,15 +24,5 @@ class InstrumentExternalRulesJsonConverterTest extends InstrumentRulesOverlayCop
     @Override
     protected InstrumentExternalRules readRules(String json) {
         return converter.jsonToRules(json);
-    }
-
-    @Override
-    protected String excludedField() {
-        return "externalTakerFeeRate";
-    }
-
-    @Override
-    protected String retainedField() {
-        return "instrumentId";
     }
 }

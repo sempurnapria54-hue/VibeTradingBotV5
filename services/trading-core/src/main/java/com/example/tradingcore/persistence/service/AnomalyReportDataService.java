@@ -4,7 +4,9 @@ import com.example.tradingcore.domain.safety.AnomalyReport;
 import com.example.tradingcore.mapping.AnomalyReportMapper;
 import com.example.tradingcore.persistence.repository.AnomalyReportRepository;
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +64,19 @@ public class AnomalyReportDataService {
     @Transactional
     public void breakSeries(Long exchangeAccountId, OffsetDateTime passStartedAt) {
         repository.breakSeries(exchangeAccountId, passStartedAt, audit.moment(), audit.writer());
+    }
+
+    /**
+     * Последняя незакрытая строка критичной тропы по ключу состояния
+     * объекта; пусто — такой нет.
+     */
+    @Transactional(readOnly = true)
+    public Optional<AnomalyReport> findUnclosed(Long exchangeAccountId, Long instrumentId, String code,
+                                                AnomalyReport.Severity severity) {
+        return repository.findUnclosed(exchangeAccountId, instrumentId, code, severity.name(),
+                        AnomalyReport.Status.COMPLETED.name(), PageRequest.of(0, 1)).stream()
+                .findFirst()
+                .map(mapper::persistenceToDomain);
     }
 
     /** Отчёт с этим кодом по этой сущности-предмету уже заведён. */

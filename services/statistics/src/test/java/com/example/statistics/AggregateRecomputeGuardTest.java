@@ -59,7 +59,7 @@ class AggregateRecomputeGuardTest {
         when(source.collectDealGrain(any(), any())).thenReturn(List.of(dealRow));
         when(source.collectIncidentGrain(any(), any())).thenReturn(List.of(incidentRow));
 
-        service.recomputeDay(BUCKET, ASSEMBLED_AT);
+        service.recomputeDay(BUCKET, service.seriesStarts(), ASSEMBLED_AT);
 
         verify(writeService).writeDay(eq(BUCKET), eq(List.of(dealRow)), eq(List.of(incidentRow)),
                 eq(ASSEMBLED_AT));
@@ -72,7 +72,7 @@ class AggregateRecomputeGuardTest {
         when(source.earliestIncidentFactMoment()).thenReturn(BUCKET_START.minusDays(1));
         when(source.collectIncidentGrain(any(), any())).thenReturn(List.of(incidentRow));
 
-        service.recomputeDay(BUCKET, ASSEMBLED_AT);
+        service.recomputeDay(BUCKET, service.seriesStarts(), ASSEMBLED_AT);
 
         verify(source, never()).collectDealGrain(any(), any());
         ArgumentCaptor<List<DealGrainRow>> deals = captor();
@@ -91,7 +91,7 @@ class AggregateRecomputeGuardTest {
         when(source.collectDealGrain(any(), any())).thenReturn(List.of(dealRow));
         when(source.collectIncidentGrain(any(), any())).thenReturn(List.of(incidentRow));
 
-        service.recomputeDay(BUCKET, ASSEMBLED_AT);
+        service.recomputeDay(BUCKET, service.seriesStarts(), ASSEMBLED_AT);
 
         verify(source).collectDealGrain(any(), any());
         verify(source).collectIncidentGrain(any(), any());
@@ -103,7 +103,7 @@ class AggregateRecomputeGuardTest {
         when(source.earliestDealFactMoment()).thenReturn(null);
         when(source.earliestIncidentFactMoment()).thenReturn(null);
 
-        service.recomputeDay(BUCKET, ASSEMBLED_AT);
+        service.recomputeDay(BUCKET, service.seriesStarts(), ASSEMBLED_AT);
 
         verify(source, never()).collectDealGrain(any(), any());
         verify(source, never()).collectIncidentGrain(any(), any());
@@ -123,7 +123,7 @@ class AggregateRecomputeGuardTest {
         when(source.collectDealGrain(any(), any())).thenReturn(List.of());
         when(source.collectIncidentGrain(any(), any())).thenReturn(List.of());
 
-        service.recomputeDay(BUCKET, ASSEMBLED_AT);
+        service.recomputeDay(BUCKET, service.seriesStarts(), ASSEMBLED_AT);
 
         verify(writeService, never()).writeDay(any(), anyList(), anyList(), any());
     }

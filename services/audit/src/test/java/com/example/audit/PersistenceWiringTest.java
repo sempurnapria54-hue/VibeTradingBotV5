@@ -44,10 +44,10 @@ class PersistenceWiringTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(PersistenceConfig.class)
             .withPropertyValues(
-                    "audit.persistence.journal.url=" + JOURNAL_URL,
-                    "audit.persistence.journal.username=" + JOURNAL_ROLE,
-                    "audit.persistence.journal.password=journal-password",
-                    "audit.persistence.journal.max-pool-size=" + JOURNAL_POOL);
+                    "audit.persistence.url=" + JOURNAL_URL,
+                    "audit.persistence.username=" + JOURNAL_ROLE,
+                    "audit.persistence.password=journal-password",
+                    "audit.persistence.max-pool-size=" + JOURNAL_POOL);
 
     @Test
     @DisplayName("Своя база владельца держится его собственной ролью")

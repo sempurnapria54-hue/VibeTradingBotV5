@@ -297,10 +297,10 @@ final class AuditSubstrate {
      */
     static Map<String, String> databaseAddress(PostgreSQLContainer container) {
         Map<String, String> values = new LinkedHashMap<>();
-        values.put("audit.persistence.journal.url", container.getJdbcUrl());
-        values.put("audit.persistence.journal.username", container.getUsername());
-        values.put("audit.persistence.journal.password", container.getPassword());
-        values.put("audit.persistence.journal.max-pool-size", "3");
+        values.put("audit.persistence.url", container.getJdbcUrl());
+        values.put("audit.persistence.username", container.getUsername());
+        values.put("audit.persistence.password", container.getPassword());
+        values.put("audit.persistence.max-pool-size", "3");
         return values;
     }
 

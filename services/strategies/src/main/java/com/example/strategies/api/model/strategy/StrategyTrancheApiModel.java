@@ -36,7 +36,8 @@ public class StrategyTrancheApiModel {
             + "запрещён иначе")
     private BigDecimal levelStep;
 
-    @Schema(description = "Допустимо ли переоткрытие эпизода этого транша; пусто читается как «не допускает»")
+    @Schema(description = "Допустимо ли переоткрытие эпизода этого транша; объявляется явно — умолчания нет, "
+            + "пустое значение создание отвергает")
     private Boolean positionReopenAllowed;
 
     @Valid

@@ -170,6 +170,18 @@ public class AnomalyReportService {
     }
 
     /**
+     * Тот же журнальный отчёт о происшествии — СВОЕЙ транзакцией. Вызывается
+     * после коммита чужой транзакции (признаки терминала сделки —
+     * docs/models/domain/aggregate/Deal.md §Енумы, строка «момент»): там
+     * обычный вызов участвовал бы в уже зафиксированной транзакции без
+     * коммита, а отказ записи не должен касаться того, что уже закоммичено.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AnomalyReport journalApart(DealContext dealContext, HoldSignal signal) {
+        return create(dealContext, signal, AnomalyReport.Status.COMPLETED, null, Map.of());
+    }
+
+    /**
      * Журнальный отчёт о происшествии, чей момент задан СУЩНОСТЬЮ-ПРЕДМЕТОМ:
      * одно решение по одной строке исполнения — один отчёт, сколько бы раз
      * строка ни планировалась повтором. Возвращает пусто, если отчёт по
@@ -215,6 +227,26 @@ public class AnomalyReportService {
     @Transactional
     public AnomalyReport open(DealContext dealContext, HoldSignal signal) {
         return create(dealContext, signal, AnomalyReport.Status.CREATED, null, Map.of());
+    }
+
+    /**
+     * Строка критичной тропы для ДОВЕДЕНИЯ недоделанного: незакрытая строка
+     * по ключу состояния объекта продолжается, нет её — открывается новая.
+     *
+     * <p>Ступень, поднятую тем же основанием, строка уже сопровождает и
+     * остаётся незакрытой до подтверждения снятия риска; вторая строка с тем
+     * же ключом сделала бы одну неподтверждённую реакцию двумя
+     * происшествиями. Ступень подняла автоматика — строки ручного кода по
+     * ключу нет, и доведение заводит свою
+     * (docs/components/SafetyHoldCoordinator.md §«Анкер и доведение
+     * недоделанного»; docs/spec/manual-halt.json, величина
+     * {@code reportProduced}).
+     */
+    @Transactional
+    public AnomalyReport resumeOrOpen(DealContext dealContext, HoldSignal signal) {
+        return dataService.findUnclosed(accountId(dealContext), instrumentId(dealContext), signal.getCode(),
+                        severityOf(signal))
+                .orElseGet(() -> open(dealContext, signal));
     }
 
     /** Продвинуть отчёт в названный статус обработки. */

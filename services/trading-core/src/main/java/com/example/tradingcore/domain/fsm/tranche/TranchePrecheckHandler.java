@@ -106,6 +106,12 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
         // (docs/components/DealOrchestratorJob.md §«Цикл прохода»). Прочти его
         // обработчик ложным условием — неотправленная нога несёт риск, и
         // повторяемый отказ отправки уводил бы сделку в ошибку.
+        // Та же охрана держит и работу, отложенную сработавшим контролем, —
+        // временный вердикт преконтроля (`SKIP_ACTION`) и отказ расчёта по
+        // стороне уровня: строка исполнения заводится `PLANNED` до расчёта и
+        // преконтроля и остаётся живой, поэтому транш ждёт следующего прохода,
+        // а не закрывается ложным условием входа
+        // (docs/processes/risk-evaluation.md §«Реакция на результат»).
         if (isNotEmpty(dealContext.liveStrategyActionStates(tranche))) {
             return TrancheTransition.stay();
         }

@@ -17,7 +17,6 @@ import com.example.strategies.api.model.strategy.StrategyConditionOperandApiMode
 import com.example.strategies.api.model.strategy.StrategyConditionRuleApiModel;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -130,27 +129,29 @@ class PhaseClassificationContextTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U26.8 — оператор правила классификации неизвестен: дом требует отказа (F4)")
-    void u26_8_theClauseOperatorIsCheckedAgainstItsEnumByTheHome() {
+    @DisplayName("U26.8 — оператор правила классификации неизвестен: нарушение перечня")
+    void u26_8_theClauseOperatorIsCheckedAgainstItsEnum() {
         CreateStrategyApiRequest request = reference();
         phaseConditionRule(request, TREND_CLAUSE).setOperator("APPROX");
 
         assertThat(violations(request))
-                .as("ожидание из дома: перечень операторов закрыт, и у правила шага он сверяется")
-                .isNotEmpty();
+                .as("перечень операторов закрыт и сверяется в обоих контекстах правила")
+                .singleElement()
+                .asString()
+                .contains(".operator: unknown value APPROX");
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U26.9 — таймфрейм правила классификации неизвестен: дом требует отказа (F4)")
-    void u26_9_theClauseTimeframeIsCheckedAgainstItsEnumByTheHome() {
+    @DisplayName("U26.9 — таймфрейм правила классификации неизвестен: нарушение перечня")
+    void u26_9_theClauseTimeframeIsCheckedAgainstItsEnum() {
         CreateStrategyApiRequest request = reference();
         phaseConditionRule(request, TREND_CLAUSE).setTimeframe("TEN_MINUTES");
 
         assertThat(violations(request))
-                .as("ожидание из дома: у правила шага таймфрейм сверяется, у клаузы — нет")
-                .isNotEmpty();
+                .as("перечень таймфреймов сверяется в обоих контекстах правила")
+                .singleElement()
+                .asString()
+                .contains(".timeframe: unknown value TEN_MINUTES");
     }
 
     @Test

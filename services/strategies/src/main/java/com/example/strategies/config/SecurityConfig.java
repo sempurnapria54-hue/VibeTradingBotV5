@@ -1,6 +1,7 @@
 package com.example.strategies.config;
 
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.platform.exception.handler.BearerTokenFailureInstaller;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -49,7 +50,9 @@ public class SecurityConfig {
                 .oauth2ResourceServer(server -> server
                         .jwt(jwt -> {})
                         .authenticationEntryPoint(accessDenialHandler)
-                        .accessDeniedHandler(accessDenialHandler))
+                        .accessDeniedHandler(accessDenialHandler)
+                        // Сбой самого звена — 500 тем же DTO, а не 401 поверх.
+                        .withObjectPostProcessor(new BearerTokenFailureInstaller(accessDenialHandler)))
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(accessDenialHandler)
                         .accessDeniedHandler(accessDenialHandler))

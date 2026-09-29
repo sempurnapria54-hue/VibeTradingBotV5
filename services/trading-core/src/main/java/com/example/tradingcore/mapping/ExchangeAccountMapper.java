@@ -55,4 +55,7 @@ public interface ExchangeAccountMapper {
      */
     @Mapping(target = "tenantId", source = "tenantInternalId")
     ExchangeAccount persistenceToDomain(ExchangeAccountEntity entity);
+
+    /** Колонка ступени защиты → доменная ступень: проекция одного поля строки. */
+    ExchangeAccount.SafetyRung persistenceToSafetyRung(String safetyRung);
 }

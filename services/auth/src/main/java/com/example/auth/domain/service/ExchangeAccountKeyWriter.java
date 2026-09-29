@@ -7,6 +7,7 @@ import com.example.tradingbot.domain.util.ExchangeAccountSecretFields;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.cloud.vault.config.VaultProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.vault.core.VaultTemplate;
 
@@ -26,12 +27,21 @@ import org.springframework.vault.core.VaultTemplate;
  * счёта в базе: у обоих один источник — действие владельца при
  * регистрации, и разведи их по носителям, они разойдутся при первой же
  * правке одного из них.
+ *
+ * <p><b>Адрес хранилища обязан быть названным</b> — так же, как имя
+ * окружения. При пустом {@code spring.cloud.vault.uri} клиент собирает
+ * адрес из собственных умолчаний ({@code https://localhost:8200}), и ключи
+ * уехали бы не туда, куда объявлено окружением, — умолчание библиотеки
+ * отказом не является. Поэтому пустая ось отказывает РЕГИСТРАЦИЮ до
+ * всякого обращения к клиенту, а подъём контекста не трогает: чтения
+ * реестра и заведение тенанта хранилища не касаются.
  */
 @Component
 @RequiredArgsConstructor
 public class ExchangeAccountKeyWriter {
 
     private final VaultTemplate vaultTemplate;
+    private final VaultProperties vaultProperties;
     private final EnvironmentProperties environment;
 
     /**
@@ -46,6 +56,7 @@ public class ExchangeAccountKeyWriter {
     public void write(String accountInternalId, String apiKey, String secret, String passphrase,
                       ExchangeAccount.Contour contour) {
         requireEnvironment();
+        requireSecretStoreAddress();
         vaultTemplate.write(
                 ExchangeAccountKeyPath.of(environment.getName(), accountInternalId),
                 Map.of(
@@ -63,6 +74,17 @@ public class ExchangeAccountKeyWriter {
     private void requireEnvironment() {
         if (StringUtils.isBlank(environment.getName())) {
             throw new IllegalStateException("Имя окружения не задано: адрес ключей счёта невычислим");
+        }
+    }
+
+    /**
+     * Адрес хранилища обязан быть объявлен осью окружения: без него клиент
+     * пошёл бы по адресу-умолчанию библиотеки, которого окружение не
+     * объявляло.
+     */
+    private void requireSecretStoreAddress() {
+        if (StringUtils.isBlank(vaultProperties.getUri())) {
+            throw new IllegalStateException("Адрес хранилища секретов не задан: ключи счёта не пишутся никуда");
         }
     }
 }

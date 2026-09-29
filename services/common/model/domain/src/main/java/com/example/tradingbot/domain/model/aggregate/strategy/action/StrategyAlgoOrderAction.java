@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -65,6 +66,7 @@ public class StrategyAlgoOrderAction extends Auditable implements StrategyAction
      * стоять не может: что действие забирает, читается у цели
      * (docs/rules/live-risk-protection.md).
      */
+    @JsonIgnore
     public Boolean isProtective() {
         return AlgoOrder.ConditionType.STOP_LOSS.equals(conditionType)
                 || AlgoOrder.ConditionType.PARTIAL_STOP_LOSS.equals(conditionType)

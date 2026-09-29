@@ -9,8 +9,11 @@ import lombok.Setter;
 /**
  * Параметры расчёта структуры рынка (уровни, диапазоны, свинги).
  * Хранятся JSONB внутри JSON настройки-владельца
- * ({@link StrategyMarketStructureSetting}). См.
- * docs/models/domain/aggregate/Strategy.md (§MarketStructureParams).
+ * ({@link StrategyMarketStructureSetting};
+ * docs/models/domain/aggregate/Strategy.md §«Настройки рыночных данных»).
+ * Смысл каждого операнда держит
+ * docs/models/domain/other/MarketStructure.md §«Семантика классификации
+ * (как считается)».
  */
 @Getter
 @Setter

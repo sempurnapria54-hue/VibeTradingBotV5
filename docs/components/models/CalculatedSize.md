@@ -19,14 +19,13 @@
 | `notionalUsdt` | `BigDecimal` | Номинал позиции в USDT, если рассчитывался. |
 | `description` | `String` | Пояснение расчёта (целевое имя; legacy — `explanation`). |
 | `sizeMode` | `SizeMode` | Режим размера (уточнённая модель). |
-| `exitOutcome` | `ExitOutcome` | Исход округления reduce-only выхода. Заполняется только при `sizeMode = REDUCE_ONLY`; у прочих режимов пусто — округлять долю там нечего. |
+| `exitOutcome` | `ExitOutcome` | Исход округления reduce-only выхода. Заполняется **классом действия**, а не режимом: только у действия выхода, у прочих пусто — округлять долю там нечего. Защитная ступень идёт тем же режимом `REDUCE_ONLY` и исхода не несёт: её размер — класс другого расчёта (`docs/components/SizeCalculator.md` §«Защитная ступень — другой класс»). |
 | `exitSize`, `exitRemainder` | `BigDecimal` | Операнды исхода: доля экспозиции транша, округлённая вниз по шагу лота, и остаток после неё (`exitSize`, `exitRemainder` в `docs/spec/order-sizing.json`). Только у выхода; размер заявки — `sizeContracts`, а эти два едут в журнальный отчёт об округлении. |
 
 ## Енум `SizeMode`
 
 - `OPEN_OR_INCREASE` — размер для открытия или увеличения позиции;
 - `REDUCE_ONLY` — только для уменьшения существующей позиции;
-- `FULL_CLOSE` — для полного закрытия позиции;
 - `NOT_REQUIRED` — для команды размер не требуется.
 
 ## Енум `ExitOutcome`
@@ -67,7 +66,8 @@
 контрактов через `ctVal`/`lotSz`/`minSz` — `docs/spec/order-sizing.json`,
 смысл — `docs/components/SizeCalculator.md`.
 Direct partial close позиции не рассчитывается; полное закрытие идёт
-market-close'ом (на выходе сделки ведёт `DealExitPendingHandler` — и по
+market-close'ом мимо расчёта размера — поэтому режима полного закрытия у
+`SizeMode` нет (на выходе сделки ведёт `DealExitPendingHandler` — и по
 условию-переходу, и при явном действии шага `EXIT`); частичное уменьшение —
 через reduce-only `Order`/`AlgoOrder` (см.
 `docs/rules/no-partial-close.md`).

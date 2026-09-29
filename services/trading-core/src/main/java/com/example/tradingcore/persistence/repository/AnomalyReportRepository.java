@@ -2,6 +2,8 @@ package com.example.tradingcore.persistence.repository;
 
 import com.example.tradingcore.persistence.model.AnomalyReportEntity;
 import java.time.OffsetDateTime;
+import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -44,6 +46,24 @@ public interface AnomalyReportRepository extends JpaRepository<AnomalyReportEnti
                            @Param("severity") String severity,
                            @Param("since") OffsetDateTime since,
                            @Param("until") OffsetDateTime until);
+
+    /**
+     * Незакрытые строки критичной тропы по ключу состояния объекта — радиус,
+     * код и критичность, без сущности-предмета, — последние по заведению
+     * первыми. Окно вызывающего ограничивает выборку одной строкой.
+     */
+    @Query("select r from AnomalyReportEntity r "
+            + "where r.exchangeAccountId = :exchangeAccountId "
+            + "and ((:instrumentId is null and r.instrumentId is null) or r.instrumentId = :instrumentId) "
+            + "and r.subjectExternalId is null "
+            + "and r.code = :code and r.severity = :severity and r.status <> :closed "
+            + "order by r.id desc")
+    List<AnomalyReportEntity> findUnclosed(@Param("exchangeAccountId") Long exchangeAccountId,
+                                           @Param("instrumentId") Long instrumentId,
+                                           @Param("code") String code,
+                                           @Param("severity") String severity,
+                                           @Param("closed") String closed,
+                                           Pageable pageable);
 
     /**
      * Носитель ПОДТВЕРЖДЕНИЯ гистерезиса: у стоящей по ключу строки серия

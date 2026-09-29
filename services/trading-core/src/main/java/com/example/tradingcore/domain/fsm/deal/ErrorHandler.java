@@ -52,7 +52,7 @@ public class ErrorHandler implements DealHandler {
 
     @Override
     public DealTransition handle(DealContext dealContext) {
-        if (isFalse(transitionGate.emergencyTerminalContract(dealContext))) {
+        if (isFalse(transitionGate.emergencyTerminalAllowed(dealContext))) {
             return harvest(dealContext);
         }
         return emergencyTerminal(dealContext);

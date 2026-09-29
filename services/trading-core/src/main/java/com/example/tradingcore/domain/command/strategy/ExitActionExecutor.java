@@ -118,7 +118,7 @@ public class ExitActionExecutor implements StrategyActionExecutor {
     /** Живые входные ноги транша: reduce-only ноги риск снимают и под отмену не идут. */
     private List<Order> liveEntryLegs(DealTranche tranche) {
         return emptyIfNull(tranche.liveOrders()).stream()
-                .filter(order -> isFalse(isTrue(order.getPositionReducingOnly())))
+                .filter(order -> isTrue(order.isEntryLeg()))
                 .collect(Collectors.toList());
     }
 

@@ -103,7 +103,7 @@ class ActionFractionsTest {
                 .singleElement()
                 .asString()
                 .contains(ALLOCATION_RANGE)
-                .contains("доля объявления лежит в (0; 100], получено 0");
+                .contains("доля объявления больше нуля и не выше ста, получено 0");
     }
 
     @Test

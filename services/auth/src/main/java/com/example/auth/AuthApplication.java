@@ -3,6 +3,7 @@ package com.example.auth;
 import com.example.auth.config.EnvironmentProperties;
 import com.example.auth.config.IdentityProperties;
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.platform.exception.handler.JwtDecoderAssemblyGuard;
 import com.example.platform.security.ActorProvider;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -14,9 +15,11 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
  * Точка входа сервиса `auth`.
  *
  * <p><b>Область отображаемых классов названа явно.</b> Базовый тип
- * audit-полей лежит в общем артефакте, то есть вне пакета сервиса, и
- * умолчание сканирования его не видит. Свой пакет перечисляется рядом:
- * {@code @EntityScan} умолчание ЗАМЕЩАЕТ, а не дополняет.
+ * audit-полей и строка отказа доступа лежат в общем артефакте, то есть вне
+ * пакета сервиса, и умолчание сканирования их не видит. Свой пакет
+ * перечисляется рядом: {@code @EntityScan} умолчание ЗАМЕЩАЕТ, а не
+ * дополняет. Строку отказа отображение берёт вместе с пакетом, и таблицу
+ * {@code access_denials} схема сервиса обязана нести.
  *
  * <p><b>Взятое из общего артефакта периметра названо ИМЕНОВАННО</b>, а не
  * взято сканированием его пакета: перечень взятого читается в одном
@@ -25,7 +28,7 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
  */
 @SpringBootApplication
 @EntityScan({"com.example.auth", "com.example.tradingbot.persistence.model"})
-@Import({AccessDenialHandler.class, ActorProvider.class})
+@Import({AccessDenialHandler.class, JwtDecoderAssemblyGuard.class, ActorProvider.class})
 @EnableConfigurationProperties({EnvironmentProperties.class, IdentityProperties.class})
 public class AuthApplication {
 

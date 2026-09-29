@@ -196,23 +196,35 @@
         </dependency>
 
         <!--
-          Ресурс-сервер — ТЕСТОВЫЙ, и он тоже не про код артефакта.
-          Резолвер актора читает Authentication; форма ПРИНЯТОГО принципала
-          у всех восьми потребителей одна — JwtAuthenticationToken, — и
-          кейс U3.6 мерит, что берётся имя принципала (claim субъекта), а
-          не токен и не его представление. Проба на суррогатном токене
-          этого не мерила бы: у него имя строится другой веткой.
+          Ресурс-сервер и настройщик цепочки — ОБЛАСТЬ optional. Код
+          артефакта берёт их ради двух классов тропы сбоя звена
+          bearer-токена: установщик обработчика отказа звена
+          (BearerTokenFailureInstaller) — звено и постобработчик настройщика
+          объявлены в этих двух артефактах — и охрана сборки декодера. У всех
+          восьми потребителей точки входа отказа они приезжают стартером
+          ресурс-сервера, а транзитивными стали бы обязательными и для
+          остальных. Тот же ресурс-сервер нужен и пробам: форма ПРИНЯТОГО
+          принципала у потребителей одна — JwtAuthenticationToken, — и кейс
+          U3.6 мерит, что резолвер актора берёт имя принципала (claim
+          субъекта), а не токен и не его представление.
         -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-resource-server</artifactId>
-            <scope>test</scope>
+            <optional>true</optional>
         </dependency>
-        <!-- Сам токен (Jwt) живёт в соседнем артефакте того же стартера. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-config</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- Сам токен (Jwt) и декодер живут в соседнем артефакте того же
+             стартера: охрана сборки декодера (JwtDecoderAssemblyGuard) берёт
+             его тем же способом, что и установщик. -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-jose</artifactId>
-            <scope>test</scope>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 

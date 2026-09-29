@@ -3,6 +3,7 @@ package com.example.marketdata.mapping;
 import static java.util.Objects.isNull;
 
 import com.example.tradingbot.domain.model.trade.market_snapshot.OrderBookLevel;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +18,11 @@ import org.springframework.stereotype.Component;
  * проходе раз в минуту по всему листингу это два порядка объёма ряда,
  * который не чистится (docs/models/domain/other/MarketOrderBook.md
  * §Персистентность).
+ *
+ * <p>Маппер берётся <b>копией</b> общего бина, и копии ставится политика
+ * непустых полей: форма колонки от настроек чужого бина не зависит, а
+ * пустое поле уровня в строку не пишется — лишний ключ платился бы объёмом
+ * на каждом уровне каждого среза.
  */
 @Component
 public class OrderBookLevelJsonConverter {
@@ -26,7 +32,8 @@ public class OrderBookLevelJsonConverter {
     private final ObjectMapper objectMapper;
 
     public OrderBookLevelJsonConverter(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+        this.objectMapper = objectMapper.copy()
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
     }
 
     /** Уровни в JSON навеса; пусто на входе — пустой массив, а не пустота. */

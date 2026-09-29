@@ -1,9 +1,9 @@
 package com.example.audit.persistence.service;
 
 import com.example.audit.config.JournalPersistenceConfig;
-import com.example.audit.domain.model.AccessDenial;
 import com.example.audit.mapping.AccessDenialMapper;
 import com.example.audit.persistence.repository.journal.AccessDenialRepository;
+import com.example.tradingbot.domain.model.other.AccessDenial;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;

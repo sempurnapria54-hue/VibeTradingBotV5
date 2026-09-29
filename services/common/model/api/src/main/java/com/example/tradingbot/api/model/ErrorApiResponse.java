@@ -2,8 +2,11 @@ package com.example.tradingbot.api.model;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.OffsetDateTime;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * Единый error-DTO внешней поверхности — <b>один на все сервисы</b>
@@ -23,20 +26,29 @@ import lombok.Getter;
  * Там, где класс причин не различает, поле пусто, и это означает «различать
  * нечего», а не «причина неизвестна»
  * (docs/rules/absent-value-semantics.md).
+ *
+ * <p><b>Форма — бин, и это следствие читателя, а не вкус:</b> тело отказа
+ * разбирают потребители поверхности, а у формы без пустого конструктора и
+ * creator'а сериализатор отказывает у читателя
+ * (.claude/rules/codestyle.md §«Неизменяемое значение, пересекающее
+ * сериализацию»). Запись переименовала бы аксессоры у всех потребителей.
  */
 @Getter
+@Setter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ErrorApiResponse {
 
     @Schema(description = "Класс отказа — устойчивый машиночитаемый идентификатор причины")
-    private final String code;
+    private String code;
 
     @Schema(description = "Причина внутри класса, когда класс её различает; пусто, если не различает")
-    private final String reason;
+    private String reason;
 
     @Schema(description = "Пояснение для человека; секретов не несёт")
-    private final String message;
+    private String message;
 
     @Schema(description = "Момент отказа, UTC")
-    private final OffsetDateTime occurredAt;
+    private OffsetDateTime occurredAt;
 }

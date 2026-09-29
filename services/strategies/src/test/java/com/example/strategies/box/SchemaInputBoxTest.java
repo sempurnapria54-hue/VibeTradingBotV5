@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class SchemaInputBoxTest extends SharedStrategiesBox {
 
     /** Версии миграций дерева: перечень закрыт каталогом `db/migration`. */
-    private static final List<String> MIGRATIONS = List.of("1");
+    private static final List<String> MIGRATIONS = List.of("1", "2");
 
     /** Таблицы дерева определения плюс outbox: их заводит миграция. */
     private static final List<String> OWN_TABLES = List.of("strategies", "strategy_details",

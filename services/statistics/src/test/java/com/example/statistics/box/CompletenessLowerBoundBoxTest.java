@@ -7,7 +7,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -121,7 +120,7 @@ class CompletenessLowerBoundBoxTest extends StatisticsBox {
     /** Насколько ПОЗЖЕ всех своих моментов наблюдается чужая пара. */
     private static final Duration JOURNAL_AHEAD = Duration.ofHours(12);
 
-    /** Слово, которым сегодня подписаны величины полноты: предмет находки F-2. */
+    /** Слово, которым величины полноты были подписаны до закрытия находки F-2. */
     private static final String JOURNAL_WORD = "урнал";
 
     /** Запись момента наблюдения одной пары. */
@@ -255,7 +254,6 @@ class CompletenessLowerBoundBoxTest extends StatisticsBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B5.5 — Величины едут СВОИ, а не журнальные")
     void theValuesAreItsOwnRatherThanTheJournalsOnes() {
         givenReceptionStateRows();

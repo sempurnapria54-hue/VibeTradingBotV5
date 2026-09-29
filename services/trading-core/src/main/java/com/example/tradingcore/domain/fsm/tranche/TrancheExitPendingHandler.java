@@ -3,7 +3,6 @@ package com.example.tradingcore.domain.fsm.tranche;
 import static java.math.BigDecimal.ZERO;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
-import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -111,7 +110,7 @@ public class TrancheExitPendingHandler implements DealTrancheHandler {
      */
     private Order liveEntryLeg(DealTranche tranche) {
         return tranche.liveOrders().stream()
-                .filter(order -> isFalse(order.getPositionReducingOnly()))
+                .filter(order -> isTrue(order.isEntryLeg()))
                 .findFirst()
                 .orElse(null);
     }

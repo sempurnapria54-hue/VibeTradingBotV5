@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -150,16 +149,12 @@ class LossStreakCounterTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b>
-     * Благоприятное умолчание запрещено (docs/rules/absent-value-semantics.md
-     * §«Благоприятное умолчание запрещено»), а гейт спрашивает ЛОЖНОСТЬ
-     * признака, а не отсутствие истины: на пустом он не срабатывает, и
-     * счётчик двигается по непредъявленному графу. Красный прогон и есть
-     * предъявление находки `S-5` (`.claude/work/backlog.md` §«Пустой
-     * признак полноты графа преконтроль читает как предъявленный»).
+     * <b>Ожидание взято из дома:</b> благоприятное умолчание запрещено
+     * (docs/rules/absent-value-semantics.md §«Благоприятное умолчание
+     * запрещено»), и гейт спрашивает отсутствие истины, а не ложность
+     * признака — пустой признак замораживает счётчик так же, как ложный.
      */
     @Test
-    @Tag("debt")
     @DisplayName("U14.6 — признак полноты графа не объявлен вовсе: тот же исход, что у ложного")
     void u14_6_anAbsentGraphFlagReadsAsNotPresented() {
         counter.applyTerminal(context(new BigDecimal("-12.5"), null, account(), BigDecimal.ZERO));

@@ -6,6 +6,8 @@ import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
+import static java.util.Collections.emptyMap;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -32,19 +34,27 @@ import lombok.Getter;
  * операнде — то есть консервативно ложны. Отдельного перечня разрешённых
  * типов правил заводить не нужно: он был бы вторым носителем того же
  * различения (docs/spec/deal-condition.json).
+ *
+ * <p><b>Несобранная раскладка — пустая, а не отсутствующая.</b> Сборщик,
+ * не заполнивший раскладку, даёт правилам на ней пустой операнд, то есть
+ * ту же консервативную ложь; держаться совпадением с тем, что нынешние
+ * сборщики раскладки заполняют, контракт не должен.
  */
 @Getter
 @Builder
 public class ConditionEvaluationContext {
 
-    /** Последние значения индикаторов по ключу настройки (indicatorKey). */
-    private final Map<String, IndicatorValue> latestIndicators;
+    /** Последние значения индикаторов по ключу настройки (indicatorKey); не собраны — пусто. */
+    @Builder.Default
+    private final Map<String, IndicatorValue> latestIndicators = emptyMap();
 
-    /** Предыдущие значения индикаторов по ключу (для slope/crossover); может быть пустым. */
-    private final Map<String, IndicatorValue> previousIndicators;
+    /** Предыдущие значения индикаторов по ключу (для slope/crossover); не собраны — пусто. */
+    @Builder.Default
+    private final Map<String, IndicatorValue> previousIndicators = emptyMap();
 
-    /** Последние структуры рынка по ключу настройки (structureKey). */
-    private final Map<String, MarketStructure> structures;
+    /** Последние структуры рынка по ключу настройки (structureKey); не собраны — пусто. */
+    @Builder.Default
+    private final Map<String, MarketStructure> structures = emptyMap();
 
     /** Текущая рыночная цена для PRICE-операндов; null — недоступна. */
     private final BigDecimal price;

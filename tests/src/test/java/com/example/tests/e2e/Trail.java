@@ -1532,10 +1532,10 @@ public final class Trail implements AutoCloseable {
             }
             case AUDIT -> {
                 Database database = databases.get(party);
-                values.put("audit.persistence.journal.url", database.url());
-                values.put("audit.persistence.journal.username", database.username());
-                values.put("audit.persistence.journal.password", database.password());
-                values.put("audit.persistence.journal.max-pool-size", "3");
+                values.put("audit.persistence.url", database.url());
+                values.put("audit.persistence.username", database.username());
+                values.put("audit.persistence.password", database.password());
+                values.put("audit.persistence.max-pool-size", "3");
                 values.put("reception.bootstrap-servers", broker.getBootstrapServers());
                 values.put("reception.group-id", "audit.journal");
                 values.put("reception.topics", Substrate.CORE_TOPIC + "," + Substrate.STRATEGY_TOPIC);

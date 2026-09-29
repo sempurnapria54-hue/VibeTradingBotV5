@@ -1,5 +1,8 @@
 package com.example.tradingcore.domain.safety;
 
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
+
+import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import java.util.Objects;
 import lombok.Value;
 
@@ -85,5 +88,33 @@ public class HoldSignal {
     /** Реакция снимает принятый риск. */
     public Boolean tearsDownRisk() {
         return Objects.equals(HoldRung.HARD, rung);
+    }
+
+    /**
+     * Ступень лестницы счёта по судьбе принятого риска: та, которую сигнал
+     * поднял бы на счётном радиусе.
+     */
+    public ExchangeAccount.SafetyRung accountLadderRung() {
+        return isTrue(tearsDownRisk())
+                ? ExchangeAccount.SafetyRung.TRADE_BLOCKED
+                : ExchangeAccount.SafetyRung.HOLD;
+    }
+
+    /**
+     * Инструментный сигнал поглощается стоящей ступенью счёта, когда её
+     * состав покрывает состав любой инструментной ступени. Покрывает только
+     * сворачивание — блок всех торговых команд счёта и снятие его риска;
+     * мягкий холд счёта (выпадение из выборки входа) у́же и мягкой ступени
+     * пары, несущей блок-сет преконтроля, и не покрывает ни одной
+     * (docs/rules/exchange-hold.md §«Границы и эскалация»).
+     *
+     * <p>Счётный сигнал доминированием не гасится: монотонность своей
+     * лестницы держит гард перехода, а не этот предикат.
+     *
+     * @param standing ступень, стоящая на счёте радиуса
+     */
+    public Boolean dominatedByAccountRung(ExchangeAccount.SafetyRung standing) {
+        return HoldScope.INSTRUMENT.equals(scope)
+                && ExchangeAccount.SafetyRung.TRADE_BLOCKED.equals(standing);
     }
 }

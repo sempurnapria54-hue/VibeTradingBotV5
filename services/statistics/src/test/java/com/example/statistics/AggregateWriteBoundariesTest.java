@@ -72,7 +72,7 @@ class AggregateWriteBoundariesTest {
         when(sourceDataService.earliestDealFactMoment()).thenReturn(longAgo);
         when(sourceDataService.earliestIncidentFactMoment()).thenReturn(longAgo);
 
-        recomputeService.recomputeDay(BUCKET, ASSEMBLED);
+        recomputeService.recomputeDay(BUCKET, recomputeService.seriesStarts(), ASSEMBLED);
 
         OffsetDateTime dayStart = BUCKET.atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
         verify(sourceDataService).collectDealGrain(dayStart, dayStart.plusDays(1));

@@ -19,7 +19,6 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -31,12 +30,6 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка.</b> Сделка с одним траншем; граф предъявлен
  * целиком; живого эпизода нет (строки позиции нет вовсе); транш
  * терминален, экспозиция ноль, живых заявок и защит нет.
- *
- * <p><b>{@code @Tag("debt")}: {@code U2.3} предъявляет находку
- * {@code F-9}</b> — пустой признак полноты графа охрану не поднимает, и
- * «мы не всё прочитали» читается как «риска нет». Ожидание взято из дома
- * (docs/rules/absent-value-semantics.md) и не ослаблено под текущий факт;
- * метка снимется правкой владельца.
  */
 class DealRiskProvenAbsentTest {
 
@@ -59,7 +52,6 @@ class DealRiskProvenAbsentTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("U2.3 — полнота графа не объявлена вовсе: пустота читается как «не предъявлен»")
     void u2_3_anAbsentGraphCompletenessReadsAsNotPresented() {
         Deal deal = baseDeal();

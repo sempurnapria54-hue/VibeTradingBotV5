@@ -1,5 +1,6 @@
 package com.example.tradingcore.config;
 
+import java.time.Duration;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -35,6 +36,19 @@ public class BrokerProperties {
      * см. шапку класса.
      */
     private String bootstrapServers;
+
+    /**
+     * Потолок ожидания раскладки темы у публикующего клиента
+     * ({@code max.block.ms}): столько отправка ждёт брокера, прежде чем
+     * отказать. Калибровка — пара «ложный отказ на медленном, но живом
+     * брокере против удержания потока планировщика проходом реле на
+     * мёртвом»; направление — КОРОЧЕ: ложный отказ стоит одного
+     * повторного прохода, а строки остаются непомеченными
+     * (docs/components/OutboxRelayJob.md §«Брокер недоступен — проход
+     * пропускается, строки копятся»). Умолчание клиента — минута, то есть
+     * несколько тактов реле.
+     */
+    private Duration publishBlockTimeout;
 
     /** Настроена ли тропа событий: им решается запуск слушателя. */
     public Boolean isConfigured() {

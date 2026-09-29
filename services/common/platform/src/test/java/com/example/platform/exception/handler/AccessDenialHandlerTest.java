@@ -25,23 +25,29 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 /**
  * Точки входа отказа фильтр-цепочки: группы `U4`, `U5`, `U6` и клетка
  * `U14.7` документа `.claude/tests/cases/platform-shared-logic.md`.
+ * Клетка `U4.11` мерит проводку {@link BearerTokenFailureInstaller} на
+ * собранном звене bearer-токена: только там видно, перебрасывает ли звено
+ * собственный сбой.
  *
  * <p><b>Запрос и ответ собираются в памяти</b>
  * ({@code MockHttpServletRequest} / {@code MockHttpServletResponse}):
@@ -59,10 +65,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * часы процесса у предмета читает ровно один метод (звено Z12), и точное
  * значение пиниться не может.
  *
- * <p><b>Два кейса помечены {@code @Tag("debt")}:</b> их ожидание взято из
- * дома, а код несёт иначе (§«Ожидание берётся из дома, даже когда сегодня
- * оно не исполнено»). Их красный прогон есть предъявление долга, и в
- * умолчание прогона они не входят.
+ * <p><b>Меток {@code debt} у класса нет:</b> клетки, предъявлявшие долг
+ * (`U5.4`, `U5.5` — неудостоверённый контекст на тропе авторизации; `U4.8`,
+ * `U5.6` — бросающий писатель), с охраной точки входа мерят исполненный
+ * дом.
  */
 class AccessDenialHandlerTest {
 
@@ -190,20 +196,70 @@ class AccessDenialHandlerTest {
     }
 
     @Test
-    @DisplayName("U4.8 — бросающий писатель доступом не становится (пробел G2)")
+    @DisplayName("U4.8 — бросающий писатель доступом не становится: тот же 401 с телом")
     void u4_8_aThrowingRecorderNeverTurnsIntoAccess() throws Exception {
         doThrow(new RuntimeException("база недоступна"))
                 .when(recorder).recordPrincipalAbsent(anyString());
 
-        assertThatThrownBy(() ->
+        assertThatCode(() ->
                 handler.commence(request, response, new BadCredentialsException("token rejected")))
-                .as("охраны у точки входа нет, и цена нарушения контракта порта — ответ не того "
-                        + "класса; доступ при этом не даётся")
-                .isInstanceOf(RuntimeException.class);
-        assertThat(response.getContentAsString())
-                .as("тела ответа не написано: отказ записи доступом не становится")
-                .isEmpty();
-        assertThat(response.isCommitted()).isFalse();
+                .as("сбой писателя точка входа поглощает сама: класс ответа не выбирает контейнер")
+                .doesNotThrowAnyException();
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getHeader(HttpHeaders.WWW_AUTHENTICATE)).isEqualTo("Bearer");
+        assertThat(objectMapper.readTree(response.getContentAsString()).get("code").asText())
+                .as("отказ записи доступом не становится и класса отказа не меняет")
+                .isEqualTo("ACCESS_UNAUTHENTICATED");
+    }
+
+    @Test
+    @DisplayName("U4.9 — сбой звена цепочки: 500 тем же DTO, без текста, без предъявления и без следа")
+    void u4_9_aFailureOfTheChainLinkIsAServerFailure() throws Exception {
+        handler.onAuthenticationFailure(request, response,
+                new AuthenticationServiceException("jwks endpoint unreachable at 10.0.0.5"));
+
+        assertThat(response.getStatus()).isEqualTo(500);
+        assertThat(response.getHeader(HttpHeaders.WWW_AUTHENTICATE))
+                .as("предъявлять нечего: отказал сервис, а не принципал")
+                .isNull();
+        var body = objectMapper.readTree(response.getContentAsString());
+        assertThat(body.get("code").asText()).isEqualTo("INTERNAL_FAILURE");
+        assertThat(body.get("message").asText()).isEqualTo("Внутренний отказ сервиса");
+        assertThat(response.getContentAsString()).doesNotContain("jwks", "10.0.0.5");
+        verify(recorder, never()).recordPrincipalAbsent(anyString());
+        verify(recorder, never()).recordOperationForbidden(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("U4.10 — иной отказ звена идёт в точку входа: тот же исход, что у U4.1")
+    void u4_10_aRejectedTokenAtTheChainLinkIsTheUnauthenticatedOutcome() throws Exception {
+        handler.onAuthenticationFailure(request, response, new BadCredentialsException("token rejected"));
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getHeader(HttpHeaders.WWW_AUTHENTICATE)).isEqualTo("Bearer");
+        assertThat(objectMapper.readTree(response.getContentAsString()).get("code").asText())
+                .isEqualTo("ACCESS_UNAUTHENTICATED");
+        verify(recorder).recordPrincipalAbsent(SURFACE);
+    }
+
+    @Test
+    @DisplayName("U4.11 — собранное звено после установщика собственный сбой не перебрасывает")
+    void u4_11_theInstalledChainLinkAnswersItsOwnFailure() throws Exception {
+        AuthenticationManager failingManager = authentication -> {
+            throw new AuthenticationServiceException("jwks endpoint unreachable");
+        };
+        BearerTokenAuthenticationFilter filter = new BearerTokenAuthenticationFilter(failingManager);
+        new BearerTokenFailureInstaller(handler).postProcess(filter);
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer token-value");
+        MockFilterChain chain = new MockFilterChain();
+
+        assertThatCode(() -> filter.doFilter(request, response, chain))
+                .as("умолчание звена перебросило бы сбой контейнеру")
+                .doesNotThrowAnyException();
+        assertThat(chain.getRequest()).as("цепочка дальше не идёт").isNull();
+        assertThat(response.getStatus()).isEqualTo(500);
+        assertThat(objectMapper.readTree(response.getContentAsString()).get("code").asText())
+                .isEqualTo("INTERNAL_FAILURE");
     }
 
     // --- U5: отказ авторизации --------------------------------------------
@@ -250,17 +306,21 @@ class AccessDenialHandlerTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("U5.4 — пустой контекст: пары «нет принципала при OPERATION_FORBIDDEN» не бывает")
     void u5_4_anEmptyContextNeverYieldsAForbiddenTrailWithoutAPrincipal() throws Exception {
         handler.handle(request, response, new AccessDeniedException("not permitted"));
 
         verify(recorder, never()).recordOperationForbidden(anyString(), isNull());
+        verify(recorder).recordPrincipalAbsent(SURFACE);
+        assertThat(response.getStatus())
+                .as("принятого принципала нет — это отказ аутентификации, и исход у него свой")
+                .isEqualTo(401);
+        assertThat(objectMapper.readTree(response.getContentAsString()).get("code").asText())
+                .isEqualTo("ACCESS_UNAUTHENTICATED");
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U5.5 — аноним: неудостоверённое имя в строку не пишется (долг F4)")
+    @DisplayName("U5.5 — аноним: неудостоверённое имя в строку не пишется")
     void u5_5_anAnonymousNameIsNeverRecordedAsAFact() throws Exception {
         Authentication anonymous = new AnonymousAuthenticationToken(
                 "probe", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
@@ -268,28 +328,31 @@ class AccessDenialHandlerTest {
 
         handler.handle(request, response, new AccessDeniedException("not permitted"));
 
-        verify(recorder, never()).recordOperationForbidden(SURFACE, "anonymousUser");
+        verify(recorder, never()).recordOperationForbidden(anyString(), any());
+        verify(recorder).recordPrincipalAbsent(SURFACE);
+        assertThat(response.getStatus()).isEqualTo(401);
     }
 
     @Test
-    @DisplayName("U5.6 — бросающий писатель доступом не становится и здесь (пробел G2)")
+    @DisplayName("U5.6 — бросающий писатель доступом не становится и здесь: тот же 403 с телом")
     void u5_6_aThrowingRecorderNeverTurnsIntoAccessOnTheForbiddenPath() throws Exception {
         givenAcceptedPrincipal();
         doThrow(new RuntimeException("база недоступна"))
                 .when(recorder).recordOperationForbidden(anyString(), any());
 
-        assertThatThrownBy(() ->
+        assertThatCode(() ->
                 handler.handle(request, response, new AccessDeniedException("not permitted")))
-                .isInstanceOf(RuntimeException.class);
-        assertThat(response.getContentAsString()).isEmpty();
-        assertThat(response.isCommitted()).isFalse();
+                .doesNotThrowAnyException();
+        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(objectMapper.readTree(response.getContentAsString()).get("code").asText())
+                .isEqualTo("ACCESS_FORBIDDEN");
     }
 
     // --- U6: тело отказа ---------------------------------------------------
 
     @Test
-    @DisplayName("U6.1 — тело несёт ровно четыре имени поля, а классом не восстанавливается (находка F9)")
-    void u6_1_theBodyCarriesExactlyFourFieldsAndIsNotReadableIntoTheClass() throws Exception {
+    @DisplayName("U6.1 — тело несёт ровно четыре имени поля и классом восстанавливается")
+    void u6_1_theBodyCarriesExactlyFourFieldsAndIsReadableIntoTheClass() throws Exception {
         handler.commence(request, response, new BadCredentialsException("token rejected"));
         String body = response.getContentAsString();
 
@@ -297,10 +360,11 @@ class AccessDenialHandlerTest {
         objectMapper.readTree(body).fieldNames().forEachRemaining(names::add);
         assertThat(names).containsExactlyInAnyOrder("code", "reason", "message", "occurredAt");
 
-        assertThatThrownBy(() -> objectMapper.readValue(body, ErrorApiResponse.class))
-                .as("читатель единого error-DTO не восстанавливает его вовсе: ноль конструкторов "
-                        + "и ни одного creator'а")
-                .isInstanceOf(InvalidDefinitionException.class);
+        ErrorApiResponse read = objectMapper.readValue(body, ErrorApiResponse.class);
+        assertThat(read.getCode())
+                .as("читатель единого error-DTO восстанавливает его классом, а не только деревом")
+                .isEqualTo("ACCESS_UNAUTHENTICATED");
+        assertThat(read.getOccurredAt()).isNotNull();
     }
 
     @Test

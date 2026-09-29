@@ -10,7 +10,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Копия навеса справочных правил в дереве торгового ядра: изымает
- * идентификатор владельца и УДЕРЖИВАЕТ ставку комиссии.
+ * идентификатор владельца и ставку комиссии — то же правило, что у копии
+ * рыночных данных.
  *
  * <p>Кейсы — `U7`, `U10.3` (.claude/tests/cases/jsonb-overlay-roundtrip.md);
  * клетка `U7.4` живёт здесь, потому что адресует именно эту копию.
@@ -30,38 +31,26 @@ class InstrumentExternalRulesJsonConverterTest extends InstrumentRulesOverlayCop
         return converter.jsonToRules(json);
     }
 
-    @Override
-    protected String excludedField() {
-        return "instrumentId";
-    }
-
-    @Override
-    protected String retainedField() {
-        return "externalTakerFeeRate";
-    }
-
     /**
-     * Направление дефекта, а не его наличие: объект, прочитанный из навеса и
-     * гидрированный ставкой, записанный обратно кладёт в навес значение,
-     * принадлежащее комиссионному уровню счёта
-     * (.claude/work/backlog.md §«Изъятия двух копий конвертера навеса правил
-     * инструмента асимметричны»).
+     * Объект, прочитанный из навеса и гидрированный ставкой, записанный
+     * обратно, ставки в навес не кладёт: она атрибут комиссионного уровня
+     * счёта (docs/models/domain/other/InstrumentExternalRules.md §«Ставка
+     * комиссии»).
      *
      * <p><b>Состояние недостижимо обычной тропой</b>: писатель проекции
-     * берёт объект из синка каталога, а не из чтения навеса. Красный прогон
-     * этого кейса продовым дефектом поэтому не является — он предъявляет
-     * цену расхождения, если ход когда-нибудь состоится.
+     * берёт объект из синка каталога, а не из чтения навеса. Кейс мерит, что
+     * ход, который такой объект запишет, второго носителя ставки не заведёт.
      */
     @Test
-    @DisplayName("U7.4 — гидрированная ставка уезжает в навес второй копией значения")
-    void u7_4_aHydratedFeeRateTravelsIntoTheOverlayAsASecondCarrier() {
+    @DisplayName("U7.4 — гидрированная ставка в навес не уезжает")
+    void u7_4_aHydratedFeeRateDoesNotTravelIntoTheOverlay() {
         InstrumentExternalRules read = readRules(writeRules(rulesWithoutFee()));
         read.setExternalTakerFeeRate("0.0005");
 
         assertThat(keysOf(writeRules(read)))
                 .as("ставка комиссии — атрибут комиссионного уровня счёта, и в навесе "
-                        + "инструмента она второй носитель, расходящийся со сменой тира")
-                .contains("externalTakerFeeRate");
+                        + "инструмента она была бы вторым носителем, расходящимся со сменой тира")
+                .doesNotContain("externalTakerFeeRate");
     }
 
     private static InstrumentExternalRules rulesWithoutFee() {

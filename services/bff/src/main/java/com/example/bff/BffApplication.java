@@ -1,6 +1,7 @@
 package com.example.bff;
 
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.platform.exception.handler.JwtDecoderAssemblyGuard;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
@@ -31,7 +32,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @ConfigurationPropertiesScan
 @SpringBootApplication
-@Import(AccessDenialHandler.class)
+@Import({AccessDenialHandler.class, JwtDecoderAssemblyGuard.class})
 public class BffApplication {
 
     public static void main(String[] args) {

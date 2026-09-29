@@ -14,7 +14,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,8 +25,8 @@ import org.junit.jupiter.api.Test;
  * носитель и предикаты»).
  *
  * <p><b>Базовая сборка:</b> фаза прохода `BULL_TREND`; фазы входа нет;
- * фактов сделки нет; правило `MARKET_PHASE_IS` с константой `BULL_TREND`
- * типа `ENUM`.
+ * фактов сделки нет; правило `MARKET_PHASE_IS` с оператором `EQ` и
+ * константой `BULL_TREND` типа `ENUM`.
  *
  * <p><b>`UNKNOWN` знанием не является</b>, и встреча двух незнаний
  * совпадением не считается: разрешающее умолчание открыло бы вход по
@@ -83,25 +82,35 @@ class MarketPhaseRuleTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Объявлено
-     * «фаза не равна», и предикат обязан ответить отрицанием
-     * (docs/models/domain/aggregate/Strategy.md §Условия против
-     * docs/spec/market-phase-condition.json); создание оператор у правила
-     * ТРЕБУЕТ и до равенства его не сужает, а код оператор не читает и
-     * отвечает истиной. Красный прогон и есть предъявление находки `F-4`
-     * (`.claude/work/backlog.md` §«Предикат фазы игнорирует оператор, а
-     * создание его требует»).
+     * Объявлено «фаза не равна», и предикат отвечает отрицанием
+     * (docs/spec/market-phase-condition.json, величина {@code marketPhaseIs};
+     * находка `F-4` закрыта): создание оператор у правила требует, и
+     * интерпретатор его читает — как у равенства типа структуры.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U8.7 — оператор NE, фаза BULL_TREND, объявлена BULL_TREND: ложь (дом), код даёт истину")
+    @DisplayName("U8.7 — оператор NE, фаза BULL_TREND, объявлена BULL_TREND: ложь")
     void u8_7_thePhasePredicateMustHonourTheOperator() {
-        StrategyCondition condition = condition(rule(StrategyConditionRuleType.MARKET_PHASE_IS,
-                StrategyConditionOperator.NE, null, enumConstant("BULL_TREND")));
-
-        assertThat(evaluator.evaluate(condition, context(MarketPhase.Type.BULL_TREND, null)))
+        assertThat(phaseIs(StrategyConditionOperator.NE, "BULL_TREND", MarketPhase.Type.BULL_TREND))
                 .as("объявлено «фаза не равна» — предикат обязан ответить отрицанием")
                 .isFalse();
+    }
+
+    /** Пара к U8.7: без неё «NE всегда ложь» проходило бы U8.7 зелёным. */
+    @Test
+    @DisplayName("U8.15 — оператор NE, фаза RANGE, объявлена BULL_TREND: истина")
+    void u8_15_aDifferentPhaseSatisfiesTheInequality() {
+        assertThat(phaseIs(StrategyConditionOperator.NE, "BULL_TREND", MarketPhase.Type.RANGE)).isTrue();
+    }
+
+    /**
+     * Пустой оператор равенством не подменяется: ветвиться не на чем, и
+     * разрешающее умолчание открыло бы вход. Охрана второго рубежа —
+     * создание оператор требует.
+     */
+    @Test
+    @DisplayName("U8.16 — оператор пуст, фаза BULL_TREND, объявлена BULL_TREND: ложь")
+    void u8_16_anAbsentOperatorIsFalse() {
+        assertThat(phaseIs(null, "BULL_TREND", MarketPhase.Type.BULL_TREND)).isFalse();
     }
 
     /** Уход от фазы, при которой входили. */
@@ -156,8 +165,12 @@ class MarketPhaseRuleTest {
     }
 
     private Boolean phaseIs(String declared, MarketPhase.Type passPhase) {
+        return phaseIs(StrategyConditionOperator.EQ, declared, passPhase);
+    }
+
+    private Boolean phaseIs(StrategyConditionOperator operator, String declared, MarketPhase.Type passPhase) {
         StrategyCondition condition = condition(rule(StrategyConditionRuleType.MARKET_PHASE_IS,
-                StrategyConditionOperator.EQ, null, enumConstant(declared)));
+                operator, null, enumConstant(declared)));
         return evaluator.evaluate(condition, context(passPhase, null));
     }
 

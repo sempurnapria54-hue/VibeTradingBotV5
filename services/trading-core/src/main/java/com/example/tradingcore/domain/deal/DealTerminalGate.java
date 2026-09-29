@@ -4,6 +4,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -92,7 +93,7 @@ public class DealTerminalGate {
      * терминал ставить рано.
      */
     public Boolean riskProvenAbsent(Deal deal, List<DealTranche> tranches, Boolean graphComplete) {
-        if (isFalse(graphComplete)) {
+        if (isNotTrue(graphComplete)) {
             return false;
         }
         Position position = deal.livePosition();

@@ -86,7 +86,7 @@ class ReceptionSubscriptionTest {
     @DisplayName("Позиция чтения — с начала темы, автоматическая фиксация смещений выключена")
     void theGroupReadsFromTheEarliestOffsetAndNeverAutoCommits() {
         ConsumerFactory<String, String> factory =
-                new ReceptionKafkaConfig().journalConsumerFactory(properties());
+                new ReceptionKafkaConfig().receptionConsumerFactory(properties());
 
         Map<String, Object> settings = factory.getConfigurationProperties();
 

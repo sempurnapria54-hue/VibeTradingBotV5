@@ -5,7 +5,8 @@
   "includes": ["protection-coverage", "order-lifecycle", "risk-at-stop"],
 
   "operands": {
-    "legs[].type": "Order.type — бизнес-тип ноги; ноги собираются по всем траншам сделки: числа риска агрегатные. Предикат ноги входа — дом docs/spec/protection-coverage.json, величина isEntryOrder, подключена через includes; множество здесь не переписывается",
+    "legs[].type": "Order.type — бизнес-тип ноги, ось встроенной защиты; отбора не несёт",
+    "legs[].positionReducingOnly": "Order.positionReducingOnly — намерение ноги; ноги собираются по всем траншам сделки: числа риска агрегатные. Предикат ноги входа — дом docs/spec/protection-coverage.json, величина isEntryOrder, подключена через includes; множество здесь не переписывается",
     "legs[].status": "Order.status",
     "legs[].plannedRiskAmount": "Order.plannedRiskAmount — write-once на ноге",
     "legs[].plannedSizeContracts": "Order.plannedSizeContracts",
@@ -120,6 +121,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "CANCELED",
             "plannedRiskAmount": 100,
             "plannedSizeContracts": 100,
@@ -132,6 +134,7 @@
           },
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "ACTIVE",
             "plannedRiskAmount": 70,
             "plannedSizeContracts": 70,
@@ -160,6 +163,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "ERROR",
             "plannedRiskAmount": 100,
             "plannedSizeContracts": 100,
@@ -188,6 +192,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
@@ -217,6 +222,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
@@ -245,6 +251,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
@@ -257,6 +264,7 @@
           },
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 464.775,
             "plannedSizeContracts": 50,
@@ -287,6 +295,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "ACTIVE",
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
@@ -315,6 +324,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 100,
             "plannedSizeContracts": 100,
@@ -343,6 +353,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "ACTIVE",
             "plannedRiskAmount": 0,
             "plannedSizeContracts": 0,
@@ -371,6 +382,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 959.1,
             "plannedSizeContracts": 100,

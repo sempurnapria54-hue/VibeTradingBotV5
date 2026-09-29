@@ -39,7 +39,7 @@ final class Rows {
     private static final String ALL_TABLES = String.join(", ",
             "candles", "candle_groups", "indicator_values", "market_price_levels", "market_structures",
             "market_structure_configs", "indicator_configs", "order_book_snapshots", "ticker_snapshots",
-            "instruments");
+            "instruments", "access_denials");
 
     private final String jdbcUrl;
     private final String username;

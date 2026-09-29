@@ -57,7 +57,8 @@ public class StatisticsPersistenceConfig {
     static final String ENTITY_PACKAGE = "com.example.statistics.persistence.model";
 
     /**
-     * Пакет общего базового типа audit-полей.
+     * Пакет общих persistence-типов: базовый тип audit-полей и строка
+     * отказа доступа.
      *
      * <p><b>Назван рядом со своим, а не подразумевается.</b> Базовый тип
      * лежит в общем артефакте — состав колонок бинарен, и единственный
@@ -66,8 +67,11 @@ public class StatisticsPersistenceConfig {
      * объявлена явно и чужих пакетов не видит.
      *
      * <p><b>Столкновения с соседним отображением он не создаёт:</b>
-     * сущностей в нём нет вовсе — только {@code @MappedSuperclass}, и разделение
-     * репозиториев между отображениями он не трогает.
+     * отображение у процесса одно, а сущность в пакете одна — строка отказа
+     * доступа, чья форма общая у всех сервисов с базой
+     * (docs/models/domain/other/AccessDenial.md §Персистентность); её
+     * репозиторий лежит в пакете репозиториев сервиса, и разделение
+     * репозиториев между отображениями пакет не трогает.
      */
     static final String SHARED_ENTITY_PACKAGE = "com.example.tradingbot.persistence.model";
 

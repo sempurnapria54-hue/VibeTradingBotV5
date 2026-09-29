@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -319,7 +318,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B4.5 — временный вердикт действие откладывает, а транш оставляет ждать")
     void theTemporaryVerdictDefersTheActionAndLeavesTheTrancheWaiting() {
         assignRiskAppetite();
@@ -332,14 +330,11 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         tick(Tick.DEAL_ORCHESTRATOR);
 
         assertThat(rows.count("orders")).isEqualTo(0L);
-        // Красно по построению: временный вердикт доносится до обработчика
-        // ПУСТЫМ исходом прохода (`SKIP_ACTION` → `TrancheTransition.stay`),
-        // а пустой исход предвходовая проверка читает как ложное условие
-        // входа и закрывает транш `ENTRY_CONDITION_EXPIRED`. Дом говорит
-        // обратное — «действие не исполняется, транш ждёт следующего
-        // прохода» (docs/processes/risk-evaluation.md §«Реакция на
-        // результат»), и ожидание под факт не ослабляется (находка F1
-        // захода).
+        // Временный вердикт откладывает работу, а не делает условие входа
+        // ложным: «действие не исполняется, транш ждёт следующего прохода»
+        // (docs/processes/risk-evaluation.md §«Реакция на результат»). Ждать
+        // транш оставляет живая строка исполнения, заведённая до
+        // преконтроля.
         assertThat(trancheStatus()).isEqualTo("PRECHECK");
         assertThat(trancheRow().get("close_reason")).isNull();
         assertThat(dealStatus()).isEqualTo("ACTIVE");
@@ -384,12 +379,12 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         // ВТОРАЯ охрана того же семейства (`RISK_APPETITE_NOT_CONFIGURED`
         // на незаданном проценте) этой клеткой не наблюдается, и это не
         // пропуск: дойти до неё можно только назначив первое число, а к
-        // тому моменту транш уже закрыт временным вердиктом первой охраны
-        // — находка F1 захода. Возврат — по её закрытию.
+        // тому моменту транш был закрыт временным вердиктом первой охраны
+        // (находка F1). С её закрытием транш ждёт, и вторая охрана
+        // достижима — клетка её пока не мерит.
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B4.13 — отказ расчёта по стороне уровня — отказ шага, не авария")
     void theRefusalByTheSideOfTheStopLevelFailsTheStepAndNotTheDeal() {
         assignRiskAppetite();
@@ -422,15 +417,11 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         // защита.
         assertThat(pairRung()).isEqualTo(NO_PAIR_RUNG);
         assertThat(accountRung()).isEqualTo(NO_ACCOUNT_RUNG);
-        // Красно по построению: транш встаёт `CLOSED` с причиной
-        // `ENTRY_CONDITION_EXPIRED`, а сделка следующим проходом уходит в
-        // терминал. Механизм тот же, что у клетки B4.5, но ПРОИЗВОДИТЕЛЬ
-        // пустого исхода другой: там временный вердикт преконтроля, здесь
-        // контролируемый отказ расчёта, не дошедший до преконтроля вовсе.
-        // Дом говорит обратное — «шаг не исполняется, транш и сделка
-        // остаются в своих статусах» (docs/processes/risk-evaluation.md
-        // §«Отказ расчёта по стороне уровня — отказ шага, не авария»), и
-        // ожидание под факт не ослабляется.
+        // Транш и сделка остаются в своих статусах: отказ по стороне уровня
+        // держит ту же живую строку `PLANNED`, что временный вердикт у
+        // клетки B4.5, хотя до преконтроля не доходит вовсе
+        // (docs/processes/risk-evaluation.md §«Отказ расчёта по стороне
+        // уровня — отказ шага, не авария»).
         assertThat(trancheStatus()).isEqualTo("PRECHECK");
         assertThat(trancheRow().get("close_reason")).isNull();
         assertThat(dealStatus()).isEqualTo("ACTIVE");
@@ -443,7 +434,12 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         tick(Tick.DEAL_ORCHESTRATOR);
 
         assertThat(rows.count("orders")).isEqualTo(1L);
-        assertThat(trancheStatus()).isEqualTo("ENTRY_SUBMITTED");
+        // Ребро в отправленный вход едет проходом, на котором отправка уже
+        // подтверждена фактом, а не проходом команды
+        // (docs/components/TranchePrecheckHandler.md §«Рабочая логика»):
+        // на проходе команды транш ещё ждёт — но уже не закрыт.
+        assertThat(trancheStatus()).isEqualTo("PRECHECK");
+        assertThat(dealStatus()).isEqualTo("ACTIVE");
     }
 
     @Test

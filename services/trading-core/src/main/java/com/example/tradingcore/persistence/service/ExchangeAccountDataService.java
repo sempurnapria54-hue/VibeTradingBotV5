@@ -180,6 +180,18 @@ public class ExchangeAccountDataService {
                 .orElseThrow(() -> new IllegalStateException("ExchangeAccount not found: " + id));
     }
 
+    /**
+     * Стоящая ступень защиты счёта по числовому ключу — проекцией поля.
+     * Ненайденность — авария тропы: ступень спрашивают о счёте, на котором
+     * уже стои́т объект радиуса.
+     */
+    @Transactional(readOnly = true)
+    public ExchangeAccount.SafetyRung getRequiredSafetyRungById(Long id) {
+        return repository.findSafetyRungById(id)
+                .map(mapper::persistenceToSafetyRung)
+                .orElseThrow(() -> new IllegalStateException("ExchangeAccount not found: " + id));
+    }
+
     /** Тенант-владелец счёта по числовому ключу — той же проекцией поля. */
     @Transactional(readOnly = true)
     public String getRequiredTenantInternalIdById(Long id) {

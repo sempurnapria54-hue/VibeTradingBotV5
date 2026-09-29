@@ -63,6 +63,8 @@ public class StrategyController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Определение заведено"),
             @ApiResponse(responseCode = "400", description = "Определение не прошло проверку создания"),
+            @ApiResponse(responseCode = "502", description = "Сосед отказал осознанно либо тропа к нему "
+                    + "не настроена: наш дефект, повтором не лечится"),
             @ApiResponse(responseCode = "503", description = "Сосед недоступен: операнд проверки не добыт")})
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping
@@ -117,6 +119,8 @@ public class StrategyController {
             @ApiResponse(responseCode = "400", description = "Переход недопустим либо не пройдены предусловия"),
             @ApiResponse(responseCode = "404", description = "У тенанта такого определения нет"),
             @ApiResponse(responseCode = "409", description = "На паре уже есть активное определение"),
+            @ApiResponse(responseCode = "502", description = "Сосед отказал осознанно либо тропа к нему "
+                    + "не настроена: наш дефект, повтором не лечится"),
             @ApiResponse(responseCode = "503", description = "Сосед недоступен: операнд проверки не добыт")})
     @PutMapping("/{internalId}/status")
     public StrategyApiResponse applyStatus(

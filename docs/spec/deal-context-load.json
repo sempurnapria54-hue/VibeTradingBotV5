@@ -18,7 +18,8 @@
     "legs[].entryAnchor": "плановая цена входа ноги — себестоимость её риска; операнд дома закрытой формы docs/spec/risk-at-stop.json",
     "legs[].plannedStopPrice": "ПЛАНОВЫЙ уровень стопа ноги — операнд обратной задачи ставки комиссии (docs/spec/deal-risk-numbers.json, feeRate)",
     "legs[].loaded": "нога (заявка) сделки попала в загруженный контекст; ноги собираются обходом всех траншей",
-    "legs[].type": "Order.type — бизнес-тип ноги; предикат ноги входа берётся из дома protection-coverage §isEntryOrder (подключён своим includes), здесь множество не переписывается",
+    "legs[].type": "Order.type — бизнес-тип ноги, ось встроенной защиты; отбора не несёт",
+    "legs[].positionReducingOnly": "Order.positionReducingOnly — намерение ноги; предикат ноги входа берётся из дома protection-coverage §isEntryOrder (подключён своим includes), здесь множество не переписывается",
     "legs[].accumulatedFillSize": "Order.accumulatedFillSize — исполненный объём ноги",
     "legs[].protections[].loaded": "встроенная защита ноги попала в загруженный контекст",
     "legs[].protections[]": "остальные поля — как в protection-coverage",
@@ -277,6 +278,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -292,6 +294,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 1,
             "protections": [
               {
@@ -360,6 +363,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -375,6 +379,7 @@
           {
             "loaded": false,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 1,
             "protections": [
               {
@@ -437,6 +442,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 3,
             "protections": [
               {
@@ -555,6 +561,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 0,
             "protections": []
           }
@@ -599,6 +606,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": []
           }
@@ -737,6 +745,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -803,6 +812,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -858,6 +868,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -920,6 +931,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -983,6 +995,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -1040,6 +1053,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -1092,6 +1106,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -1150,6 +1165,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -1209,6 +1225,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 60,
             "plannedSizeContracts": 1,
@@ -1227,6 +1244,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 40,
             "plannedSizeContracts": 1,
@@ -1288,6 +1306,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 60,
             "plannedSizeContracts": 1,
@@ -1306,6 +1325,7 @@
           {
             "loaded": false,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 40,
             "plannedSizeContracts": 1,
@@ -1369,6 +1389,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 60,
             "plannedSizeContracts": 1,
@@ -1387,6 +1408,7 @@
           {
             "loaded": false,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 40,
             "plannedSizeContracts": 1,
@@ -1445,6 +1467,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 60,
             "plannedSizeContracts": 1,
@@ -1463,6 +1486,7 @@
           {
             "loaded": false,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 40,
             "plannedSizeContracts": 1,
@@ -1521,6 +1545,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 60,
             "plannedSizeContracts": 1,
@@ -1539,6 +1564,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "plannedRiskAmount": 40,
             "plannedSizeContracts": 1,
@@ -1595,6 +1621,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -1646,6 +1673,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {
@@ -1661,6 +1689,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 1,
             "protections": [
               {
@@ -1747,6 +1776,7 @@
           {
             "loaded": true,
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "accumulatedFillSize": 2,
             "protections": [
               {

@@ -144,7 +144,7 @@ public class SubmitOrderExecutor implements CommandExecutor {
      * (docs/spec/cash-flow-linkage.json).
      */
     private void applyBillsWindowBegin(Order order, OffsetDateTime observedAt) {
-        if (isTrue(order.getPositionReducingOnly()) || isNull(order.getDealId()) || isNull(observedAt)) {
+        if (isTrue(order.isReducingLeg()) || isNull(order.getDealId()) || isNull(observedAt)) {
             return;
         }
         dealDataService.applyBillsWindowBegin(order.getDealId(), observedAt);
@@ -190,7 +190,7 @@ public class SubmitOrderExecutor implements CommandExecutor {
      */
     private Boolean ensureLeverage(Order order, DealContext dealContext, String accountInternalId,
                                    Instrument instrument) {
-        if (isTrue(order.getPositionReducingOnly())) {
+        if (isTrue(order.isReducingLeg())) {
             return true;
         }
         Integer leverage = accountInstrumentStateDataService

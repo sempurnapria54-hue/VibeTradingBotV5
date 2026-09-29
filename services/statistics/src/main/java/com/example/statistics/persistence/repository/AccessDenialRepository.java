@@ -1,6 +1,6 @@
 package com.example.statistics.persistence.repository;
 
-import com.example.statistics.persistence.model.AccessDenialEntity;
+import com.example.tradingbot.persistence.model.AccessDenialEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**

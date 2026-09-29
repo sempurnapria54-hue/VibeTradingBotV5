@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Агрегатная выборка чтения: строки выбранного зерна и объявленная полнота
- * журнала рядом с ними
+ * собственного приёма рядом с ними
  * (docs/rules/statistics-aggregates.md §«Что это за числа и кто их
  * читает»).
  *

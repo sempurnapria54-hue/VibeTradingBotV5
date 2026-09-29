@@ -41,6 +41,13 @@ public class StrategyStatusWriter {
      * класс события, знает шина; сюда приходят определение и актор
      * (.claude/rules/codestyle.md §«Слой сообщения: внутренняя шина»).
      *
+     * <p><b>Статус определения переставляется ДО записи факта.</b> У
+     * активации определение и есть снимок, едущий содержимым события, и
+     * статус, поставленный после записи, уехал бы прежним — событие
+     * {@code STRATEGY_ACTIVATED} несло бы {@code CREATED}, то есть значение,
+     * противоречащее собственному классу. Читатель, кладущий содержимое как
+     * доставлено (журнал аудита), защиты применителя копии у ядра не имеет.
+     *
      * @param definition определение, чей статус переставляется; у активации
      *                   это снимок с деревом — он же поедет содержимым
      * @param target     целевой статус
@@ -51,8 +58,8 @@ public class StrategyStatusWriter {
         StrategyEntity entity =
                 strategyDataService.getRequiredEntityByInternalId(definition.getInternalId());
         strategyDataService.applyStatus(entity, target);
-        eventWriter.record(definition, eventType(target), actor);
         definition.setStatus(target);
+        eventWriter.record(definition, eventType(target), actor);
         log.info("Strategy definition moved internalId={} status={}", definition.getInternalId(), target);
         return definition;
     }

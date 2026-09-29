@@ -1,5 +1,6 @@
 package com.example.bff.util;
 
+import java.util.Set;
 import lombok.experimental.UtilityClass;
 
 /**
@@ -58,12 +59,34 @@ public class Constants {
         public static final String HEALTH = "/actuator/health/**";
 
         /**
+         * Вторая открытая точка — съём метрик наблюдателем окружения
+         * (docs/rules/api-access-policy.md §«Съём метрик — второе
+         * исключение»). Путь поимённый, а не префикс актуатора.
+         */
+        public static final String PROMETHEUS = "/actuator/prometheus";
+
+        /**
          * Форма имени владельца: строчные, цифры и дефис. Охрана
          * СОБСТВЕННАЯ, а не только сетевой политикой кластера — иначе
          * свойство периметра держалось бы конфигурацией среды, в которой
          * он запущен.
          */
         public static final String OWNER_NAME_FORM = "[a-z0-9-]+";
+    }
+
+    /** Заголовки соединения, которые пересылка владельцу браузеру не отдаёт. */
+    @UtilityClass
+    public static class ConnectionHeaders {
+
+        /**
+         * Заголовки соединения (hop-by-hop, RFC 9110 §7.6.1): описывают
+         * соединение владельца с периметром, а не ответ, и дальше него не
+         * уезжают. Ответ браузеру собирает контейнер периметра своим
+         * соединением.
+         */
+        public static final Set<String> HOP_BY_HOP = Set.of(
+                "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+                "te", "trailer", "transfer-encoding", "upgrade");
     }
 
     /** Заголовки протокола потока в браузер. */
@@ -108,6 +131,23 @@ public class Constants {
          * кладётся, и клиент протокола его не показывает.
          */
         public static final String OPENED_COMMENT = "PERIMETER_OPENED";
+    }
+
+    /** Ряд частоты отказов доступа — след отказа у периметра без базы. */
+    @UtilityClass
+    public static class AccessDenialMetrics {
+
+        /** Счётчик отказов доступа на поверхности периметра. */
+        public static final String DENIALS = "perimeter.access.denials";
+
+        /** Метка класса отказа: ряд на класс, чтобы серию было видно по классу. */
+        public static final String OUTCOME_TAG = "outcome";
+
+        /** Класс отказа: принципал не предъявлен либо предъявленный не принят. */
+        public static final String PRINCIPAL_ABSENT = "PRINCIPAL_ABSENT";
+
+        /** Класс отказа: принципал принят, операция ему не разрешена. */
+        public static final String OPERATION_FORBIDDEN = "OPERATION_FORBIDDEN";
     }
 
     /** Имена, которыми клиент брокера называет связь с координатором группы. */

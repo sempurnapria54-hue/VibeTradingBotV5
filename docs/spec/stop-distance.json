@@ -26,7 +26,7 @@
     },
     {
       "name": "distanceDeclaredWhenNeeded",
-      "note": "Доля дистанции объявляется всеми способами, кроме BREAKEVEN: у него доля есть функция ставки комиссии, и объявленная автором была бы вторым носителем той же величины.",
+      "note": "Доля дистанции объявляется всеми способами, кроме BREAKEVEN: у него доля есть функция ставки комиссии, и объявленная автором была бы вторым носителем той же величины. Реджекты создания — STRATEGY_STOP_DISTANCE_MISSING и STRATEGY_STOP_DISTANCE_UNEXPECTED.",
       "expr": "if(calculationType == 'BREAKEVEN', isNull(?distancePercents), notNull(?distancePercents))"
     },
     {

@@ -32,10 +32,10 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
  * <p><b>Значение отдаёт общий поставщик</b> ({@link ActorProvider}), а не
  * приватный метод конфигурации: классы значений, их признак и обе тропы
  * отказа доступа названы у него, и второй их носитель разошёлся бы с
- * первым первой же правкой (.claude/rules/policy-home.md). Пока принципал
- * у поверхности один, актором строк реестра идёт класс контура; при
- * втором субъекте та же тропа отдаст его имя, не меняя ни строки здесь
- * (docs/models/domain/other/Auditable.md §«Область значений актора»).
+ * первым первой же правкой (.claude/rules/policy-home.md). Какое значение
+ * получает строка реестра на какой тропе, называет дом значения
+ * (docs/models/domain/other/Auditable.md §«Область значений актора»), а не
+ * этот класс.
  */
 @Configuration
 @EnableJpaAuditing(auditorAwareRef = "auditorAware", dateTimeProviderRef = "auditingDateTimeProvider")

@@ -26,7 +26,6 @@ import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
@@ -239,19 +238,15 @@ class FullReactionSequenceTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Дом
-     * жизненного цикла объявляет статус {@code KILL_SWITCH_EXECUTED}
+     * Дом жизненного цикла объявляет статус {@code KILL_SWITCH_EXECUTED}
      * подтверждением снятия риска (docs/lifecycles/AnomalyReport.md
-     * §Статусы), а координатор ставит его до того, как посмотрел на исход
-     * снятия. Красный прогон и есть предъявление находки `S-1`
-     * (`.claude/work/backlog.md` §«Статус подтверждённого снятия риска
-     * ставится и на неподтверждённом»).
+     * §Статусы): на неподтверждённом снятии отчёт его не получает и остаётся
+     * в обработке.
      *
      * <p>Счётный радиус взят потому, что эскалировать с него некуда: ось
      * кейса — только статус отчёта.
      */
     @Test
-    @Tag("debt")
     @DisplayName("U5.13 — снятие риска не подтверждено: статуса подтверждённого снятия отчёт не получает")
     void u5_13_theConfirmedTeardownStatusIsNotSetOnAnUnconfirmedTeardown() {
         when(harness.killSwitchService.fireExchangeAccount(anyLong())).thenReturn(false);

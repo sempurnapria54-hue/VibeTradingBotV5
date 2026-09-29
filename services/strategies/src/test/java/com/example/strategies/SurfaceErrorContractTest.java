@@ -1,6 +1,10 @@
 package com.example.strategies;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -41,6 +46,8 @@ class SurfaceErrorContractTest {
 
     private static final String TENANT = "tn-0001";
 
+    private final StrategyDataService strategyDataService = mock(StrategyDataService.class);
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -49,7 +56,7 @@ class SurfaceErrorContractTest {
                         mock(StrategyCreationService.class),
                         mock(StrategyLifecycleService.class),
                         mock(StrategyDefinitionValidator.class),
-                        mock(StrategyDataService.class),
+                        strategyDataService,
                         mock(StrategyApiMapper.class),
                         new SurfaceProperties()))
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -95,5 +102,24 @@ class SurfaceErrorContractTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").exists())
                 .andExpect(jsonPath("$.occurredAt").exists());
+    }
+
+    /**
+     * Отказ по правам последним обработчиком не разрешается: ответ на него
+     * пишет контур снаружи диспетчера. Бросает его здесь коллаборатор, а не
+     * пер-операционная проверка права, — таких проверок нет ни одной, и
+     * предмет от этого не меняется: мерится, что исключение ВЫХОДИТ из
+     * диспетчера.
+     */
+    @Test
+    @DisplayName("Отказ по правам уходит наружу диспетчера, а не разрешается перехватчиком")
+    void anAccessDenialLeavesTheDispatcherUnresolved() {
+        when(strategyDataService.findByInternalIdWithTree(anyString()))
+                .thenThrow(new AccessDeniedException("нет права"));
+
+        assertThatThrownBy(() -> mockMvc.perform(get("/api/v1/strategies/st-0001")
+                .header(Constants.Header.TENANT, TENANT)))
+                .as("разрешённый здесь отказ ушёл бы кодом 500, и ответ контура его не написал бы")
+                .hasRootCauseInstanceOf(AccessDeniedException.class);
     }
 }

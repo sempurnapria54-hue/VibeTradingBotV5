@@ -93,21 +93,28 @@ public class HoldRungEdgeService {
      * ступень его лестницы; больше ни на что они не влияют — гард
      * перехода служит анкером у обеих
      * (docs/rules/instrument-hold.md, docs/rules/exchange-hold.md).
+     *
+     * <p><b>Доминирование биржевой ступени — здесь, и носитель у него
+     * один.</b> Ребро — единственный применитель подъёма, и через него идут
+     * обе тропы, автоматическая и ручная: инструментный сигнал, поглощённый
+     * стоящей ступенью счёта, ступени пары не переставляет, и затребовавшая
+     * тропа читает это тем же исходом, что поглощение своей лестницей
+     * (docs/components/HoldService.md §«Ребро подъёма ступени — один носитель
+     * на четыре тропы»). Ступень счёта читается в транзакции ребра, а не со
+     * снимка контекста: счёт, свёрнутый тем же проходом раньше, снимок
+     * прохода не видит.
      */
     private Boolean rungApplied(HoldSignal signal, DealContext dealContext) {
+        Long accountId = dealContext.getExchangeAccount().getId();
         if (HoldScope.EXCHANGE_ACCOUNT.equals(signal.getScope())) {
-            return exchangeAccountDataService.raiseRung(dealContext.getExchangeAccount().getId(),
-                    accountRung(signal));
+            return exchangeAccountDataService.raiseRung(accountId, signal.accountLadderRung());
         }
-        return accountInstrumentStateDataService.raiseRung(dealContext.getExchangeAccount().getId(),
-                dealContext.getInstrument().getId(), instrumentRung(signal));
-    }
-
-    /** Ступень лестницы счёта по судьбе принятого риска. */
-    private static ExchangeAccount.SafetyRung accountRung(HoldSignal signal) {
-        return isTrue(signal.tearsDownRisk())
-                ? ExchangeAccount.SafetyRung.TRADE_BLOCKED
-                : ExchangeAccount.SafetyRung.HOLD;
+        ExchangeAccount.SafetyRung accountRung = exchangeAccountDataService.getRequiredSafetyRungById(accountId);
+        if (isTrue(signal.dominatedByAccountRung(accountRung))) {
+            return false;
+        }
+        return accountInstrumentStateDataService.raiseRung(accountId, dealContext.getInstrument().getId(),
+                instrumentRung(signal));
     }
 
     /** Ступень лестницы пары «счёт, инструмент» по той же оси. */

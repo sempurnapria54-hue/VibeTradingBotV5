@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -99,6 +100,7 @@ public class StrategyTranche extends Auditable {
      * Торгуемая деталь обязана объявить ровно одно такое
      * (docs/rules/strategy-validation.md).
      */
+    @JsonIgnore
     public Boolean isEntryDeclaration() {
         return isNotEmpty(entrySteps());
     }

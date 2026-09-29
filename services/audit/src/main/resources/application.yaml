@@ -38,15 +38,14 @@ spring:
 # (.claude/decisions/audit-statistics-split.md).
 audit:
   persistence:
-    journal:
-      url: ${AUDIT_DB_URL:}
-      username: ${AUDIT_DB_USERNAME:}
-      password: ${AUDIT_DB_PASSWORD:}
-      # РАЗМЕР ПУЛА — величина конфигурации, а не умолчание библиотеки:
-      # подключение собирается явно, и spring.datasource.hikari.* этим бином
-      # не читается. Процесс не параллелит работу шире одного слушателя,
-      # одного планировщика и одного читателя.
-      max-pool-size: ${AUDIT_DB_MAX_POOL_SIZE:5}
+    url: ${AUDIT_DB_URL:}
+    username: ${AUDIT_DB_USERNAME:}
+    password: ${AUDIT_DB_PASSWORD:}
+    # РАЗМЕР ПУЛА — величина конфигурации, а не умолчание библиотеки:
+    # подключение собирается явно, и spring.datasource.hikari.* этим бином
+    # не читается. Процесс не параллелит работу шире одного слушателя,
+    # одного планировщика и одного читателя.
+    max-pool-size: ${AUDIT_DB_MAX_POOL_SIZE:5}
 
 # Подписка группы журнала. Форма своя, а не spring.kafka.*: автоконфигурации
 # Kafka в дереве зависимостей нет — Boot 4 разнёс её по модулям

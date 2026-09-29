@@ -95,4 +95,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # Съём метрик — ряд частоты отказов доступа, след отказа у периметра
+        # без базы (docs/rules/api-access-policy.md §«Съём метрик — второе
+        # исключение»). Ингресс ведёт только префикс внешней поверхности, и
+        # снаружи кластера этой точки нет.
+        include: health,prometheus

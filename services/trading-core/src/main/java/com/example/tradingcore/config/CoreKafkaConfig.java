@@ -64,6 +64,7 @@ public class CoreKafkaConfig {
         settings.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         settings.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         settings.put(ProducerConfig.ACKS_CONFIG, "all");
+        settings.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, properties.getPublishBlockTimeout().toMillis());
         return new DefaultKafkaProducerFactory<>(settings);
     }
 

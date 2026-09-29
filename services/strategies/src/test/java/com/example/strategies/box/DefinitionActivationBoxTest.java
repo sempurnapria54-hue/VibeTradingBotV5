@@ -11,7 +11,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -205,13 +204,11 @@ class DefinitionActivationBoxTest extends SharedStrategiesBox {
     }
 
     /**
-     * Ожидание взято из дома, а не из сегодняшнего факта: вторым
-     * носителем инварианта стои́т частичный уникальный индекс, и его
-     * срабатывание доходит до перехватчика непредусмотренного — ответом
-     * идёт {@code INTERNAL_FAILURE} без реджект-кода (находка F-2,
-     * .claude/work/backlog.md §«Гонка активаций отвечает `500` вместо
-     * объявленного `409`»). Клетка красна этим, а не ослабленным
-     * ассертом.
+     * Ожидание взято из дома: вторым носителем инварианта стои́т частичный
+     * уникальный индекс, и проигравший гонку отвечает тем же отказом, что и
+     * проверка приложения (docs/lifecycles/Strategy.md §«Допустимые
+     * переходы»). Прежде срабатывание индекса доходило до перехватчика
+     * непредусмотренного — находка F-2 закрыта.
      *
      * <p><b>Барьер стои́т перед ОТПРАВКОЙ, и большего тест обещать не
      * может:</b> разъехаться внутри сервиса потоки вправе, и тогда
@@ -220,7 +217,6 @@ class DefinitionActivationBoxTest extends SharedStrategiesBox {
      * безусловно.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B5.9 — Гонка двух одновременных активаций одной пары")
     void b5_9_aRaceOfTwoSimultaneousActivationsOfOnePair() throws Exception {
         peerResolvesEverything();

@@ -239,15 +239,22 @@ class ManualHaltClearTest {
                 eq(Instrument.SafetyRung.ACTIVE));
     }
 
-    /** Снятие уже применено, и журнал его не гейтит. */
+    /**
+     * Снятие и его строка — одна транзакция: отказ записи строки роняет
+     * операцию, и откат транзакции оставляет ступень стоять
+     * (docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо и от
+     * автоматики, и друг от друга»). Откат здесь не наблюдается — у предмета
+     * нет транзакции; наблюдается, что отказ не поглощён.
+     */
     @Test
-    @DisplayName("U13.15 — запись строки снятия бросает: исключения наружу нет")
-    void u13_15_aFailingClearanceJournalIsSwallowed() {
-        when(harness.reports.journal(any(), any())).thenThrow(new IllegalStateException("db is down"));
+    @DisplayName("U13.15 — запись строки снятия бросает: операция падает, отказ не поглощён")
+    void u13_15_aFailingClearanceJournalFailsTheOperation() {
+        IllegalStateException journalDown = new IllegalStateException("db is down");
+        when(harness.reports.journal(any(), any())).thenThrow(journalDown);
 
-        assertThatCode(() -> harness.manualHalt.clear(ManualHaltClass.FREEZE,
+        assertThatThrownBy(() -> harness.manualHalt.clear(ManualHaltClass.FREEZE,
                 ACCOUNT_INTERNAL_ID, null))
-                .doesNotThrowAnyException();
+                .isSameAs(journalDown);
     }
 
     /** Снятие идёт своей тропой и через общую точку входа не проходит. */
@@ -259,7 +266,7 @@ class ManualHaltClearTest {
         harness.accountStands(ExchangeAccount.SafetyRung.TRADE_BLOCKED, ExchangeAccount.Status.ACTIVE);
         harness.manualHalt.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, null);
 
-        verify(harness.holdService, never()).raise(any(), any());
+        verify(harness.holdService, never()).raiseManual(any(), any());
     }
 
     private void liveRiskRemains() {

@@ -20,7 +20,6 @@ import com.example.tradingbot.domain.model.trade.market_structure.MarketStructur
 import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -171,17 +170,13 @@ class MarketStructureRuleTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Структура
-     * и константа на месте, ветвиться не на чем, и дом объявляет
-     * консервативную ложь (docs/rules/absent-value-semantics.md). Код
-     * выбирает ветвь по оператору без охраны — та же асимметрия, что у
-     * `U5.12`, при том что сравнение (`U2.11`) ту же охрану несёт. Красный
-     * прогон и есть предъявление находки `F-8` (`.claude/work/backlog.md`
-     * §«Интерпретатор бросает там, где объявлена консервативная ложь»).
+     * Структура и константа на месте, ветвиться не на чем — консервативная
+     * ложь, та же охрана, что у пересечения (`U5.12`) и сравнения (`U2.11`)
+     * (docs/components/StrategyConditionEvaluator.md §Границы; находка `F-8`
+     * закрыта).
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U7.14 — базовая сборка, оператор пуст: ложь (дом), код бросает выбор ветви")
+    @DisplayName("U7.14 — базовая сборка, оператор пуст: ложь")
     void u7_14_anAbsentOperatorIsFalseAndNotAFailure() {
         assertThat(evaluate(structureIs(null, "RANGE"), rangeLayout()))
                 .as("пустой оператор — не на чем ветвиться, а не отказ")

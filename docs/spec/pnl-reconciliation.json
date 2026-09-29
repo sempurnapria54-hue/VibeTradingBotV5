@@ -51,7 +51,7 @@
     },
     {
       "name": "expectedDealFee",
-      "note": "Ожидаемая комиссия сделки. Множество ног — предикат взятого риска, а не заявленного. Бизнес-типы ноги входа здесь не переписываются: множество берётся у дома docs/spec/protection-coverage.json, величина isEntryOrder, через includes — подключение прямое, потому что includes нетранзитивен: дом, подключённый в deal-risk-numbers, отсюда не виден. По той же причине дом чисел риска подключён здесь напрямую: ставка ноги и доля её филла живут в нём. И по ней же подключён order-lifecycle: подключая набор protection-coverage, файл берёт его целиком, а часть величин того набора стоит на величинах жизненного цикла заявки.",
+      "note": "Ожидаемая комиссия сделки. Множество ног — предикат взятого риска, а не заявленного. Предикат ноги входа здесь не переписывается: множество берётся у дома docs/spec/protection-coverage.json, величина isEntryOrder, через includes — подключение прямое, потому что includes нетранзитивен: дом, подключённый в deal-risk-numbers, отсюда не виден. По той же причине дом чисел риска подключён здесь напрямую: ставка ноги и доля её филла живут в нём. И по ней же подключён order-lifecycle: подключая набор protection-coverage, файл берёт его целиком, а часть величин того набора стоит на величинах жизненного цикла заявки.",
       "op": "sum",
       "over": "legs",
       "where": "isEntryOrder && accumulatedFillSize > 0 && notNull(plannedRiskAmount)",
@@ -213,6 +213,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 100,
@@ -264,6 +265,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 100,
@@ -399,6 +401,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 100,
@@ -449,6 +452,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 0,
@@ -488,6 +492,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 30,
@@ -953,6 +958,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 40,
@@ -1010,6 +1016,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 100,
@@ -1065,6 +1072,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 100,
@@ -1129,6 +1137,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 100,
@@ -1193,6 +1202,7 @@
         "legs": [
           {
             "type": "ENTRY",
+            "positionReducingOnly": false,
             "plannedRiskAmount": 929.55,
             "plannedSizeContracts": 100,
             "accumulatedFillSize": 100,

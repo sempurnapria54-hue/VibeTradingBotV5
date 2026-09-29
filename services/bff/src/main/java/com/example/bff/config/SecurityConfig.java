@@ -2,6 +2,7 @@ package com.example.bff.config;
 
 import com.example.bff.util.Constants;
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.platform.exception.handler.BearerTokenFailureInstaller;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,10 +15,12 @@ import org.springframework.security.web.SecurityFilterChain;
  * каждом запросе (docs/architecture/contracts.md §«Контекст тенанта в
  * вызове»).
  *
- * <p><b>Умолчание закрыто; открытая точка одна — проба живости</b>
- * (docs/rules/api-access-policy.md §«Вся поверхность закрыта; открытое —
- * перечислено»). Она отвечает на вопрос «процесс жив», а не отдаёт
- * данные.
+ * <p><b>Умолчание закрыто; открытых точек две — проба живости и съём
+ * метрик</b> (docs/rules/api-access-policy.md §«Вся поверхность закрыта;
+ * открытое — перечислено»). Первая отвечает на вопрос «процесс жив»,
+ * вторая отдаёт ряд частоты отказов доступа и ряды среды исполнения; ни
+ * одна не отдаёт данных. Съём снаружи кластера недостижим: ингресс ведёт
+ * только префикс внешней поверхности.
  *
  * <p><b>Тропа подписки исключена из bearer-цепочки НАМЕРЕННО, и открытой
  * она от этого не становится.</b> Браузерный {@code EventSource}
@@ -53,6 +56,8 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(Constants.Paths.HEALTH).permitAll()
+                        // Съём метрик наблюдателем окружения — поимённо.
+                        .requestMatchers(Constants.Paths.PROMETHEUS).permitAll()
                         // Билет вместо токена — проверка в самой точке подписки.
                         .requestMatchers(STREAM_PATH).permitAll()
                         // Умолчание закрыто: всё прочее требует
@@ -60,7 +65,9 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(server -> server.jwt(jwt -> {})
                         .authenticationEntryPoint(denialHandler)
-                        .accessDeniedHandler(denialHandler))
+                        .accessDeniedHandler(denialHandler)
+                        // Сбой самого звена — 500 тем же DTO, а не 401 поверх.
+                        .withObjectPostProcessor(new BearerTokenFailureInstaller(denialHandler)))
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(denialHandler)
                         .accessDeniedHandler(denialHandler))

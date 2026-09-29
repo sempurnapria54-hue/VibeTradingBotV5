@@ -3383,6 +3383,25 @@ RETIRED = [
              r'Предела\s+здесь\s+нет'),
         ),
     },
+    {
+        'name': 'значение REDUCE_ONLY у типа заявки и инвариант пары',
+        # Снято заходом 231 шага 12 фазы 2 (Д2339): третьего значения у
+        # перечня в коде не было, закрывающая нога несла тип простой заявки, и
+        # отбор по типу расходился с отбором по намерению. Что действует
+        # теперь — объявляет ключ `arrived` у каждого носителя популяции.
+        'pattern': r"type\s*==\s*'REDUCE_ONLY'|Type\s*=\s*REDUCE_ONLY|Инвариант\s+пары"
+                   r'|"type":\s*"REDUCE_ONLY"',
+        'arrived': r'"positionReducingOnly":\s*true',
+        'date': '2026-09-29',
+        'source': 'заход 231 шага 12 фазы 2 (Д2339)',
+        'allowed': ('.claude/work/decision-digest.md',),
+        'population': (
+            ('docs/models/domain/core/Order.md', r'Направление\s+риска\s+несёт\s+`positionReducingOnly`'),
+            ('docs/spec/protection-coverage.json', r'positionReducingOnly\s*==\s*true'),
+            ('docs/spec/deal-lifecycle.json', None),
+            ('docs/spec/deal-tranche-lifecycle.json', None),
+        ),
+    },
 ]
 
 

@@ -3,8 +3,8 @@ package com.example.marketdata.box;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,6 +24,9 @@ import org.junit.jupiter.api.Test;
  * точки входа контура — контракт, и они остаются числами.
  */
 class AccessContourBoxTest extends SharedMarketDataBox {
+
+    /** Таблица следа отказов доступа. */
+    private static final String DENIALS_TABLE = "access_denials";
 
     /**
      * Ожидание формы тела взято из дома: отказ доступа есть тот же
@@ -191,17 +194,10 @@ class AccessContourBoxTest extends SharedMarketDataBox {
      * Ожидание взято из дома: след отказа пишет тот, у кого есть своя
      * база, и пишет он ЕГО ДО ОТВЕТА
      * (docs/rules/api-access-policy.md §«След отказа пишет тот, у кого
-     * есть база»; docs/models/domain/other/AccessDenial.md).
-     *
-     * <p>Сегодня у сервиса нет ни таблицы, ни точки входа отказа: отказ
-     * уходит наружу, не оставляя следа НИ ОДНОГО — ни строки, ни записи
-     * журнала. Прогон это и показал: ожидание «хотя бы журнальный след»
-     * не сошлось, и потому клетка предъявляет весь долг целиком, а не его
-     * половину. Долг — `.claude/work/backlog.md` §«Таблица отказов
-     * доступа у сервисов со своей базой».
+     * есть база»; docs/models/domain/other/AccessDenial.md). Сверх строки
+     * точка входа пишет строку лога — на каждом отказе у всякого сервиса.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B8.11 — след отказа доступа")
     void b8_11_theTraceOfAnAccessRefusal() {
         Integer mark = AppLog.mark();
@@ -209,8 +205,13 @@ class AccessContourBoxTest extends SharedMarketDataBox {
         Answer answer = getAnonymously(INSTRUMENTS);
 
         assertThat(answer.status()).isEqualTo(401);
-        assertThat(rows.tableNames()).contains("access_denials");
-        assertThat(AppLog.since(mark)).isNotEmpty();
+        List<Map<String, Object>> denials = rows.all(DENIALS_TABLE);
+        assertThat(denials).as("попытка была одна, и строка у неё одна").hasSize(1);
+        Map<String, Object> denial = denials.getFirst();
+        assertThat(denial.get("outcome")).isEqualTo("PRINCIPAL_ABSENT");
+        assertThat(denial.get("principal")).as("принятого принципала у отказа нет").isNull();
+        assertThat(denial.get("surface")).isEqualTo("GET " + INSTRUMENTS);
+        assertThat(AppLog.since(mark)).contains("Access denied", INSTRUMENTS);
     }
 
     @Test

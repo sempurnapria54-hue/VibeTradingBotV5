@@ -8,9 +8,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.example.audit.config.JournalPersistenceConfig;
-import com.example.audit.domain.model.AccessDenial;
 import com.example.audit.domain.service.AccessDenialService;
 import com.example.audit.persistence.service.AccessDenialDataService;
+import com.example.tradingbot.domain.model.other.AccessDenial;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Objects;

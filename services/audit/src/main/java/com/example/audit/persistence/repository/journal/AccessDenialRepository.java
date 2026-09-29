@@ -1,6 +1,6 @@
 package com.example.audit.persistence.repository.journal;
 
-import com.example.audit.persistence.model.journal.AccessDenialEntity;
+import com.example.tradingbot.persistence.model.AccessDenialEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**

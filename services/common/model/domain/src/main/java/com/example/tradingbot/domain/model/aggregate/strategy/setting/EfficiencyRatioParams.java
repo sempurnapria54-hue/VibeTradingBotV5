@@ -10,7 +10,7 @@ import lombok.Setter;
  * индикатор: warmup по умолчанию = period. Каталожный измеритель
  * тренд/шум (fork A). См.
  * docs/models/domain/other/IndicatorValue.md,
- * docs/models/domain/aggregate/Strategy.md (§IndicatorParams).
+ * docs/models/domain/aggregate/Strategy.md §«Настройки рыночных данных».
  */
 @Getter
 @Setter

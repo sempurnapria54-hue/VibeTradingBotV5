@@ -1,5 +1,7 @@
 package com.example.statistics.integration.internal.event;
 
+import static com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS;
+import static com.fasterxml.jackson.databind.cfg.JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
@@ -102,7 +104,10 @@ public class EnvelopeReader {
             return null;
         }
         try {
-            return objectMapper.readTree(record.value());
+            return objectMapper.reader()
+                    .with(USE_BIG_DECIMAL_FOR_FLOATS)
+                    .without(STRIP_TRAILING_BIGDECIMAL_ZEROES)
+                    .readTree(record.value());
         } catch (JsonProcessingException e) {
             throw new IncompleteEventException("Содержимое события не разбирается как документ", e);
         }
@@ -121,10 +126,14 @@ public class EnvelopeReader {
     /**
      * Числовой операнд.
      *
-     * <p><b>Читается текстом, а не двоичным типом узла:</b> денежная
+     * <p><b>Читается десятичным значением, а не двоичным:</b> денежная
      * величина пересекает провод десятичной записью, и чтение её через
      * {@code double} внесло бы двоичную погрешность в сумму, которую потом
-     * увидит человек (docs/rules/decimal-arithmetic.md).
+     * увидит человек (docs/rules/decimal-arithmetic.md). Производитель кладёт
+     * {@code BigDecimal} полем, и сериализатор пишет его JSON-<b>числом</b>:
+     * поэтому документ разбирается с десятичными узлами и без срезания
+     * хвостовых нулей ({@link #contentTree}) — масштаб есть часть величины, —
+     * а строковая запись по-прежнему читается текстом.
      *
      * <p><b>Неразбираемое число роняет обработку:</b> подставленная на его
      * месте пустота выдала бы испорченный операнд за «не приехало».
@@ -133,6 +142,9 @@ public class EnvelopeReader {
         JsonNode value = value(content, name);
         if (isNull(value) || value.isNull()) {
             return null;
+        }
+        if (value.isNumber()) {
+            return value.decimalValue();
         }
         try {
             return new BigDecimal(value.asText());

@@ -9,6 +9,7 @@ import static com.example.strategies.unit.validation.ValidationFixture.decimal;
 import static com.example.strategies.unit.validation.ValidationFixture.matching;
 import static com.example.strategies.unit.validation.ValidationFixture.newAlgo;
 import static com.example.strategies.unit.validation.ValidationFixture.newStep;
+import static com.example.strategies.unit.validation.ValidationFixture.newStopSettings;
 import static com.example.strategies.unit.validation.ValidationFixture.newTranche;
 import static com.example.strategies.unit.validation.ValidationFixture.protectionStep;
 import static com.example.strategies.unit.validation.ValidationFixture.range;
@@ -86,6 +87,7 @@ class ProtectionCoverageTest {
         CreateStrategyApiRequest request = reference();
         StrategyAlgoOrderActionApiModel extra = newAlgo("bull_second_stop", "CREATE_ACTION", "STOP_LOSS");
         extra.setCloseFractionPercents(decimal("50"));
+        extra.setStopLossSettings(newStopSettings());
         actions(protectionStep(bull(request))).add(extra);
 
         assertThat(violations(request))
@@ -126,9 +128,11 @@ class ProtectionCoverageTest {
         CreateStrategyApiRequest request = reference();
         StrategyAlgoOrderActionApiModel created = newAlgo("partial_stop", "CREATE_ACTION", "STOP_LOSS");
         created.setCloseFractionPercents(decimal("50"));
+        created.setStopLossSettings(newStopSettings());
         StrategyAlgoOrderActionApiModel replaced = newAlgo("partial_replace", "REPLACE_ACTION", "STOP_LOSS");
         replaced.setTargetActionKey("partial_stop");
         replaced.setCloseFractionPercents(decimal("30"));
+        replaced.setStopLossSettings(newStopSettings());
         stepsByStatus(tranche(bull(request))).put("PROTECTION_SWITCHED",
                 List.of(newStep("PROTECTION_ADJUSTMENT", created),
                         newStep("PROTECTION_ADJUSTMENT", replaced)));

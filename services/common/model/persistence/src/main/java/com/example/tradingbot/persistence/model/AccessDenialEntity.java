@@ -1,6 +1,5 @@
-package com.example.statistics.persistence.model;
+package com.example.tradingbot.persistence.model;
 
-import com.example.tradingbot.persistence.model.AuditableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -11,10 +10,16 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Persistence-проекция
- * {@link com.example.statistics.domain.model.AccessDenial} — таблица
- * {@code access_denials} базы статистики
+ * Persistence-проекция доменной строки отказа доступа
+ * ({@code com.example.tradingbot.domain.model.other.AccessDenial}) —
+ * таблица {@code access_denials} собственной базы каждого сервиса-писателя
  * (docs/models/domain/other/AccessDenial.md §Персистентность).
+ *
+ * <p><b>Лежит в общем артефакте, и отображение её берёт без правки:</b>
+ * пакет общих persistence-типов входит в область сканирования у каждого
+ * сервиса с базой, а таблицу заводит миграция каждого из них. Сервис,
+ * отображающий этот пакет, обязан таблицу иметь — схема проверяется на
+ * подъёме.
  *
  * <p>Класс отказа хранится строкой значением {@code name()} доменного
  * перечня, без {@code @Enumerated}: енумы объявляются только в доменном

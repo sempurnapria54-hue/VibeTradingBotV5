@@ -20,7 +20,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -33,12 +32,11 @@ import org.junit.jupiter.api.Test;
  * средняя цена входа {@code 100}; цена момента {@code 103}; направление
  * `LONG`; правило `PROFIT_PERCENTS_REACHED`, порог {@code 2} объявлен
  * <b>обеими формами сразу</b> — плоским полем {@code percents} (её требует
- * создание) и константным операндом (её читает интерпретатор).
+ * создание и читает интерпретатор) и константным операндом.
  *
- * <p><b>Форма базовой сборки выбрана так не для удобства:</b> правило БЕЗ
- * плоского поля создание отвергает, а правило БЕЗ константного операнда
- * интерпретатор читает ложью. Обе половины по отдельности предъявляют
- * строки `U10.13` и `U10.14`.
+ * <p><b>Форма базовой сборки выбрана так не для удобства:</b> вторая форма
+ * в ней — приманка. Порогом служит только плоское поле: строка `U10.13`
+ * предъявляет его одного, `U10.17` — одну приманку, `U10.14` — ни одной.
  */
 class MoveThresholdTest {
 
@@ -135,25 +133,34 @@ class MoveThresholdTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Контракт
-     * авторинга кладёт порог в ПЛОСКОЕ ПОЛЕ правила
+     * Контракт авторинга кладёт порог в ПЛОСКОЕ ПОЛЕ правила
      * (docs/rules/strategy-condition-contract.md §«Правило и операнды»),
      * создание его там и требует, и эталонное определение объявляет его
-     * так. Код читает только константный операнд и отвечает ложью: оба
-     * порога ложны всегда, и шаг перевода защиты в безубыток не
-     * срабатывает ни разу. Красный прогон и есть предъявление находки
-     * `F-1` (`.claude/work/backlog.md` §«Порог хода читается из операнда,
-     * а объявляется плоским полем правила»).
+     * так — интерпретатор читает его оттуда (находка `F-1` закрыта).
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U10.13 — порог объявлен только плоским полем percents = 2: истина (дом), код даёт ложь")
+    @DisplayName("U10.13 — порог объявлен только плоским полем percents = 2: истина")
     void u10_13_theThresholdDeclaredByTheFlatFieldIsRead() {
         StrategyCondition condition = moveRule(StrategyConditionRuleType.PROFIT_PERCENTS_REACHED, "2", null);
 
         assertThat(evaluator.evaluate(condition, moveContext("100", "103", StrategyTradeDirection.LONG)))
                 .as("форма контракта авторинга — плоское поле; ход +3 %% взял порог 2")
                 .isTrue();
+    }
+
+    /**
+     * Константный операнд у правил хода порогом не является: форма, которой
+     * контракт авторинга не производит и которую создание отвергает, второй
+     * формой объявления не читается.
+     */
+    @Test
+    @DisplayName("U10.17 — порог объявлен только константным операндом 2: ложь")
+    void u10_17_aConstantOperandIsNotTheThreshold() {
+        StrategyCondition condition = moveRule(StrategyConditionRuleType.PROFIT_PERCENTS_REACHED, null, "2");
+
+        assertThat(evaluator.evaluate(condition, moveContext("100", "103", StrategyTradeDirection.LONG)))
+                .as("ход +3 %% взял бы порог 2, будь операнд порогом")
+                .isFalse();
     }
 
     /** Порог, прочитанный нулём, срабатывал бы на любом положительном ходе. */

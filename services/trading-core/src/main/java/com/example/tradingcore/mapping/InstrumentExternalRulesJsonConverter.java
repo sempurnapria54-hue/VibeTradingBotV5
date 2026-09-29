@@ -21,6 +21,12 @@ import org.springframework.stereotype.Component;
  * (docs/models/domain/core/Instrument.md §«Проекция у торгового ядра»).
  * Своя строка свой идентификатор и так знает.
  *
+ * <p><b>Ставка комиссии в навес не едет тоже</b>, и правило изъятия у обеих
+ * копий конвертера одно (docs/models/domain/other/InstrumentExternalRules.md
+ * §«Ставка комиссии»). Ставку на объект наливает хранилищный слой при
+ * чтении из строки комиссионной группы счёта; записанная обратно, она стала
+ * бы вторым носителем значения, расходящимся со сменой тира.
+ *
  * <p>Знание о хранении выражено примесью, а не аннотацией на доменной
  * модели: форма лежит в общей библиотеке и о том, кто и как её хранит,
  * знать не должна.
@@ -71,5 +77,8 @@ public class InstrumentExternalRulesJsonConverter {
 
         @JsonIgnore
         abstract Long getInstrumentId();
+
+        @JsonIgnore
+        abstract String getExternalTakerFeeRate();
     }
 }

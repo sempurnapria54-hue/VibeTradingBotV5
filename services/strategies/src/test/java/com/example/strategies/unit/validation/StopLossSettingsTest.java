@@ -2,7 +2,6 @@ package com.example.strategies.unit.validation;
 
 import static com.example.strategies.unit.validation.ValidationFixture.algoAction;
 import static com.example.strategies.unit.validation.ValidationFixture.bull;
-import static com.example.strategies.unit.validation.ValidationFixture.matching;
 import static com.example.strategies.unit.validation.ValidationFixture.reference;
 import static com.example.strategies.unit.validation.ValidationFixture.violations;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,7 +10,6 @@ import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.api.model.strategy.StopLossSettingsApiModel;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -112,28 +110,30 @@ class StopLossSettingsTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U21.8 — безубыток вместе с долей дистанции: дом требует отказа (F1)")
-    void u21_8_breakevenWithADistanceIsRejectedByTheHome() {
+    @DisplayName("U21.8 — безубыток вместе с долей дистанции: доля у безубытка не объявляется")
+    void u21_8_breakevenWithADistanceIsRejected() {
         CreateStrategyApiRequest request = reference();
         algoAction(bull(request), "bull_sl_to_breakeven").getStopLossSettings()
                 .setDistancePercents(ValidationFixture.decimal("100"));
 
         assertThat(violations(request))
-                .as("ожидание из дома: у безубытка доля дистанции не объявляется")
-                .isNotEmpty();
+                .as("у безубытка уровень есть функция ставки комиссии")
+                .singleElement()
+                .asString()
+                .contains(".stopLossSettings.distancePercents STRATEGY_STOP_DISTANCE_UNEXPECTED");
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U21.9 — способ от индикатора без доли дистанции: дом требует отказа (F1)")
-    void u21_9_anIndicatorBasedStopWithoutADistanceIsRejectedByTheHome() {
+    @DisplayName("U21.9 — способ от индикатора без доли дистанции: отказ создания, а не рантайма")
+    void u21_9_anIndicatorBasedStopWithoutADistanceIsRejected() {
         CreateStrategyApiRequest request = reference();
         stopSettings(request).setDistancePercents(null);
 
         assertThat(violations(request))
-                .as("ожидание из дома: иначе отказ приходит в рантайме на расчёте цены уровня")
-                .isNotEmpty();
+                .as("иначе отказ приходит в рантайме на расчёте цены уровня")
+                .singleElement()
+                .asString()
+                .contains(".stopLossSettings.distancePercents STRATEGY_STOP_DISTANCE_MISSING");
     }
 
     @Test

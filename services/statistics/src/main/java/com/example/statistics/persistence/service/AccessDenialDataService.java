@@ -1,9 +1,9 @@
 package com.example.statistics.persistence.service;
 
 import com.example.statistics.config.StatisticsPersistenceConfig;
-import com.example.statistics.domain.model.AccessDenial;
 import com.example.statistics.mapping.AccessDenialMapper;
 import com.example.statistics.persistence.repository.AccessDenialRepository;
+import com.example.tradingbot.domain.model.other.AccessDenial;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;

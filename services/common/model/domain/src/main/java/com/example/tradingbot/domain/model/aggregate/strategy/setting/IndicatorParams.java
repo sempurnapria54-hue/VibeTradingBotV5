@@ -14,7 +14,7 @@ import lombok.Setter;
  * не дублируется (docs/rules/persistence-representation.md). Наследники
  * несут только математические параметры по типу индикатора. Хранение —
  * JSONB внутри JSON настройки-владельца. См.
- * docs/models/domain/aggregate/Strategy.md (§IndicatorParams),
+ * docs/models/domain/aggregate/Strategy.md §«Настройки рыночных данных»,
  * docs/rules/strategy-condition-contract.md.
  */
 @Getter

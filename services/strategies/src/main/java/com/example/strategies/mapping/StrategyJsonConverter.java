@@ -25,7 +25,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import java.util.List;
 import org.mapstruct.Named;
 import org.springframework.stereotype.Component;
@@ -36,9 +35,7 @@ import org.springframework.stereotype.Component;
  * клаузы фазы, условие шага, политика устаревания, вложенные настройки
  * действий).
  *
- * <p>Пишутся только непустые значения; длительность — строкой ISO-8601, а
- * не числом секунд: форма хранения читается человеком и переживает смену
- * единицы.
+ * <p>Пишутся только непустые значения.
  *
  * <p><b>Тега подтипа в параметрах индикатора нет:</b> он восстанавливается
  * по колонке {@code indicator_type} строки-владельца — дискриминатор живёт
@@ -52,8 +49,7 @@ public class StrategyJsonConverter {
 
     public StrategyJsonConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy()
-                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
-                .disable(SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS);
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
     }
 
     /** Параметры индикатора в JSON — без тега типа, он в колонке строки. */

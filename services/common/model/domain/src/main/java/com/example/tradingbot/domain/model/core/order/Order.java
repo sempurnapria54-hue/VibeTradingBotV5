@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
@@ -72,7 +73,7 @@ public class Order extends Auditable {
     /** Причина финализации / перевода в ERROR. */
     private CloseReason closeReason;
 
-    /** Бизнес-тип ordinary order (не подменяет strategy role). */
+    /** Бизнес-тип заявки — наличие встроенной защиты; направление риска несёт намерение. */
     private Type type;
 
     /**
@@ -100,7 +101,10 @@ public class Order extends Auditable {
     /** Накопленная комиссия. */
     private BigDecimal fee;
 
-    /** Доменное намерение: ордер только уменьшает позицию (не из снапшота биржи). */
+    /**
+     * Доменное намерение: ордер только уменьшает позицию (не из снапшота биржи).
+     * Ось направления риска и предикат отбора ноги — {@link #isEntryLeg()}.
+     */
     private Boolean positionReducingOnly;
 
     /** internalId предшественника в цепочке REPLACE (nullable; обратная ссылка выводится запросом). */
@@ -164,6 +168,25 @@ public class Order extends Auditable {
     /** Live: ещё существует на бирже / влияет на risk (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED). */
     public Boolean isLive() {
         return LIVE_STATUSES.contains(status);
+    }
+
+    /**
+     * Входная нога — заявка, объявившая, что НЕ только уменьшает позицию.
+     *
+     * <p><b>Ось направления риска — намерение, а не тип.</b> Тип заявки
+     * различает только наличие встроенной защиты, и закрывающая нога выхода
+     * несёт тип простой заявки (docs/models/domain/core/Order.md §Енумы).
+     * Пустое намерение не читается ни входом, ни уменьшением: оба писателя
+     * ноги его объявляют, и пустота есть несогласованное состояние, а не
+     * третий вид ноги.
+     */
+    public Boolean isEntryLeg() {
+        return isFalse(positionReducingOnly);
+    }
+
+    /** Нога, объявившая, что только уменьшает позицию; пустое намерение — не она (см. {@link #isEntryLeg()}). */
+    public Boolean isReducingLeg() {
+        return isTrue(positionReducingOnly);
     }
 
     /** Нога налита целиком: завершена с причиной налива. */
@@ -277,13 +300,17 @@ public class Order extends Auditable {
         SELL
     }
 
-    /** Бизнес-тип ordinary order (не подменяет strategy role). */
+    /**
+     * Бизнес-тип заявки — ось встроенной защиты, а не направления риска:
+     * закрывающая нога несёт {@link #ENTRY}, её отличает намерение
+     * {@code positionReducingOnly} (docs/models/domain/core/Order.md §Енумы).
+     */
     public enum Type {
 
-        /** Входной ордер без встроенной защиты. */
+        /** Простая заявка без встроенной защиты: вход либо закрывающая нога. */
         ENTRY,
 
-        /** Входной ордер со встроенным attached stop-loss. */
+        /** Вход со встроенной защитой (attached stop-loss). */
         ENTRY_ATTACHED_STOP_LOSS
     }
 

@@ -12,7 +12,6 @@ import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.api.model.strategy.StrategyDetailApiModel;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -104,13 +103,12 @@ class RiskWithinGlobalTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U10.7 — конфигурационный потолок пуст: код взят из дома (F2)")
+    @DisplayName("U10.7 — конфигурационный потолок пуст: код с общим префиксом сущности")
     void u10_7_anUnconfiguredCeilingIsRejectedByItsNamedCode() {
         List<String> violations = violations(reference(), appetite(null, "100"));
 
         assertThat(matching(violations, "details[0].strategySimultaneousRiskPerDealPercent " + NOT_CONFIGURED))
-                .as("ожидание из дома: код несёт общий префикс сущности")
+                .as("код несёт общий префикс сущности")
                 .hasSize(1);
         assertThat(matching(violations, HEADROOM))
                 .as("запас нотинала на пустом конфигурационном числе не считается")
@@ -118,8 +116,7 @@ class RiskWithinGlobalTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U10.8 — конфигурационный предел множителя пуст: тот же код на своём пути (F2)")
+    @DisplayName("U10.8 — конфигурационный предел множителя пуст: тот же код на своём пути")
     void u10_8_anUnconfiguredMultiplierLimitIsRejectedToo() {
         List<String> violations = violations(reference(), appetite("1", null));
 
@@ -128,8 +125,7 @@ class RiskWithinGlobalTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U10.9 — пусты оба конфигурационных числа: по нарушению на путь у каждой детали (F2)")
+    @DisplayName("U10.9 — пусты оба конфигурационных числа: по нарушению на путь у каждой детали")
     void u10_9_bothUnconfiguredNumbersAreReportedPerDetail() {
         List<String> violations = violations(reference(), appetite(null, null));
 

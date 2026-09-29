@@ -15,7 +15,6 @@ import com.example.tradingcore.domain.command.calc.DealTerminalFeatures;
 import com.example.tradingcore.util.Constants;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,11 +33,6 @@ import org.junit.jupiter.api.Test;
  * закрытия площадки: {@code 1}, {@code 2} — штатный выход; {@code 3},
  * {@code 4} — ликвидация; {@code 5}, {@code 6} — принудительное
  * сокращение.
- *
- * <p><b>Один кейс группы красен по построению</b> и помечен
- * {@code @Tag("debt")}: {@code U6.18} предъявляет находку {@code F3}
- * (охрана полноты графа читает пустое не так, как читает его охрана
- * итога).
  */
 class TerminalCloseOutcomeTest {
 
@@ -219,7 +213,6 @@ class TerminalCloseOutcomeTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("U6.18 — пустой признак полноты графа: корзина неизвестности, симметрично охране итога")
     void u6_18_anEmptyGraphCompletenessFlagGivesTheBasket() {
         DealContext dealContext = contextBuilder(enteredDeal(closedEpisode("1", "1")), List.of(),
@@ -229,8 +222,7 @@ class TerminalCloseOutcomeTest {
 
         assertThat(harness.apply(dealContext, false).getCloseOutcome())
                 .as("операнд спеки объявляет охрану СИММЕТРИЧНОЙ охране итога, а итог на том же "
-                        + "пустом значении становится недоступным (U1.12). Сегодня охрана читает "
-                        + "пустое как «граф полон» и даёт штатный выход (находка F3, Z16)")
+                        + "пустом значении становится недоступным (U1.12)")
                 .isEqualTo(Deal.CloseOutcome.UNDETERMINED);
     }
 

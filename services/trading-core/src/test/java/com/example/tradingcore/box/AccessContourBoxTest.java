@@ -8,7 +8,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,10 +19,7 @@ import org.junit.jupiter.api.Test;
  * разные ожидания»). Числами пиньнуты ровно те исходы, чьё число
  * фиксирует дом: {@code 401} точки входа контура, {@code 405} и
  * {@code 400} контейнера, {@code 200} и {@code 204} контракта успеха.
- *
- * <p><b>Клетки с меткой {@code debt} красны ПО ПОСТРОЕНИЮ</b>: их
- * ожидание взято из дома, который дерево кода ещё не несёт, и ослаблять
- * его под текущий факт значило бы закрепить дефект.
+
  */
 class AccessContourBoxTest extends SharedTradingCoreBox {
 
@@ -35,6 +31,9 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
 
     /** Последняя цена момента. */
     private static final String LAST_PRICE = "100";
+
+    /** Таблица следа отказов доступа. */
+    private static final String DENIALS_TABLE = "access_denials";
 
     @Test
     @DisplayName("B12.1 — вызов без предъявленного принципала")
@@ -178,24 +177,27 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
         assertThat(auth.paths()).containsOnly(PEER_ACCOUNTS);
     }
 
+    /**
+     * След отказа у сервиса со своей базой — строка до ответа плюс строка
+     * лога точки входа (docs/rules/api-access-policy.md §«След отказа
+     * пишет тот, у кого есть база»; docs/models/domain/other/AccessDenial.md).
+     * Путь в строку идёт без запроса: поверхность — метод и путь.
+     */
     @Test
-    @Tag("debt")
     @DisplayName("B12.10 — след отказа доступа")
     void theAccessDenialLeavesATrace() {
         Integer mark = AppLog.mark();
 
-        getAnonymously(DEALS + "?exchangeAccountInternalId=" + ACCOUNT);
+        Answer answer = getAnonymously(DEALS + "?exchangeAccountInternalId=" + ACCOUNT);
 
-        // Часть о СТРОКЕ не прогоняется: таблицы отказов доступа в схеме
-        // ядра нет (.claude/work/backlog.md §«Таблица отказов доступа у
-        // сервисов со своей базой»), и её появление — исход находки, а не
-        // ожидание этой клетки.
-        assertThat(rows.tableNames()).doesNotContain("access_denials");
-        // Долг, добытый прогоном: следа у отказа доступа НЕТ ВОВСЕ — ни
-        // строки, ни записи журнала. Точек входа отказа ядро не берёт из
-        // общего артефакта периметра, а контур отвечает молча. Ожидание
-        // взято из дома и под текущий факт не ослаблено.
-        assertThat(AppLog.since(mark)).contains(ACCOUNT);
+        assertThat(answer.status()).isEqualTo(401);
+        List<Map<String, Object>> denials = rows.all(DENIALS_TABLE);
+        assertThat(denials).as("попытка была одна, и строка у неё одна").hasSize(1);
+        Map<String, Object> denial = denials.getFirst();
+        assertThat(denial.get("outcome")).isEqualTo("PRINCIPAL_ABSENT");
+        assertThat(denial.get("principal")).as("принятого принципала у отказа нет").isNull();
+        assertThat(denial.get("surface")).isEqualTo("GET " + DEALS);
+        assertThat(AppLog.since(mark)).contains("Access denied", DEALS);
     }
 
     // ------------------------------------------------------------------

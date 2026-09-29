@@ -105,13 +105,17 @@ public class RiskValidator {
         CalculatedPrice price = calculatedAction.getCalculatedPrice();
         ExchangeAccount account = dealContext.getExchangeAccount();
 
-        if (isFalse(dealContext.getGraphComplete())) {
+        if (isNotTrue(dealContext.getGraphComplete())) {
             return blockedResult(checks, RiskCheckCode.DEAL_GRAPH_INCOMPLETE,
                     "Deal graph is not fully presented by the pass context");
         }
         if (isNull(size) || isNull(size.getSizeContracts()) || size.getSizeContracts().signum() <= 0) {
             return blockedResult(checks, RiskCheckCode.CALCULATED_ACTION_INVALID,
                     "Calculated size missing or non-positive");
+        }
+        if (isNull(price)) {
+            return blockedResult(checks, RiskCheckCode.CALCULATED_ACTION_INVALID,
+                    "Calculated price missing: level checks and act risk are unmeasured");
         }
         InstrumentExternalRules rules = rulesDataService
                 .findByInstrumentId(dealContext.getInstrument().getId(), account.getId())
@@ -246,7 +250,7 @@ public class RiskValidator {
         StrategyDetail detail = dealContext.getStrategyDetail();
         ExchangeAccount account = dealContext.getExchangeAccount();
         BigDecimal base = dealContext.riskBase();
-        if (isFalse(dealContext.getGraphComplete()) || isNull(detail) || isNull(base) || base.signum() <= 0) {
+        if (isNotTrue(dealContext.getGraphComplete()) || isNull(detail) || isNull(base) || base.signum() <= 0) {
             return List.of();
         }
         InstrumentExternalRules rules = rulesDataService
@@ -496,6 +500,8 @@ public class RiskValidator {
 
     /**
      * Живые ВХОДНЫЕ ноги сделки — по всем траншам: потолки агрегатные.
+     * Входную ногу отбирает её намерение ({@link Order#isEntryLeg()}) — тот
+     * же предикат, что у писателя четвёрки чисел риска.
      *
      * <p><b>Ноги собираются обходом траншей, а не полем агрегата:</b> поля
      * {@code Deal.orders} в целевой модели нет — нога висит на транше, а
@@ -506,7 +512,7 @@ public class RiskValidator {
         return emptyIfNull(dealContext.getDeal().getTranches()).stream()
                 .flatMap(tranche -> emptyIfNull(tranche.getOrders()).stream())
                 .filter(order -> isTrue(order.isLive()))
-                .filter(order -> isNotTrue(order.getPositionReducingOnly()))
+                .filter(order -> isTrue(order.isEntryLeg()))
                 .collect(Collectors.toList());
     }
 
@@ -683,7 +689,7 @@ public class RiskValidator {
      */
     private void checkFeeRate(CalculatedPrice price, InstrumentExternalRules rules, DealContext dealContext,
                               List<RiskCheckResult> checks) {
-        boolean touchesStopLevel = nonNull(price) && nonNull(price.getStopLossPrice())
+        boolean touchesStopLevel = nonNull(price.getStopLossPrice())
                 && nonNull(price.getStopLossPrice().getTriggerPrice());
         boolean episodeLive = nonNull(dealContext.getDeal().livePosition());
         if (isFalse(touchesStopLevel || episodeLive)) {
@@ -929,7 +935,7 @@ public class RiskValidator {
 
     /** Per-order лимит размера по режиму цены: EXPLICIT — limit-лимит, иначе market-лимит. */
     private BigDecimal applicableMaxSize(InstrumentExternalRules rules, CalculatedPrice price) {
-        if (nonNull(price) && PriceMode.EXPLICIT.equals(price.getPriceMode())) {
+        if (PriceMode.EXPLICIT.equals(price.getPriceMode())) {
             return rules.maxLimitSize();
         }
         return rules.maxMarketSize();

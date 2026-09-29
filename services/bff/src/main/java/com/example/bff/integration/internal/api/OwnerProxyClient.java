@@ -4,8 +4,10 @@ import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.bff.config.PerimeterProperties;
+import com.example.bff.util.Constants.ConnectionHeaders;
 import com.example.platform.exception.PeerServiceUnavailableException;
 import java.net.URI;
+import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -95,10 +97,31 @@ public class OwnerProxyClient {
         if (isFalse(isEmptyBody(body))) {
             request = request.body(body);
         }
-        return request.retrieve()
+        ResponseEntity<byte[]> answer = request.retrieve()
                 .onStatus(status -> true, (ignoredRequest, ignoredResponse) -> {
                 })
                 .toEntity(byte[].class);
+        return new ResponseEntity<>(answer.getBody(), endToEndHeaders(answer.getHeaders()),
+                answer.getStatusCode());
+    }
+
+    /**
+     * Заголовки ответа владельца без заголовков соединения. Те описывают
+     * соединение владельца с периметром: пересланный браузеру
+     * {@code Transfer-Encoding: chunked} при теле, записанном целиком,
+     * делал ответ неразбираемым. Решение владельца — статус, заголовки
+     * содержимого и тело — доезжает без изменения
+     * (docs/architecture/contracts.md §«Периметр: что `bff` отдаёт и чего не
+     * делает»).
+     */
+    private HttpHeaders endToEndHeaders(HttpHeaders ownerHeaders) {
+        HttpHeaders forwarded = new HttpHeaders();
+        ownerHeaders.forEach((name, values) -> {
+            if (isFalse(ConnectionHeaders.HOP_BY_HOP.contains(name.toLowerCase(Locale.ROOT)))) {
+                forwarded.addAll(name, values);
+            }
+        });
+        return forwarded;
     }
 
     /** Пустое тело — отсутствие тела, а не тело нулевой длины. */

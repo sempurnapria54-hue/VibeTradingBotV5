@@ -12,10 +12,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.statistics.config.AggregateRecomputeProperties;
 import com.example.statistics.domain.jobs.AggregateRecomputeJob;
+import com.example.statistics.domain.model.FactSeriesStarts;
 import com.example.statistics.domain.service.AggregateRecomputeService;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -45,6 +47,9 @@ class AggregateRecomputeTest {
 
     private static final Integer WINDOW_DAYS = 3;
     private static final LocalDate TODAY = LocalDate.now(ZoneOffset.UTC);
+    private static final FactSeriesStarts STARTS = new FactSeriesStarts(
+            OffsetDateTime.of(2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC),
+            OffsetDateTime.of(2026, 2, 1, 0, 0, 0, 0, ZoneOffset.UTC));
 
     private final JobExecutionGuard executionGuard = mock(JobExecutionGuard.class);
     private final AggregateRecomputeService recomputeService = mock(AggregateRecomputeService.class);
@@ -56,6 +61,17 @@ class AggregateRecomputeTest {
     @BeforeEach
     void setUp() {
         letTheGuardThrough();
+        when(recomputeService.seriesStarts()).thenReturn(STARTS);
+    }
+
+    @Test
+    @DisplayName("Начала рядов читаются один раз на проход и едут в каждую порцию")
+    void theSeriesStartsAreReadOncePerPass() {
+        job.tick();
+
+        verify(recomputeService, times(1)).seriesStarts();
+        verify(recomputeService, times(WINDOW_DAYS))
+                .recomputeDay(any(LocalDate.class), eq(STARTS), any(OffsetDateTime.class));
     }
 
     @Test
@@ -64,10 +80,13 @@ class AggregateRecomputeTest {
         job.tick();
 
         InOrder order = inOrder(recomputeService);
-        order.verify(recomputeService).recomputeDay(eq(TODAY), any(OffsetDateTime.class));
-        order.verify(recomputeService).recomputeDay(eq(TODAY.minusDays(1)), any(OffsetDateTime.class));
-        order.verify(recomputeService).recomputeDay(eq(TODAY.minusDays(2)), any(OffsetDateTime.class));
-        verify(recomputeService, times(WINDOW_DAYS)).recomputeDay(any(LocalDate.class), any(OffsetDateTime.class));
+        order.verify(recomputeService).recomputeDay(eq(TODAY), eq(STARTS), any(OffsetDateTime.class));
+        order.verify(recomputeService)
+                .recomputeDay(eq(TODAY.minusDays(1)), eq(STARTS), any(OffsetDateTime.class));
+        order.verify(recomputeService)
+                .recomputeDay(eq(TODAY.minusDays(2)), eq(STARTS), any(OffsetDateTime.class));
+        verify(recomputeService, times(WINDOW_DAYS))
+                .recomputeDay(any(LocalDate.class), any(FactSeriesStarts.class), any(OffsetDateTime.class));
     }
 
     @Test
@@ -77,22 +96,25 @@ class AggregateRecomputeTest {
 
         job.tick();
 
-        verify(recomputeService, times(1)).recomputeDay(any(LocalDate.class), any(OffsetDateTime.class));
-        verify(recomputeService).recomputeDay(eq(TODAY), any(OffsetDateTime.class));
+        verify(recomputeService, times(1))
+                .recomputeDay(any(LocalDate.class), any(FactSeriesStarts.class), any(OffsetDateTime.class));
+        verify(recomputeService).recomputeDay(eq(TODAY), eq(STARTS), any(OffsetDateTime.class));
     }
 
     @Test
     @DisplayName("Обрыв между порциями оставляет пересчитанными ровно пройденные сутки")
     void aBreakBetweenBucketsLeavesThePassedBucketsRecomputed() {
         doThrow(new IllegalStateException("порция оборвалась"))
-                .when(recomputeService).recomputeDay(eq(TODAY.minusDays(1)), any(OffsetDateTime.class));
+                .when(recomputeService)
+                        .recomputeDay(eq(TODAY.minusDays(1)), eq(STARTS), any(OffsetDateTime.class));
 
         assertThatThrownBy(job::tick)
                 .as("отказ порции не глушится: он останавливает проход, а следующий тик берёт окно заново")
                 .isInstanceOf(IllegalStateException.class);
 
-        verify(recomputeService).recomputeDay(eq(TODAY), any(OffsetDateTime.class));
-        verify(recomputeService, never()).recomputeDay(eq(TODAY.minusDays(2)), any(OffsetDateTime.class));
+        verify(recomputeService).recomputeDay(eq(TODAY), eq(STARTS), any(OffsetDateTime.class));
+        verify(recomputeService, never())
+                .recomputeDay(eq(TODAY.minusDays(2)), eq(STARTS), any(OffsetDateTime.class));
     }
 
     @Test
@@ -103,7 +125,8 @@ class AggregateRecomputeTest {
         job.tick();
 
         ArgumentCaptor<OffsetDateTime> assembled = ArgumentCaptor.forClass(OffsetDateTime.class);
-        verify(recomputeService, times(WINDOW_DAYS)).recomputeDay(any(LocalDate.class), assembled.capture());
+        verify(recomputeService, times(WINDOW_DAYS))
+                .recomputeDay(any(LocalDate.class), any(FactSeriesStarts.class), assembled.capture());
         OffsetDateTime after = OffsetDateTime.now(ZoneOffset.UTC).plus(Duration.ofSeconds(1));
         assertThat(assembled.getAllValues())
                 .as("число, показанное без своей актуальности, читается как «сейчас»")
@@ -118,7 +141,8 @@ class AggregateRecomputeTest {
         job.tick();
 
         verify(executionGuard, never()).runExclusively(anyString(), any(Runnable.class));
-        verify(recomputeService, never()).recomputeDay(any(LocalDate.class), any(OffsetDateTime.class));
+        verify(recomputeService, never())
+                .recomputeDay(any(LocalDate.class), any(FactSeriesStarts.class), any(OffsetDateTime.class));
     }
 
     @Test
@@ -128,7 +152,8 @@ class AggregateRecomputeTest {
 
         job.tick();
 
-        verify(recomputeService, never()).recomputeDay(any(LocalDate.class), any(OffsetDateTime.class));
+        verify(recomputeService, never())
+                .recomputeDay(any(LocalDate.class), any(FactSeriesStarts.class), any(OffsetDateTime.class));
     }
 
     private void letTheGuardThrough() {

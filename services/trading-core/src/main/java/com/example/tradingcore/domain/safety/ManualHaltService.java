@@ -20,6 +20,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Ручное управление safety-остановкой: держатель управляет теми же
@@ -94,7 +95,7 @@ public class ManualHaltService {
             safetyHoldCoordinator.react(signal, context, true);
             return;
         }
-        holdService.raise(signal, context);
+        holdService.raiseManual(signal, context);
     }
 
     /**
@@ -111,7 +112,15 @@ public class ManualHaltService {
      *
      * <p><b>Холостое снятие строки журнала не заводит:</b> названная
      * ступень не стои́т — ничего не произошло.
+     *
+     * <p><b>Снятие и его строка журнала — одна транзакция:</b> отказ записи
+     * строки роняет операцию, и ступень остаётся стоять. Цена разрешающая
+     * лишь по виду — при недоступном журнале контур остаётся остановленным, —
+     * а исход «вернул торговлю, но следа нет» закрыт
+     * (docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо и от
+     * автоматики, и друг от друга»).
      */
+    @Transactional
     public void clear(ManualHaltClass haltClass, String accountInternalId, String instrumentInternalId) {
         HoldScope scope = scopeOf(haltClass, instrumentInternalId);
         DealContext context = objectContext(scope, accountInternalId, instrumentInternalId);
@@ -120,7 +129,7 @@ public class ManualHaltService {
             log.debug("Manual clearance is a no-op: the named rung does not stand scope={}", scope);
             return;
         }
-        journal(HoldSignal.instrumentJournal(Constants.Hold.MANUAL_HALT_CLEARED), scope, context);
+        journalClearance(scope, context);
     }
 
     // ------------------------------------------------------------------
@@ -248,19 +257,13 @@ public class ManualHaltService {
      * обязано дать свою строку, иначе холд, поднятый и снятый трижды,
      * оставил бы один след.
      */
-    private void journal(HoldSignal signal, HoldScope scope, DealContext context) {
-        try {
-            if (Constants.Hold.MANUAL_HALT_CLEARED.equals(signal.getCode())) {
-                anomalyReportService.journal(context, scopedJournalSignal(scope, signal.getCode()));
-                return;
-            }
-            anomalyReportService.journalState(context, signal, null);
-        } catch (RuntimeException e) {
-            log.error("Manual halt journal failed scope={} code={}", scope, signal.getCode(), e);
-        }
+    private void journalClearance(HoldScope scope, DealContext context) {
+        anomalyReportService.journal(context, clearanceSignal(scope));
     }
 
-    private HoldSignal scopedJournalSignal(HoldScope scope, String code) {
+    /** Журнальный сигнал снятия радиусом самой операции. */
+    private HoldSignal clearanceSignal(HoldScope scope) {
+        String code = Constants.Hold.MANUAL_HALT_CLEARED;
         return HoldScope.EXCHANGE_ACCOUNT.equals(scope)
                 ? HoldSignal.exchangeAccountJournal(code)
                 : HoldSignal.instrumentJournal(code);

@@ -20,7 +20,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -115,16 +114,13 @@ class ContextWhitelistTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b>
-     * Несобранная раскладка есть недоступный операнд, и дом объявляет
-     * консервативную ложь (docs/rules/absent-value-semantics.md); код
-     * обращается к пустой раскладке и роняет оценку. Красный прогон и есть
-     * предъявление находки `F-8` (`.claude/work/backlog.md`
-     * §«Интерпретатор бросает там, где объявлена консервативная ложь»).
+     * Несобранная раскладка есть недоступный операнд: контекст отдаёт её
+     * пустой, и оценка отвечает консервативной ложью
+     * (docs/components/StrategyConditionEvaluator.md §Границы; находка `F-8`
+     * закрыта).
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U11.9 — контекст собран без раскладок вовсе: ложь (дом), код роняет оценку")
+    @DisplayName("U11.9 — контекст собран без раскладок вовсе: ложь")
     void u11_9_aContextWithoutLayoutsIsConservativelyFalse() {
         StrategyCondition condition = condition(rule(StrategyConditionRuleType.INDICATOR_COMPARE,
                 StrategyConditionOperator.GT, indicator(FAST_KEY, null), number("10")));

@@ -84,11 +84,23 @@ public class AttachedAlgoOrderStateResolver {
                 && isNotTrue(cancelIntentStanding);
     }
 
-    /** Состояние защиты по предъявленным фактам. */
+    /**
+     * Состояние защиты по предъявленным фактам.
+     *
+     * <p><b>Пустой статус родителя — отсутствие факта, а не факт</b>, и
+     * читается так же, как в публичном гейте цикла: класс родителя не
+     * выводится, исход не определён, статус защиты не двигается
+     * (docs/components/AttachedAlgoOrderStateResolver.md §Границы). Отказ
+     * постановки проверяется раньше — это свой факт, и статус родителя его
+     * не отменяет.
+     */
     public AttachedProtectionResolution resolve(AttachedProtectionFacts facts) {
         if (isTrue(failsToPlace(facts.getObserved()))) {
             return AttachedProtectionResolution.of(AttachedAlgoOrder.Status.ERROR,
                     AttachedAlgoOrder.CloseReason.PROTECTION_PLACEMENT_FAILED);
+        }
+        if (isNull(facts.getParentStatus())) {
+            return AttachedProtectionResolution.undetermined();
         }
         ParentClass parentClass = parentClass(facts);
         if (Objects.equals(ParentClass.PROBLEM, parentClass)) {

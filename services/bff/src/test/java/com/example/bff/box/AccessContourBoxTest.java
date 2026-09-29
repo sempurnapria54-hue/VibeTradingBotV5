@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -51,8 +50,8 @@ class AccessContourBoxTest extends SharedBffBox {
     }
 
     @Test
-    @DisplayName("B9.2 — Открытых точек ровно две, и вторая — тропа билета")
-    void b9_2_exactlyTwoOpenPointsAndTheSecondIsTheTicketPath() {
+    @DisplayName("B9.2 — Открытых точек ровно три: проба живости, тропа билета и съём метрик")
+    void b9_2_exactlyThreeOpenPoints() {
         authAnswersOneMembership();
 
         Answer health = getAnonymously(HEALTH);
@@ -68,14 +67,16 @@ class AccessContourBoxTest extends SharedBffBox {
             assertThat(withoutTicket.errorCode()).isEqualTo(UNAUTHENTICATED);
         }
 
-        // Съёма метрик нет вовсе: без предъявления — отказ контура (точка не
-        // в перечне открытых), под принятым токеном — отказ контейнера
-        // (точки не существует).
+        // Съём метрик открыт поимённо: наблюдатель окружения токена не
+        // носит. Отдаёт он ряды состояния, а не данные, — и ряд частоты
+        // отказов доступа среди них с первого отказа, а не с первого съёма.
         Answer metricsAnonymous = getAnonymously("/actuator/prometheus");
-        assertThat(metricsAnonymous.status()).isEqualTo(401);
-        assertThat(metricsAnonymous.errorCode()).isEqualTo(UNAUTHENTICATED);
-        Answer metricsAuthenticated = get("/actuator/prometheus");
-        assertThat(metricsAuthenticated.errorCode()).isEqualTo(NOT_ACCEPTED);
+        assertThat(metricsAnonymous.status()).isEqualTo(200);
+        assertThat(metricsAnonymous.body()).contains("perimeter_access_denials");
+        // Префикс актуатора не открыт: соседняя точка — отказ контура.
+        Answer metricsList = getAnonymously("/actuator/metrics");
+        assertThat(metricsList.status()).isEqualTo(401);
+        assertThat(metricsList.errorCode()).isEqualTo(UNAUTHENTICATED);
     }
 
     @Test
@@ -163,7 +164,6 @@ class AccessContourBoxTest extends SharedBffBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B9.8 — Отказ доступа оставляет наблюдаемый след")
     void b9_8_anAccessRefusalLeavesAnObservableTrace() {
         List<String> paths = List.of(CONTEXT, "/api/v1/trading-core/deals", "/api/v1/strategies/definitions",
@@ -173,13 +173,14 @@ class AccessContourBoxTest extends SharedBffBox {
 
         paths.forEach(path -> assertThat(getAnonymously(path).status()).as(path).isEqualTo(401));
 
-        // Ожидание из дома: каждый отказ виден строкой журнала с путём и
-        // глаголом, а частота отказов — рядом наблюдателя окружения.
-        // Сегодня красно: точка входа отказа не пишет ни строки, а реестра
-        // рядов у сервиса нет вовсе (находка F-5 документа кейсов).
+        // Каждый отказ виден строкой журнала с путём и глаголом, а частота
+        // отказов — рядом наблюдателя окружения.
         String log = AppLog.since(mark);
-        assertThat(paths).allSatisfy(path -> assertThat(log).contains(path));
-        assertThat(get("/actuator/prometheus").status()).isEqualTo(200);
+        assertThat(paths).allSatisfy(path -> assertThat(log).contains("GET " + path));
+        Answer metrics = getAnonymously("/actuator/prometheus");
+        assertThat(metrics.status()).isEqualTo(200);
+        assertThat(metrics.body()).containsPattern(
+                "perimeter_access_denials_total\\{[^}]*outcome=\"PRINCIPAL_ABSENT\"[^}]*} [1-9]");
     }
 
     @Test

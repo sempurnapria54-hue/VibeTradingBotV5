@@ -2,6 +2,7 @@ package com.example.tradingcore.domain.fsm;
 
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -63,7 +64,7 @@ public class DealTransitionGate {
      * (docs/rules/exit-teardown-order.md).
      */
     public Boolean netCloseAllowed(DealContext dealContext) {
-        if (isFalse(dealContext.getGraphComplete())) {
+        if (isNotTrue(dealContext.getGraphComplete())) {
             return false;
         }
         return dealContext.getDeal().getTranches().stream()
@@ -71,11 +72,14 @@ public class DealTransitionGate {
     }
 
     /**
-     * Контракт ШТАТНОГО терминала: все транши терминальны, живого риска
-     * доказанно нет, число посчитано и валюта резолвлена у состоявшейся
-     * сделки.
+     * Ветвь ШТАТНОГО терминала композиции {@code transitionAllowed}
+     * (docs/spec/deal-lifecycle.json): все транши терминальны, живого риска
+     * доказанно нет, и выполнена величина {@code cleanTerminalContract} —
+     * число посчитано, валюта резолвлена у состоявшейся сделки. Имя
+     * называет ветвь, а не одноимённую величину спеки: та несёт только
+     * число и валюту.
      */
-    public Boolean cleanTerminalContract(DealContext dealContext) {
+    public Boolean cleanTerminalAllowed(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         if (isFalse(deal.allTranchesTerminal())) {
             return false;
@@ -90,14 +94,24 @@ public class DealTransitionGate {
     }
 
     /**
-     * Контракт АВАРИЙНОГО терминала: требование одно — доказанное
-     * отсутствие живого риска.
+     * Ветвь АВАРИЙНОГО терминала композиции {@code transitionAllowed}
+     * (docs/spec/deal-lifecycle.json): гейт мерит ПЕРВЫЙ конъюнкт —
+     * доказанное отсутствие живого риска.
+     *
+     * <p><b>Второй конъюнкт — величину {@code emergencyTerminalContract}
+     * («число посчитано, а не подставлено») — держат писатели числа, а не
+     * этот гейт,</b> и спека называет их поимённо: провенанса у числа в
+     * данных нет, и отличить подставленное от посчитанного по нему нельзя.
+     * Каждый писатель пишет только посчитанное — финализация выхода по
+     * доступному итогу, штатный терминал тропы без входа нулём-результатом
+     * тропы, само аварийное звено по доступности либо пустоту
+     * (docs/components/MarkDealEmergencyClosedExecutor.md).
      *
      * <p><b>Терминальность строк траншей его не гейтит:</b> строка транша
      * стала бы второй точкой отказа аварийного контура
      * (docs/components/ErrorHandler.md).
      */
-    public Boolean emergencyTerminalContract(DealContext dealContext) {
+    public Boolean emergencyTerminalAllowed(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         return terminalGate.riskProvenAbsent(deal, deal.getTranches(), dealContext.getGraphComplete());
     }
@@ -111,10 +125,10 @@ public class DealTransitionGate {
             return false;
         }
         if (Deal.Status.CLOSED.equals(to)) {
-            return cleanTerminalContract(dealContext);
+            return cleanTerminalAllowed(dealContext);
         }
         if (Deal.Status.EMERGENCY_CLOSED.equals(to)) {
-            return emergencyTerminalContract(dealContext);
+            return emergencyTerminalAllowed(dealContext);
         }
         return true;
     }

@@ -157,12 +157,13 @@ class RiskNumbersLegSelectionTest {
     }
 
     @Test
-    @DisplayName("U27.13 — нога не входного типа: ни в одно из четырёх чисел не входит")
-    void u27_13_aLegOutsideTheEntryTypesStaysOutOfEveryNumber() {
-        Order outsideTheTypes = leg(Order.Status.ACTIVE, "100", "100", "50");
-        outsideTheTypes.setType(null);
+    @DisplayName("U27.13 — закрывающая нога: тип простой заявки, намерение reduce-only — ни в одно из четырёх чисел не входит")
+    void u27_13_aReducingLegOfTheEntryTypeStaysOutOfEveryNumber() {
+        Order closing = leg(Order.Status.ACTIVE, "100", "100", "50");
+        closing.setType(Order.Type.ENTRY);
+        closing.setPositionReducingOnly(true);
 
-        assertAllFourAreZero(compute(outsideTheTypes));
+        assertAllFourAreZero(compute(closing));
     }
 
     /** Входная нога базовой сборки, привязанная к живому эпизоду. */

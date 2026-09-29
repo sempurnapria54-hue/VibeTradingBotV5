@@ -73,13 +73,15 @@ public abstract class ReceptionHaltMarkerContract {
     }
 
     @Test
-    @DisplayName("U11.2 — вторая неудачная доставка того же сообщения: не пишется ничего")
-    void u11_2_aSecondDeliveryWritesNothing() {
+    @DisplayName("U11.2 — вторая неудачная доставка того же сообщения: отметка идёт снова")
+    void u11_2_aSecondDeliveryMarksTheHaltAgain() {
         Recording recording = failedDelivery(TOPIC, 2);
 
         assertThat(recording.calls)
-                .as("флаг уже стои́т, и запись на каждом повторе била бы в базу с частотой паузы")
-                .isEmpty();
+                .as("условие записи — состояние строки, а не номер попытки: первая доставка могла "
+                        + "прийтись на окно, где строки пары ещё нет")
+                .containsExactly("noteHalt");
+        assertThat(recording.halted).containsExactly(TOPIC);
     }
 
     @Test

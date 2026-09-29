@@ -13,6 +13,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -92,7 +93,28 @@ public class StrategyLifecycleService {
                         "Strategy tree disappeared before activation: " + definition.getInternalId()));
         validator.validateRiskInequalities(mapper.domainToApi(snapshot).getDetails(),
                 riskAppetiteReader.read(tenantInternalId));
-        return statusWriter.commit(snapshot, Strategy.Status.ACTIVE, actorProvider.currentActor());
+        return commitActivation(snapshot);
+    }
+
+    /**
+     * Запись активации с исходом гонки.
+     *
+     * <p><b>Проигравший гонку отвечает тем же отказом, что и проверка
+     * приложения.</b> Между чтением активной на паре и фиксацией есть окно,
+     * и вторую одновременную активацию ловит второй носитель инварианта —
+     * частичный уникальный индекс. Нарушение целостности здесь повторяет
+     * проверку приложения: победитель к этому моменту зафиксирован, и
+     * проверка отвечает {@code 409} с его идентичностью. Не ответила —
+     * нарушение не о паре, и оно уходит дальше как есть
+     * (docs/lifecycles/Strategy.md §«Допустимые переходы»).
+     */
+    private Strategy commitActivation(Strategy snapshot) {
+        try {
+            return statusWriter.commit(snapshot, Strategy.Status.ACTIVE, actorProvider.currentActor());
+        } catch (DataIntegrityViolationException e) {
+            requireNoOtherActiveOnPair(snapshot);
+            throw e;
+        }
     }
 
     /**

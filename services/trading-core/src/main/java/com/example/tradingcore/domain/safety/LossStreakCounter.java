@@ -2,7 +2,7 @@ package com.example.tradingcore.domain.safety;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
-import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
@@ -79,7 +79,7 @@ public class LossStreakCounter {
      */
     private BigDecimal priceResult(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
-        if (isFalse(dealContext.getGraphComplete()) || isNull(deal.getResultProfit())) {
+        if (isNotTrue(dealContext.getGraphComplete()) || isNull(deal.getResultProfit())) {
             return null;
         }
         return deal.getResultProfit().add(deal.accumulatedFundingCost());

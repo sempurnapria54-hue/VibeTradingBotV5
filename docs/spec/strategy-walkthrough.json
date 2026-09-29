@@ -104,6 +104,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "CREATED",
             "accumulatedFillSize": 0
           }
@@ -141,6 +142,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "PENDING",
             "accumulatedFillSize": 0
           }
@@ -183,6 +185,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -221,6 +224,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -268,6 +272,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -314,6 +319,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -367,6 +373,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -414,6 +421,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -470,6 +478,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -519,6 +528,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -574,6 +584,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -627,6 +638,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }
@@ -674,6 +686,7 @@
         "orders": [
           {
             "type": "ENTRY_ATTACHED_STOP_LOSS",
+            "positionReducingOnly": false,
             "status": "COMPLETED",
             "accumulatedFillSize": 3
           }

@@ -59,8 +59,9 @@ public class DealReconciliationCalculator {
         }
         String settleCurrency = dealContext.getInstrument().getExternalSettlementCurrency();
         ExchangeContourProperties.Contour contour = contourOf(dealContext);
-        List<DealCashFlow> scope = inScope(dealContext.getCashFlows(), settleCurrency, contour);
-        boolean separateFeeGranularity = separateFeeGranularity(scope);
+        List<DealCashFlow> settleFlows = inSettleCurrency(dealContext.getCashFlows(), settleCurrency);
+        boolean separateFeeGranularity = separateFeeGranularity(settleFlows);
+        List<DealCashFlow> scope = inScope(settleFlows, contour);
         BigDecimal discrepancy = totalDiscrepancy(deal, scope, separateFeeGranularity);
         return discrepancy.compareTo(epsilon(deal, scope)) <= 0
                 ? Deal.ReconciliationStatus.MATCHED
@@ -107,20 +108,25 @@ public class DealReconciliationCalculator {
     }
 
     /**
-     * Область сверки: расчётная валюта, вне списка исключений биржи,
+     * Область сверки: строки расчётной валюты вне списка исключений биржи,
      * экономическая категория. Конъюнкция целиком — принимающая корзина
      * нераспознанного в область не входит.
      */
-    private List<DealCashFlow> inScope(List<DealCashFlow> cashFlows, String settleCurrency,
-                                       ExchangeContourProperties.Contour contour) {
+    private List<DealCashFlow> inScope(List<DealCashFlow> settleFlows, ExchangeContourProperties.Contour contour) {
+        return settleFlows.stream()
+                .filter(flow -> isFalse(contour.excludesFromReconciliation(flow.getExternalType(),
+                        flow.getExternalSubType())))
+                .filter(flow -> isFalse(DealCashFlow.CashFlowCategory.OTHER.equals(flow.getCategory())))
+                .collect(Collectors.toList());
+    }
+
+    /** Строки расчётной валюты — общий корень области сверки и области различителя. */
+    private List<DealCashFlow> inSettleCurrency(List<DealCashFlow> cashFlows, String settleCurrency) {
         if (isBlank(settleCurrency)) {
             return List.of();
         }
         return emptyIfNull(cashFlows).stream()
                 .filter(flow -> Objects.equals(settleCurrency, flow.getCcy()))
-                .filter(flow -> isFalse(contour.excludesFromReconciliation(flow.getExternalType(),
-                        flow.getExternalSubType())))
-                .filter(flow -> isFalse(DealCashFlow.CashFlowCategory.OTHER.equals(flow.getCategory())))
                 .collect(Collectors.toList());
     }
 
@@ -130,15 +136,14 @@ public class DealReconciliationCalculator {
      * снимает построчную неразличимость комбинированной записи и
      * информационного эха комиссии на торговой записи.
      *
-     * <p><b>Область различителя уже области сверки на один конъюнкт</b> —
-     * список исключений биржи сюда не входит: исключение комиссионного
-     * типа списком сбило бы различитель в «комбинированная», после чего
-     * эхо вычиталось бы из торговой строки. Здесь область уже сужена
-     * вызывающей стороной, и это названное упрощение: комиссионные типы
-     * контура в списке исключений не стоя́т.
+     * <p><b>Область различителя шире области сверки на один конъюнкт</b> —
+     * список исключений биржи сюда не входит (docs/spec/pnl-reconciliation.json
+     * §{@code separateFeeGranularity}): исключение комиссионного типа списком
+     * сбило бы различитель в «комбинированная», после чего эхо вычиталось бы
+     * из торговой строки.
      */
-    private boolean separateFeeGranularity(List<DealCashFlow> scope) {
-        return scope.stream().anyMatch(flow -> isFeeCategory(flow.getCategory()));
+    private boolean separateFeeGranularity(List<DealCashFlow> settleFlows) {
+        return settleFlows.stream().anyMatch(flow -> isFeeCategory(flow.getCategory()));
     }
 
     private boolean isFeeCategory(DealCashFlow.CashFlowCategory category) {

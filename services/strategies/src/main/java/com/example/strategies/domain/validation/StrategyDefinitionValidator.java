@@ -98,7 +98,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Component
 public class StrategyDefinitionValidator {
 
-    /** Верхняя граница доли объявления, проценты: диапазон обеих долей — (0; 100]. */
+    /**
+     * Верхняя граница доли объявления, проценты: диапазон обеих долей — (0, 100].
+     * Текст нарушения диапазон называет словами: точка с запятой — разделитель
+     * склейки нарушений отказа, и внутри члена она делила бы его надвое.
+     */
     private static final BigDecimal FRACTION_PERCENTS_MAX = BigDecimal.valueOf(100);
 
     /**
@@ -257,6 +261,7 @@ public class StrategyDefinitionValidator {
     private void validatePhaseConditionRule(StrategyConditionRuleApiModel rule, String path,
                                             Map<String, IndicatorValue.Type> indicatorTypes,
                                             Set<String> structureKeys, List<String> violations) {
+        validateOperatorAndTimeframe(rule, path, violations);
         if (isFalse(EnumUtils.isValidEnum(StrategyConditionRuleType.class, rule.getRuleType()))) {
             validateEnum(StrategyConditionRuleType.class, rule.getRuleType(), path + ".ruleType", violations);
             return;
@@ -763,7 +768,7 @@ public class StrategyDefinitionValidator {
             return;
         }
         if (isNull(configured)) {
-            violations.add(path + " RISK_APPETITE_NOT_CONFIGURED: конфигурационное число риск-аппетита "
+            violations.add(path + " STRATEGY_RISK_APPETITE_NOT_CONFIGURED: конфигурационное число риск-аппетита "
                     + "не задано — объявленное стратегией сверять не с чем");
             return;
         }
@@ -1082,15 +1087,29 @@ public class StrategyDefinitionValidator {
                               Map<String, IndicatorValue.Type> indicatorTypes,
                               Set<String> structureKeys, List<String> violations) {
         validateEnum(StrategyConditionRuleType.class, rule.getRuleType(), path + ".ruleType", violations);
+        validateOperatorAndTimeframe(rule, path, violations);
+        validateOperand(rule.getLeftOperand(), path + ".leftOperand", indicatorTypes, structureKeys, violations);
+        validateOperand(rule.getRightOperand(), path + ".rightOperand", indicatorTypes, structureKeys, violations);
+        validateRuleContract(rule, path, violations);
+    }
+
+    /**
+     * Оператор и таймфрейм правила — из своих перечней, в ОБОИХ контекстах:
+     * у правила шага и у клаузы классификации фазы. Граница держит перечни
+     * строкой затем, чтобы сверять их самой (.claude/rules/codestyle.md
+     * §«Слои моделей и enum'ы»); пропущенное значение роняло бы разбор
+     * перечня в маппинге, то есть отказ пришёл бы не созданием
+     * (docs/rules/strategy-validation.md §«Линия реза»). Пустота здесь не
+     * отвергается: обязательность по типу правила держит его контракт.
+     */
+    private void validateOperatorAndTimeframe(StrategyConditionRuleApiModel rule, String path,
+                                              List<String> violations) {
         if (nonNull(rule.getOperator())) {
             validateEnum(StrategyConditionOperator.class, rule.getOperator(), path + ".operator", violations);
         }
         if (nonNull(rule.getTimeframe())) {
             validateEnum(TimeFrame.class, rule.getTimeframe(), path + ".timeframe", violations);
         }
-        validateOperand(rule.getLeftOperand(), path + ".leftOperand", indicatorTypes, structureKeys, violations);
-        validateOperand(rule.getRightOperand(), path + ".rightOperand", indicatorTypes, structureKeys, violations);
-        validateRuleContract(rule, path, violations);
     }
 
     /**
@@ -1391,7 +1410,8 @@ public class StrategyDefinitionValidator {
             return;
         }
         if (fraction.signum() <= 0 || fraction.compareTo(FRACTION_PERCENTS_MAX) > 0) {
-            violations.add(path + " " + code + ": доля объявления лежит в (0; 100], получено " + fraction);
+            violations.add(path + " " + code + ": доля объявления больше нуля и не выше ста, получено "
+                    + fraction);
         }
     }
 
@@ -1580,11 +1600,36 @@ public class StrategyDefinitionValidator {
         }
     }
 
+    /**
+     * Действие, СТАВЯЩЕЕ уровень, объявило его источник — блок стопа либо
+     * блок трейлинга (docs/spec/strategy-reference.json, величина
+     * {@code actionsSettingLevelWithoutSource}). Обратное состояние к
+     * {@link #validateLevelSourceUnambiguous}: без обоих блоков уровень
+     * неизвестен ни в момент постановки, ни после, и под охрану стороны
+     * уровня действие не попадает ни одним признаком.
+     *
+     * <p>Область — ставящие уровень: защитное создание и защитное замещение
+     * ({@code actionSetsLevel}). Снимающее и выходные действия уровня не
+     * ставят вовсе, и источник у них не требуется. Дом правила —
+     * docs/rules/strategy-validation.md §«Что проверяется на создании».
+     */
+    private void validateLevelSourceDeclared(StrategyAlgoOrderActionApiModel action, String path,
+                                             List<String> violations) {
+        if (isFalse(protectiveAction(action)) || isFalse(coverageSettingAction(action))) {
+            return;
+        }
+        if (isNull(action.getStopLossSettings()) && isNull(action.getTrailingSettings())) {
+            violations.add(path + " STRATEGY_LEVEL_SOURCE_NOT_DECLARED: ставящее уровень действие "
+                    + "не объявило ни блока стопа, ни блока трейлинга");
+        }
+    }
+
     private void validateAlgoOrderAction(StrategyAlgoOrderActionApiModel action, String path,
                                          Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
                                          List<String> violations) {
         validateEnum(AlgoOrder.ConditionType.class, action.getConditionType(), path + ".conditionType", violations);
         validateLevelSourceUnambiguous(action, path, violations);
+        validateLevelSourceDeclared(action, path, violations);
         validateFractionPositive(action.getCloseFractionPercents(), "STRATEGY_ACTION_FRACTION_NOT_POSITIVE",
                 path + ".closeFractionPercents", violations);
         validateProtectiveTriggerIsMark(action, path, violations);
@@ -1607,6 +1652,7 @@ public class StrategyDefinitionValidator {
                 path + ".calculationType", violations);
         validateEnum(AlgoOrder.TriggerPriceType.class, settings.getTriggerPriceType(),
                 path + ".triggerPriceType", violations);
+        validateStopDistanceDeclared(settings, path, violations);
         if (Objects.equals(settings.getCalculationType(), StopLossCalculationType.ATR_PERCENT.name())) {
             validateReference(settings.getIndicatorKey(), indicatorTypes.keySet(),
                     path + ".indicatorKey", "indicator setting", violations);
@@ -1615,6 +1661,34 @@ public class StrategyDefinitionValidator {
                 StopLossCalculationType.MARKET_STRUCTURE_BUFFER_PERCENT.name())) {
             validateReference(settings.getStructureKey(), structureKeys,
                     path + ".structureKey", "market structure setting", violations);
+        }
+    }
+
+    /**
+     * Доля дистанции согласована со способом расчёта уровня: у {@code BREAKEVEN}
+     * она не объявляется, у прочих способов обязательна
+     * (docs/spec/stop-distance.json §{@code distanceDeclaredWhenNeeded}).
+     *
+     * <p>Пропущенная доля иначе доезжала бы до расчёта цены уровня и отказывала
+     * там — в рантайме сделки, где дом ошибку конфигурации встречать запрещает;
+     * объявленная у безубытка стала бы вторым носителем величины, которая есть
+     * функция ставки комиссии. Способ вне перечня отвергает его сверка, и
+     * второго нарушения по доле он не даёт. Дом правила —
+     * docs/rules/strategy-validation.md.
+     */
+    private void validateStopDistanceDeclared(StopLossSettingsApiModel settings, String path,
+                                              List<String> violations) {
+        if (isFalse(EnumUtils.isValidEnum(StopLossCalculationType.class, settings.getCalculationType()))) {
+            return;
+        }
+        Boolean breakeven = StopLossCalculationType.BREAKEVEN.name().equals(settings.getCalculationType());
+        if (breakeven && nonNull(settings.getDistancePercents())) {
+            violations.add(path + ".distancePercents STRATEGY_STOP_DISTANCE_UNEXPECTED: "
+                    + "у безубытка доля дистанции не объявляется — уровень есть функция ставки комиссии");
+        }
+        if (isFalse(breakeven) && isNull(settings.getDistancePercents())) {
+            violations.add(path + ".distancePercents STRATEGY_STOP_DISTANCE_MISSING: "
+                    + "способ расчёта " + settings.getCalculationType() + " требует доли дистанции");
         }
     }
 

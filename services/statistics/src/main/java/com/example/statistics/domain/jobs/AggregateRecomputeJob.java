@@ -4,6 +4,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.statistics.config.AggregateRecomputeProperties;
+import com.example.statistics.domain.model.FactSeriesStarts;
 import com.example.statistics.domain.service.AggregateRecomputeService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -71,12 +72,16 @@ public class AggregateRecomputeJob {
      * <p><b>Направление выбрано, а не унаследовано:</b> свежие сутки
      * читают чаще, и обрыв прохода оставляет непересчитанными самые
      * старые — те, чьи числа и так меняются реже всего.
+     *
+     * <p><b>Начала рядов читаются один раз на проход</b>: охрана отбора
+     * меряет все сутки окна одной границей.
      */
     private void run() {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         OffsetDateTime assembledAt = OffsetDateTime.now(ZoneOffset.UTC);
+        FactSeriesStarts seriesStarts = aggregateRecomputeService.seriesStarts();
         for (int daysBack = 0; daysBack < properties.getWindowDays(); daysBack++) {
-            aggregateRecomputeService.recomputeDay(today.minusDays(daysBack), assembledAt);
+            aggregateRecomputeService.recomputeDay(today.minusDays(daysBack), seriesStarts, assembledAt);
         }
     }
 }

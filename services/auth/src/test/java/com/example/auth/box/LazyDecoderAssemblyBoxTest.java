@@ -20,8 +20,11 @@ import org.springframework.test.context.DynamicPropertySource;
  *
  * <p><b>Звено разведено с {@code B1.15} по производителю отказа:</b> там
  * сборка позади и отказывает добыча ключей, здесь не удаётся сама сборка.
- * Ожидание — по форме {@code B1.15}: успех недопустим, принципал не
- * принят, заведения нет; класс исхода читается, число пишет прогон.
+ * Ожидание — по форме {@code B1.15}: принципал не принят, заведения нет,
+ * ответ — {@code 500} единым error-DTO. Отказ сборки приходит не
+ * {@code JwtException}, и до того звено его не видело вовсе: исход давал
+ * контейнер. Переводит его охрана сборки декодера общего артефакта
+ * ({@code JwtDecoderAssemblyGuard}).
  *
  * <p>Стаб общий на прогон, поэтому диспетчер возвращается в рабочее
  * состояние тем же кейсом.
@@ -48,7 +51,8 @@ class LazyDecoderAssemblyBoxTest extends AuthBox {
             identity.healDiscovery();
         }
 
-        assertThat(answer.status()).isNotEqualTo(200);
+        assertThat(answer.status()).isEqualTo(500);
+        assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(rows.countWhere("memberships", "user_id", "user-g4")).isZero();
         assertThat(rows.count("tenants")).isEqualTo(tenantsBefore);
         assertThat(rows.count("memberships")).isEqualTo(membershipsBefore);

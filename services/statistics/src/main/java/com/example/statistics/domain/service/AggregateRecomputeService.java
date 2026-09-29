@@ -3,6 +3,7 @@ package com.example.statistics.domain.service;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
+import com.example.statistics.domain.model.FactSeriesStarts;
 import com.example.statistics.persistence.repository.DealGrainRow;
 import com.example.statistics.persistence.repository.IncidentGrainRow;
 import com.example.statistics.persistence.service.AggregateSourceDataService;
@@ -30,6 +31,9 @@ import org.springframework.stereotype.Service;
  * свежем моменте сборки. Ряды двух зёрен наполняются независимо, поэтому и
  * охрана у них раздельная: общая запретила бы пересчёт суток, покрытых
  * одним зерном и не покрытых другим.
+ *
+ * <p><b>Начала рядов приезжают операндом порции</b> ({@link FactSeriesStarts}):
+ * проход читает их один раз и меряет все свои сутки одной границей.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,6 +41,12 @@ public class AggregateRecomputeService {
 
     private final AggregateSourceDataService aggregateSourceDataService;
     private final AggregateWriteService aggregateWriteService;
+
+    /** Начала рядов фактов обоих зёрен — одно чтение на проход. */
+    public FactSeriesStarts seriesStarts() {
+        return new FactSeriesStarts(aggregateSourceDataService.earliestDealFactMoment(),
+                aggregateSourceDataService.earliestIncidentFactMoment());
+    }
 
     /**
      * Пересчитать одни сутки окна: по запросу группировки на каждое
@@ -48,16 +58,15 @@ public class AggregateRecomputeService {
      * Непокрытое зерно отдаёт пустой перечень — строк не появляется ни
      * одной, и прежние числа остаются на своём моменте сборки.
      */
-    public void recomputeDay(LocalDate bucketDate, OffsetDateTime assembledAt) {
+    public void recomputeDay(LocalDate bucketDate, FactSeriesStarts seriesStarts, OffsetDateTime assembledAt) {
         OffsetDateTime dayStart = bucketDate.atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
         OffsetDateTime dayEnd = dayStart.plusDays(1);
-        List<DealGrainRow> dealRows = dayRecomputable(dayStart, aggregateSourceDataService.earliestDealFactMoment())
+        List<DealGrainRow> dealRows = dayRecomputable(dayStart, seriesStarts.getDealSeriesStart())
                 ? aggregateSourceDataService.collectDealGrain(dayStart, dayEnd)
                 : List.of();
-        List<IncidentGrainRow> incidentRows =
-                dayRecomputable(dayStart, aggregateSourceDataService.earliestIncidentFactMoment())
-                        ? aggregateSourceDataService.collectIncidentGrain(dayStart, dayEnd)
-                        : List.of();
+        List<IncidentGrainRow> incidentRows = dayRecomputable(dayStart, seriesStarts.getIncidentSeriesStart())
+                ? aggregateSourceDataService.collectIncidentGrain(dayStart, dayEnd)
+                : List.of();
         if (isFalse(dealRows.isEmpty()) || isFalse(incidentRows.isEmpty())) {
             aggregateWriteService.writeDay(bucketDate, dealRows, incidentRows, assembledAt);
         }

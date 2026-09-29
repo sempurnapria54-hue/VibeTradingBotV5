@@ -1,7 +1,7 @@
 package com.example.statistics.mapping;
 
-import com.example.statistics.domain.model.AccessDenial;
-import com.example.statistics.persistence.model.AccessDenialEntity;
+import com.example.tradingbot.domain.model.other.AccessDenial;
+import com.example.tradingbot.persistence.model.AccessDenialEntity;
 import org.mapstruct.InjectionStrategy;
 import org.mapstruct.Mapper;
 import org.mapstruct.ReportingPolicy;

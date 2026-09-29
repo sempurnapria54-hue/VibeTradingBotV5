@@ -159,8 +159,7 @@ public abstract class PeerCallContract {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U7.10 — неразбираемое тело ответа: ожидание из дома — НАШ дефект (долг F2)")
+    @DisplayName("U7.10 — неразбираемое тело ответа: НАШ дефект, а не недоступность")
     void u7_10_anUnreadableBodyIsOurOwnDefect() {
         assertThatThrownBy(() -> execute(PEER, ENDPOINT, throwing(
                 new RestClientException("Error while extracting response for type [Features]"))))
@@ -170,8 +169,7 @@ public abstract class PeerCallContract {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U7.11 — неизвестный тип содержимого: тот же долг, что у U7.10")
+    @DisplayName("U7.11 — неизвестный тип содержимого: тот же класс, что у U7.10")
     void u7_11_anUnknownContentTypeIsOurOwnDefect() {
         assertThatThrownBy(() -> execute(PEER, ENDPOINT, throwing(new UnknownContentTypeException(
                 String.class, org.springframework.http.MediaType.TEXT_HTML, HttpStatus.OK.value(), "OK",
@@ -187,6 +185,26 @@ public abstract class PeerCallContract {
         assertThatThrownBy(() -> execute(PEER, ENDPOINT, throwing(ours)))
                 .as("иначе наш дефект уехал бы в тропу «сосед недоступен»")
                 .isSameAs(ours);
+    }
+
+    /**
+     * Адрес без схемы клиент отвергает {@code IllegalArgumentException} ещё
+     * до отправки; без этой ветви отказ уходил к обработчику негодного
+     * входа, и вызывающий правил бы тело, в котором править нечего
+     * (docs/rules/runtime-error-classification.md §«Ненастроенная тропа к
+     * соседу — наш дефект»).
+     */
+    @Test
+    @DisplayName("U7.14 — негодный адрес соседа: наш дефект, а не недоступность и не дефект входа")
+    void u7_14_anUnusableNeighbourAddressIsOurOwnDefect() {
+        IllegalArgumentException failure = new IllegalArgumentException("URI with undefined scheme");
+
+        assertThatThrownBy(() -> execute(PEER, ENDPOINT, throwing(failure)))
+                .as("повтор тем же адресом даст тот же отказ — чинится конфигурация, а не тело")
+                .isInstanceOf(peerReadExceptionType())
+                .hasMessageContaining(PEER)
+                .hasMessageContaining(ENDPOINT)
+                .hasCause(failure);
     }
 
     @Test

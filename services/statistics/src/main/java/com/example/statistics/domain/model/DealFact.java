@@ -1,6 +1,7 @@
 package com.example.statistics.domain.model;
 
 import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -89,11 +90,17 @@ public class DealFact {
      * <b>значение</b>, разбираемое свёрткой (недоступный результат, не
      * резолвившаяся валюта), а не пробел входа
      * (docs/rules/absent-value-semantics.md).
+     *
+     * <p><b>Строковый ключ присутствует, когда НЕПУСТО значение, а не
+     * ссылка:</b> {@code not null} схемы пустой строки не отвергает, а
+     * пустой ключ дедупа поглотил бы всякое следующее событие с тем же
+     * пустым значением, пустой ключ зерна — дал бы зерно, которого не
+     * прочитает ни один читатель.
      */
     public Boolean hasCompleteInput() {
-        return nonNull(eventId)
-                && nonNull(tenantId)
-                && nonNull(exchangeAccountInternalId)
+        return isNotBlank(eventId)
+                && isNotBlank(tenantId)
+                && isNotBlank(exchangeAccountInternalId)
                 && nonNull(closedAt);
     }
 }

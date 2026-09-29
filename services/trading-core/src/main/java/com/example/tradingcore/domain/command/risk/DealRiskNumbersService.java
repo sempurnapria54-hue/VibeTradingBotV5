@@ -5,6 +5,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.order.Order;
@@ -38,7 +39,7 @@ import org.springframework.stereotype.Service;
  * накопители: группировка по траншам их не сдвигает, область отбора —
  * входные ноги сделки, чьи бы транши их ни держали.
  *
- * <p><b>Отбор идёт по бизнес-типу ноги, а доля — по её состоянию.</b>
+ * <p><b>Отбор идёт по объявленному направлению ноги, а доля — по её состоянию.</b>
  * Живая и исполнившаяся входят заявленным риском целиком, выбывшая
  * (снятая, {@code ERROR}) — только налитой долей: довод «снятая заявка не
  * стояла» верен для её НЕИСПОЛНЕННОЙ доли и неверен для налитой — за
@@ -116,6 +117,11 @@ public class DealRiskNumbersService {
     /**
      * Входные ноги сделки — по всем траншам: числа риска агрегатные.
      *
+     * <p><b>Входную ногу отбирает намерение, а не тип</b> ({@link Order#isEntryLeg()}):
+     * закрывающая нога выхода несёт тип простой заявки. Тот же предикат
+     * отбирает живые входные ноги преконтроля и налив входа у транша — одна
+     * популяция у всех читателей.
+     *
      * <p><b>Ноги собираются обходом траншей, а не полем агрегата.</b>
      * Поля {@code Deal.orders} в целевой модели нет: нога висит на транше
      * (docs/models/domain/aggregate/Deal.md §Структура), а одноимённое
@@ -133,8 +139,7 @@ public class DealRiskNumbersService {
     public static List<Order> entryLegs(Deal deal) {
         return emptyIfNull(deal.getTranches()).stream()
                 .flatMap(tranche -> emptyIfNull(tranche.getOrders()).stream())
-                .filter(order -> Order.Type.ENTRY.equals(order.getType())
-                        || Order.Type.ENTRY_ATTACHED_STOP_LOSS.equals(order.getType()))
+                .filter(order -> isTrue(order.isEntryLeg()))
                 .filter(order -> nonNull(order.getPlannedRiskAmount()))
                 .collect(Collectors.toList());
     }

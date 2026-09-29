@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import com.example.audit.config.JpaAuditConfig;
-import com.example.audit.persistence.model.journal.AccessDenialEntity;
+import com.example.tradingbot.persistence.model.AccessDenialEntity;
 import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.persistence.model.AuditableEntity;
 import jakarta.persistence.EntityListeners;

@@ -4,6 +4,7 @@ import com.example.audit.config.EnvironmentProperties;
 import com.example.audit.config.JournalCleanupProperties;
 import com.example.audit.config.JournalReadProperties;
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.platform.exception.handler.JwtDecoderAssemblyGuard;
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.platform.security.ActorProvider;
 import org.springframework.boot.SpringApplication;
@@ -49,7 +50,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableConfigurationProperties({EnvironmentProperties.class,
         JournalCleanupProperties.class,
         JournalReadProperties.class})
-@Import({AccessDenialHandler.class, ActorProvider.class, JobExecutionGuard.class})
+@Import({AccessDenialHandler.class, JwtDecoderAssemblyGuard.class, ActorProvider.class, JobExecutionGuard.class})
 public class AuditApplication {
 
     public static void main(String[] args) {

@@ -10,6 +10,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyIn
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketPhaseSetting;
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMarketStructureSetting;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -110,11 +111,13 @@ public class Strategy extends Auditable {
     private List<StrategyMarketStructureSetting> marketStructureSettings;
 
     /** Стратегия активна (единственная активная стратегия инструмента). */
+    @JsonIgnore
     public Boolean isActive() {
         return Objects.equals(status, Status.ACTIVE);
     }
 
     /** Стратегия логически удалена (терминальный статус). */
+    @JsonIgnore
     public Boolean isDeleted() {
         return Objects.equals(status, Status.DELETED);
     }

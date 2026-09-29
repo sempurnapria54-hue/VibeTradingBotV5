@@ -288,6 +288,11 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
      * <p>Стаб общий на прогон, поэтому JWKS-точка возвращается в рабочее
      * состояние тем же кейсом: оставленный сломанным, стаб красил бы
      * соседей.
+     *
+     * <p><b>Код — {@code 500} тем же error-DTO:</b> сбой звена цепочки
+     * отвечает обработчик отказа звена, а не контейнер. До него звено
+     * перебрасывало сбой, и наружу уходил {@code 401} без тела поверх
+     * {@code 500} (находка {@code F-11}, закрыта заходом 222).
      */
     @Test
     @DisplayName("B1.15 — ключи провайдера недостижимы при разборе токена")
@@ -305,7 +310,8 @@ class MembershipResolutionBoxTest extends SharedAuthBox {
             identity.healKeySet();
         }
 
-        assertThat(answer.status()).isNotEqualTo(200);
+        assertThat(answer.status()).isEqualTo(500);
+        assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(rows.countWhere("memberships", "user_id", "user-18")).isZero();
         assertThat(rows.count("tenants")).isEqualTo(tenantsBefore);
         assertThat(rows.count("memberships")).isEqualTo(membershipsBefore);

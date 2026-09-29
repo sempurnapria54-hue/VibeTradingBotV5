@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -81,6 +82,29 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(PeerServiceUnavailableException.class)
     public ResponseEntity<ErrorApiResponse> onPeerUnavailable(PeerServiceUnavailableException failure) {
         return response(HttpStatus.SERVICE_UNAVAILABLE, "PEER_UNAVAILABLE", failure.getMessage());
+    }
+
+    /**
+     * <b>Отказ по правам сюда не попадает, и это несущее исключение из
+     * области последнего обработчика.</b> Ответ на него пишет контур —
+     * {@code AccessDenialHandler}, — а он стои́т СНАРУЖИ
+     * {@code DispatcherServlet}, в {@code ExceptionTranslationFilter}.
+     * Перехваченное последним обработчиком, {@code AccessDeniedException}
+     * ушло бы вызывающему кодом {@code 500} вместо {@code 403}, и следа
+     * отказа не осталось бы.
+     *
+     * <p><b>Проброс — рабочая форма, а не обход.</b> Резолвер
+     * {@code @ExceptionHandler}, получив из обработчика ТО ЖЕ исключение,
+     * отказ не разрешает и возвращает обработку контейнеру — тот
+     * пробрасывает исходное исключение дальше по цепочке фильтров.
+     *
+     * <p><b>Достижимость сегодня нулевая</b>: пер-операционных проверок
+     * права нет ни одной (docs/rules/api-access-policy.md), и дефект этой
+     * тропы прогоном не обнаружился бы — он ждал бы первой такой проверки.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public void onAccessDenied(AccessDeniedException denial) throws AccessDeniedException {
+        throw denial;
     }
 
     /**

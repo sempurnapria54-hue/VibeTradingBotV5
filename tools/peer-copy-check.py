@@ -41,6 +41,7 @@ AU = "services/audit/src/main/java/com/example/audit"
 SA = "services/statistics/src/main/java/com/example/statistics"
 BF = "services/bff/src/main/java/com/example/bff"
 MD = "services/market-data/src/main/java/com/example/marketdata"
+AT = "services/auth/src/main/java/com/example/auth"
 
 # --- реестр объявленных семейств копий ----------------------------------
 # `различия` — шаблоны строк ИСПОЛНЯЕМОГО тела, расхождение которых
@@ -179,6 +180,70 @@ FAMILIES = [
         # Имя строки состояния — своё у каждого дерева: таблицы две, и
         # каждая принадлежит своей базе.
         "различия": [r"^from \w*ReceptionStateEntity state$"],
+    },
+    # --- писатель строки отказа доступа ---------------------------------
+    # Форма строки лежит в общем артефакте (модель и сущность), а писатель —
+    # у каждого сервиса с базой: его тело зовёт репозиторий и менеджер
+    # транзакций своего дерева, а репозиторий сканируется приложением
+    # (.claude/rules/carrier-levels.md §«Копия, которую нельзя свести к
+    # дому: объявленное семейство»; docs/models/domain/other/AccessDenial.md
+    # §Персистентность).
+    {
+        "имя": "AccessDenialService — писатель строки отказа доступа",
+        "пути": [
+            AU + "/domain/service/AccessDenialService.java",
+            SA + "/domain/service/AccessDenialService.java",
+            AT + "/domain/service/AccessDenialService.java",
+            TC + "/domain/service/AccessDenialService.java",
+            ST + "/domain/service/AccessDenialService.java",
+            MD + "/domain/service/AccessDenialService.java",
+        ],
+        "различия": [],
+    },
+    {
+        "имя": "AccessDenialMapper — строка отказа domain → persistence",
+        "пути": [
+            AU + "/mapping/AccessDenialMapper.java",
+            SA + "/mapping/AccessDenialMapper.java",
+            AT + "/mapping/AccessDenialMapper.java",
+            TC + "/mapping/AccessDenialMapper.java",
+            ST + "/mapping/AccessDenialMapper.java",
+            MD + "/mapping/AccessDenialMapper.java",
+        ],
+        "различия": [],
+    },
+    {
+        "имя": "AccessDenialRepository — строки отказа доступа",
+        "пути": [
+            AU + "/persistence/repository/journal/AccessDenialRepository.java",
+            SA + "/persistence/repository/AccessDenialRepository.java",
+            AT + "/persistence/repository/AccessDenialRepository.java",
+            TC + "/persistence/repository/AccessDenialRepository.java",
+            ST + "/persistence/repository/AccessDenialRepository.java",
+            MD + "/persistence/repository/AccessDenialRepository.java",
+        ],
+        "различия": [],
+    },
+    {
+        # Подключение у сервиса одно, и менеджер транзакций — умолчание.
+        "имя": "AccessDenialDataService — своя транзакция строки, одно подключение",
+        "пути": [
+            AT + "/persistence/service/AccessDenialDataService.java",
+            TC + "/persistence/service/AccessDenialDataService.java",
+            ST + "/persistence/service/AccessDenialDataService.java",
+            MD + "/persistence/service/AccessDenialDataService.java",
+        ],
+        "различия": [],
+    },
+    {
+        # Отображение объявлено сервисом, и менеджер транзакций назван явно
+        # своей константой — различие объявлено javadoc обеих копий.
+        "имя": "AccessDenialDataService — своя транзакция строки, объявленное отображение",
+        "пути": [
+            AU + "/persistence/service/AccessDenialDataService.java",
+            SA + "/persistence/service/AccessDenialDataService.java",
+        ],
+        "различия": [r"^@Transactional\(transactionManager = \w+PersistenceConfig\.\w+_TRANSACTION_MANAGER,$"],
     },
 ]
 

@@ -182,6 +182,17 @@ class StopLevelAfterActTest {
     }
 
     @Test
+    @DisplayName("U13.15 — нога живая, намерение пусто: в сумму не входит — тот же предикат, что у писателя чисел риска")
+    void u13_15_aLegWithoutDeclaredIntentStaysOutOfTheSum() {
+        Order undeclared = liveLeg("100", "100", "0");
+        undeclared.setPositionReducingOnly(null);
+        Deal deal = dealWith(episode("10", ANCHOR),
+                tranche(List.of(undeclared), List.of(protection(STOP.toPlainString()))));
+
+        assertThat(codes(harness.validate(weakeningAction(), context(deal, "0.92955")))).isEmpty();
+    }
+
+    @Test
     @DisplayName("U13.13 — нога не живая (снята): в сумму не входит")
     void u13_13_aCanceledLegStaysOutOfTheSum() {
         Order canceled = entryLeg(Order.Status.CANCELED, "100", "100", "0");

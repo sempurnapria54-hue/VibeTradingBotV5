@@ -29,7 +29,6 @@ import com.example.tradingcore.util.Constants;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -101,13 +100,13 @@ class AbsorptionAndRetryTest {
 
     /** Доведение недоделанного: тропа не поглощённая, и строки поглощения она не пишет. */
     @Test
-    @DisplayName("U6.4 — вызов с правом на доведение при стоящей ступени: отчёт открыт, снятие риска заново, каскад идёт")
+    @DisplayName("U6.4 — вызов с правом на доведение при стоящей ступени: строка отчёта взята, снятие риска заново, каскад идёт")
     void u6_4_theTeardownRetryRunsTheWholeReactionAgain() {
         harness.cascadeOnPair(deals(deal(31L)));
 
         harness.coordinator.react(HoldSignal.instrument(CODE), pairContext(), true);
 
-        verify(harness.reports).open(any(), any());
+        verify(harness.reports).resumeOrOpen(any(), any());
         verify(harness.killSwitchService).fireInstrument(any());
         verify(harness.statusEdges).enforceHardRung(any(), any());
         verify(harness.reports, never()).journalState(any(), any(), any());
@@ -235,35 +234,32 @@ class AbsorptionAndRetryTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Дом и
-     * спека объявляют строку отчёта незаводимой там, где стоящую ступень
-     * поднял тот же ручной вызов (docs/spec/manual-halt.json, величина
-     * {@code reportProduced}), а доведение открывает отчёт критичной
-     * тропой, у которой дедупа нет вовсе. Красный прогон и есть
-     * предъявление находки `S-6` (`.claude/work/backlog.md` §«Отчёт
-     * доведения заводится и там, где дом его не заводит»).
-     *
-     * <p><b>Вход от U6.13 отличается только состоянием мира</b> —
-     * стоящей строкой ручного ключа, — и координатор не читает его
-     * нигде: ровно это находка и называет.
+     * Доведение не открывает строку само: оно продолжает незакрытую строку
+     * своего ключа либо заводит новую, и развилку держит сервис отчёта
+     * (`U9.23`, `U9.24`). Ступень, поднятая тем же ручным вызовом, второй
+     * строки поэтому не получает (docs/spec/manual-halt.json, величина
+     * {@code reportProduced}).
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U6.12 — доведение на ступени, поднятой тем же ручным вызовом: второй строки отчёта нет")
-    void u6_12_theRetryOpensNoSecondReportOverItsOwnManualRow() {
+    @DisplayName("U6.12 — доведение идёт строкой своего ключа: продолжение либо новая, а не открытие безусловно")
+    void u6_12_theRetryResumesTheRowOfItsKeyInsteadOfOpeningOne() {
         harness.coordinator.react(HoldSignal.instrument(Constants.Hold.MANUAL_HALT_REQUESTED),
                 pairContext(), true);
 
+        verify(harness.reports).resumeOrOpen(any(), any());
         verify(harness.reports, never()).open(any(), any());
     }
 
-    /** Ступень поднята автоматикой — ручной строки по ключу нет, и доведение заводит свою. */
+    /** Первая реакция на ступени, которой не было, открывает строку безусловно: продолжать нечего. */
     @Test
-    @DisplayName("U6.13 — доведение на ступени, поднятой автоматикой: доведение заводит свою строку")
-    void u6_13_theRetryOpensItsOwnReportOverAnAutomaticRung() {
-        harness.coordinator.react(HoldSignal.instrument(CODE), pairContext(), true);
+    @DisplayName("U6.13 — первая полная реакция: строка открыта, продолжение не спрашивается")
+    void u6_13_theFirstReactionOpensItsRow() {
+        when(harness.pairStates.raiseRung(anyLong(), anyLong(), any())).thenReturn(true);
+
+        harness.coordinator.react(HoldSignal.instrument(CODE), pairContext(), false);
 
         verify(harness.reports).open(any(), any());
+        verify(harness.reports, never()).resumeOrOpen(any(), any());
     }
 
     private ExchangeAccount otherAccount() {

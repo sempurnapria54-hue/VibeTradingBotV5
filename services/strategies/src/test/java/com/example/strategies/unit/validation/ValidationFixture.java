@@ -438,6 +438,7 @@ final class ValidationFixture {
     static StopLossSettingsApiModel newStopSettings() {
         StopLossSettingsApiModel settings = new StopLossSettingsApiModel();
         settings.setCalculationType("ENTRY_PRICE_PERCENT");
+        settings.setDistancePercents(decimal("1"));
         settings.setTriggerPriceType("MARK");
         return settings;
     }
@@ -509,35 +510,16 @@ final class ValidationFixture {
     }
 
     /**
-     * Разбор склейки нарушений.
+     * Разбор склейки нарушений — разрезом по разделителю.
      *
-     * <p><b>Разделитель склейки встречается ВНУТРИ члена</b>: текст
-     * диапазонного нарушения несёт полуинтервал {@code (0; 100]}, и
-     * наивный разрез по разделителю делит одно нарушение на два. Поэтому
-     * новый член опознаётся НАЧАЛОМ ПУТИ, а не разделителем: корней у
-     * путей валидатора пять, и все пять перечислены ниже. Фрагмент,
-     * который ни одним из них не начинается, принадлежит предыдущему
-     * члену.
+     * <p>Внутри члена разделитель не встречается: диапазон доли текст
+     * нарушения называет словами ({@code validateFractionPositive}). Поэтому
+     * разрез и есть счёт нарушений, а член, снова понёсший разделитель
+     * внутри, раскололся бы надвое и уронил счётные клетки.
      */
     private static List<String> split(ResponseStatusException rejected) {
-        List<String> members = new ArrayList<>();
-        for (String fragment : String.valueOf(rejected.getReason()).split("; ")) {
-            if (members.isEmpty() || startsAViolation(fragment)) {
-                members.add(fragment);
-            } else {
-                members.set(members.size() - 1, members.get(members.size() - 1) + "; " + fragment);
-            }
-        }
-        return List.copyOf(members);
+        return List.of(String.valueOf(rejected.getReason()).split("; "));
     }
-
-    /** Корни путей валидатора — по ним опознаётся начало нового нарушения. */
-    private static Boolean startsAViolation(String fragment) {
-        return VIOLATION_ROOTS.stream().anyMatch(fragment::startsWith);
-    }
-
-    private static final List<String> VIOLATION_ROOTS = List.of(
-            "details[", "strategy.", "marketPhaseSetting.", "duplicate detail for", "missing detail for");
 
     /**
      * Карта шагов, уже переведённая в изменяемую форму, возвращается как

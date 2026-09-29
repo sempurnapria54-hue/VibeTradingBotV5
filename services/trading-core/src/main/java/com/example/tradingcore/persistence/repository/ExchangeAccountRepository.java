@@ -60,6 +60,14 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
     Optional<String> findTenantInternalIdById(@Param("id") Long id);
 
     /**
+     * Стоящая ступень защиты счёта по числовому ключу — проекция одного
+     * поля: ребро подъёма читает её в своей транзакции, а не со снимка
+     * контекста.
+     */
+    @Query("select a.safetyRung from ExchangeAccountEntity a where a.id = :id")
+    Optional<String> findSafetyRungById(@Param("id") Long id);
+
+    /**
      * Идентичности тенантов, у которых есть счёт.
      *
      * <p>Проекция поля, а не выборка строк: тик заводит место под числа

@@ -3,6 +3,7 @@ package com.example.tradingcore.domain.safety;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -56,7 +57,7 @@ public class DealInvariantDetectors {
         for (Deal deal : dealDataService.findNonTerminalByExchangeAccountId(account.getId())) {
             try {
                 DealContext context = dealContextService.build(deal);
-                if (isFalse(context.getGraphComplete())) {
+                if (isNotTrue(context.getGraphComplete())) {
                     continue;
                 }
                 uncoveredLiveRisk(context, account);

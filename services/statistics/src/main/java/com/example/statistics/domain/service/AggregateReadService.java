@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Агрегатная выборка чтения: строки выбранного зерна и объявленная полнота
- * журнала рядом с ними
+ * собственного приёма рядом с ними
  * (docs/rules/statistics-aggregates.md §«Что это за числа и кто их
  * читает»).
  *
@@ -41,20 +41,17 @@ import org.springframework.transaction.annotation.Transactional;
  * шире предела получают отказ: молчаливое сужение отдало бы неполный ряд
  * под видом запрошенного (docs/concept.md, П1).
  *
- * <p><b>Полнота берётся источником АГРЕГАТНОГО подключения</b>
- * ({@link ReceptionCompletenessSource}): журнал для модуля
- * статистики — чужая база, и читается он третьим подключением под ролью
- * агрегатов (docs/architecture/data-ownership.md §Раскладка). Тип
- * объявленного источника и есть охрана: подключение владельца журнала
- * сюда не подставляется.
+ * <p><b>Полнота — СВОЯ</b> ({@link ReceptionCompletenessSource}): величины
+ * считаются по строке состояния приёма группы статистики в её же базе, а не
+ * по журнальной — здоровый приём журнала дал бы зелёный признак на неполных
+ * фактах (docs/models/domain/other/StatisticsFact.md §«Состояние приёма и
+ * полнота чисел статистики»).
  *
- * <p><b>Менеджер транзакций назван, а не подразумевается:</b> подключений у
- * процесса три, и умолчания у выбора нет намеренно
- * ({@link StatisticsPersistenceConfig}). Транзакция накрывает <b>строки</b>;
- * полнота лежит в другой базе, и общей транзакции с ними у неё не бывает по
- * построению. Обещать согласованность и не нужно — обе величины полноты
- * монотонны, и прочитанные позже строк они обещают <b>не больше</b>, чем
- * строки несут.
+ * <p><b>Менеджер транзакций назван, а не подразумевается:</b> подключение у
+ * процесса одно, но квалификатор стои́т у каждого транзакционного метода
+ * ({@link StatisticsPersistenceConfig}). Полнота читается после строк и
+ * общей транзакцией с ними не связана: обе величины монотонны, и
+ * прочитанные позже строк они обещают <b>не больше</b>, чем строки несут.
  */
 @Service
 @RequiredArgsConstructor
@@ -64,12 +61,12 @@ public class AggregateReadService {
     private final ReceptionProperties receptionProperties;
     private final DealAggregateDataService dealAggregateDataService;
     private final IncidentAggregateDataService incidentAggregateDataService;
-    private final ReceptionCompletenessService journalCompletenessService;
-    private final ReceptionCompletenessSource journalCompletenessSource;
+    private final ReceptionCompletenessService receptionCompletenessService;
+    private final ReceptionCompletenessSource receptionCompletenessSource;
 
     /**
-     * Прочитать страницу окна вместе с тем, что журнал объявляет о своей
-     * полноте.
+     * Прочитать страницу окна вместе с тем, что статистика объявляет о
+     * полноте своих фактов.
      *
      * <p><b>Зерно выбирает и запрос, и форму строки:</b> заполняется ровно
      * один перечень страницы, второй остаётся пустым — «спрошено не это
@@ -136,10 +133,10 @@ public class AggregateReadService {
         }
     }
 
-    /** Полнота журнала — обеими величинами, тем же ответом, что и строки. */
+    /** Полнота собственного приёма — обеими величинами, тем же ответом, что и строки. */
     private ReceptionCompleteness completeness() {
         OffsetDateTime moment = OffsetDateTime.now(ZoneOffset.UTC);
-        return journalCompletenessService.completeness(journalCompletenessSource,
+        return receptionCompletenessService.completeness(receptionCompletenessSource,
                 receptionProperties.getGroupId(),
                 moment.minus(receptionProperties.getStateMaxAge()));
     }

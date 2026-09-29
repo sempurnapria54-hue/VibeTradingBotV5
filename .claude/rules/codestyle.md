@@ -1005,7 +1005,7 @@ scope — то есть не относится ни к одному класс�
 - **Spring 7, конвертер** · не компилируется `read(Type, Class, …)`; нужен `read(ResolvableType…)` → CS-010
 - **servlet-фильтр, ERROR** · `OncePerRequestFilter` пропущен на ERROR-диспетче при `EnumSet.allOf` → CS-011
 - **`ProviderManager`** · родитель `ProviderManager` null, не пустой: `lazyBean` при нуле бинов → CS-012
-- **OAuth2, `issuer-uri`** · пустой `issuer-uri` не роняет старт, пробы зелены, отказ на вызове → CS-013
+- **OAuth2, `issuer-uri`** · негодный непустой `issuer-uri` не роняет старт, пробы зелены, отказ на вызове → CS-013
 
 ### Jackson
 

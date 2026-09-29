@@ -111,10 +111,18 @@ public class StrategyDataService {
      * (docs/architecture/contracts.md §«У каждого класса события назван
      * писатель, и он же писатель решения»); собственная транзакция здесь
      * разорвала бы их надвое.
+     *
+     * <p><b>Запись сбрасывается в базу здесь же, а не на фиксации.</b>
+     * Второй носитель инварианта «одна активная на паре» — частичный
+     * уникальный индекс, и его нарушение обязано прийти из этого вызова
+     * переводимым исключением слоя данных: на фиксации оно пришло бы из
+     * прокси транзакции, и вызывающий не отличил бы гонку активаций от
+     * прочих отказов фиксации (docs/lifecycles/Strategy.md §«Допустимые
+     * переходы»).
      */
     public void applyStatus(StrategyEntity entity, Strategy.Status status) {
         entity.setStatus(status.name());
-        repository.save(entity);
+        repository.saveAndFlush(entity);
     }
 
     private void resolveTargetActions(StrategyEntity saved) {

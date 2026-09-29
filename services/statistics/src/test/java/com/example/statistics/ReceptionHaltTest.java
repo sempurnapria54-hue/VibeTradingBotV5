@@ -35,8 +35,10 @@ import org.springframework.kafka.listener.MessageListenerContainer;
  * входит.</b> Его ветви живут группой `U11` документа
  * `.claude/tests/cases/durable-reception.md` и прогоняются контрактом
  * копий ({@code ReceptionHaltMarkerContract}) в обоих деревьях; маркер
- * остаётся здесь настоящим, потому что «флаг записан ровно один раз на
- * двенадцати доставках» есть утверждение о ПАРЕ, а не о нём одном.
+ * остаётся здесь настоящим, потому что «отметка идёт на каждой из
+ * двенадцати доставок» есть утверждение о ПАРЕ, а не о нём одном: условие
+ * записи — состояние строки, а не номер попытки. Что строку при стоящем
+ * флаге отметка не трогает, мерит клетка {@code B2.12} чёрного ящика.
  */
 class ReceptionHaltTest {
 
@@ -61,7 +63,7 @@ class ReceptionHaltTest {
                     .isFalse();
         }
 
-        verify(receptionService, times(1))
+        verify(receptionService, times(DELIVERIES))
                 .noteHalt(TOPIC);
     }
 

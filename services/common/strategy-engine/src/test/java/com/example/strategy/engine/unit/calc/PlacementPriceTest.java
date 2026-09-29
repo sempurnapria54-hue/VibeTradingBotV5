@@ -32,7 +32,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTra
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketPriceLevel;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -277,18 +276,13 @@ class PlacementPriceTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Дом
-     * объявляет пустую сторону смещения как «смещения нет»
-     * (docs/models/domain/aggregate/Strategy.md §«StrategyPricePlacement»),
-     * а код вычитает смещение и даёт {@code 2970}: заявка встаёт ниже
-     * объявленной базы, и создание такое объявление пропускает. Красный
-     * прогон и есть предъявление находки `F-6`
-     * (`.claude/work/backlog.md` §«Пустая сторона смещения означает в доме
-     * отсутствие смещения, а в коде — вычитание»).
+     * Дом объявляет пустую сторону смещения как «смещения нет»
+     * (docs/models/domain/aggregate/Strategy.md §«StrategyPricePlacement»);
+     * прежний код на ней вычитал смещение и давал {@code 2970} — заявка
+     * вставала ниже объявленной базы.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U1.19 — сторона смещения не объявлена, проценты 1: цена равна базе 3000 (дом), код даёт 2970")
+    @DisplayName("U1.19 — сторона смещения не объявлена, проценты 1: цена равна базе 3000")
     void u1_19_anAbsentOffsetSideMeansNoOffsetInTheHome() {
         CalculationContext context = base(entryAction(placement(StrategyPriceBaseType.MARKET_PRICE,
                 StrategyPriceSource.LAST_PRICE, null, "1")))

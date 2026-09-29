@@ -38,7 +38,7 @@ public class PersistenceConfig {
 
     @Bean(JOURNAL_DATA_SOURCE)
     public DataSource journalDataSource(PersistenceProperties properties) {
-        return connect(properties.getJournal());
+        return connect(properties);
     }
 
     private DataSource connect(DatabaseConnectionProperties connection) {

@@ -1,16 +1,16 @@
 package com.example.tradingcore.box;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
 import com.example.tradingcore.TradingCoreApplication;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 /**
  * Ненастроенный контур доступа — клетка {@code B13.1}.
@@ -23,50 +23,43 @@ import org.springframework.context.ConfigurableApplicationContext;
  * <p><b>Оси подаются АРГУМЕНТАМИ, а не {@code properties(…)}.</b>
  * {@code properties(…)} кладёт умолчания, а они НИЖЕ {@code application.yaml}
  * приложения: адрес базы, поданный умолчанием, перекрылся бы объявленным
- * там пустым значением, и контекст упал бы «не по той причине» — то есть
- * клетка была бы зелёной, ничего о контуре доступа не утверждая.
+ * там пустым значением, и контекст упал бы «не по той причине».
  *
- * <p><b>Клетка красна по построению, и долг добыт этим прогоном.</b> Дом
- * величины ({@code application.yaml}, комментарий оси {@code issuer-uri}:
- * «пустое означает, что контур доступа не настроен, и поверхность не
- * поднимется — это отказ») дерево кода не несёт: контекст поднимается,
- * Tomcat слушает, проба живости отвечает. Ожидание под текущий факт не
- * ослаблено — оно и есть предъявление долга
- * (.claude/work/backlog.md §«Пустой издатель у ядра поверхность
- * поднимает»).
+ * <p><b>Пустой издатель ЗАМЕНЯЕТ ось субстрата, а не дописывается вторым
+ * аргументом.</b> Повторённый ключ командной строки Spring склеивает через
+ * запятую: {@code --issuer-uri=<стаб>} и {@code --issuer-uri=} дают
+ * непустое {@code "<стаб>,"}, декодер собирается по нему лениво, и
+ * контекст поднимается — клетка краснела, мерив не пустой издатель, а
+ * склейку.
+ *
+ * <p><b>Причина отказа пинится.</b> Пустой издатель гасит условие
+ * автоконфигурации декодера, и цепочка фильтров, требующая бин
+ * {@link JwtDecoder}, не собирается: отказ — отсутствие ровно этого бина.
+ * Засчитанный любой отказ позеленил бы клетку и на недоступной базе.
  */
 class UnconfiguredAccessContourTest {
 
+    private static final String ISSUER_KEY = "spring.security.oauth2.resourceserver.jwt.issuer-uri";
+
     @Test
-    @Tag("debt")
     @DisplayName("B13.1 — ненастроенный контур доступа не поднимает поверхности")
     void anUnconfiguredAccessContourRaisesNoSurface() {
-        Boolean rose = Boolean.FALSE;
-        ConfigurableApplicationContext context = null;
-        try {
-            context = new SpringApplicationBuilder(TradingCoreApplication.class)
-                    .run(argumentsWithoutIssuer());
-            rose = Boolean.TRUE;
-        } catch (RuntimeException refused) {
-            rose = Boolean.FALSE;
-        } finally {
-            // Поднявшийся контекст закрывается в любом исходе: оставленный
-            // живым, он держал бы порт и пул соединений до конца прогона.
-            if (context != null) {
-                context.close();
-            }
-        }
-
-        assertThat(rose).isFalse();
+        assertThatThrownBy(() -> new SpringApplicationBuilder(TradingCoreApplication.class)
+                .run(argumentsWithoutIssuer())
+                .close())
+                .as("незаданный издатель означает отказ подъёма, а не открытую поверхность")
+                .rootCause()
+                .asInstanceOf(type(NoSuchBeanDefinitionException.class))
+                .extracting(NoSuchBeanDefinitionException::getBeanType)
+                .isEqualTo(JwtDecoder.class);
     }
 
     private String[] argumentsWithoutIssuer() {
-        List<String> arguments = new ArrayList<>();
-        for (Map.Entry<String, String> axis : TradingCoreSubstrate.defaults().entrySet()) {
-            arguments.add("--" + axis.getKey() + "=" + axis.getValue());
-        }
-        arguments.add("--spring.security.oauth2.resourceserver.jwt.issuer-uri=");
-        arguments.add("--server.port=0");
-        return arguments.toArray(new String[0]);
+        Map<String, String> axes = new LinkedHashMap<>(TradingCoreSubstrate.defaults());
+        axes.put(ISSUER_KEY, "");
+        axes.put("server.port", "0");
+        return axes.entrySet().stream()
+                .map(axis -> "--" + axis.getKey() + "=" + axis.getValue())
+                .toArray(String[]::new);
     }
 }

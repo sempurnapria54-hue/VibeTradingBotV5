@@ -80,6 +80,12 @@ class RecomputePassShapeBoxTest extends StatisticsBox {
     private static final List<String> MARK_NAMES =
             List.of("recompute", "progress", "watermark", "checkpoint", "high_water");
 
+    /** Образец текста запроса начала ряда сделочных фактов. */
+    private static final String DEAL_SERIES_START_QUERY = "%min(%closed_at)%from deal_facts%";
+
+    /** Образец текста запроса начала ряда фактов происшествий. */
+    private static final String INCIDENT_SERIES_START_QUERY = "%min(%occurred_at)%from incident_facts%";
+
     /** Сутки, открывающие ряд фактов у клетки о счёте запросов: старшие в окне. */
     private static final Integer SERIES_DAY = StatisticsSubstrate.RECOMPUTE_WINDOW_DAYS - 1;
 
@@ -121,6 +127,13 @@ class RecomputePassShapeBoxTest extends StatisticsBox {
         assertThat(rows.statementCalls(INCIDENT_GRAIN_QUERY))
                 .as("у второго зерна счёт тот же: порция спрашивает ОБА зерна своих суток")
                 .isEqualTo(windowDays);
+        assertThat(rows.statementCalls(DEAL_SERIES_START_QUERY))
+                .as("начало ряда читается ОДИН раз на проход, а не на каждые сутки: граница "
+                        + "отбора одна на весь проход")
+                .isEqualTo(1L);
+        assertThat(rows.statementCalls(INCIDENT_SERIES_START_QUERY))
+                .as("и у второго зерна — один раз")
+                .isEqualTo(1L);
         assertThat(rows.statementRows(DEAL_GRAIN_QUERY))
                 .as("а объём выдачи ВСЕХ его исполнений — две строки: по одной на ключ "
                         + "зерна суток. Фактов при этом %s, и вычитанные в память они дали "

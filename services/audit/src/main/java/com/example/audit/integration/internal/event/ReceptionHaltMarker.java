@@ -16,9 +16,14 @@ import org.springframework.stereotype.Component;
  * <b>отдельной</b> транзакцией — той же она откатилась бы вместе с
  * обработкой.
  *
- * <p><b>Пишется на ПЕРВОЙ неудачной доставке.</b> Повторов у группы журнала
- * не ограничено ничем, и запись на каждом из них била бы в базу с частотой
- * паузы, ничего не меняя: флаг уже стои́т.
+ * <p><b>Пишется на КАЖДОЙ неудачной доставке, пока флаг не стои́т:</b>
+ * условие записи — состояние строки, а не номер попытки
+ * (docs/rules/durable-consumer-reception.md, таблица писателей). Гейт по
+ * номеру попытки терял флаг навсегда, когда первая доставка приходилась на
+ * окно до первого такта тика: строки пары ещё нет, обновление цели не
+ * находит, а повторы уже не пишут. Повторов у группы журнала не ограничено
+ * ничем, но повтор при стоящем флаге строки не трогает — обновление
+ * отбирает только пару, где флага ещё нет.
  *
  * <p><b>Отказ самой записи флага проход не рвёт.</b> Он и так идёт по
  * тропе отказа; исключение отсюда подменило бы причину остановки, а
@@ -30,18 +35,17 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReceptionHaltMarker implements RetryListener {
 
-    /** Номер первой доставки: повторы приходят с бо́льшим номером. */
+    /** Номер первой доставки: причина остановки логируется на ней одной. */
     private static final int FIRST_ATTEMPT = 1;
 
     private final AuditReceptionService receptionService;
 
     @Override
     public void failedDelivery(ConsumerRecord<?, ?> record, Exception exception, int deliveryAttempt) {
-        if (deliveryAttempt > FIRST_ATTEMPT) {
-            return;
+        if (deliveryAttempt == FIRST_ATTEMPT) {
+            log.error("Приём остановлен на сообщении topic={} partition={} offset={}",
+                    record.topic(), record.partition(), record.offset(), exception);
         }
-        log.error("Приём остановлен на сообщении topic={} partition={} offset={}",
-                record.topic(), record.partition(), record.offset(), exception);
         markHalted(record.topic());
     }
 

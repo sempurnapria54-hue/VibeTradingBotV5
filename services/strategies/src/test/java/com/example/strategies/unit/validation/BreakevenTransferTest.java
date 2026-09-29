@@ -10,11 +10,11 @@ import static com.example.strategies.unit.validation.ValidationFixture.violation
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
+import com.example.strategies.api.model.strategy.StopLossSettingsApiModel;
 import com.example.strategies.api.model.strategy.StrategyDetailApiModel;
 import com.example.strategies.api.model.strategy.StrategyOrderActionApiModel;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -63,7 +63,7 @@ class BreakevenTransferTest {
     @DisplayName("U18.3 — способ первичной защиты сменён на безубыток: первичной он быть не может")
     void u18_3_breakevenMayNotBeThePrimaryProtection() {
         CreateStrategyApiRequest request = reference();
-        algoAction(bull(request), "bull_protection_oco").getStopLossSettings().setCalculationType("BREAKEVEN");
+        declareBreakeven(algoAction(bull(request), "bull_protection_oco").getStopLossSettings());
 
         assertThat(violations(request)).singleElement().asString().contains(NOT_A_TRANSFER);
     }
@@ -72,7 +72,7 @@ class BreakevenTransferTest {
     @DisplayName("U18.4 — способ ВСТРОЕННОЙ защиты входа сменён на безубыток: носителей уровня два")
     void u18_4_theAttachedProtectionCarriesTheSameCalculationType() {
         CreateStrategyApiRequest request = reference();
-        entryAction(bull(request)).getAttachedProtection().getStopLossSettings().setCalculationType("BREAKEVEN");
+        declareBreakeven(entryAction(bull(request)).getAttachedProtection().getStopLossSettings());
 
         assertThat(violations(request))
                 .singleElement()
@@ -99,7 +99,7 @@ class BreakevenTransferTest {
         CreateStrategyApiRequest request = reference();
         StrategyDetailApiModel detail = bull(request);
         StrategyOrderActionApiModel entry = entryAction(detail);
-        entry.getAttachedProtection().getStopLossSettings().setCalculationType("BREAKEVEN");
+        declareBreakeven(entry.getAttachedProtection().getStopLossSettings());
         entry.setTargetActionKey("bull_protection_oco");
 
         assertThat(violations(request)).singleElement().asString().contains(NOT_A_TRANSFER);
@@ -110,7 +110,7 @@ class BreakevenTransferTest {
     void u18_7_aCreatingActionWithATargetIsStillNotATransfer() {
         CreateStrategyApiRequest request = reference();
         StrategyDetailApiModel detail = bull(request);
-        algoAction(detail, "bull_protection_oco").getStopLossSettings().setCalculationType("BREAKEVEN");
+        declareBreakeven(algoAction(detail, "bull_protection_oco").getStopLossSettings());
         algoAction(detail, "bull_protection_oco").setTargetActionKey("bull_entry");
 
         assertThat(violations(request)).singleElement().asString().contains(NOT_A_TRANSFER);
@@ -127,15 +127,26 @@ class BreakevenTransferTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U18.9 — безубыток объявлен вместе с долей дистанции: дом требует отказа (F1)")
-    void u18_9_breakevenDeclaringADistanceIsRejectedByTheHome() {
+    @DisplayName("U18.9 — безубыток объявлен вместе с долей дистанции: отказ и у переноса")
+    void u18_9_breakevenDeclaringADistanceIsRejectedEvenAsATransfer() {
         CreateStrategyApiRequest request = reference();
         algoAction(bull(request), "bull_sl_to_breakeven").getStopLossSettings()
                 .setDistancePercents(decimal("100"));
 
-        assertThat(matching(violations(request), "distancePercents"))
-                .as("ожидание из дома: у безубытка доля дистанции не объявляется")
-                .isNotEmpty();
+        assertThat(violations(request))
+                .as("у безубытка доля дистанции не объявляется; роль переноса законна")
+                .singleElement()
+                .asString()
+                .contains(".stopLossSettings.distancePercents STRATEGY_STOP_DISTANCE_UNEXPECTED");
+    }
+
+    /**
+     * Безубыток по форме: способ сменён, а доли дистанции нет — у безубытка
+     * она не объявляется (docs/spec/stop-distance.json §distanceDeclaredWhenNeeded).
+     * Иначе клетка роли получала бы второе нарушение, не своё.
+     */
+    private static void declareBreakeven(StopLossSettingsApiModel settings) {
+        settings.setCalculationType("BREAKEVEN");
+        settings.setDistancePercents(null);
     }
 }

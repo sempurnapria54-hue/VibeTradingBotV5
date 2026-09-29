@@ -69,6 +69,7 @@ class DealRiskNumbersTest {
         Order leg = new Order();
         leg.setDealTrancheId(10L);
         leg.setType(Order.Type.ENTRY);
+        leg.setPositionReducingOnly(false);
         leg.setStatus(Order.Status.COMPLETED);
         leg.setPlannedRiskAmount(new BigDecimal("500"));
         leg.setPlannedSizeContracts(new BigDecimal("100"));

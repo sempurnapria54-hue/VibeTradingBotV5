@@ -91,10 +91,7 @@ public class PriceCalculator {
                     .description("market-like entry; reference last price");
         } else {
             BigDecimal base = resolveBasePrice(placement, context);
-            BigDecimal offset = percentOf(base, placement.getPercents());
-            BigDecimal raw = StrategyPriceOffsetSide.ABOVE.equals(placement.getOffsetSide())
-                    ? base.add(offset)
-                    : base.subtract(offset);
+            BigDecimal raw = offsetFromBase(base, placement);
             RoundingMode mode = StrategyTradeDirection.LONG.equals(direction) ? RoundingMode.DOWN : RoundingMode.UP;
             entryPrice = requirePositive(roundToTick(raw, context, mode));
             builder.purpose(StrategyPricePurpose.ORDER_LIMIT_PRICE)
@@ -405,6 +402,22 @@ public class PriceCalculator {
             case ENTRY_PRICE, MARKET_PRICE -> throw error(MISSING_STRUCTURE,
                     "Base type is not a structure level: " + baseType);
         };
+    }
+
+    /**
+     * Цена от базы со смещением объявленной стороны. Пустая сторона —
+     * смещения нет, как и пустые проценты
+     * (docs/models/domain/aggregate/Strategy.md §«StrategyPricePlacement»):
+     * вычитание по умолчанию ставило бы заявку ниже объявленной базы
+     * решением, которого автор не принимал.
+     */
+    private BigDecimal offsetFromBase(BigDecimal base, StrategyPricePlacement placement) {
+        StrategyPriceOffsetSide side = placement.getOffsetSide();
+        if (isNull(side)) {
+            return base;
+        }
+        BigDecimal offset = percentOf(base, placement.getPercents());
+        return StrategyPriceOffsetSide.ABOVE.equals(side) ? base.add(offset) : base.subtract(offset);
     }
 
     private BigDecimal percentOf(BigDecimal base, BigDecimal percents) {

@@ -24,6 +24,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTra
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.ConstantValueType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperator;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRule;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionSourceType;
@@ -419,6 +420,7 @@ class EntryScanPassTest {
         declared.setValue(phaseType.name());
         StrategyConditionRule rule = new StrategyConditionRule();
         rule.setRuleType(StrategyConditionRuleType.MARKET_PHASE_IS);
+        rule.setOperator(StrategyConditionOperator.EQ);
         rule.setRightOperand(declared);
         return entryStep(new StrategyCondition(new ArrayList<>(List.of(rule))));
     }

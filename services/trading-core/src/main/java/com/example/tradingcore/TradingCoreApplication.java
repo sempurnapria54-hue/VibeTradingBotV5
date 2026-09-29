@@ -2,6 +2,7 @@ package com.example.tradingcore;
 
 import com.example.platform.client.ServiceClientConfig;
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.platform.exception.handler.JwtDecoderAssemblyGuard;
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.platform.security.ActorProvider;
 import com.example.strategy.engine.calc.PriceCalculator;
@@ -28,11 +29,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * <p><b>Взятое из общего артефакта периметра названо ИМЕНОВАННО</b>, а не
  * взято сканированием его пакета: перечень взятого читается в одном
  * месте, а то, чего сервису не нужно, не приезжает к нему вместе с
- * пакетом. Точек входа отказа доступа здесь нет и не будет, пока
- * писателя следа у ядра не появится (docs/rules/api-access-policy.md
- * §«След отказа пишет тот, у кого есть база»,
- * .claude/work/backlog.md §«Таблица отказов доступа у сервисов со своей
- * базой»).
+ * пакетом. Точки входа отказа доступа берутся тем же ходом, а писатель
+ * следа у ядра свой — строка в собственной базе
+ * (docs/rules/api-access-policy.md §«След отказа пишет тот, у кого есть
+ * база»).
  *
  * <p><b>Движок стратегий берётся тем же именованным ходом, и без него
  * контекст не поднимался вовсе.</b> Интерпретатор условий и расчётный
@@ -44,15 +44,18 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * сканированием чужого пакета: перечень взятого читается в одном месте.
  *
  * <p><b>Область отображаемых классов названа явно.</b> Базовый тип
- * audit-полей лежит в общем артефакте, то есть вне пакета сервиса, и
- * умолчание сканирования его не видит. Свой пакет перечисляется рядом:
- * {@code @EntityScan} умолчание ЗАМЕЩАЕТ, а не дополняет.
+ * audit-полей и строка отказа доступа лежат в общем артефакте, то есть вне
+ * пакета сервиса, и умолчание сканирования их не видит. Свой пакет
+ * перечисляется рядом: {@code @EntityScan} умолчание ЗАМЕЩАЕТ, а не
+ * дополняет. Строку отказа отображение берёт вместе с пакетом, и таблицу
+ * {@code access_denials} схема сервиса обязана нести.
  */
 @EnableAsync
 @EnableScheduling
 @SpringBootApplication
 @EnableConfigurationProperties(EnvironmentProperties.class)
-@Import({AccessDenialHandler.class, ActorProvider.class, JobExecutionGuard.class, ServiceClientConfig.class,
+@Import({AccessDenialHandler.class, JwtDecoderAssemblyGuard.class, ActorProvider.class, JobExecutionGuard.class,
+        ServiceClientConfig.class,
         StrategyConditionEvaluator.class, StrategyActionCalculator.class,
         PriceCalculator.class, SizeCalculator.class})
 @EntityScan({"com.example.tradingcore", "com.example.tradingbot.persistence.model"})

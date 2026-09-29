@@ -12,7 +12,6 @@ import com.example.tradingcore.domain.command.resolve.AttachedAlgoOrderStateReso
 import com.example.tradingcore.domain.command.resolve.AttachedProtectionResolution;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -31,10 +30,9 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка:</b> {@code new AttachedAlgoOrderStateResolver()};
  * набор фактов собирается строителем. Конфигурации у единицы нет вовсе.
  *
- * <p><b>Один кейс группы красен по построению</b> и помечен
- * {@code @Tag("debt")}: {@code U10.13} предъявляет находку {@code F4} —
- * публичный гейт цикла пустой статус родителя охраняет явным возвратом
- * лжи, а резолв на том же значении роняет разыменование.
+ * <p><b>Пустой статус родителя оба входа читают одинаково</b> —
+ * отсутствием факта: гейт цикла не запускает ({@code U10.1}), резолв
+ * исхода не определяет ({@code U10.13}, находка {@code F4} закрыта).
  */
 class AttachedParentClassTest {
 
@@ -156,18 +154,17 @@ class AttachedParentClassTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U10.13 — пустой статус родителя у резолва: пустота есть отсутствие факта, а не отказ")
-    void u10_13_anEmptyParentStatusDoesNotBreakTheResolve() {
-        assertThatCode(() -> resolver.resolve(facts()
+    @DisplayName("U10.13 — пустой статус родителя у резолва: пустота есть отсутствие факта, исход не определён")
+    void u10_13_anEmptyParentStatusLeavesTheOutcomeUndetermined() {
+        AttachedProtectionResolution resolution = resolver.resolve(facts()
                 .observed(observed())
                 .parentAccumulatedFillSize(fill("1"))
-                .build()))
-                .as("ожидание дома — тот же отказ, что у публичного гейта (Z25): пустота есть "
-                        + "отсутствие факта. Сегодня выбор по пустому статусу роняет разыменование, "
-                        + "хотя публичный гейт ту же пустоту охраняет явно — находка F4 (Z24). "
-                        + "Состояние недостижимо: факты собирает исполнитель добычи по уже "
-                        + "прочитанной заявке")
-                .doesNotThrowAnyException();
+                .build());
+
+        assertThat(resolution.getOutcomeUndetermined())
+                .as("та же трактовка, что у публичного гейта (Z25): класс родителя не выводится")
+                .isTrue();
+        assertThat(resolution.getStatus()).as("статус защиты не двигается").isNull();
+        assertThat(resolution.getCloseReason()).isNull();
     }
 }

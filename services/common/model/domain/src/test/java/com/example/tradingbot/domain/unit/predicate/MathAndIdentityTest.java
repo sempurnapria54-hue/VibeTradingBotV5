@@ -17,7 +17,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -220,18 +219,12 @@ class MathAndIdentityTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b>
-     * docs/rules/absent-value-semantics.md требует, чтобы пустое значение
-     * читалось отсутствием, а не отказом; справочник построен на
-     * {@code Map.of}, и неизменяемая карта роняет
-     * {@code NullPointerException} и на {@code getOrDefault(null, …)}, и на
-     * {@code containsKey(null)} — то есть пустой тип индикатора обрушивает
-     * ПРОХОД вместо того, чтобы дать пустое множество (находка `D-9`,
-     * `.claude/work/backlog.md` §«Справочник компонентов индикатора роняет
-     * проход на пустом типе»). Красный прогон и есть предъявление долга.
+     * Пустое значение читается отсутствием, а не отказом
+     * (docs/rules/absent-value-semantics.md): пустой тип индикатора даёт
+     * пустое множество и ложный признак многокомпонентности (находка `D-9`
+     * закрыта заходом 226).
      */
     @Test
-    @Tag("debt")
     @DisplayName("U19.25 — тип индикатора пуст")
     void u19_25_anAbsentIndicatorTypeGivesAnEmptySet() {
         assertThatCode(() -> IndicatorComponents.allowedFor(null)).doesNotThrowAnyException();

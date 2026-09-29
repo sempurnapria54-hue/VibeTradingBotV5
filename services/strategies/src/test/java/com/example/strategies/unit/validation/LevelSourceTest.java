@@ -12,7 +12,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.api.model.strategy.StrategyAlgoOrderActionApiModel;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -81,15 +80,16 @@ class LevelSourceTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U20.6 — у защитного создания нет НИ ОДНОГО блока уровня: дом требует отказа (F5)")
-    void u20_6_aLevelSettingActionWithoutASourceIsRejectedByTheHome() {
+    @DisplayName("U20.6 — у защитного создания нет НИ ОДНОГО блока уровня: источник не объявлен")
+    void u20_6_aLevelSettingActionWithoutASourceIsRejected() {
         CreateStrategyApiRequest request = reference();
         algoAction(bull(request), "bull_protection_oco").setStopLossSettings(null);
 
         assertThat(violations(request))
-                .as("ожидание из дома: ставящее уровень действие объявляет его источник")
-                .isNotEmpty();
+                .as("ставящее уровень действие объявляет его источник")
+                .singleElement()
+                .asString()
+                .contains(" STRATEGY_LEVEL_SOURCE_NOT_DECLARED");
     }
 
     @Test

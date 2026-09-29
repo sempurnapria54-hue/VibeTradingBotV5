@@ -181,7 +181,7 @@ public class SafetyHoldCoordinator {
             return;
         }
         try {
-            runReaction(signal, dealContext, killSwitch);
+            runReaction(resumeSafely(signal, dealContext), signal, dealContext, killSwitch);
             cascade.run();
         } finally {
             runningObjects.remove(key);
@@ -290,7 +290,11 @@ public class SafetyHoldCoordinator {
     }
 
     private void runReaction(HoldSignal signal, DealContext dealContext, Supplier<Boolean> killSwitch) {
-        AnomalyReport report = openSafely(signal, dealContext);
+        runReaction(openSafely(signal, dealContext), signal, dealContext, killSwitch);
+    }
+
+    private void runReaction(AnomalyReport report, HoldSignal signal, DealContext dealContext,
+                             Supplier<Boolean> killSwitch) {
         advanceSafely(report, AnomalyReport.Status.IN_PROGRESS);
         Boolean closeConfirmed = fireSafely(signal, report, killSwitch);
         completeOrEscalate(report, signal, dealContext, closeConfirmed);
@@ -311,9 +315,7 @@ public class SafetyHoldCoordinator {
      */
     private Boolean fireSafely(HoldSignal signal, AnomalyReport report, Supplier<Boolean> killSwitch) {
         try {
-            Boolean closeConfirmed = killSwitch.get();
-            advanceSafely(report, AnomalyReport.Status.KILL_SWITCH_EXECUTED);
-            return closeConfirmed;
+            return killSwitch.get();
         } catch (RuntimeException e) {
             log.error("Safety hold kill-switch failed scope={}", signal.getScope(), e);
             failSafely(report, e.getMessage());
@@ -322,7 +324,10 @@ public class SafetyHoldCoordinator {
     }
 
     /**
-     * Терминал отчёта — только по <b>подтверждённому</b> снятию риска.
+     * Терминал отчёта — только по <b>подтверждённому</b> снятию риска; им же
+     * гейтится и статус снятия риска: он означает «выполнено И подтверждено»
+     * (docs/lifecycles/AnomalyReport.md §Статусы), и на неподтверждённом
+     * отчёт остаётся в обработке — незакрытая строка и есть след.
      *
      * <p>Не подтверждено на инструментном радиусе — эскалация на счётный:
      * неустранимый остаток означает, что интеграции нельзя доверять, а
@@ -338,6 +343,7 @@ public class SafetyHoldCoordinator {
     private void completeOrEscalate(AnomalyReport report, HoldSignal signal, DealContext dealContext,
                                     Boolean closeConfirmed) {
         if (isTrue(closeConfirmed)) {
+            advanceSafely(report, AnomalyReport.Status.KILL_SWITCH_EXECUTED);
             completeSafely(report, dealContext);
             return;
         }
@@ -368,6 +374,20 @@ public class SafetyHoldCoordinator {
             return anomalyReportService.open(dealContext, signal);
         } catch (RuntimeException e) {
             log.error("Anomaly report open failed scope={} code={}", signal.getScope(), signal.getCode(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Строка доведения best-effort: незакрытая строка того же ключа
+     * продолжается, иначе открывается новая. Сбой — тот же, что у
+     * открытия: снятия риска не подавляет.
+     */
+    private AnomalyReport resumeSafely(HoldSignal signal, DealContext dealContext) {
+        try {
+            return anomalyReportService.resumeOrOpen(dealContext, signal);
+        } catch (RuntimeException e) {
+            log.error("Anomaly report resume failed scope={} code={}", signal.getScope(), signal.getCode(), e);
             return null;
         }
     }

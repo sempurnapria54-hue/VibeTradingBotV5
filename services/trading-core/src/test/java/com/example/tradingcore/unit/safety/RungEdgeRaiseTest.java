@@ -34,7 +34,6 @@ import com.example.tradingcore.persistence.service.AccountInstrumentStateDataSer
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -194,27 +193,67 @@ class RungEdgeRaiseTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b>
-     * Доминирование биржевых ступеней над инструментными реакциями
-     * объявлено лестницей (docs/rules/exchange-hold.md §«Границы и
-     * эскалация»), а ребро подъёма на инструментном радиусе читает только
-     * строку пары — счётная ступень его операндом не является нигде.
-     * Красный прогон и есть предъявление находки `S-2`
-     * (`.claude/work/backlog.md` §«Доминирование биржевых ступеней над
-     * инструментными реакциями энфорсера не имеет»).
+     * Биржевые ступени доминируют инструментные реакции
+     * (docs/rules/exchange-hold.md §«Границы и эскалация»): под
+     * сворачиванием счёта жёсткий инструментный сигнал поглощается.
      */
     @Test
-    @Tag("debt")
     @DisplayName("U1.12 — счёт свёрнут, приходит инструментный сигнал: ступень пары не переставляется, факта нет")
     void u1_12_theAccountRungDominatesTheInstrumentReaction() {
-        DealContext context = DealContext.builder()
-                .exchangeAccount(account(ExchangeAccount.SafetyRung.TRADE_BLOCKED))
-                .instrument(instrument())
-                .build();
+        when(accounts.getRequiredSafetyRungById(ACCOUNT_ID)).thenReturn(ExchangeAccount.SafetyRung.TRADE_BLOCKED);
 
-        edge.raise(HoldSignal.instrument(CODE), context);
+        Boolean applied = edge.raise(HoldSignal.instrument(CODE), pairContext());
 
         verify(pairStates, never()).raiseRung(anyLong(), anyLong(), any());
         verifyNoInteractions(coreEventWriter);
+        assertThat(applied).as("поглощение читается исходом «не переставилась»").isFalse();
+    }
+
+    /**
+     * Мягкий холд счёта мягкой ступени пары не покрывает: у пары блок-сет
+     * преконтроля, у счёта только выпадение из выборки входа.
+     */
+    @Test
+    @DisplayName("U1.13 — счёт в мягком холде, мягкий инструментный сигнал ставит мягкую ступень пары")
+    void u1_13_aSoftAccountHoldDoesNotAbsorbASoftInstrumentSignal() {
+        when(accounts.getRequiredSafetyRungById(ACCOUNT_ID)).thenReturn(ExchangeAccount.SafetyRung.HOLD);
+
+        Boolean applied = edge.raise(HoldSignal.instrumentSoft(CODE), pairContext());
+
+        verify(pairStates).raiseRung(ACCOUNT_ID, INSTRUMENT_ID, Instrument.SafetyRung.ENTRY_BLOCKED);
+        assertThat(applied).isTrue();
+    }
+
+    /** Жёсткий инструментный под мягким холдом счёта проходит: снятия риска пары мягкая ступень счёта не производит. */
+    @Test
+    @DisplayName("U1.14 — счёт в мягком холде, жёсткий инструментный сигнал сворачивает пару")
+    void u1_14_aHardInstrumentSignalPassesASoftAccountHold() {
+        when(accounts.getRequiredSafetyRungById(ACCOUNT_ID)).thenReturn(ExchangeAccount.SafetyRung.HOLD);
+
+        Boolean applied = edge.raise(HoldSignal.instrument(CODE), pairContext());
+
+        verify(pairStates).raiseRung(ACCOUNT_ID, INSTRUMENT_ID, Instrument.SafetyRung.TRADE_BLOCKED);
+        verify(coreEventWriter).holdRaised(eq(TENANT_ID), any(), eq(ACCOUNT_INTERNAL_ID),
+                eq(INSTRUMENT_INTERNAL_ID), eq(ACTOR));
+        assertThat(applied).isTrue();
+    }
+
+    /**
+     * Ступень счёта читается ребром в своей транзакции, а не со снимка
+     * контекста: счёт, свёрнутый тем же проходом раньше, снимок не видит.
+     */
+    @Test
+    @DisplayName("U1.15 — снимок контекста несёт рабочий счёт, строка — сворачивание: доминирует строка")
+    void u1_15_theStandingAccountRungIsReadFreshNotFromTheContextSnapshot() {
+        DealContext context = DealContext.builder()
+                .exchangeAccount(account(ExchangeAccount.SafetyRung.ACTIVE))
+                .instrument(instrument())
+                .build();
+        when(accounts.getRequiredSafetyRungById(ACCOUNT_ID)).thenReturn(ExchangeAccount.SafetyRung.TRADE_BLOCKED);
+
+        Boolean applied = edge.raise(HoldSignal.instrument(CODE), context);
+
+        verify(pairStates, never()).raiseRung(anyLong(), anyLong(), any());
+        assertThat(applied).isFalse();
     }
 }

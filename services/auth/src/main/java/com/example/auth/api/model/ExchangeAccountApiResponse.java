@@ -24,6 +24,6 @@ public class ExchangeAccountApiResponse {
     @Schema(description = "Контур площадки: LIVE либо DEMO. Показывается везде, где показывается счёт")
     private final String contour;
 
-    @Schema(description = "Состояние счёта: ACTIVE, HOLD, TRADE_BLOCKED, CLOSED")
+    @Schema(description = "Реестровое состояние счёта: ACTIVE либо CLOSED. Ступени безопасности счёта ведёт trading-core, и здесь их нет")
     private final String status;
 }

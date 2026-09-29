@@ -57,7 +57,7 @@ final class TerminalFeaturesHarness {
     /** Коды журнальных отчётов в порядке вызовов. */
     List<String> journalledCodes() {
         ArgumentCaptor<HoldSignal> signals = ArgumentCaptor.forClass(HoldSignal.class);
-        verify(reports, Mockito.atLeast(0)).journal(any(), signals.capture());
+        verify(reports, Mockito.atLeast(0)).journalApart(any(), signals.capture());
         return signals.getAllValues().stream().map(HoldSignal::getCode).toList();
     }
 }

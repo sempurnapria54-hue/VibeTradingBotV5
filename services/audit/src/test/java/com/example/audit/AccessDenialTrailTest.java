@@ -5,9 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
-import com.example.audit.domain.model.AccessDenial;
 import com.example.audit.domain.service.AccessDenialService;
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.tradingbot.domain.model.other.AccessDenial;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;

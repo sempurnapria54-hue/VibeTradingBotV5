@@ -16,12 +16,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>Инвариант «один пишущий» этим не теряет обеспечения: писателя отделяет
  * от чужих таблиц то, что чужих учётных данных у процесса нет вовсе.
+ *
+ * <p><b>Уровня под именем комплекта у ключа нет:</b> имя различало две
+ * половины прежнего комплекта, и с одной половиной различать нечего — форма
+ * та же, что у соседа, собранного под тот же предикат.
  */
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "audit.persistence")
-public class PersistenceProperties {
-
-    /** Подключение под ролью-владельцем журнала: `audit`. */
-    private DatabaseConnectionProperties journal = new DatabaseConnectionProperties();
+public class PersistenceProperties extends DatabaseConnectionProperties {
 }

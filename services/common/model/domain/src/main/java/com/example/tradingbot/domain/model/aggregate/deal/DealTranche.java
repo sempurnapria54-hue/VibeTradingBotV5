@@ -139,8 +139,8 @@ public class DealTranche extends Auditable {
      * слагаемое — тот же отбор, что у входной ноги.
      */
     public void deriveOwnFills() {
-        entryFilled = fillOf(order -> isFalse(order.getPositionReducingOnly()));
-        reduceOnlyFilled = fillOf(order -> isTrue(order.getPositionReducingOnly()));
+        entryFilled = fillOf(order -> isTrue(order.isEntryLeg()));
+        reduceOnlyFilled = fillOf(order -> isTrue(order.isReducingLeg()));
         protectionClosed = attachedClosed().add(standaloneClosed());
     }
 
@@ -225,7 +225,7 @@ public class DealTranche extends Auditable {
     public Boolean hasLiveEntryOrder() {
         return emptyIfNull(orders).stream()
                 .anyMatch(order -> isTrue(order.isLive())
-                        && isFalse(order.getPositionReducingOnly()));
+                        && isTrue(order.isEntryLeg()));
     }
 
     /**
@@ -246,7 +246,7 @@ public class DealTranche extends Auditable {
      */
     public Order entryOrder() {
         return emptyIfNull(orders).stream()
-                .filter(order -> isFalse(order.getPositionReducingOnly()))
+                .filter(order -> isTrue(order.isEntryLeg()))
                 .filter(order -> nonNull(order.getId()))
                 .max(Comparator.comparing(Order::getId))
                 .orElse(null);
@@ -278,7 +278,7 @@ public class DealTranche extends Auditable {
             return triggered;
         }
         boolean ownExitFilled = emptyIfNull(orders).stream()
-                .filter(order -> isTrue(order.getPositionReducingOnly()))
+                .filter(order -> isTrue(order.isReducingLeg()))
                 .anyMatch(order -> isTrue(order.isFilled()));
         return ownExitFilled ? CloseReason.STRATEGY_EXIT : null;
     }

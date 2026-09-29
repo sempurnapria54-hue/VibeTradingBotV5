@@ -10,6 +10,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.size;
 import static com.example.tradingcore.unit.risk.RiskFixture.sizeWithoutContracts;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingContext;
 import static com.example.tradingcore.unit.risk.RiskFixture.account;
+import static com.example.tradingcore.unit.risk.RiskFixture.withPrice;
 import static com.example.tradingcore.unit.risk.RiskFixture.withSize;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,7 +22,6 @@ import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -65,7 +65,6 @@ class PrecheckInputGateTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("U1.3 — признак полноты графа не объявлен: пустота читается как «не предъявлен» (R-5)")
     void u1_3_anAbsentGraphCompleteFlagReadsAsNotPresented() {
         DealContext dealContext = contextBuilder(emptyDeal()).graphComplete(null).build();
@@ -178,6 +177,12 @@ class PrecheckInputGateTest {
         assertThatThrownBy(() -> harness.validate(entryAction(), workingContext()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("pair state read failed");
+    }
+
+    @Test
+    @DisplayName("U1.18 — рассчитанной цены нет вовсе: действие невалидно, уровневые проверки не бегут (R-9)")
+    void u1_18_anActionWithoutACalculatedPriceIsInvalid() {
+        assertSingleInvalidAction(withPrice(entryAction(), null));
     }
 
     private void assertSingleInvalidAction(CalculatedStrategyAction action) {

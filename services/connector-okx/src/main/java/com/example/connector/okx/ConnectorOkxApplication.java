@@ -4,6 +4,7 @@ import com.example.connector.okx.config.CredentialsProperties;
 import com.example.connector.okx.config.EnvironmentProperties;
 import com.example.connector.okx.config.OkxProperties;
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.platform.exception.handler.JwtDecoderAssemblyGuard;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -21,7 +22,7 @@ import org.springframework.context.annotation.Import;
  * базы нет, и точка входа отвечает отказом, ничего не записывая.
  */
 @SpringBootApplication
-@Import(AccessDenialHandler.class)
+@Import({AccessDenialHandler.class, JwtDecoderAssemblyGuard.class})
 @EnableConfigurationProperties({OkxProperties.class, EnvironmentProperties.class, CredentialsProperties.class})
 public class ConnectorOkxApplication {
 

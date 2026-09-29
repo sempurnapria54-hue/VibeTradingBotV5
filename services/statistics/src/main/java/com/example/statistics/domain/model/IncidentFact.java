@@ -1,6 +1,7 @@
 package com.example.statistics.domain.model;
 
 import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import java.time.OffsetDateTime;
 import lombok.Builder;
@@ -55,12 +56,16 @@ public class IncidentFact {
      */
     String operationCode;
 
-    /** Вход полон: ключ дедупа, оба ключа зерна, ось времени и класс. */
+    /**
+     * Вход полон: ключ дедупа, оба ключа зерна, ось времени и класс.
+     * Строковое значение присутствует, когда оно непусто, а не когда
+     * непуста ссылка — по тому же доводу, что у сделочного факта.
+     */
     public Boolean hasCompleteInput() {
-        return nonNull(eventId)
-                && nonNull(tenantId)
-                && nonNull(exchangeAccountInternalId)
+        return isNotBlank(eventId)
+                && isNotBlank(tenantId)
+                && isNotBlank(exchangeAccountInternalId)
                 && nonNull(occurredAt)
-                && nonNull(eventType);
+                && isNotBlank(eventType);
     }
 }

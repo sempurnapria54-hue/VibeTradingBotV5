@@ -36,6 +36,7 @@ import com.example.tradingcore.util.Constants;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -104,6 +105,23 @@ class ManualHaltSurfaceTest {
     }
 
     // --- постановка --------------------------------------------------------
+
+    /**
+     * Мягкая ручная постановка пишет отчёт ПЕРВЫМ и отказа журнала не
+     * поглощает: ветви «ступень поставлена, отчёта нет» у ручной тропы нет
+     * (docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо и от
+     * автоматики, и друг от друга»). Сервис блокировки здесь настоящий.
+     */
+    @Test
+    @DisplayName("U12.18 — мягкая постановка, запись отчёта бросает: операция падает, ступень не поднята")
+    void u12_18_aFailingSoftRaiseReportFailsTheOperationBeforeTheRung() {
+        IllegalStateException journalDown = new IllegalStateException("db is down");
+        when(reports.journalState(any(), any(), any())).thenThrow(journalDown);
+
+        assertThatThrownBy(() -> service.raise(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null))
+                .isSameAs(journalDown);
+        verify(accounts, never()).raiseRung(anyLong(), any());
+    }
 
     /** Мягкая постановка счёта: статус плюс строка журнала, координатор не зовётся. */
     @Test

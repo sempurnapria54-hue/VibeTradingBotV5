@@ -18,7 +18,6 @@ import com.example.tradingbot.domain.model.other.DealCashFlow;
 import com.example.tradingcore.domain.command.calc.DealReconciliationCalculator;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -38,10 +37,8 @@ import org.junit.jupiter.api.Test;
  * задан рабочими числами. Входных ног у сделки нет, поэтому омиссионный
  * член нулевой и допуск вырождается в пол — {@code 0.05}.
  *
- * <p><b>Один кейс группы красен по построению</b> и помечен
- * {@code @Tag("debt")}: {@code U4.11} предъявляет находку {@code F1} —
- * различитель гранулярности считается по уже прореженной области, а
- * спека ставит его на непрореженные строки расчётной валюты.
+ * <p>{@code U4.11} мерит область различителя гранулярности: он стои́т на
+ * непрореженных строках расчётной валюты, а не на области сверки.
  */
 class ReconciliationPairsTest {
 
@@ -192,7 +189,6 @@ class ReconciliationPairsTest {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("U4.11 — исключение комиссионного типа списком биржи различитель гранулярности не сбивает")
     void u4_11_anExcludedFeeTypeDoesNotFlipTheGranularityDiscriminator() {
         Deal deal = enteredDeal(withExchangeNumbers(closedEpisode("10"), "10", "0", "0", "0"));
@@ -201,10 +197,8 @@ class ReconciliationPairsTest {
                 withType(flow(DealCashFlow.CashFlowCategory.TRADE_FEE, "-1"), "8", null));
 
         assertThat(calculatorExcluding("8").reconcile(context(deal, flows)))
-                .as("ожидание дома: различитель стои́т на НЕПРОРЕЖЕННЫХ строках расчётной валюты, "
-                        + "эхо на торговой строке не читается, комиссионная пара сходится. Сегодня "
-                        + "различитель считается по прореженной области (Z9), эхо вычитается, и сверка "
-                        + "расходится величиной двух комиссий — находка F1")
+                .as("различитель стои́т на НЕПРОРЕЖЕННЫХ строках расчётной валюты: эхо на торговой "
+                        + "строке не читается, комиссионная пара сходится")
                 .isEqualTo(Deal.ReconciliationStatus.MATCHED);
     }
 

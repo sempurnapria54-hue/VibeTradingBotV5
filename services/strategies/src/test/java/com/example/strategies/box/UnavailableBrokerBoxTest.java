@@ -33,18 +33,20 @@ import org.springframework.test.context.DynamicPropertySource;
  * значит статусы стоя́т, строки копятся, а наружу исход работы не идёт
  * (docs/components/OutboxRelayJob.md; docs/rules/error-handling-policy.md).
  *
- * <p><b>Тик ждётся своим потолком.</b> Отказ приходит не сразу:
- * публикующий клиент ждёт раскладки темы до своего умолчания, а
- * величиной конфигурации сервиса этот потолок не объявлен — цена названа
- * у {@link BrokerGate}.
+ * <p><b>Тик ждётся своим потолком, и он мерит объявленную величину.</b>
+ * Отказ приходит не сразу: публикующий клиент ждёт раскладки темы до
+ * потолка {@code broker.publish-block-timeout} ({@code application.yaml}).
+ * Потолок следа клетки выше объявленного с запасом на проход и НИЖЕ
+ * умолчания клиента (минута): клиент, потерявший объявленную величину,
+ * клетку роняет.
  */
 class UnavailableBrokerBoxTest extends StrategiesBox {
 
     /**
-     * Потолок ожидания следа тика против закрытой тропы: он длиннее
-     * штатного ровно на умолчание клиента брокера.
+     * Потолок ожидания следа тика против закрытой тропы: объявленный
+     * потолок публикации с запасом на проход, но короче умолчания клиента.
      */
-    private static final Duration REFUSAL_TIMEOUT = Duration.ofSeconds(240);
+    private static final Duration REFUSAL_TIMEOUT = Duration.ofSeconds(20);
 
     /** Перекрываемая тропа: контекст читает её адрес вместо адреса контейнера. */
     private static final BrokerGate GATE =

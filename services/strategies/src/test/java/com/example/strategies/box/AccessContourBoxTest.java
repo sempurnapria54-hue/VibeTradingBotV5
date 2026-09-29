@@ -3,6 +3,7 @@ package com.example.strategies.box;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -48,7 +49,7 @@ class AccessContourBoxTest extends SharedStrategiesBox {
     /** Запись журнала о непредусмотренном отказе поверхности. */
     private static final String UNHANDLED = "Unhandled failure on the strategies surface";
 
-    /** Таблица отказов доступа: в схеме владельца определений её нет. */
+    /** Таблица следа отказов доступа. */
     private static final String DENIALS_TABLE = "access_denials";
 
     @Test
@@ -203,18 +204,14 @@ class AccessContourBoxTest extends SharedStrategiesBox {
     }
 
     /**
-     * Часть о СТРОКЕ сегодня не прогоняется: таблицы отказов доступа в
-     * схеме владельца определений нет вовсе
-     * (.claude/work/backlog.md §«Таблица отказов доступа у сервисов со
-     * своей базой»), и её появление — исход находки, а не ожидание этой
-     * клетки. Прогоняемое здесь — что отказ состоялся своим контрактом и
-     * что ни один наблюдатель следа сверх него не увидел.
+     * След отказа у сервиса со своей базой — строка до ответа
+     * (docs/rules/api-access-policy.md §«След отказа пишет тот, у кого есть
+     * база»; docs/models/domain/other/AccessDenial.md). Кроме неё отказ не
+     * оставляет ни одной строки ни в одной таблице схемы.
      */
     @Test
     @DisplayName("B8.9 — След отказа доступа")
     void b8_9_theAccessDenialLeavesItsTrace() {
-        List<String> tables = rows.tableNames();
-
         Answer answer = getAnonymously(STRATEGIES);
 
         assertThat(answer.status()).isEqualTo(401);
@@ -222,11 +219,14 @@ class AccessContourBoxTest extends SharedStrategiesBox {
         assertThat(answer.errorCode())
                 .as("актором хода идёт класс контура: предъявителя контур не удостоверил")
                 .isEqualTo(UNAUTHENTICATED);
-        assertThat(tables)
-                .as("писателя следа у сервиса нет: таблицы отказов доступа в схеме не заведено")
-                .doesNotContain(DENIALS_TABLE);
-        assertThat(rows.countsByTable().values())
-                .as("и ни одной строки отказ за собой не оставил ни в одной таблице")
-                .allMatch(count -> count == 0L);
+        List<Map<String, Object>> denials = rows.all(DENIALS_TABLE);
+        assertThat(denials).as("попытка была одна, и строка у неё одна").hasSize(1);
+        Map<String, Object> denial = denials.getFirst();
+        assertThat(denial.get("outcome")).isEqualTo("PRINCIPAL_ABSENT");
+        assertThat(denial.get("principal")).as("принятого принципала у отказа нет").isNull();
+        assertThat(denial.get("surface")).isEqualTo("GET " + STRATEGIES);
+        assertThat(rows.countsByTable())
+                .as("сверх строки следа отказ не оставил ни одной строки ни в одной таблице")
+                .allSatisfy((table, count) -> assertThat(count).isEqualTo(DENIALS_TABLE.equals(table) ? 1L : 0L));
     }
 }

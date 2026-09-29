@@ -1,7 +1,7 @@
 package com.example.audit.mapping;
 
-import com.example.audit.domain.model.AccessDenial;
-import com.example.audit.persistence.model.journal.AccessDenialEntity;
+import com.example.tradingbot.domain.model.other.AccessDenial;
+import com.example.tradingbot.persistence.model.AccessDenialEntity;
 import org.mapstruct.InjectionStrategy;
 import org.mapstruct.Mapper;
 import org.mapstruct.ReportingPolicy;

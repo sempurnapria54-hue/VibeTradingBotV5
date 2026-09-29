@@ -5,6 +5,7 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -15,6 +16,7 @@ import com.example.tradingcore.config.ExchangeContourProperties;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldSignal;
+import com.example.tradingcore.util.AfterCommit;
 import com.example.tradingcore.util.Constants;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -146,9 +148,20 @@ public class DealTerminalFeaturesWriter {
         }
     }
 
+    /**
+     * Журнальный отчёт признака — ПОСЛЕ коммита вызывающего и своей
+     * транзакцией (docs/models/domain/aggregate/Deal.md §Енумы, строка
+     * «момент»): отказ записи отчёта, где бы он ни пришёл — в вызове либо
+     * при сбросе в базу, — ребро не откатывает, а откат ребра отчёта не
+     * оставляет.
+     */
     private void journal(DealContext dealContext, String code) {
+        AfterCommit.run(() -> journalApart(dealContext, code));
+    }
+
+    private void journalApart(DealContext dealContext, String code) {
         try {
-            anomalyReportService.journal(dealContext, HoldSignal.instrumentJournal(code));
+            anomalyReportService.journalApart(dealContext, HoldSignal.instrumentJournal(code));
         } catch (RuntimeException e) {
             log.error("Journal anomaly report failed code={} dealId={}", code,
                     dealContext.getDeal().getId(), e);
@@ -187,7 +200,7 @@ public class DealTerminalFeaturesWriter {
         if (isFalse(hadEntry)) {
             return null;
         }
-        if (isFalse(dealContext.getGraphComplete())) {
+        if (isNotTrue(dealContext.getGraphComplete())) {
             return Deal.CloseOutcome.UNDETERMINED;
         }
         List<Deal.CloseOutcome> outcomes = episodes.stream().map(this::episodeOutcome).toList();

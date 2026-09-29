@@ -15,7 +15,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -102,21 +101,16 @@ class ConditionConjunctionTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b>
-     * Консервативная ложь объявлена домом
-     * (docs/rules/absent-value-semantics.md), а пустой элемент перечня
-     * правил роняет чтение типа: {@code #evaluate} уходит в
-     * {@code #evaluateRule} и падает. Красный прогон и есть предъявление
-     * находки `F-8` (`.claude/work/backlog.md` §«Интерпретатор бросает там,
-     * где объявлена консервативная ложь»).
+     * Пустой элемент перечня правил — правило, которое оценить нечем, и
+     * конъюнкция на нём консервативно ложна, а не роняет чтение типа
+     * (docs/components/StrategyConditionEvaluator.md §Границы; находка `F-8`
+     * закрыта).
      *
      * <p>Строка добрана под-шагом 3 по пробелу `G6`: вход производится
-     * битым разбором тела определения, а не авторингом, и потому ждал
-     * кейсов `F-8`.
+     * битым разбором тела определения, а не авторингом.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U1.10 — элемент перечня правил пуст: ложь (дом), код роняет чтение типа")
+    @DisplayName("U1.10 — элемент перечня правил пуст: ложь")
     void u1_10_aNullRuleInTheListIsConservativelyFalse() {
         StrategyCondition condition = new StrategyCondition();
         condition.setRules(Arrays.asList(phaseRule("BULL_TREND"), null));

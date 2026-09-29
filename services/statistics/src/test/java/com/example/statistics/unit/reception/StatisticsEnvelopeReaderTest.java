@@ -22,7 +22,6 @@ import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -124,8 +123,7 @@ class StatisticsEnvelopeReaderTest {
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U8.5 — JSON-число: ожидание из дома — знаки не теряются (долг F4)")
+    @DisplayName("U8.5 — JSON-число: знаки и масштаб не теряются")
     void u8_5_aJsonFloatIsReadWithoutLosingDigits() {
         String scaled = "{\"result\":1.10}";
         String longMantissa = "{\"plannedRisk\":0.123456789012345678901234567890}";

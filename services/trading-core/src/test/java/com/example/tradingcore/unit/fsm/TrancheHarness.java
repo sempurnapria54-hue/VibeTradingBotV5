@@ -134,11 +134,11 @@ final class TrancheHarness {
     }
 
     TrancheEntryFinalizedHandler entryFinalized() {
-        return new TrancheEntryFinalizedHandler(workPass, disposition, coverageGate);
+        return new TrancheEntryFinalizedHandler(workPass, coverageGate);
     }
 
     TrancheProtectionSwitchedHandler protectionSwitched() {
-        return new TrancheProtectionSwitchedHandler(workPass, disposition, coverageGate);
+        return new TrancheProtectionSwitchedHandler(workPass, coverageGate);
     }
 
     TrancheManagingHandler managing() {

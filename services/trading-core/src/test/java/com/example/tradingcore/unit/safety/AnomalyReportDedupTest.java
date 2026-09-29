@@ -44,6 +44,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -412,6 +413,40 @@ class AnomalyReportDedupTest {
 
         assertThat(service.journalOnce(pairContext(), HoldSignal.instrumentJournal(CODE), SUBJECT, Map.of()))
                 .isNotNull();
+    }
+
+    /**
+     * Доведение по ступени, поднятой тем же основанием: незакрытая строка
+     * по ключу состояния продолжается, второй не заводится
+     * (docs/components/SafetyHoldCoordinator.md §«Анкер и доведение
+     * недоделанного»).
+     */
+    @Test
+    @DisplayName("U9.23 — доведение, незакрытая строка по ключу стои́т: продолжается она, второй строки и факта нет")
+    void u9_23_theRetryResumesTheUnclosedRowOfItsKey() {
+        AnomalyReport unclosed = new AnomalyReport();
+        unclosed.setStatus(AnomalyReport.Status.IN_PROGRESS);
+        when(dataService.findUnclosed(ACCOUNT_ID, INSTRUMENT_ID, CODE, AnomalyReport.Severity.CRITICAL))
+                .thenReturn(Optional.of(unclosed));
+
+        AnomalyReport returned = service.resumeOrOpen(pairContext(), HoldSignal.instrument(CODE));
+
+        assertThat(returned).isSameAs(unclosed);
+        verify(dataService, never()).save(any());
+        verify(coreEventWriter, never()).anomalyReported(any(), any(), any(), any(), any());
+    }
+
+    /** Ступень подняла автоматика — строки этого кода по ключу нет, и доведение заводит свою. */
+    @Test
+    @DisplayName("U9.24 — доведение, незакрытой строки по ключу нет: открыта новая строка критичной тропы")
+    void u9_24_theRetryOpensItsOwnRowWhenNoneOfItsKeyIsUnclosed() {
+        when(dataService.findUnclosed(any(), any(), any(), any())).thenReturn(Optional.empty());
+
+        AnomalyReport returned = service.resumeOrOpen(pairContext(), HoldSignal.instrument(CODE));
+
+        assertThat(returned).isNotNull();
+        assertThat(saved().getStatus()).isEqualTo(AnomalyReport.Status.CREATED);
+        assertThat(saved().getSeverity()).isEqualTo(AnomalyReport.Severity.CRITICAL);
     }
 
     private Map<String, Object> snapshotOf(String json) throws JsonProcessingException {

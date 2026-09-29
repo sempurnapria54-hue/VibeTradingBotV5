@@ -15,12 +15,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Навес уровней книги заявок: единственная форма предмета, у которой
- * пустота НЕ зеркальна, и единственная, чей маппер берётся без копии.
+ * пустота НЕ зеркальна.
  *
  * <p>Кейсы — группа `U8`
- * (.claude/tests/cases/jsonb-overlay-roundtrip.md). Маппер здесь подаётся
- * явным входом: конвертер берёт его как есть, и форма строки зависит от
- * настроек ЧУЖОГО бина.
+ * (.claude/tests/cases/jsonb-overlay-roundtrip.md). Маппер подаётся явным
+ * входом: `U8.5` меряет, что политику включения конвертер пинит сам, и
+ * правка настроек чужого бина форму строки не двигает.
  */
 class OrderBookLevelJsonConverterTest extends JsonbOverlayProbe {
 
@@ -55,25 +55,26 @@ class OrderBookLevelJsonConverterTest extends JsonbOverlayProbe {
     }
 
     @Test
-    @DisplayName("U8.4 — политика включения у формы ЧУЖАЯ: пустое число заявок едет ключом")
-    void u8_4_theInclusionPolicyIsInheritedFromTheForeignBean() {
+    @DisplayName("U8.4 — пустое число заявок в строку не пишется")
+    void u8_4_anEmptyOrderCountIsNotWritten() {
         String json = converter.levelsToJson(List.of(levelWithoutOrderCount()));
 
         assertThat(readTree(json).get(0).has("orderCount"))
-                .as("форма навеса наследует умолчание контекста, а не непустые поля, "
-                        + "как у шести остальных конвертеров")
-                .isTrue();
-        assertThat(readTree(json).get(0).get("orderCount").isNull()).isTrue();
+                .as("политика непустых полей у формы своя, как у шести остальных конвертеров")
+                .isFalse();
+        assertThat(converter.jsonToLevels(json)).singleElement()
+                .extracting(OrderBookLevel::getOrderCount).isNull();
     }
 
     @Test
-    @DisplayName("U8.5 — правка настроек чужого бина меняет содержимое колонки")
-    void u8_5_aChangeInTheForeignBeanChangesTheColumnContent() {
-        OrderBookLevelJsonConverter onNonNull = new OrderBookLevelJsonConverter(
-                beanAssemblyMapper().setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL));
+    @DisplayName("U8.5 — обратная политика у чужого бина содержимого колонки не меняет")
+    void u8_5_theOppositePolicyOfTheForeignBeanDoesNotChangeTheColumnContent() {
+        OrderBookLevelJsonConverter onAlways = new OrderBookLevelJsonConverter(
+                beanAssemblyMapper().setDefaultPropertyInclusion(JsonInclude.Include.ALWAYS));
 
-        String json = onNonNull.levelsToJson(List.of(levelWithoutOrderCount()));
+        String json = onAlways.levelsToJson(List.of(levelWithoutOrderCount()));
 
+        assertThat(json).isEqualTo(converter.levelsToJson(List.of(levelWithoutOrderCount())));
         assertThat(readTree(json).get(0).has("orderCount")).isFalse();
     }
 

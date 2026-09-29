@@ -1,5 +1,8 @@
 package com.example.tradingbot.domain.util;
 
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.IndicatorComponent;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import java.util.Map;
@@ -12,6 +15,12 @@ import lombok.experimental.UtilityClass;
  * и какие типы многокомпонентны (компонент обязателен). Опора и
  * create-валидации (контракт авторинга), и evaluator'а (выбор компонента).
  * Утилитный класс — в пакете util (конвенция проекта).
+ *
+ * <p><b>Пустой тип читается отсутствием, а не отказом</b>
+ * (docs/rules/absent-value-semantics.md): компонентов у него нет, и
+ * многокомпонентным он не является. Охрана явная — неизменяемая карта JDK
+ * хеширует ключ до всякой проверки, и умолчание {@code getOrDefault} на
+ * пустом ключе не срабатывает.
  */
 @UtilityClass
 public class IndicatorComponents {
@@ -27,11 +36,14 @@ public class IndicatorComponents {
 
     /** Допустимые компоненты типа индикатора (пусто — одно-компонентный, компонент не задаётся). */
     public static Set<IndicatorComponent> allowedFor(IndicatorValue.Type type) {
+        if (isNull(type)) {
+            return Set.of();
+        }
         return ALLOWED.getOrDefault(type, Set.of());
     }
 
     /** Тип многокомпонентный — адресный компонент операнда обязателен. */
     public static Boolean isMultiComponent(IndicatorValue.Type type) {
-        return ALLOWED.containsKey(type);
+        return nonNull(type) && ALLOWED.containsKey(type);
     }
 }

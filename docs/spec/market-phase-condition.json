@@ -5,7 +5,8 @@
   "operands": {
     "marketPhase": "фаза рынка на этом проходе — вычисленное значение, положенное в контекст прохода сборщиком контекста (docs/components/models/DealContext.md). Не персистируется: производная своих входов. UNKNOWN означает «операнд недоступен либо ни одна клауза не сработала», а не отдельную фазу",
     "entryMarketPhase": "фаза рынка, наблюдённая при ВХОДЕ сделки — Deal.entryMarketPhase, write-once. Durable: без неё сравнивать не с чем, а истории у самой фазы нет по построению. Пусто у восстановленной сделки: входа по объявлению у неё не было",
-    "declaredPhase": "фаза, объявленная условием шага стратегии (StrategyCondition правила MARKET_PHASE_IS)"
+    "declaredPhase": "фаза, объявленная условием шага стратегии (StrategyCondition правила MARKET_PHASE_IS)",
+    "declaredOperator": "оператор того же правила: 'EQ' либо 'NE' — пара, которую читает и зеркальное равенство типа структуры. Пусто и прочие значения перечня операторов ветви не имеют"
   },
   "values": [
     {
@@ -20,8 +21,8 @@
     },
     {
       "name": "marketPhaseIs",
-      "note": "Предикат MARKET_PHASE_IS: фаза прохода совпадает с объявленной шагом. Неустановленная фаза даёт ЛОЖЬ, а не совпадение: условие входа обязано опираться на наблюдение, и разрешающее умолчание здесь открыло бы сделку по неизвестной фазе (docs/concept.md П1).",
-      "expr": "phaseKnown && marketPhase == declaredPhase"
+      "note": "Предикат MARKET_PHASE_IS: фаза прохода совпадает с объявленной шагом при операторе EQ и отличается от неё при NE. Пустой оператор равенством не подменяется, а пустая объявленная фаза неравенством не становится: ветвиться не на чем, и исход — ложь. Неустановленная фаза даёт ЛОЖЬ, а не совпадение: условие входа обязано опираться на наблюдение, и разрешающее умолчание здесь открыло бы сделку по неизвестной фазе (docs/concept.md П1).",
+      "expr": "phaseKnown && notNull(declaredPhase) && ((declaredOperator == 'EQ' && marketPhase == declaredPhase) || (declaredOperator == 'NE' && marketPhase != declaredPhase))"
     },
     {
       "name": "trendChanged",
@@ -32,46 +33,76 @@
   "examples": [
     {
       "case": "фаза прохода совпала с объявленной — условие входа истинно",
-      "state": { "marketPhase": "BULL_TREND", "entryMarketPhase": null, "declaredPhase": "BULL_TREND" },
+      "state": { "marketPhase": "BULL_TREND", "entryMarketPhase": null, "declaredPhase": "BULL_TREND", "declaredOperator": "EQ" },
       "expect": { "phaseKnown": true, "marketPhaseIs": true }
     },
     {
       "case": "фаза прохода другая — условие входа ложно",
-      "state": { "marketPhase": "RANGE", "entryMarketPhase": null, "declaredPhase": "BULL_TREND" },
+      "state": { "marketPhase": "RANGE", "entryMarketPhase": null, "declaredPhase": "BULL_TREND", "declaredOperator": "EQ" },
       "expect": { "phaseKnown": true, "marketPhaseIs": false }
     },
     {
       "case": "фаза не установлена — условие входа ложно, а не совпадает",
       "note": "Фальсифицирует конъюнкт phaseKnown в marketPhaseIs: без него UNKNOWN != BULL_TREND дал бы ложь здесь, но объявленная фаза UNKNOWN дала бы истину — см. следующий пример.",
-      "state": { "marketPhase": "UNKNOWN", "entryMarketPhase": null, "declaredPhase": "UNKNOWN" },
+      "state": { "marketPhase": "UNKNOWN", "entryMarketPhase": null, "declaredPhase": "UNKNOWN", "declaredOperator": "EQ" },
       "expect": { "phaseKnown": false, "marketPhaseIs": false }
     },
     {
+      "case": "оператор NE, фаза прохода равна объявленной — условие входа ложно",
+      "note": "Фальсифицирует чтение оператора: предикат, знающий одно равенство, дал бы здесь ИСТИНУ — объявленное «фаза не равна» исполнялось бы как «равна».",
+      "state": { "marketPhase": "BULL_TREND", "entryMarketPhase": null, "declaredPhase": "BULL_TREND", "declaredOperator": "NE" },
+      "expect": { "phaseKnown": true, "marketPhaseIs": false }
+    },
+    {
+      "case": "оператор NE, фаза прохода другая — условие входа истинно",
+      "note": "Пара к предыдущему: без неё «NE всегда ложь» проходило бы спеку.",
+      "state": { "marketPhase": "RANGE", "entryMarketPhase": null, "declaredPhase": "BULL_TREND", "declaredOperator": "NE" },
+      "expect": { "marketPhaseIs": true }
+    },
+    {
+      "case": "оператор NE, фаза не установлена — условие входа ложно",
+      "note": "Фальсифицирует конъюнкт phaseKnown на ветви неравенства: UNKNOWN != BULL_TREND без него дало бы ИСТИНУ, и вход открывался бы по неизвестной фазе.",
+      "state": { "marketPhase": "UNKNOWN", "entryMarketPhase": null, "declaredPhase": "BULL_TREND", "declaredOperator": "NE" },
+      "expect": { "phaseKnown": false, "marketPhaseIs": false }
+    },
+    {
+      "case": "оператор NE, объявленной фазы нет — условие входа ложно",
+      "note": "Фальсифицирует конъюнкт notNull(declaredPhase): без него известная фаза отличалась бы от пустоты, и неравенство давало бы ИСТИНУ на правиле без объявления.",
+      "state": { "marketPhase": "BULL_TREND", "entryMarketPhase": null, "declaredPhase": null, "declaredOperator": "NE" },
+      "expect": { "marketPhaseIs": false }
+    },
+    {
+      "case": "оператор пуст, фаза прохода равна объявленной — условие входа ложно",
+      "note": "Фальсифицирует подмену пустого оператора равенством: разрешающее умолчание открыло бы вход по правилу, которое не говорит, что сравнивать.",
+      "state": { "marketPhase": "BULL_TREND", "entryMarketPhase": null, "declaredPhase": "BULL_TREND", "declaredOperator": null },
+      "expect": { "marketPhaseIs": false }
+    },
+    {
       "case": "тренд сменился относительно входа — условие выхода истинно",
-      "state": { "marketPhase": "BEAR_TREND", "entryMarketPhase": "BULL_TREND", "declaredPhase": null },
+      "state": { "marketPhase": "BEAR_TREND", "entryMarketPhase": "BULL_TREND", "declaredPhase": null, "declaredOperator": null },
       "expect": { "phaseKnown": true, "entryPhaseKnown": true, "trendChanged": true }
     },
     {
       "case": "фаза та же, что при входе — условие выхода ложно",
-      "state": { "marketPhase": "BULL_TREND", "entryMarketPhase": "BULL_TREND", "declaredPhase": null },
+      "state": { "marketPhase": "BULL_TREND", "entryMarketPhase": "BULL_TREND", "declaredPhase": null, "declaredOperator": null },
       "expect": { "trendChanged": false }
     },
     {
       "case": "фаза прохода неизвестна — смена тренда не утверждается",
       "note": "Фальсифицирует конъюнкт phaseKnown в trendChanged: без него UNKNOWN != BULL_TREND дало бы ИСТИНУ, и сделка выходила бы по пропаже операнда.",
-      "state": { "marketPhase": "UNKNOWN", "entryMarketPhase": "BULL_TREND", "declaredPhase": null },
+      "state": { "marketPhase": "UNKNOWN", "entryMarketPhase": "BULL_TREND", "declaredPhase": null, "declaredOperator": null },
       "expect": { "phaseKnown": false, "trendChanged": false }
     },
     {
       "case": "фазы входа нет (восстановленная сделка) — смена тренда не утверждается",
       "note": "Фальсифицирует конъюнкт entryPhaseKnown: без него пустая фаза входа сравнилась бы с непустой текущей и дала бы ИСТИНУ на каждом проходе.",
-      "state": { "marketPhase": "BEAR_TREND", "entryMarketPhase": null, "declaredPhase": null },
+      "state": { "marketPhase": "BEAR_TREND", "entryMarketPhase": null, "declaredPhase": null, "declaredOperator": null },
       "expect": { "entryPhaseKnown": false, "trendChanged": false }
     },
     {
       "case": "фаза входа UNKNOWN — смена тренда не утверждается",
       "note": "Вторая форма неустановленности фазы входа: сделка вошла при недоступном операнде фазы. Фальсифицирует вторую половину entryPhaseKnown (проверку на UNKNOWN, а не только на пустоту).",
-      "state": { "marketPhase": "BEAR_TREND", "entryMarketPhase": "UNKNOWN", "declaredPhase": null },
+      "state": { "marketPhase": "BEAR_TREND", "entryMarketPhase": "UNKNOWN", "declaredPhase": null, "declaredOperator": null },
       "expect": { "entryPhaseKnown": false, "trendChanged": false }
     }
   ]

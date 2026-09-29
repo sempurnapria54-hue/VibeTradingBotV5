@@ -2,6 +2,7 @@ package com.example.marketdata;
 
 import com.example.platform.client.ServiceClientConfig;
 import com.example.platform.exception.handler.AccessDenialHandler;
+import com.example.platform.exception.handler.JwtDecoderAssemblyGuard;
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.platform.security.ActorProvider;
 import org.springframework.boot.SpringApplication;
@@ -28,14 +29,17 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * исполнители.
  *
  * <p><b>Область отображаемых классов названа явно.</b> Базовый тип
- * audit-полей лежит в общем артефакте, то есть вне пакета сервиса, и
- * умолчание сканирования его не видит. Свой пакет перечисляется рядом:
- * {@code @EntityScan} умолчание ЗАМЕЩАЕТ, а не дополняет.
+ * audit-полей и строка отказа доступа лежат в общем артефакте, то есть вне
+ * пакета сервиса, и умолчание сканирования их не видит. Свой пакет
+ * перечисляется рядом: {@code @EntityScan} умолчание ЗАМЕЩАЕТ, а не
+ * дополняет. Строку отказа отображение берёт вместе с пакетом, и таблицу
+ * {@code access_denials} схема сервиса обязана нести.
  */
 @EnableAsync
 @EnableScheduling
 @ConfigurationPropertiesScan
-@Import({AccessDenialHandler.class, ActorProvider.class, JobExecutionGuard.class, ServiceClientConfig.class})
+@Import({AccessDenialHandler.class, JwtDecoderAssemblyGuard.class, ActorProvider.class, JobExecutionGuard.class,
+        ServiceClientConfig.class})
 @EntityScan({"com.example.marketdata", "com.example.tradingbot.persistence.model"})
 @SpringBootApplication(scanBasePackages = {"com.example.marketdata", "com.example.strategy.engine"})
 public class MarketDataApplication {

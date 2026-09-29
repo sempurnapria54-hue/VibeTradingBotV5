@@ -98,7 +98,7 @@
     },
     {
       "name": "emergencyTerminalContract",
-      "note": "Аварийный терминал: число best-effort ПО ДОСТУПНОСТИ. Контракт ровно в этом и состоит: число, записанное ЭТИМ ребром, обязано быть посчитанным, а не подставленным. Пусто допустимо и означает «неисчислимо»; подстановка недопустима — в первую очередь ноль, самая правдоподобная из них, потому что на тропе закрытия без входа ноль законен и на глаз неотличим. Третий дизъюнкт несущий, и он тут ради ЦЕНЫ: без него контракт закрывал бы ребро у сделки, чьё число законно посчитала финализация выхода до ухода в ошибочное состояние, — доступность пересчитывается каждым проходом и на усечённой загрузке ложна, так что аварийный контур получил бы вторую точку отказа, а сделка перестала бы доходить до финала. Ровно эта цена названа и отвергнута соседним требованием: терминальность траншей здесь не гейт по тому же доводу. С третьим дизъюнктом ложным контракт остаётся ровно на подстановке — состоянии, которое производит дефект писателя, а не обстоятельства.",
+      "note": "Аварийный терминал: число best-effort ПО ДОСТУПНОСТИ. Контракт ровно в этом и состоит: число, записанное ЭТИМ ребром, обязано быть посчитанным, а не подставленным. Пусто допустимо и означает «неисчислимо»; подстановка недопустима — в первую очередь ноль, самая правдоподобная из них, потому что на тропе закрытия без входа ноль законен и на глаз неотличим. Третий дизъюнкт несущий, и он тут ради ЦЕНЫ: без него контракт закрывал бы ребро у сделки, чьё число законно посчитала финализация выхода до ухода в ошибочное состояние, — доступность пересчитывается каждым проходом и на усечённой загрузке ложна, так что аварийный контур получил бы вторую точку отказа, а сделка перестала бы доходить до финала. Ровно эта цена названа и отвергнута соседним требованием: терминальность траншей здесь не гейт по тому же доводу. С третьим дизъюнктом ложным контракт остаётся ровно на подстановке — состоянии, которое производит дефект писателя, а не обстоятельства. ИСПОЛНЯЮТ контракт писатели числа, а не гейт ребра: провенанса у числа в данных нет, и гейт аварийного ребра мерит только riskProvenAbsent. Писателей три, и каждый пишет только посчитанное — финализация выхода по доступному итогу (docs/spec/deal-result.json, finalizationCompletes), штатный терминал тропы без входа нулём-результатом тропы, аварийное звено по доступности либо пустоту (docs/components/MarkDealEmergencyClosedExecutor.md); дом правила прозой — docs/lifecycles/Deal.md.",
       "expr": "isNull(resultProfit) || resultAvailable || resultProfitFinalized"
     },
     {
@@ -372,6 +372,7 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -408,6 +409,7 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "PENDING",
                 "accumulatedFillSize": 0
               }
@@ -444,11 +446,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -490,6 +494,7 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -528,11 +533,13 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -576,6 +583,7 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 5
               }
@@ -596,6 +604,7 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -643,11 +652,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -713,11 +724,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -753,11 +766,13 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -797,6 +812,7 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 5
               }
@@ -844,6 +860,7 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "ACTIVE",
                 "accumulatedFillSize": 0
               }
@@ -880,11 +897,13 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -930,16 +949,19 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "ACTIVE",
                 "accumulatedFillSize": 0
               }
@@ -978,11 +1000,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 5
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 2
               }
@@ -1044,11 +1068,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 40
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 40
               }
@@ -1087,6 +1113,7 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "CANCELED",
                 "accumulatedFillSize": 0
               }
@@ -1123,11 +1150,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -1166,11 +1195,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -1210,11 +1241,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -1253,11 +1286,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -1295,6 +1330,7 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "CANCELED",
                 "accumulatedFillSize": 0
               }
@@ -1334,11 +1370,13 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -1389,6 +1427,7 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -1430,11 +1469,13 @@
             "orders": [
               {
                 "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               },
               {
-                "type": "REDUCE_ONLY",
+                "type": "ENTRY",
+                "positionReducingOnly": true,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -1513,6 +1554,7 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "ACTIVE",
                 "accumulatedFillSize": 2
               }
@@ -1548,6 +1590,7 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "CANCELED",
                 "accumulatedFillSize": 2
               }
@@ -1584,6 +1627,7 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "CANCELED",
                 "accumulatedFillSize": 2
               }
@@ -1620,6 +1664,7 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 3
               }
@@ -1657,6 +1702,7 @@
             "orders": [
               {
                 "type": "ENTRY",
+                "positionReducingOnly": false,
                 "status": "COMPLETED",
                 "accumulatedFillSize": 2
               }

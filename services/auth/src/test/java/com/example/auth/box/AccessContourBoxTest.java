@@ -2,6 +2,8 @@ package com.example.auth.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -13,14 +15,15 @@ import org.junit.jupiter.api.Test;
  * что закрыто умолчанием и какой формой отвечает отказ, произведённый не
  * нашим кодом, а контейнером (`docs/rules/api-access-policy.md`,
  * `docs/rules/error-handling-policy.md`).
- *
- * <p><b>Кейса {@code B5.7} здесь нет, и это не пропуск:</b> след отказа
- * доступа у сервиса со своей базой не наблюдается сегодня ничем —
- * таблицы {@code access_denials} в схеме нет, точки входа отказа и
- * логгера на тропе тоже (находка {@code F-5} документа). Кейс описан и
- * прогоняемым станет закрытием парковки о таблице отказов.
+
  */
 class AccessContourBoxTest extends SharedAuthBox {
+
+    /** Таблица следа отказов доступа. */
+    private static final String DENIALS_TABLE = "access_denials";
+
+    /** Путь клетки следа: поверхности неизвестен, строку своей попытки выделяет. */
+    private static final String TRACE_PATH = "/api/v1/auth/b5-7-trace";
 
     @Test
     @DisplayName("B5.1 — проба живости открыта")
@@ -99,5 +102,30 @@ class AccessContourBoxTest extends SharedAuthBox {
 
         assertThat(answer.status()).isEqualTo(401);
         assertThat(answer.body()).doesNotContain(MEMBERSHIPS_SELF, EXCHANGE_ACCOUNTS, "swagger-ui");
+    }
+
+    /**
+     * След отказа у сервиса со своей базой — строка до ответа
+     * (docs/rules/api-access-policy.md §«След отказа пишет тот, у кого есть
+     * база»; docs/models/domain/other/AccessDenial.md).
+     *
+     * <p><b>Путь клетки свой</b>, неизвестный поверхности: строки у ящика
+     * между клетками не опустошаются, и отказы соседних клеток лежат в той
+     * же таблице. Своя поверхность выделяет строку этой попытки, а
+     * неизвестный путь отвергается тем же отказом, что закрытая точка
+     * ({@code B5.4}).
+     */
+    @Test
+    @DisplayName("B5.7 — след отказа доступа")
+    void b5_7_anAccessRefusalLeavesItsTrace() {
+        Answer answer = get(TRACE_PATH);
+
+        assertThat(answer.status()).isEqualTo(401);
+        List<Map<String, Object>> denials = rows.rowsWhere(DENIALS_TABLE, "surface", "GET " + TRACE_PATH);
+        assertThat(denials).as("попытка была одна, и строка у неё одна").hasSize(1);
+        Map<String, Object> denial = denials.getFirst();
+        assertThat(denial.get("outcome")).isEqualTo("PRINCIPAL_ABSENT");
+        assertThat(denial.get("principal")).as("принятого принципала у отказа нет").isNull();
+        assertThat(denial.get("created_at")).as("момент строки проставлен").isNotNull();
     }
 }

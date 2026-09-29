@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -480,7 +479,6 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B5.9 — инструментный сигнал на счёте под биржевой ступенью ничего не делает")
     void theInstrumentSignalOnAnAccountUnderTheExchangeRungDoesNothing() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
@@ -501,15 +499,8 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
         assertThat(codesOfReports()).contains(ORPHAN_ORDERS);
         // Ступень пары не переставлена: биржевая ступень доминирует
         // инструментные реакции, и сигнал уже биржевой ступени не делает
-        // ничего (docs/rules/exchange-hold.md §«Границы и эскалация»,
-        // docs/rules/instrument-hold.md §Enforcement).
-        //
-        // КРАСНО ПО ПОСТРОЕНИЮ, метка `debt`: доминирования биржевой
-        // ступени не исполняет ни один носитель тропы — ни детектор, ни
-        // реакция, ни ребро подъёма, — и пара встаёт в `ENTRY_BLOCKED`.
-        // Ожидание взято из дома и под текущий факт не ослаблено
-        // (.claude/work/backlog.md §«Доминирование биржевой ступени над
-        // инструментной реакцией не исполняет ни один носитель»).
+        // ничего (docs/rules/exchange-hold.md §«Границы и эскалация»);
+        // носитель доминирования — ребро подъёма ступени.
         assertThat(pairRung(INSTRUMENT)).isEqualTo(NO_RUNG);
         // Счётная ступень стои́т и второй реакции не получила: статус не
         // переставлялся, второго факта подъёма нет.

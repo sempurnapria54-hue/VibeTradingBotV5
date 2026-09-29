@@ -11,6 +11,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAct
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -48,6 +49,7 @@ public class StrategyStep extends Auditable {
     private StrategyMarketDataExpiredSetting marketDataExpiredSetting;
 
     /** Шаг — точка входа: ENTRY или GRID_ENTRY. */
+    @JsonIgnore
     public Boolean isEntryStep() {
         return StrategyStepType.ENTRY.equals(stepType)
                 || StrategyStepType.GRID_ENTRY.equals(stepType);

@@ -17,6 +17,8 @@ import com.example.tradingcore.util.Constants;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Признаки терминала: контроль валюты и журнальные отчёты — группа
@@ -176,7 +178,7 @@ class TerminalCurrencyAndJournalTest {
     @Test
     @DisplayName("U8.11 — отказ журнала на первом вызове: второй всё равно делается, терминал не отменяется")
     void u8_11_aFailingJournalNeitherEscapesNorSkipsTheNextReport() {
-        doThrow(new RuntimeException("journal down")).when(harness.reports()).journal(any(), any());
+        doThrow(new RuntimeException("journal down")).when(harness.reports()).journalApart(any(), any());
         Deal deal = enteredDeal(closedEpisode("10", "77"));
 
         assertThatCode(() -> harness.apply(context(deal, List.of(), null), false))
@@ -188,6 +190,32 @@ class TerminalCurrencyAndJournalTest {
         assertThat(deal.getCloseOutcome())
                 .as("терминал отказом журнала не отменяется")
                 .isEqualTo(Deal.CloseOutcome.UNDETERMINED);
+    }
+
+    /**
+     * Момент отчёта — после коммита вызывающего (docs/models/domain/aggregate/Deal.md
+     * §Енумы, строка «момент»). Транзакция здесь — синхронизация, открытая
+     * вручную: у предмета своей транзакции нет, и коммит вызывающего
+     * изображает его обратный вызов.
+     */
+    @Test
+    @DisplayName("U8.12 — отчёт признака уходит ПОСЛЕ коммита вызывающего: внутри его транзакции журнал не зовётся")
+    void u8_12_theFeatureReportLeavesOnlyAfterTheCallerCommits() {
+        Deal deal = enteredDeal(closedEpisode("10", "77"));
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            harness.apply(context(deal, List.of(), null), false);
+            assertThat(harness.journalledCodes())
+                    .as("внутри транзакции вызывающего отчёт не пишется — его отказ откатил бы ребро")
+                    .isEmpty();
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(harness.journalledCodes())
+                .containsExactly(Constants.Hold.UNRECOGNIZED_CLOSE_TYPE,
+                        Constants.Hold.RESULT_CURRENCY_UNVERIFIABLE);
     }
 
     @Test

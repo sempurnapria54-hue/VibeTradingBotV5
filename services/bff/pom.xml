@@ -100,6 +100,18 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         <!--
+          Реестр метрик: у периметра базы нет, и след отказа доступа там —
+          лог и ряд частоты отказов (docs/rules/api-access-policy.md §«След
+          отказа пишет тот, у кого есть база»). Автоконфигурация экспорта
+          уже в дереве через стартер актуатора и условна по классу
+          PrometheusMeterRegistry, который приезжает только этим артефактом.
+          Версией управляет BOM Boot.
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!--
           RestClient.Builder переехал в отдельный модуль в Boot 4:
           starter-web несёт серверную часть, клиентский автоконфиг — здесь.
           Без него бина строителя нет вовсе, и контекст периметра не

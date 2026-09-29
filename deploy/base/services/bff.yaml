@@ -18,6 +18,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: bff
+  # МЕТКА У САМОЙ СЛУЖБЫ, А НЕ ТОЛЬКО У ПОДА: наблюдатель выбирает
+  # ServiceMonitor'ом именно СЛУЖБУ, и без метки на ней он не нашёл бы
+  # цели вовсе — молча (docs/architecture/platform.md §Наблюдаемость).
+  labels:
+    app.kubernetes.io/name: bff
 spec:
   selector:
     app.kubernetes.io/name: bff
@@ -100,6 +105,32 @@ spec:
               port: http
             initialDelaySeconds: 60
             periodSeconds: 20
+---
+# СЪЁМ МЕТРИК: ряд частоты отказов доступа — половина следа отказа у
+# периметра, у которого базы нет (docs/rules/api-access-policy.md §«След
+# отказа пишет тот, у кого есть база»); вторая половина — строка лога.
+#
+# СНАРУЖИ КЛАСТЕРА ЭТОЙ ТОЧКИ НЕТ: ингресс ниже ведёт только префикс
+# внешней поверхности, а путь съёма лежит вне него. Тропу в сети заводить
+# не надо — вход из пространства наблюдателя разрешён всем подам общим
+# правилом яруса (deploy/base/network-platform-allowances.yaml).
+#
+# МЕТКА `release` отбирает ресурс оператором чарта наблюдателя — без неё
+# ресурс существует, а съёма нет (довод — deploy/base/services/audit.yaml).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: bff
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bff
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 30s
 ---
 # Исходящее периметра. Разрешение даёт таблица
 # docs/architecture/contracts.md §«Синхронные вызовы»: строки `bff → auth`,

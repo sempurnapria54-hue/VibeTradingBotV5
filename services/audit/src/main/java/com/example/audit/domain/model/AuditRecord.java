@@ -1,6 +1,7 @@
 package com.example.audit.domain.model;
 
 import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import java.time.OffsetDateTime;
 import lombok.Builder;
@@ -90,16 +91,22 @@ public class AuditRecord {
      * послабление — он называет ровно те колонки, которых во входящем
      * сообщении нет по построению.
      *
+     * <p><b>Строковое значение присутствует, когда оно НЕПУСТО, а не когда
+     * непуста ссылка:</b> {@code not null} схемы пустой строки не отвергает,
+     * а пустая идентичность дала бы строку, о которую дедуп схлопнет всякое
+     * следующее событие с тем же пустым значением, пустой тенант — строку,
+     * невидимую любому читателю.
+     *
      * <p><b>Контекст трассировки сюда не входит:</b> он законно пуст, и
      * требование его присутствия останавливало бы приём у всякого
      * производителя, чьё инструментирование ещё не подключено.
      */
     public Boolean hasCompleteInput() {
-        return nonNull(eventId)
-                && nonNull(tenantId)
-                && nonNull(eventType)
+        return isNotBlank(eventId)
+                && isNotBlank(tenantId)
+                && isNotBlank(eventType)
                 && nonNull(occurredAt)
                 && nonNull(version)
-                && nonNull(content);
+                && isNotBlank(content);
     }
 }

@@ -238,6 +238,7 @@ final class CalcFixture {
         Order leg = new Order();
         leg.setId(3L);
         leg.setType(Order.Type.ENTRY);
+        leg.setPositionReducingOnly(false);
         leg.setStatus(Order.Status.COMPLETED);
         leg.setPlannedRiskAmount(decimal(plannedRisk));
         leg.setPlannedEntryPrice(new BigDecimal("3000"));

@@ -29,7 +29,7 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
  *
  * <p><b>Две величины здесь несущие, а не вкусовые:</b>
  * <ul>
- *   <li><b>позиция чтения — с начала темы.</b> Группа журнала durable:
+ *   <li><b>позиция чтения — с начала темы.</b> Группа статистики durable:
  *       пропущенное ею не восстанавливается ничем, и старт «с текущего
  *       момента» терял бы произведённое, пока потребителя не было
  *       (docs/rules/durable-consumer-reception.md §«Нижняя граница»);</li>
@@ -46,7 +46,7 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 public class ReceptionKafkaConfig {
 
     @Bean
-    public ConsumerFactory<String, String> journalConsumerFactory(ReceptionProperties properties) {
+    public ConsumerFactory<String, String> receptionConsumerFactory(ReceptionProperties properties) {
         Map<String, Object> settings = new HashMap<>();
         settings.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.getBootstrapServers());
         settings.put(ConsumerConfig.GROUP_ID_CONFIG, properties.getGroupId());
@@ -71,12 +71,12 @@ public class ReceptionKafkaConfig {
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
-            ConsumerFactory<String, String> journalConsumerFactory,
+            ConsumerFactory<String, String> receptionConsumerFactory,
             ReceptionErrorHandler errorHandler,
             ReceptionRebalanceListener rebalanceListener) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(journalConsumerFactory);
+        factory.setConsumerFactory(receptionConsumerFactory);
         factory.setCommonErrorHandler(errorHandler);
         factory.getContainerProperties().setConsumerRebalanceListener(rebalanceListener);
         return factory;
@@ -99,7 +99,7 @@ public class ReceptionKafkaConfig {
      * вызова.
      */
     @Bean(destroyMethod = "close")
-    public Admin journalKafkaAdmin(ReceptionProperties properties) {
+    public Admin receptionKafkaAdmin(ReceptionProperties properties) {
         Map<String, Object> settings = new HashMap<>();
         settings.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, properties.getBootstrapServers());
         return Admin.create(settings);

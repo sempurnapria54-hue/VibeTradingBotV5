@@ -16,14 +16,18 @@ import org.springframework.stereotype.Component;
  * значения; доменные перечни — строкой. Один актуальный набор правил на
  * инструмент.
  *
- * <p><b>Что в навес не пишется, объявляет ЭТОТ слой, а не форма.</b>
- * Ставка комиссии принадлежит комиссионной группе счёта, а не справочнику
- * инструмента (docs/models/domain/other/TradeFeeRate.md), и копия на
- * инструменте разошлась бы со сменой тира. Прежде это выражалось
- * аннотацией на самой доменной модели — то есть форма знала о своём
- * хранении, и общая библиотека из-за одной аннотации объявляла
- * зависимость от Jackson. Здесь то же правило выражено примесью:
- * знание о хранении осталось в хранилище.
+ * <p><b>Из навеса изымаются два поля, и правило у обеих копий конвертера
+ * одно</b> (docs/models/domain/other/InstrumentExternalRules.md
+ * §«Ставка комиссии»). Ставка комиссии принадлежит комиссионной группе
+ * счёта, а не справочнику инструмента
+ * (docs/models/domain/other/TradeFeeRate.md), и копия на инструменте
+ * разошлась бы со сменой тира. Идентификатор инструмента-владельца строка
+ * и так знает, а в проекции ядра он был бы ключом чужой базы внутри нашей
+ * (docs/models/domain/core/Instrument.md §«Проекция у торгового ядра»).
+ *
+ * <p>Знание о хранении выражено примесью, а не аннотацией на доменной
+ * модели: форма лежит в общей библиотеке и о том, кто и как её хранит,
+ * знать не должна.
  */
 @Component
 public class InstrumentExternalRulesJsonConverter {
@@ -68,6 +72,9 @@ public class InstrumentExternalRulesJsonConverter {
      * общей то, что общим не является.
      */
     private abstract static class InstrumentExternalRulesNavelMixin {
+
+        @JsonIgnore
+        abstract Long getInstrumentId();
 
         @JsonIgnore
         abstract String getExternalTakerFeeRate();

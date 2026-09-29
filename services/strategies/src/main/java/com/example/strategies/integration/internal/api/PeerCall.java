@@ -4,29 +4,28 @@ import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.strategies.exception.PeerReadException;
 import java.util.function.Supplier;
 import lombok.experimental.UtilityClass;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
  * Разводит отказ соседа по ярусу на два класса и держит эту границу в
- * одном месте.
- *
- * <p><b>Граница проведена домом класса, а не удобством:</b> недоступностью
- * названы таймаут, обрыв и {@code 5xx}
- * (docs/rules/runtime-error-classification.md §«Отказ соседа по ярусу —
- * свой класс, и сделку в ошибку он не уводит»); осознанный отказ соседа
- * ({@code 4xx}) — наш дефект и повтором не лечится (там же, §«Осознанный
- * отказ соседа — наш дефект, и повтором он не лечится»).
+ * одном месте. Граница — дом класса, а не удобство:
+ * docs/rules/runtime-error-classification.md §«Отказ соседа по ярусу — свой
+ * класс, и сделку в ошибку он не уводит» и его подразделы. Недоступность —
+ * транспорт ({@link ResourceAccessException}) и {@code 5xx}; осознанный отказ
+ * соседа ({@code 4xx}), неразбираемое тело и негодный адрес — наш дефект,
+ * повтором он не лечится; команда классифицируется так же, как чтение.
  *
  * <p>Живёт хелпером, а не методом каждого клиента: вызовов к соседям у
- * владельца определений два — числа риск-аппетита тенанта и проверка
- * ссылок определения, — и копии одного разбора разошлись бы первой же
- * правкой класса.
+ * сервиса несколько, и копии одного разбора разошлись бы первой же правкой
+ * класса. Копия этого хелпера у соседнего сервиса — объявленное семейство
+ * ({@code tools/peer-copy-check.py}); javadoc у копий один.
  *
- * <p><b>Недоступность соседа отвергает создание, а не пропускает его.</b>
- * Операнд не добыт — сверять объявленное автором не с чем, и пропуск был
- * бы разрешающей ошибкой ровно там, где стои́т охрана
- * (docs/rules/strategy-validation.md).
+ * <p><b>Коннектор сюда не входит, и это не пропуск.</b> Он объявляет
+ * класс отказа ОТДЕЛЬНЫМ ПОЛЕМ ответа
+ * ({@code docs/components/IntegrationService.md} §«Классы отказа на
+ * границе — дом здесь»), и разбор его вызова читает тело, а не статус.
  */
 @UtilityClass
 public class PeerCall {
@@ -48,9 +47,15 @@ public class PeerCall {
             }
             throw new PeerReadException(
                     "Peer " + peer + " refused [" + endpoint + "]: " + e.getStatusCode(), e);
-        } catch (RestClientException e) {
+        } catch (ResourceAccessException e) {
             throw new PeerServiceUnavailableException(
                     "Peer " + peer + " transport error on [" + endpoint + "]", e);
+        } catch (RestClientException e) {
+            throw new PeerReadException(
+                    "Peer " + peer + " answered [" + endpoint + "] with a body we cannot read", e);
+        } catch (IllegalArgumentException e) {
+            throw new PeerReadException(
+                    "Peer " + peer + " address is not usable for [" + endpoint + "]", e);
         }
     }
 }

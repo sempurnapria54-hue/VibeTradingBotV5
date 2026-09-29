@@ -70,7 +70,12 @@ public class StrategyConditionEvaluator {
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
-    /** Условие истинно, когда истинны все его правила (пустое условие — истинно). */
+    /**
+     * Условие истинно, когда истинны все его правила (пустое условие — истинно).
+     * Правило, которое оценить нечем, — пустой элемент перечня, пустой тип
+     * или оператор, неразбираемый литерал, несобранная раскладка, — ложно, а
+     * не бросает (docs/components/StrategyConditionEvaluator.md §Границы).
+     */
     public Boolean evaluate(StrategyCondition condition, ConditionEvaluationContext context) {
         if (isNull(condition) || isEmpty(condition.getRules())) {
             return true;
@@ -79,6 +84,9 @@ public class StrategyConditionEvaluator {
     }
 
     private boolean evaluateRule(StrategyConditionRule rule, ConditionEvaluationContext context) {
+        if (isNull(rule) || isNull(rule.getRuleType())) {
+            return false;
+        }
         return switch (rule.getRuleType()) {
             case INDICATOR_COMPARE, PRICE_COMPARE -> evaluateCompare(rule, context);
             case CROSSOVER -> evaluateCrossover(rule, context);
@@ -116,7 +124,8 @@ public class StrategyConditionEvaluator {
         BigDecimal currentRight = resolveScalar(rule.getRightOperand(), context, true);
         BigDecimal previousLeft = resolveScalar(rule.getLeftOperand(), context, false);
         BigDecimal previousRight = resolveScalar(rule.getRightOperand(), context, false);
-        if (isNull(currentLeft) || isNull(currentRight) || isNull(previousLeft) || isNull(previousRight)) {
+        if (isNull(rule.getOperator())
+                || isNull(currentLeft) || isNull(currentRight) || isNull(previousLeft) || isNull(previousRight)) {
             return false;
         }
         return switch (rule.getOperator()) {
@@ -129,7 +138,7 @@ public class StrategyConditionEvaluator {
     private boolean evaluateMarketStructureIs(StrategyConditionRule rule, ConditionEvaluationContext context) {
         MarketStructure structure = structureOf(rule, context);
         String expectedType = constantEnumValue(rule);
-        if (isNull(structure) || isNull(structure.getType()) || isNull(expectedType)) {
+        if (isNull(structure) || isNull(structure.getType()) || isNull(expectedType) || isNull(rule.getOperator())) {
             return false;
         }
         boolean equal = Objects.equals(structure.getType().name(), expectedType);
@@ -175,18 +184,26 @@ public class StrategyConditionEvaluator {
     }
 
     /**
-     * Фаза прохода совпала с объявленной шагом
-     * (docs/spec/market-phase-condition.json, {@code marketPhaseIs}).
+     * Фаза прохода равна объявленной шагом либо, при операторе {@code NE},
+     * отличается от неё (docs/spec/market-phase-condition.json,
+     * {@code marketPhaseIs}) — та же форма, что у равенства типа структуры.
      *
-     * <p>Неустановленная фаза даёт ЛОЖЬ, а не совпадение: условие входа
+     * <p>Неустановленная фаза даёт ЛОЖЬ при любом операторе: условие входа
      * обязано опираться на наблюдение, и разрешающее умолчание открыло бы
-     * сделку по неизвестной фазе.
+     * сделку по неизвестной фазе. Неизвестная объявленная фаза, пустой
+     * оператор и оператор вне пары — тоже ложь: ветвиться не на чем.
      */
     private boolean evaluateMarketPhaseIs(StrategyConditionRule rule, ConditionEvaluationContext context) {
-        String declared = constantEnumValue(rule);
-        return isTrue(phaseKnown(context.getMarketPhase()))
-                && nonNull(declared)
-                && Objects.equals(context.getMarketPhase().name(), declared);
+        MarketPhase.Type declared = EnumUtils.getEnum(MarketPhase.Type.class, constantEnumValue(rule));
+        if (isFalse(phaseKnown(context.getMarketPhase())) || isNull(declared) || isNull(rule.getOperator())) {
+            return false;
+        }
+        boolean equal = Objects.equals(context.getMarketPhase(), declared);
+        return switch (rule.getOperator()) {
+            case EQ -> equal;
+            case NE -> isFalse(equal);
+            default -> false;
+        };
     }
 
     /**
@@ -237,10 +254,17 @@ public class StrategyConditionEvaluator {
         return nonNull(tranche) && isTrue(tranche.hasStandaloneProtection());
     }
 
-    /** Ход достиг объявленного порога прибыли ({@code profitPercentsReached}). */
+    /**
+     * Ход достиг объявленного порога прибыли ({@code profitPercentsReached}).
+     *
+     * <p>Порог читается из ПЛОСКОГО поля правила — туда его кладёт контракт
+     * авторинга и там его требует создание
+     * (docs/rules/strategy-condition-contract.md); константный операнд у
+     * правил хода порогом не является.
+     */
     private boolean evaluateProfitReached(StrategyConditionRule rule, ConditionEvaluationContext context) {
         BigDecimal move = signedMovePercents(context);
-        BigDecimal declared = declaredPercents(rule);
+        BigDecimal declared = rule.getPercents();
         return nonNull(move) && nonNull(declared) && move.compareTo(declared) >= 0;
     }
 
@@ -253,7 +277,7 @@ public class StrategyConditionEvaluator {
      */
     private boolean evaluateLossReached(StrategyConditionRule rule, ConditionEvaluationContext context) {
         BigDecimal move = signedMovePercents(context);
-        BigDecimal declared = declaredPercents(rule);
+        BigDecimal declared = rule.getPercents();
         return nonNull(move) && nonNull(declared) && move.compareTo(declared.negate()) <= 0;
     }
 
@@ -282,12 +306,6 @@ public class StrategyConditionEvaluator {
     private BigDecimal entryAnchor(ConditionEvaluationContext context) {
         Position position = context.getActivePosition();
         return isNull(position) ? null : position.getExternalAverageEntryPrice();
-    }
-
-    /** Порог, объявленный правилом константным операндом любой стороны. */
-    private BigDecimal declaredPercents(StrategyConditionRule rule) {
-        BigDecimal fromRight = parseConstant(rule.getRightOperand());
-        return nonNull(fromRight) ? fromRight : parseConstant(rule.getLeftOperand());
     }
 
     private BigDecimal resolveScalar(StrategyConditionOperand operand, ConditionEvaluationContext context,
@@ -363,9 +381,26 @@ public class StrategyConditionEvaluator {
             return null;
         }
         return switch (operand.getValueType()) {
-            case NUMBER, PERCENT -> isNull(operand.getValue()) ? null : new BigDecimal(operand.getValue());
+            case NUMBER, PERCENT -> parseNumber(operand.getValue());
             default -> null;
         };
+    }
+
+    /**
+     * Литерал, не разбираемый числом, — недоступный операнд, а не отказ
+     * оценки: бросок ушёл бы мимо отбора входа и остановил бы его по всему
+     * счёту на каждом тике, пока определение живо.
+     */
+    private BigDecimal parseNumber(String literal) {
+        if (isNull(literal)) {
+            return null;
+        }
+        try {
+            return new BigDecimal(literal);
+        } catch (NumberFormatException exception) {
+            log.warn("Constant operand literal '{}' is not a number", literal);
+            return null;
+        }
     }
 
     private boolean applyRelational(StrategyConditionOperator operator, BigDecimal left, BigDecimal right) {

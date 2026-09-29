@@ -16,7 +16,6 @@ import com.example.tradingcore.domain.deal.DealTerminalGate;
 import com.example.tradingcore.domain.fsm.DealTransitionGate;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -30,17 +29,17 @@ import org.junit.jupiter.api.Test;
  * отсутствует; все транши терминальны; число результата {@code 10},
  * валюта {@code USDT}; вход состоялся — у транша есть налив входной ноги.
  *
- * <p><b>Имя {@code cleanTerminalContract} у кода и у спеки называет
- * РАЗНЫЕ конъюнкции</b> (находка {@code F-8}): величина спеки — только
- * число и валюта, а метод гейта несёт ещё терминальность траншей и
- * доказанное отсутствие риска, то есть ветвь композиции. Клетки
- * {@code U3.2} и {@code U3.7} предъявляют разведение: метод отвечает «не
- * выполнен», а конъюнкты величины спеки при этом держатся.
+ * <p><b>Методы гейта называют ВЕТВИ композиции {@code transitionAllowed},
+ * а не одноимённые величины спеки.</b> Ветвь штатного терминала несёт
+ * терминальность траншей, доказанное отсутствие риска и величину
+ * {@code cleanTerminalContract}; клетки {@code U3.2} и {@code U3.7}
+ * предъявляют, что конъюнкты величины при отказе ветви держатся.
  *
- * <p><b>{@code @Tag("debt")}: {@code U3.11} предъявляет находку
- * {@code F-1}</b> — спека объявляет аварийный контракт двумя конъюнктами,
- * а гейт мерит один. Провенанс числа гейт не читает вовсе, поэтому
- * подставленное число он от посчитанного не отличает.
+ * <p><b>Ветвь аварийного терминала мерит только отсутствие риска</b>:
+ * величину {@code emergencyTerminalContract} держат писатели числа, и спека
+ * называет их поимённо. Клетка {@code U3.11} пинит это ограничение: число,
+ * которого не писал ни один писатель, ветвь пропускает — провенанса у
+ * числа в данных нет.
  */
 class DealTerminalContractsTest {
 
@@ -49,7 +48,7 @@ class DealTerminalContractsTest {
     @Test
     @DisplayName("U3.1 — базовая сборка: штатный контракт выполнен")
     void u3_1_theBaseStateSatisfiesTheCleanContract() {
-        assertThat(gate.cleanTerminalContract(baseContext())).isTrue();
+        assertThat(gate.cleanTerminalAllowed(baseContext())).isTrue();
     }
 
     @Test
@@ -58,7 +57,7 @@ class DealTerminalContractsTest {
         DealContext context = contextOf(withResult(deal(Deal.Status.EXIT_PENDING,
                 closedTrancheWithEntryFill(), tranche(SECOND_TRANCHE_ID, DealTranche.Status.MANAGING))));
 
-        assertThat(gate.cleanTerminalContract(context)).isFalse();
+        assertThat(gate.cleanTerminalAllowed(context)).isFalse();
         assertThat(context.getDeal().getResultProfit()).isNotNull();
         assertThat(context.getDeal().getResultProfitCurrency()).isNotBlank();
     }
@@ -69,7 +68,7 @@ class DealTerminalContractsTest {
         DealContext context = baseContext();
         context.getDeal().setResultProfit(null);
 
-        assertThat(gate.cleanTerminalContract(context)).isFalse();
+        assertThat(gate.cleanTerminalAllowed(context)).isFalse();
     }
 
     @Test
@@ -79,7 +78,7 @@ class DealTerminalContractsTest {
         context.getDeal().setResultProfitCurrency(null);
 
         assertThat(context.getDeal().positionObserved()).isTrue();
-        assertThat(gate.cleanTerminalContract(context)).isFalse();
+        assertThat(gate.cleanTerminalAllowed(context)).isFalse();
     }
 
     @Test
@@ -91,7 +90,7 @@ class DealTerminalContractsTest {
         DealContext context = contextOf(dealWithoutEntry);
 
         assertThat(dealWithoutEntry.positionObserved()).isFalse();
-        assertThat(gate.cleanTerminalContract(context)).isTrue();
+        assertThat(gate.cleanTerminalAllowed(context)).isTrue();
     }
 
     @Test
@@ -100,7 +99,7 @@ class DealTerminalContractsTest {
         DealContext context = baseContext();
         context.getDeal().setResultProfitCurrency("");
 
-        assertThat(gate.cleanTerminalContract(context)).isFalse();
+        assertThat(gate.cleanTerminalAllowed(context)).isFalse();
     }
 
     @Test
@@ -109,7 +108,7 @@ class DealTerminalContractsTest {
         DealContext context = baseContext();
         context.getDeal().getTranches().getFirst().getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
 
-        assertThat(gate.cleanTerminalContract(context)).isFalse();
+        assertThat(gate.cleanTerminalAllowed(context)).isFalse();
         assertThat(context.getDeal().getResultProfit()).isNotNull();
         assertThat(context.getDeal().getResultProfitCurrency()).isNotBlank();
     }
@@ -117,7 +116,7 @@ class DealTerminalContractsTest {
     @Test
     @DisplayName("U3.8 — базовая сборка, аварийный контракт: выполнен третьим дизъюнктом")
     void u3_8_theBaseStateSatisfiesTheEmergencyContract() {
-        assertThat(gate.emergencyTerminalContract(baseContext())).isTrue();
+        assertThat(gate.emergencyTerminalAllowed(baseContext())).isTrue();
     }
 
     @Test
@@ -126,27 +125,28 @@ class DealTerminalContractsTest {
         DealContext context = contextOf(withResult(deal(Deal.Status.ERROR,
                 closedTrancheWithEntryFill(), tranche(SECOND_TRANCHE_ID, DealTranche.Status.MANAGING))));
 
-        assertThat(gate.emergencyTerminalContract(context)).isTrue();
+        assertThat(gate.emergencyTerminalAllowed(context)).isTrue();
     }
 
     @Test
-    @DisplayName("U3.10 — риск доказанно не отсутствует: единственный конъюнкт, который контракт мерит")
+    @DisplayName("U3.10 — риск доказанно не отсутствует: единственный конъюнкт, который мерит ветвь")
     void u3_10_theEmergencyContractRefusesOnLiveRisk() {
         DealContext context = baseContext();
         context.getDeal().getTranches().getFirst().getOrders().add(liveEntryLeg(30L, TRANCHE_ID));
 
-        assertThat(gate.emergencyTerminalContract(context)).isFalse();
+        assertThat(gate.emergencyTerminalAllowed(context)).isFalse();
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U3.11 — число ПОДСТАВЛЕНО: спека требует посчитанного, гейт провенанса не читает")
-    void u3_11_theEmergencyContractDoesNotTellASubstitutedResultFromAComputedOne() {
+    @DisplayName("U3.11 — число стоит, итог на проходе неисчислим: ветвь провенанса не читает — его держат писатели")
+    void u3_11_theEmergencyBranchLeavesTheResultProvenanceToItsWriters() {
         DealContext context = contextBuilder(withResult(deal(Deal.Status.ERROR, closedTrancheWithEntryFill())))
                 .computationAllowed(Boolean.FALSE)
                 .build();
 
-        assertThat(gate.emergencyTerminalContract(context)).isFalse();
+        assertThat(gate.emergencyTerminalAllowed(context))
+                .as("второй конъюнкт аварийного контракта держат писатели числа (docs/spec/deal-lifecycle.json)")
+                .isTrue();
     }
 
     @Test
@@ -155,7 +155,7 @@ class DealTerminalContractsTest {
         DealContext context = baseContext();
         context.getDeal().setResultProfit(null);
 
-        assertThat(gate.emergencyTerminalContract(context)).isTrue();
+        assertThat(gate.emergencyTerminalAllowed(context)).isTrue();
     }
 
     @Test
@@ -165,7 +165,7 @@ class DealTerminalContractsTest {
                 .computationAllowed(Boolean.TRUE)
                 .build();
 
-        assertThat(gate.emergencyTerminalContract(context)).isTrue();
+        assertThat(gate.emergencyTerminalAllowed(context)).isTrue();
     }
 
     /** Базовая сборка группы поверх сделки в координированном выходе. */

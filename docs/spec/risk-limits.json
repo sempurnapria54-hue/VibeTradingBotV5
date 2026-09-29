@@ -19,7 +19,7 @@
     "hasLiveEpisode": "живой эпизод существует; резолв — docs/spec/protection-coverage.json, величина hasLiveEpisode. Оба конъюнкта определения живого риска позиции живут там; здесь берётся значение",
     "position.externalSize": "Position.externalSize живого эпизода; ПУСТО либо 0 — живого эпизода нет вовсе (первый вход сделки). Это факт домена, а не недобытая величина: контекст прохода грузит эпизоды целиком (docs/spec/deal-context-load.json), поэтому отсутствие эпизода отличимо от неполноты загрузки. Отличимость держится не на добросовестности загрузчика: неполный граф до неравенств не доезжает вовсе — операнд graphComplete отправляет потолки в отказ",
     "instrument.contractValue": "InstrumentExternalRules.externalContractValue",
-    "entryLegs[]": "строки orders сделки с бизнес-типом входа — по всем траншам: потолки агрегатные, транши их не множат",
+    "entryLegs[]": "строки orders сделки — ноги входа (дом docs/spec/protection-coverage.json, величина isEntryOrder) по всем траншам: потолки агрегатные, транши их не множат",
     "limits.riskPerActionPercent": "StrategyDetail.riskPerActionPercent, проценты",
     "limits.cumulativeRiskPerDealMultiplier": "StrategyDetail.cumulativeRiskPerDealMultiplier (K)",
     "limits.strategySimultaneousRiskPerDealPercent": "StrategyDetail.strategySimultaneousRiskPerDealPercent, проценты",

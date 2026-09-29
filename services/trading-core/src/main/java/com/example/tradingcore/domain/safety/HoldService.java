@@ -69,6 +69,24 @@ public class HoldService {
     }
 
     /**
+     * Вход РУЧНОЙ постановки держателем. Полный режим — тот же координатор,
+     * что у автоматики. Мягкий — отчёт ПЕРВЫМ и без поглощения: отказ
+     * записи отчёта роняет операцию, и ветви «ступень поставлена, отчёта
+     * нет» у ручной тропы не остаётся (docs/rules/manual-halt.md
+     * §«Наблюдаемость: ручное отличимо и от автоматики, и друг от друга»).
+     * Автоматический контур идёт {@link #raise} и отказ журнала
+     * поглощает: реакция безопасности из-за журнала не встаёт.
+     */
+    public void raiseManual(HoldSignal signal, DealContext dealContext) {
+        if (isTrue(signal.tearsDownRisk())) {
+            safetyHoldCoordinator.react(signal, dealContext);
+            return;
+        }
+        anomalyReportService.journalState(dealContext, signal, null);
+        holdRungEdgeService.raise(signal, dealContext);
+    }
+
+    /**
      * Мягкая ступень: строка журнала плюс переход ступени со своим фактом.
      * Снятия риска в составе нет — принятый риск покрыт, и рвать его
      * нечем, — поэтому отчёт создаётся уже завершённым.

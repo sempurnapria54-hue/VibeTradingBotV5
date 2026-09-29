@@ -4,9 +4,9 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.StringUtils.abbreviate;
 
-import com.example.audit.domain.model.AccessDenial;
 import com.example.audit.persistence.service.AccessDenialDataService;
 import com.example.platform.exception.handler.AccessDenialRecorder;
+import com.example.tradingbot.domain.model.other.AccessDenial;
 import com.example.tradingbot.domain.util.InternalIdFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -22,6 +22,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.TrailingSet
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.ConstantValueType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperator;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRule;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionSourceType;
@@ -742,8 +743,8 @@ final class Definitions {
         action.setDirection(StrategyTradeDirection.LONG);
         action.setAllocationPercents(new BigDecimal("10"));
         // Намерение reduce-only объявлено ЯВНЫМ отрицанием, а не пустотой:
-        // инвариант пары требует его непустым у всякой ноги
-        // (docs/models/domain/core/Order.md), а предикат транша, ищущий
+        // намерение обязательно у всякой нашей ноги
+        // (docs/models/domain/core/Order.md §Енумы), а предикат транша, ищущий
         // свою ногу входа, читает пустоту как «не отрицание» и ногу
         // отбрасывает — транш тогда не получает своего входного ребра
         // вовсе (находка F3 захода).
@@ -876,6 +877,7 @@ final class Definitions {
         declared.setValue(phase.name());
         StrategyConditionRule rule = new StrategyConditionRule();
         rule.setRuleType(StrategyConditionRuleType.MARKET_PHASE_IS);
+        rule.setOperator(StrategyConditionOperator.EQ);
         rule.setRightOperand(declared);
         return new StrategyCondition(new ArrayList<>(List.of(rule)));
     }

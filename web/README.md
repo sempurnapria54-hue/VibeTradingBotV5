@@ -5,6 +5,6 @@
 Что кладётся в этот каталог.
 
 SPA. Отдаётся ингрессом как статика, не через `bff`
-(`docs/architecture/services.md`). Зрелость фронта — атрибут шага:
-простой для прогонов в фазах 2-4 (шаг 12 фазы 2), полноценный с ролями —
-шаг 3 фазы 5 (`.claude/work/roadmap/roadmap.md` §Примечания).
+(`docs/architecture/services.md`). Зрелость фронта — атрибут шага
+(`.claude/work/roadmap/roadmap.md` §Примечания); в фазе 2 это кабинет
+владельца, шаг 13 (`docs/concepts/owner-cabinet.md`).

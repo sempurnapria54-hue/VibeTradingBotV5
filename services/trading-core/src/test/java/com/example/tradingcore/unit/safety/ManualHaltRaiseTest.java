@@ -40,13 +40,13 @@ class ManualHaltRaiseTest {
 
     private HoldSignal raisedSignal() {
         ArgumentCaptor<HoldSignal> captor = ArgumentCaptor.forClass(HoldSignal.class);
-        verify(harness.holdService).raise(captor.capture(), any());
+        verify(harness.holdService).raiseManual(captor.capture(), any());
         return captor.getValue();
     }
 
     private DealContext raisedContext() {
         ArgumentCaptor<DealContext> captor = ArgumentCaptor.forClass(DealContext.class);
-        verify(harness.holdService).raise(any(), captor.capture());
+        verify(harness.holdService).raiseManual(any(), captor.capture());
         return captor.getValue();
     }
 
@@ -120,7 +120,7 @@ class ManualHaltRaiseTest {
         harness.manualHalt.raise(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, null);
 
         ArgumentCaptor<HoldSignal> captor = ArgumentCaptor.forClass(HoldSignal.class);
-        verify(harness.holdService, org.mockito.Mockito.times(4)).raise(captor.capture(), any());
+        verify(harness.holdService, org.mockito.Mockito.times(4)).raiseManual(captor.capture(), any());
         assertThat(captor.getAllValues()).extracting(HoldSignal::getCode)
                 .containsOnly(Constants.Hold.MANUAL_HALT_REQUESTED);
     }
@@ -146,7 +146,7 @@ class ManualHaltRaiseTest {
                 ACCOUNT_INTERNAL_ID, null))
                 .doesNotThrowAnyException();
 
-        verify(harness.holdService).raise(any(), any());
+        verify(harness.holdService).raiseManual(any(), any());
     }
 
     /** Запрос слабее стоящей поглощается: понижение делает только снятие. */
@@ -186,7 +186,7 @@ class ManualHaltRaiseTest {
         }
         verify(harness.coordinator).react(
                 eq(HoldSignal.exchangeAccount(Constants.Hold.MANUAL_HALT_REQUESTED)), any(), eq(true));
-        verify(harness.holdService, never()).raise(any(), any());
+        verify(harness.holdService, never()).raiseManual(any(), any());
     }
 
     /** Риск погашен — права на доведение нет, вызов идёт общей тропой. */
@@ -197,7 +197,7 @@ class ManualHaltRaiseTest {
 
         harness.manualHalt.raise(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, null);
 
-        verify(harness.holdService).raise(any(), any());
+        verify(harness.holdService).raiseManual(any(), any());
         verify(harness.coordinator, never()).react(any(), any(), any());
     }
 
@@ -209,7 +209,7 @@ class ManualHaltRaiseTest {
 
         harness.manualHalt.raise(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, null);
 
-        verify(harness.holdService).raise(any(), any());
+        verify(harness.holdService).raiseManual(any(), any());
         verify(harness.coordinator, never()).react(any(), any(), any());
     }
 

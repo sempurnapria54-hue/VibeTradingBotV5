@@ -91,10 +91,11 @@ class DefinitionEventBoxTest extends SharedStrategiesBox {
      * <p><b>Сравнение состава идёт «не меньше», а не «поровну», и причина
      * названа.</b> Предмет клетки — что ни один узел дерева не опущен;
      * снимок же несёт СВЕРХ ответа поверхности колонки аудита каждого
-     * узла — тридцать узлов вместо одного корня, — и это отдельная
-     * находка того же механизма, что F-5 (F-7 того же документа). Строгое
-     * равенство сделало бы клетку красной по двум причинам сразу, и ни
-     * одну из них нельзя было бы прочитать по падению.
+     * узла — тридцать узлов вместо одного корня, — и этот состав объявлен
+     * домом формы (docs/models/mapping/Strategy.md §«domain → message»;
+     * находка F-7 того же документа закрыта им). Строгое равенство
+     * сделало бы клетку красной на объявленном составе, и предмет клетки
+     * по падению не читался бы.
      */
     @Test
     @DisplayName("B6.2 — Снимок едет деревом целиком, а не ссылкой на него")
@@ -279,6 +280,25 @@ class DefinitionEventBoxTest extends SharedStrategiesBox {
         assertThat(statusOf(rival, TENANT)).isEqualTo("CREATED");
         assertThat(statusOf(unresolvable, TENANT)).isEqualTo("CREATED");
         assertThat(statusOf(withoutNumbers, TENANT)).isEqualTo("CREATED");
+    }
+
+    /**
+     * Ожидание взято из дома формы (docs/models/mapping/Strategy.md
+     * §«domain → message»): снимок активации несёт целевой статус. Прежде
+     * статус ставился после записи факта, и событие активации везло
+     * {@code CREATED} — значение, противоречащее своему классу (находка
+     * F-8 закрыта). Вопрос «активна ли» у снимка полем не едет вовсе —
+     * это пин клетки {@code B10.5}.
+     */
+    @Test
+    @DisplayName("B6.10 — Снимок активации несёт статус своего класса события")
+    void b6_10_theActivationSnapshotCarriesTheStatusOfItsEventClass() {
+        peerResolvesEverything();
+        givenActive(TENANT);
+
+        assertThat(nested(contentOf(event(ACTIVATED)), DEFINITION))
+                .as("снимок STRATEGY_ACTIVATED говорит ACTIVE, а не статус до перехода")
+                .containsEntry("status", "ACTIVE");
     }
 
     /** Прямая постановка статуса: предусловие мимо приложения. */

@@ -77,6 +77,10 @@ public interface JournalReceptionStateRepository
      * ней — то есть не появился бы ровно в том случае, ради которого
      * заведён (docs/rules/durable-consumer-reception.md §«Транзакционные
      * границы»).
+     *
+     * <p><b>Стоящий флаг строку не трогает:</b> писатель зовёт ход на каждой
+     * неудачной доставке, и без отбора по флагу повтор бил бы в строку с
+     * частотой паузы, ничего не меняя.
      */
     @Modifying
     @Query(nativeQuery = true, value = """
@@ -84,6 +88,7 @@ public interface JournalReceptionStateRepository
                set reception_halted = true
              where consumer_group = :consumerGroup
                and topic = :topic
+               and reception_halted = false
             """)
     void markHalted(@Param("consumerGroup") String consumerGroup,
                     @Param("topic") String topic);

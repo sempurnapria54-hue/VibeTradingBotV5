@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -157,7 +158,7 @@ public class DealActiveHandler implements DealHandler {
      */
     private DealTransition reobserveExposure(DealContext dealContext) {
         List<ServiceCommand> observations = new ArrayList<>();
-        Boolean positionFirst = isFalse(dealContext.getGraphComplete());
+        Boolean positionFirst = isNotTrue(dealContext.getGraphComplete());
         if (isTrue(positionFirst)) {
             fetch(dealContext, ServiceCommandType.REFRESH_POSITION_COMMAND, null).ifPresent(observations::add);
         }

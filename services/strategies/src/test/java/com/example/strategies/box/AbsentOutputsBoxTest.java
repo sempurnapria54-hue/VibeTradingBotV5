@@ -40,8 +40,9 @@ class AbsentOutputsBoxTest extends SharedStrategiesBox {
 
     /**
      * Поля, которые снимок несёт СВЕРХ ответа поверхности, — метаданные
-     * персистентности ВЛАДЕЛЬЦА: колонки аудита каждого узла (находка F-7
-     * того же документа).
+     * персистентности ВЛАДЕЛЬЦА: колонки аудита каждого узла. Состав
+     * объявлен домом формы (docs/models/mapping/Strategy.md §«domain →
+     * message»), находка F-7 того же документа закрыта им.
      *
      * <p><b>Технического ключа строки в перечне нет:</b> числовой ключ базы
      * границу сервиса не пересекает (находка F-5 закрыта), и вернувшийся
@@ -56,14 +57,12 @@ class AbsentOutputsBoxTest extends SharedStrategiesBox {
             "modifiedAt", "modifiedBy");
 
     /**
-     * Предикаты rich-модели, уехавшие на провод полями: их в форме
-     * сообщения не объявлено ни одного, а сериализатор вывел их из
-     * методов (находка F-8 того же документа).
+     * Предикаты rich-модели: сериализатор вывел бы их из методов полями, и
+     * изъяты они на самой модели (находка F-8 того же документа закрыта).
      *
-     * <p><b>Пятый предикат добыт этой клеткой:</b> {@code entryDeclaration}
-     * — метод {@code StrategyTranche#isEntryDeclaration()}, и находка
-     * F-8 называла четыре из пяти. Перечень здесь закрытый ровно затем,
-     * чтобы шестой предъявился падением, а не растворился в исключении.
+     * <p><b>Перечень — отрицательный пин, а не исключение:</b> вернувшийся
+     * на провод предикат клетка предъявит падением. Шестой, заведённый без
+     * изъятия, предъявится иначе — полем сверх ответа поверхности.
      */
     private static final Set<String> RICH_PREDICATES = Set.of("active", "deleted", "entryStep",
             "protective", "entryDeclaration");
@@ -187,8 +186,10 @@ class AbsentOutputsBoxTest extends SharedStrategiesBox {
         Set<String> given = names(get(STRATEGIES + "/" + internalId, TENANT).asObject());
 
         Set<String> declared = new LinkedHashSet<>(OWNER_METADATA);
-        declared.addAll(RICH_PREDICATES);
         declared.addAll(SURFACE_OMITS);
+        assertThat(snapshot)
+                .as("предикаты модели полями не едут: форма их не объявляла")
+                .doesNotContainAnyElementsOf(RICH_PREDICATES);
         assertThat(snapshot)
                 .as("объявленное исключение обязано встречаться: мёртвая маска прячет ровно то, "
                         + "ради чего заведена")

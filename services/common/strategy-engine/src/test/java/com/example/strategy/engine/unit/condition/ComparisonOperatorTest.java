@@ -23,7 +23,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -197,16 +196,13 @@ class ComparisonOperatorTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b>
-     * Неразбираемый литерал есть недоступный операнд, и дом объявляет
-     * консервативную ложь (docs/rules/absent-value-semantics.md); код
-     * бросает исключение разбора и роняет весь тик отбора входа. Красный
-     * прогон и есть предъявление находки `F-8` (`.claude/work/backlog.md`
-     * §«Интерпретатор бросает там, где объявлена консервативная ложь»).
+     * Неразбираемый литерал есть недоступный операнд, и оценка отвечает
+     * консервативной ложью, а не исключением разбора, которое роняло бы весь
+     * тик отбора входа (docs/components/StrategyConditionEvaluator.md
+     * §Границы; находка `F-8` закрыта).
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U2.19 — правая константа NUMBER со значением abc: ложь (дом), код бросает разбор")
+    @DisplayName("U2.19 — правая константа NUMBER со значением abc: ложь")
     void u2_19_anUnparsableLiteralIsAnUnavailableOperand() {
         assertThat(evaluate(compare(StrategyConditionOperator.GT, number("abc"))))
                 .as("неразбираемый литерал — недоступный операнд, а не отказ")

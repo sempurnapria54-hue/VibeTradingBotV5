@@ -18,7 +18,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import org.springframework.stereotype.Component;
 
 /**
@@ -64,8 +63,10 @@ public class ComputationParamsJsonConverter {
     }
 
     /**
-     * Маппер канонической формы: пустые поля не пишутся, ключи карт и
-     * свойства объектов идут в алфавитном порядке.
+     * Маппер канонической формы: пустые поля не пишутся, свойства объектов
+     * идут в алфавитном порядке. Упорядочения ключей карт у него нет: карты
+     * среди форм параметров нет ни одной, и настройка без операнда читалась
+     * бы клеймом «по этой оси кто-то ветвится».
      *
      * <p>Сортировка свойств ставится <b>конфигурацией сериализации</b>, а
      * не {@code configure(MapperFeature, …)} на самом маппере: последний
@@ -75,8 +76,7 @@ public class ComputationParamsJsonConverter {
      */
     private ObjectMapper buildCanonicalMapper(ObjectMapper source) {
         ObjectMapper canonical = source.copy()
-                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
-                .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
         canonical.setConfig(canonical.getSerializationConfig()
                 .with(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY));
         return canonical;

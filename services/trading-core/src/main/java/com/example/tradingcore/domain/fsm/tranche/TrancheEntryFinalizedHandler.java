@@ -9,7 +9,6 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.deal.ProtectionCoverageGate;
 import com.example.tradingcore.domain.fsm.DealTrancheHandler;
-import com.example.tradingcore.domain.fsm.TrancheActionDisposition;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
 import com.example.tradingcore.domain.fsm.TrancheWorkPass;
 import com.example.tradingcore.domain.safety.HoldSignal;
@@ -38,7 +37,6 @@ import org.springframework.stereotype.Component;
 public class TrancheEntryFinalizedHandler implements DealTrancheHandler {
 
     private final TrancheWorkPass workPass;
-    private final TrancheActionDisposition disposition;
     private final ProtectionCoverageGate coverageGate;
 
     @Override

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -32,20 +31,15 @@ class UnconfiguredPeerAddressBoxTest extends StrategiesBox {
     }
 
     /**
-     * <b>Клетка красна по построению, и долг добыт этим прогоном.</b>
-     * Пустой адрес соседа не доходит до разбора отказа
-     * ({@code PeerCall}) вовсе: клиент отвергает адрес без схемы
-     * {@code IllegalArgumentException}, и поверхность отвечает
-     * {@code 400 INVALID_REQUEST} — то есть объявляет дефектом ВХОД
-     * вызывающего там, где негодна конфигурация СЕРВИСА. Вызывающий по
-     * такому ответу правит тело, которое править не в чем.
-     *
-     * <p>Ожидание взято из дома и под текущий факт не ослаблено: оно и
-     * есть предъявление долга (.claude/work/backlog.md §«Пустой адрес
-     * соседа у `strategies` отвечает дефектом входа вызывающего»).
+     * <b>Класс отказа — наш дефект, а не недоступность и не дефект входа.</b>
+     * Адрес без схемы клиент отвергает ещё до отправки; повтор тем же
+     * адресом даст тот же отказ, и чинить здесь не вызывающему, а
+     * конфигурацию сервиса (docs/rules/runtime-error-classification.md
+     * §«Ненастроенная тропа к соседу — наш дефект»). Прежде отказ минувал
+     * разбор соседа и отвечал {@code 400 INVALID_REQUEST} — находка F-9
+     * закрыта.
      */
     @Test
-    @Tag("debt")
     @DisplayName("B9.2 — Пустой адрес соседа отвергает создание, а не пропускает его")
     void b9_2_anEmptyNeighbourAddressRefusesCreationRatherThanLettingItThrough() {
         Answer answer = post(STRATEGIES, TENANT, Bodies.reference());
@@ -55,8 +49,8 @@ class UnconfiguredPeerAddressBoxTest extends StrategiesBox {
                 .isNotEqualTo(201);
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode())
-                .as("операнд не добыт — это недоступность соседа, а не дефект тела")
-                .isEqualTo("PEER_UNAVAILABLE");
+                .as("тропа к соседу не настроена — это наш дефект, а не дефект тела")
+                .isEqualTo("PEER_REFUSED");
         assertThat(rows.count(STRATEGIES_TABLE)).as("строки определения нет").isZero();
         assertThat(rows.count(OUTBOX_TABLE)).isZero();
     }
