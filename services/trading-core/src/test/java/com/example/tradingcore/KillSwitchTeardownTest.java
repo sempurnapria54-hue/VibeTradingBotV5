@@ -47,6 +47,7 @@ import com.example.tradingcore.persistence.service.PositionDataService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -218,6 +219,29 @@ class KillSwitchTeardownTest {
         verify(exchange, times(2)).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any());
         assertThat(result.getSuccess()).isFalse();
         assertThat(result.getErrorCode()).isEqualTo(RuntimeErrorCode.EXCHANGE_ERROR);
+    }
+
+    /**
+     * Сделка без строки эпизода — восстановленная до первого прохода: живой
+     * позиции локально нет, эпизод заводит добыча подтверждения, и закрытие
+     * уходит ТОЙ ЖЕ попыткой. Предел в одну попытку такую сделку снимает
+     * (docs/components/KillSwitchExecutor.md §Подтверждение).
+     */
+    @Test
+    void anEpisodeFetchedByTheConfirmationIsClosedWithinTheSameAttempt() {
+        Deal deal = deal(tranche(null, null), livePosition());
+        deal.setPositions(List.of());
+        DealContext dealContext = context(deal);
+        Position fetched = livePosition();
+        AtomicInteger reloads = new AtomicInteger();
+        onGraphReload(deal, () -> deal.setPositions(
+                List.of(reloads.getAndIncrement() == 0 ? fetched : closedPosition())));
+
+        ServiceCommandExecutionResult result = executor.execute(dealContext);
+
+        assertThat(result.getSuccess()).isTrue();
+        verify(exchange, times(1)).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any());
+        assertThat(fetched.getCloseReason()).isEqualTo(Position.CloseReason.KILL_SWITCH);
     }
 
     @Test

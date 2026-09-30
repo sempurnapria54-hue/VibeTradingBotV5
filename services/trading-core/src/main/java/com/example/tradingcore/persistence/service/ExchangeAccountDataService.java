@@ -233,13 +233,21 @@ public class ExchangeAccountDataService {
      * таком проходе — то есть различение «ничего не нашли» против «не
      * смотрели» переставало бы работать ровно в момент сбоя.
      *
-     * @param observed проход наблюдён: срез добыт целиком И детекция по
-     *                 нему отработала
+     * <p><b>Наблюдённый проход несёт и свой момент</b> — операнд возраста
+     * наблюдения у отбора входа: счёт слепоты тика, не исполнившегося вовсе,
+     * не видит, а возраст момента растёт и тогда
+     * (docs/components/EntryScannerJob.md §«Гейт входа»).
+     *
+     * @param observed      проход наблюдён: срез добыт целиком И детекция по
+     *                      нему отработала
+     * @param passStartedAt момент начала прохода — наблюдения прохода его не
+     *                      старше, поэтому возраст меряется от него
      */
     @Transactional
-    public Integer markPass(Long id, Boolean observed) {
+    public Integer markPass(Long id, Boolean observed, OffsetDateTime passStartedAt) {
         if (isTrue(observed)) {
             repository.resetBlindPassCount(id, audit.moment(), audit.writer());
+            repository.markObservedPassAt(id, passStartedAt);
             return COUNTER_START;
         }
         repository.incrementBlindPassCount(id, audit.moment(), audit.writer());

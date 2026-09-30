@@ -188,6 +188,37 @@ class ReplayWindowBoxTest extends SharedBffBox {
         }
     }
 
+    /**
+     * Две формы приёма позиции: параметр адреса — форма пересоздания,
+     * доступная {@code EventSource}; заголовок — форма его собственного
+     * переподключения. При обеих старше непустой заголовок: адрес заморожен
+     * с пересоздания, заголовок несёт последнее, что получила уже эта
+     * подписка. Победи адрес — хвост второй подписки начался бы с
+     * {@code e-b4-11-2}.
+     */
+    @Test
+    @DisplayName("B4.11 — Позиция параметром адреса продолжает поток, а непустой заголовок её старше")
+    void b4_11_anAddressPositionContinuesTheStreamAndTheHeaderOutranksIt() {
+        String tenant = "TR11";
+        String ticket = ticketOf(tenant);
+
+        try (Subscription filling = filledWindow(tenant, ticket, "e-b4-11-1", "e-b4-11-2", "e-b4-11-3");
+             Subscription byAddress = subscribe(ticket, null, "e-b4-11-1");
+             Subscription byBoth = subscribe(ticket, "e-b4-11-2", "e-b4-11-1")) {
+            byAddress.awaitFrames(2);
+            byBoth.awaitFrames(1);
+            // Барьер: запись после открытия предъявляет, что хвост второй
+            // подписки дописан целиком и лишнего в нём не появится.
+            publishDealOpened(tenant, "e-b4-11-4");
+            byBoth.awaitFrames(2);
+
+            assertThat(byAddress.ids()).startsWith("e-b4-11-2", "e-b4-11-3");
+            assertThat(byAddress.types()).doesNotContain(GAP);
+            assertThat(byBoth.ids()).containsExactly("e-b4-11-3", "e-b4-11-4");
+            assertThat(byBoth.types()).doesNotContain(GAP);
+        }
+    }
+
     /** Билет субъекта клетки, чьё единственное членство — названный тенант. */
     private String ticketOf(String tenant) {
         authAnswers(Bodies.memberships(tenant, ROLE));

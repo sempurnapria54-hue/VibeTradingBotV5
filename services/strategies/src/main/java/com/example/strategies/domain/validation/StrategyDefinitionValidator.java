@@ -18,6 +18,7 @@ import com.example.strategies.api.model.strategy.EfficiencyRatioParamsApiModel;
 import com.example.strategies.api.model.strategy.EmaParamsApiModel;
 import com.example.strategies.api.model.strategy.IndicatorParamsApiModel;
 import com.example.strategies.api.model.strategy.MacdParamsApiModel;
+import com.example.strategies.api.model.strategy.MarketStructureParamsApiModel;
 import com.example.strategies.api.model.strategy.RsiParamsApiModel;
 import com.example.strategies.api.model.strategy.StochasticParamsApiModel;
 import com.example.strategies.api.model.strategy.StopLossSettingsApiModel;
@@ -90,7 +91,7 @@ import org.springframework.web.server.ResponseStatusException;
  * (дозаполняется инкрементально), пара «вид, тип» действия
  * (docs/models/domain/aggregate/Strategy.md §Действия). Торгово-суждённые
  * диапазоны — отложены до activate (422):
- * docs/decisions/strategy-materialization-and-validation.md.
+ * docs/rules/strategy-validation.md §«Что проверяется на активации».
  * Per-field презенс и числовые границы держит Bean Validation на
  * api-моделях. Warmup-floor — упрощённый минимум шага 2; настоящий
  * derive — у реализаций индикаторов (шаг 3).
@@ -867,6 +868,7 @@ public class StrategyDefinitionValidator {
         validateEnum(TimeFrame.class, setting.getTimeframe(), path + ".timeframe", violations);
         validateEnum(Destiny.class, setting.getDestiny(), path + ".destiny", violations);
         validateDuration(setting.getExpirationDuration(), path + ".expirationDuration", violations);
+        validateStructureLookback(setting.getParams(), path + ".params.lookbackBars", violations);
         if (nonNull(setting.getEfficiencyRatioKey())) {
             validateIndicatorKeyOfType(setting.getEfficiencyRatioKey(), IndicatorValue.Type.EFFICIENCY_RATIO,
                     indicatorTypes, path + ".efficiencyRatioKey", violations);
@@ -874,6 +876,39 @@ public class StrategyDefinitionValidator {
         if (nonNull(setting.getAtrKey())) {
             validateIndicatorKeyOfType(setting.getAtrKey(), IndicatorValue.Type.ATR,
                     indicatorTypes, path + ".atrKey", violations);
+        }
+    }
+
+    /**
+     * Окно расчёта структуры ОБЪЯВЛЕНО и положительно.
+     *
+     * <p>Пустое окно владелец рыночных данных читает пропуском
+     * идентичности с записью в журнал: структура не считается ни разу, и
+     * условие на ней не срабатывает никогда — молча. Нулевое и
+     * отрицательное окно отказывает чтению ряда. Обязательность и диапазон
+     * разведены кодами: отказ адресует тот конъюнкт, который ложен. Дом
+     * правила — docs/rules/strategy-validation.md.
+     *
+     * <p>Блок параметров, опущенный целиком, здесь не отвергается: его
+     * наличие держит аннотация поверхности, а предмет проверки — окно
+     * объявленного блока. Диапазон держит валидатор, а не аннотация
+     * api-модели, по доводу {@code validateFractionPositive}: именованный
+     * код с аннотацией был бы недостижим.
+     */
+    private void validateStructureLookback(MarketStructureParamsApiModel params, String path,
+                                           List<String> violations) {
+        if (isNull(params)) {
+            return;
+        }
+        Integer lookbackBars = params.getLookbackBars();
+        if (isNull(lookbackBars)) {
+            violations.add(path + " STRATEGY_STRUCTURE_LOOKBACK_NOT_DECLARED: "
+                    + "окно расчёта структуры объявляется явно, умолчания нет");
+            return;
+        }
+        if (lookbackBars <= 0) {
+            violations.add(path + " STRATEGY_STRUCTURE_LOOKBACK_NOT_POSITIVE: "
+                    + "окно расчёта структуры больше нуля баров, получено " + lookbackBars);
         }
     }
 

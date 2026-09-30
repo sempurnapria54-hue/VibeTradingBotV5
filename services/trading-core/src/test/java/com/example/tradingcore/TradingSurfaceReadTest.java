@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
@@ -25,6 +26,7 @@ import com.example.tradingcore.api.model.RiskAppetiteApiRequest;
 import com.example.tradingcore.api.model.RiskAppetiteApiResponse;
 import com.example.tradingcore.api.model.SafetyStateApiResponse;
 import com.example.tradingcore.config.DealContextProperties;
+import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.market.MarketFeatureService;
 import com.example.tradingcore.domain.service.TradingSurfaceService;
@@ -175,14 +177,15 @@ class TradingSurfaceReadTest {
     }
 
     /**
-     * Торговое состояние счёта: ступень и статус едут строками, перечень
-     * пар со стоящей ступенью — идентичностями.
+     * Торговое состояние счёта: ступень и статус едут строками, ступени
+     * стоящих пар — идентичностью инструмента и именем ступени, а не одним
+     * фактом стояния: снятие обязано назвать ступень.
      */
     @Test
     void theSafetyStateCarriesTheRungAndTheStandingPairs() {
         givenAccount();
-        when(pairStates.findInstrumentIdsWithStandingRung(ACCOUNT_ID))
-                .thenReturn(List.of(SECOND_INSTRUMENT_ID));
+        when(pairStates.findWithStandingRung(ACCOUNT_ID))
+                .thenReturn(List.of(pairState(SECOND_INSTRUMENT_ID, Instrument.SafetyRung.ENTRY_BLOCKED)));
         when(instruments.findInternalIdsByIds(anyCollection()))
                 .thenReturn(Map.of(SECOND_INSTRUMENT_ID, SECOND_INSTRUMENT_INTERNAL_ID));
 
@@ -192,8 +195,18 @@ class TradingSurfaceReadTest {
         assertThat(response.getAccountSafetyRung())
                 .isEqualTo(ExchangeAccount.SafetyRung.HOLD.name());
         assertThat(response.getAccountStatus()).isEqualTo(ExchangeAccount.Status.ACTIVE.name());
-        assertThat(response.getInstrumentInternalIdsWithStandingRung())
-                .containsExactly(SECOND_INSTRUMENT_INTERNAL_ID);
+        assertThat(response.getStandingInstrumentRungs())
+                .containsExactly(Map.entry(SECOND_INSTRUMENT_INTERNAL_ID,
+                        Instrument.SafetyRung.ENTRY_BLOCKED.name()));
+    }
+
+    /** Строка пары в названной ступени. */
+    private static AccountInstrumentState pairState(Long instrumentId, Instrument.SafetyRung rung) {
+        AccountInstrumentState state = new AccountInstrumentState();
+        state.setExchangeAccountId(ACCOUNT_ID);
+        state.setInstrumentId(instrumentId);
+        state.setSafetyRung(rung);
+        return state;
     }
 
     /**

@@ -3,6 +3,7 @@ package com.example.tradingcore.mapping;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.api.model.AccountInstrumentStateApiRequest;
 import com.example.tradingcore.api.model.AccountInstrumentStateApiResponse;
@@ -12,6 +13,7 @@ import com.example.tradingcore.api.model.RiskAppetiteApiRequest;
 import com.example.tradingcore.api.model.RiskAppetiteApiResponse;
 import com.example.tradingcore.api.model.SafetyStateApiResponse;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
+import java.util.Map;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
@@ -49,9 +51,8 @@ public interface TradingSurfaceMapper {
     RiskAppetiteApiResponse domainToApi(Tenant tenant);
 
     /**
-     * Торговое состояние счёта в модель ответа. Перечень инструментов со
-     * стоящей ступенью маппером не заполняется — он приходит вторым
-     * чтением, а не полем счёта.
+     * Торговое состояние счёта в модель ответа. Ступени пар маппером не
+     * заполняются — они приходят вторым чтением, а не полем счёта.
      */
     @Mapping(target = "exchangeAccountInternalId", source = "internalId")
     @Mapping(target = "accountSafetyRung", source = "safetyRung")
@@ -69,4 +70,10 @@ public interface TradingSurfaceMapper {
      * маппером не заполняются — их резолвит вызывающий.
      */
     AccountInstrumentStateApiResponse domainToApi(AccountInstrumentState state);
+
+    /**
+     * Ступени пар счёта в модель ответа: ключ — идентичность инструмента,
+     * значение — имя ступени его лестницы.
+     */
+    Map<String, String> domainToApi(Map<String, Instrument.SafetyRung> standingRungs);
 }

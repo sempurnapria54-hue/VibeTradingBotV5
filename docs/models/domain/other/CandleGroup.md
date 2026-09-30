@@ -30,6 +30,7 @@
 | `actualFirstUtcMillis` | `Long` | Время открытия **первой** фактически загруженной свечи группы, UTC мс. |
 | `actualLastUtcMillis` | `Long` | Время открытия **последней** фактически загруженной свечи группы, UTC мс. |
 | `count` | `Long` | Поддерживаемое число свечей в группе (обновляется при записи; основа проверки целостности). |
+| `repairAttempts` | `Integer` | Попытки докачки дыр, израсходованные с последнего подтверждения плотности; пусто читается нулём. Писатель — цикл загрузки (`docs/components/CandleJob.md`): засчитывает попытку состоявшимся проходом `REPAIR`, обнуляет при переходе в `ACTIVE`; превышение предела конфигурации `candle-loading.max-repair-attempts` переводит группу в `ERROR`. Счётчик — поле группы, а не память процесса, потому что гарантия «исчерпаны попытки — `ERROR`» обязана пережить рестарт. |
 
 Пара `(instrumentId, timeframe)` уникальна. `actualFirst`/`actualLast`
 — фактические границы загруженной истории. `count` поддерживается при
@@ -139,8 +140,9 @@ density-инварианта. Идемпотентность записи и ind
   (uk_candle_group_instrument_timeframe) — одна группа на
   инструмент + таймфрейм; `internal_id`
   (uk_candle_group_internal_id) — уникален.
-- `internal_id`, `instrument_id`, `timeframe`, `status`, `count` —
-  `NOT NULL` (`count` default `0`);
+- `internal_id`, `instrument_id`, `timeframe`, `status`, `count`,
+  `repair_attempts` — `NOT NULL` (`count` и `repair_attempts` default
+  `0`: заведённая группа ни свечей, ни попыток не имеет);
   `planned_first_utc_millis` — nullable (глубина не названа);
   `actual_first_utc_millis`/`actual_last_utc_millis` — nullable
   (null при `count = 0`). `internal_id` — `updatable = false`.

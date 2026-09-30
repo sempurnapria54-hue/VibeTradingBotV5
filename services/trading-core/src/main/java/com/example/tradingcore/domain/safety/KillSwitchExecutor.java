@@ -188,11 +188,23 @@ public class KillSwitchExecutor {
      * Один ход снятия риска: ноги → экспозиция → подтверждение закрытия →
      * защита. Каждый вызов границы best-effort: отказ одного не отменяет
      * остальных, потому что реакция снимает риск, а не отчитывается о нём.
+     *
+     * <p><b>Эпизод, заведённый добычей подтверждения, закрывается той же
+     * попыткой.</b> У сделки без строки эпизода — восстановленной до первого
+     * прохода — живой позиции локально нет, и закрывать до добычи нечего;
+     * добыча заводит эпизод, и закрытие уходит сразу, а не следующей
+     * попыткой: иначе при пределе в одну попытку такая сделка не снималась
+     * бы ни одной (docs/components/KillSwitchExecutor.md §Подтверждение).
+     * Порядок инварианта не меняется — ноги сняты раньше, защита остаётся
+     * последней.
      */
     private void teardown(DealContext dealContext) {
         cancelLiveLegs(dealContext);
-        closePositionIfLive(dealContext);
+        Boolean closeSent = closePositionIfLive(dealContext);
         confirmPositionSafely(dealContext);
+        if (isFalse(closeSent) && isTrue(closePositionIfLive(dealContext))) {
+            confirmPositionSafely(dealContext);
+        }
         if (isFalse(dealContext.getDeal().hasLivePositionRisk())) {
             cancelProtection(dealContext);
         }
@@ -212,15 +224,17 @@ public class KillSwitchExecutor {
         }
     }
 
-    private void closePositionIfLive(DealContext dealContext) {
+    /** Закрытие живого эпизода; {@code false} — живого эпизода локально нет, закрытие не отправлялось. */
+    private Boolean closePositionIfLive(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
         Position live = deal.livePosition();
         if (isFalse(deal.hasLivePositionRisk()) || isNull(live)) {
-            return;
+            return false;
         }
         dispatchSafely("close-position", deal.getId(), closePositionExecutor, dealContext, command(deal,
                 ServiceCommandType.CLOSE_POSITION_COMMAND,
                 new ClosePositionCommandPayload(live.getId(), Position.CloseReason.KILL_SWITCH)));
+        return true;
     }
 
     /**

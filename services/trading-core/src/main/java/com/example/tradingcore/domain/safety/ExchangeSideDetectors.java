@@ -62,7 +62,7 @@ public class ExchangeSideDetectors {
         for (String externalInstrumentId : scan.instrumentsWithLiveEntities()) {
             try {
                 if (isFalse(contour.contains(externalInstrumentId))) {
-                    outsideContour(externalInstrumentId, account);
+                    outsideContour(scan, externalInstrumentId, account);
                     continue;
                 }
                 duplicatePosition(scan, externalInstrumentId, account);
@@ -82,13 +82,14 @@ public class ExchangeSideDetectors {
      * тропы «дотянуть спецификацию и допустить инструмент» не
      * существует, — поэтому риск не может быть приписан ничему.
      */
-    private void outsideContour(String externalInstrumentId, ExchangeAccount account) {
+    private void outsideContour(AnomalyScan scan, String externalInstrumentId, ExchangeAccount account) {
         log.warn("Live entity on an instrument outside the contour externalInstrumentId={}",
                 externalInstrumentId);
         reaction.apply(AnomalyFinding.builder()
                 .scope(HoldScope.EXCHANGE_ACCOUNT)
                 .rung(HoldRung.HARD)
                 .code(Constants.Hold.EXCHANGE_FOREIGN_INSTRUMENT_RISK)
+                .externalObservation(scan.observedRowsOf(externalInstrumentId))
                 .hysteresisTicks(WITHOUT_HYSTERESIS)
                 .journalOnly(false)
                 .build(), account);
@@ -110,6 +111,7 @@ public class ExchangeSideDetectors {
                 .scope(HoldScope.EXCHANGE_ACCOUNT)
                 .rung(HoldRung.HARD)
                 .code(Constants.Hold.EXCHANGE_POSITION_MODE_VIOLATION)
+                .externalObservation(scan.observedRowsOf(externalInstrumentId))
                 .hysteresisTicks(WITHOUT_HYSTERESIS)
                 .journalOnly(false)
                 .build(), account);
@@ -139,6 +141,7 @@ public class ExchangeSideDetectors {
                 .scope(HoldScope.EXCHANGE_ACCOUNT)
                 .rung(HoldRung.HARD)
                 .code(Constants.Hold.EXCHANGE_FOREIGN_ORDER)
+                .externalObservation(scan.observedRowsOf(externalInstrumentId))
                 .hysteresisTicks(CONFIRMED_NEXT_TICK)
                 .journalOnly(false)
                 .build(), account);

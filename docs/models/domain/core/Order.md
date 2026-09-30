@@ -44,7 +44,15 @@
 | `attachedAlgoOrders` | `List<AttachedAlgoOrder>` | Встроенная защита. |
 
 **Доменные методы:** `isLive`, `isEntryLeg`, `isReducingLeg`,
-`toCancel(reason)`, `toComplete`, `toError(reason)`.
+`canTransitionTo(target)`, `toCancel(reason)`, `toComplete`,
+`toError(reason)`, `toNotPlaced`.
+
+Переходы состояний идут через строгую матрицу, как у двух соседей по
+жизненному циклу: ребро вне матрицы отказывает броском, не трогая ни
+статуса, ни причины. Переводящие методы у модели есть только у
+терминальных рёбер; рёбра в `PENDING`, `ACTIVE` и `PARTIALLY_COMPLETED`
+ставят исполнители отправки и добычи, и матрицу им даёт предикат
+`canTransitionTo`.
 
 
 ## Енум `Side`

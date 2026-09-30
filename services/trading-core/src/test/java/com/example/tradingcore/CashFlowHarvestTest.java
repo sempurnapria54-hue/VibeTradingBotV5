@@ -1,9 +1,10 @@
 package com.example.tradingcore;
 
-import static java.util.Objects.isNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -223,17 +225,38 @@ class CashFlowHarvestTest {
     }
 
     /**
-     * Запись, уже приземлённая по ключу идемпотентности, второй строки не
-     * порождает: повторный проход перечитывает окно целиком.
+     * Запись, уже приземлённая прежним проходом, отсекается ДО лестницы
+     * курса: повторный проход перечитывает окно целиком, и без отсечки
+     * каждая старая строка заново платила бы вызовами источника.
      */
     @Test
-    void anAlreadyLandedRecordIsNotStoredTwice() {
-        givenPipeline(flow("bill-1", "2", null, SETTLE, "1"));
-        when(cashFlowDataService.exists(ACCOUNT_ID, "bill-1")).thenReturn(true);
+    void anAlreadyLandedRecordIsCutOffBeforeTheRateLadder() {
+        givenPipeline(flow("bill-1", "2", null, "BTC", "0.01"));
+        when(cashFlowDataService.findLandedBillIds(ACCOUNT_ID, List.of("bill-1"))).thenReturn(Set.of("bill-1"));
 
         executor.execute(command(), row(), context(deal()));
 
-        verify(cashFlowDataService, never()).save(any());
+        verify(cashFlowDataService, never()).saveIfAbsent(any());
+        verify(exchange, never()).getIndexCandleAt(any(), any(), any());
+    }
+
+    /**
+     * Запись, приземлённая ДРУГИМ писателем между отсечкой и вставкой,
+     * поглощается ключом, а не роняет проход: дедуп держит вставка
+     * (docs/rules/idempotency-via-unique.md). Поглощённая строка этим
+     * проходом не приземлена — возникновения корзины она не объявляет, его
+     * отчитал писатель-победитель.
+     */
+    @Test
+    void aRecordLandedByAConcurrentWriterIsAbsorbedWithoutJournaling() {
+        givenPipeline(flow("bill-1", "999", null, SETTLE, "1"));
+        doReturn(false).when(cashFlowDataService).saveIfAbsent(any());
+
+        ServiceCommandExecutionResult result = executor.execute(command(), row(), context(deal()));
+
+        assertThat(savedFlows()).isEmpty();
+        verify(anomalyReportService, never()).journalState(any(), any(), any());
+        assertThat(result.getSuccess()).isTrue();
     }
 
     /**
@@ -281,15 +304,14 @@ class CashFlowHarvestTest {
         when(exchange.getBillsArchive(eq(ACCOUNT), any(), eq(SOURCE_TIME))).thenReturn(List.of());
         when(cashFlowDataService.findUnclassifiedByDeal(DEAL_ID)).thenReturn(List.of());
         when(cashFlowDataService.unclassifiedBasketStands(ACCOUNT_ID)).thenReturn(false);
-        when(cashFlowDataService.exists(any(), any())).thenReturn(false);
-        when(cashFlowDataService.save(any())).thenAnswer(call -> {
+        when(cashFlowDataService.findLandedBillIds(eq(ACCOUNT_ID), anyList())).thenReturn(Set.of());
+        when(cashFlowDataService.saveIfAbsent(any())).thenAnswer(call -> {
             DealCashFlow flow = call.getArgument(0);
-            if (isNull(flow.getId())) {
-                flow.setId(ids.incrementAndGet());
-                stored.add(flow);
-            }
-            return flow;
+            flow.setId(ids.incrementAndGet());
+            stored.add(flow);
+            return true;
         });
+        when(cashFlowDataService.save(any())).thenAnswer(call -> call.getArgument(0));
         when(cashFlowDataService.findByDeal(DEAL_ID)).thenReturn(stored);
     }
 

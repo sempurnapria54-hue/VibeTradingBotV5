@@ -103,8 +103,8 @@ final class FsmFixture {
         deal.setDirection(StrategyTradeDirection.LONG);
         deal.setEntryReason(Deal.EntryReason.STRATEGY);
         deal.setTranches(new ArrayList<>(List.of(tranches)));
-        deal.setOrders(new ArrayList<>());
-        deal.setAlgoOrders(new ArrayList<>());
+        deal.setUnattributedOrders(new ArrayList<>());
+        deal.setUnattributedAlgoOrders(new ArrayList<>());
         deal.setPositions(new ArrayList<>());
         return deal;
     }

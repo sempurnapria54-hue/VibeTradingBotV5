@@ -6,7 +6,7 @@
 
 ## Правило
 
-`OkxIntegrationService` сам выставляет в request body всех операций
+Коннектор сам выставляет в request body всех операций
 `Order`/`AlgoOrder`/`Position`:
 
 - `tdMode = isolated` — режим торговли;
@@ -19,7 +19,9 @@ OKX.
 
 ## Где применяется
 
-- `OkxIntegrationService` (создание/отмена ордеров, close-position);
+- мапперы запроса `OrderMapper` и `AlgoOrderMapper` (постановка заявки
+  и algo-заявки) и читатель источника `OkxSourceReader` (close-position,
+  установка плеча);
 - adapter validation при refresh (request rejected, если received
   значение ≠ ожидаемого).
 

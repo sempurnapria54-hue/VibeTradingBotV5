@@ -144,7 +144,12 @@ class TeardownReportPathTest {
         assertThat(local.has("dealInternalId")).as("E4.1: идентичности сделки нет").isFalse();
         assertThat(local.has("orderIds")).as("E4.1: ног траншей нет").isFalse();
         assertThat(local.has("instrumentId")).as("E4.1: полей инструмента нет").isFalse();
-        assertThat(report.get("external_before")).as("E4.1: внешнего снимка нет вовсе").isNull();
+        JsonNode external = Json.tree(String.valueOf(report.get("external_before")));
+        assertThat(external.path("instrumentExternalId").asString())
+                .as("E4.1: внешний снимок «до» — срез прохода по адресу находки").isEqualTo(Trail.EXTERNAL_INSTRUMENT);
+        assertThat(external.path("positions").size()).as("E4.1: и несёт живую позицию").isEqualTo(1);
+        assertThat(external.path("pendingOrders").findValuesAsString("externalId"))
+                .as("E4.1: и заявку, вызвавшую отчёт").containsExactly("okx-hand-1");
         assertThat(escalationTick.stream().map(request -> request.getLoggedDate().toInstant())
                 .filter(at -> at.isAfter(opened) && at.isBefore(firstCommand)))
                 .as("E4.1: перед первой командой к стабу не ушло чтения состояния").isEmpty();

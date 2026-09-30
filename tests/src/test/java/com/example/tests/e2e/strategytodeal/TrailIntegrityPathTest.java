@@ -137,9 +137,10 @@ class TrailIntegrityPathTest {
                 .containsOnly("GET " + Trail.PEER_INSTRUMENTS, "GET " + Trail.PEER_INSTRUMENTS + "/"
                         + Trail.INSTRUMENT + "/rules", "POST " + Trail.PEER_FEATURES);
         List<String> exchange = paths(trail.exchange().requests());
-        assertThat(exchange).as("E8.2: у площадки — ставка комиссии, момент, средства, плечо, постановка, "
-                        + "добыча заявки и её защиты; иных обращений нет")
-                .containsOnly("GET " + Trail.EXCHANGE_FEE, "GET " + Trail.EXCHANGE_TIME,
+        assertThat(exchange).as("E8.2: у площадки — ставка комиссии, три среза детекции, момент, средства, "
+                        + "плечо, постановка, добыча заявки и её защиты; иных обращений нет")
+                .containsOnly("GET " + Trail.EXCHANGE_FEE, "GET " + Trail.EXCHANGE_POSITIONS,
+                        "GET " + Trail.EXCHANGE_ORDERS_PENDING, "GET " + Trail.EXCHANGE_TIME,
                         "GET " + Trail.EXCHANGE_BALANCE, "POST " + Trail.EXCHANGE_LEVERAGE,
                         "POST " + Trail.EXCHANGE_ORDER, "GET " + Trail.EXCHANGE_ORDER,
                         "GET " + Trail.EXCHANGE_ALGO_PENDING);
@@ -248,8 +249,15 @@ class TrailIntegrityPathTest {
                 today()).getFirst();
     }
 
+    /**
+     * Классы записей темы, несущих ключ тенанта тропы. Стенд общий: проход
+     * детекции, которым предусловие ставит наблюдение, идёт по всем его
+     * счетам, и у счетов прежних пар оставляет отчёты под их тенантами — это
+     * след чужих пар, а не этой тропы.
+     */
     private static List<String> eventTypes(String topic) {
         return trail.records(topic).stream()
+                .filter(record -> Objects.equals(record.key(), trail.tenant()))
                 .map(record -> record.headers().lastHeader("eventType"))
                 .filter(Objects::nonNull)
                 .map(Header::value)

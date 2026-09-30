@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +65,9 @@ class EntryScanBoxTest extends SharedTradingCoreBox {
 
     /** След отказа отбора по одному счёту в журнале приложения. */
     private static final String SCAN_FAILED = "Entry scan failed exchangeAccountId=";
+
+    /** След счёта, пропущенного гейтом возраста наблюдения. */
+    private static final String UNOBSERVED = "Entry scan skipped: no anomaly detection pass observed the account";
 
     @Test
     @DisplayName("B1.1 — активное определение на свободной паре заводит сделку и её транши")
@@ -211,7 +216,7 @@ class EntryScanBoxTest extends SharedTradingCoreBox {
         // Пара под ступенью не читалась вовсе — она выпала до чтения фич.
         assertThat(marketData.count(featuresPath(INSTRUMENT))).isZero();
         assertThat(get(SAFETY_STATES + "/" + ACCOUNT).asObject()
-                .get("instrumentInternalIdsWithStandingRung")).isEqualTo(List.of(INSTRUMENT));
+                .get("standingInstrumentRungs")).isEqualTo(Map.of(INSTRUMENT, "ENTRY_BLOCKED"));
     }
 
     @Test
@@ -364,6 +369,56 @@ class EntryScanBoxTest extends SharedTradingCoreBox {
         assertThat(eventTypes()).doesNotContain(ORDER_DECIDED);
     }
 
+    @Test
+    @DisplayName("B1.15 — счёт, не наблюдавшийся детекцией, риска не набирает, пока проход его не наблюдёт")
+    void anAccountUnobservedByDetectionOpensNothingUntilAPassObservesIt() {
+        project(List.of(ACCOUNT), List.of(INSTRUMENT));
+        featuresOf(INSTRUMENT, MarketPhase.Type.BULL_TREND);
+        exchangeMoment();
+        activate(entryDefinition(DEFINITION, INSTRUMENT, MarketPhase.Type.BULL_TREND));
+        // Возраст данных ставится в данных: наблюдения у счёта не было.
+        rows.put("update exchange_accounts set observed_pass_at = null where internal_id = ?", ACCOUNT);
+        Integer mark = AppLog.mark();
+
+        tick(Tick.ENTRY_SCANNER);
+
+        // Молчание детекции разрешением не является: сделки нет, и гейт стои́т
+        // до всякого чтения наружу.
+        assertThat(rows.count("deals")).isZero();
+        assertThat(marketData.count()).isZero();
+        assertThat(AppLog.since(mark)).contains(UNOBSERVED);
+
+        // Тропой ящика — проходом детекции, чей срез добыт целиком, — счёт
+        // наблюдён, и тот же вход открывается.
+        standCleanScan();
+        tick(Tick.ANOMALY_DETECTION);
+        tick(Tick.ENTRY_SCANNER);
+
+        assertThat(get(DEALS + "?exchangeAccountInternalId=" + ACCOUNT).single().get("status"))
+                .isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("B1.16 — наблюдение старше допуска закрывает вход так же, как его отсутствие")
+    void anObservationOlderThanTheToleranceClosesTheEntry() {
+        project(List.of(ACCOUNT), List.of(INSTRUMENT));
+        featuresOf(INSTRUMENT, MarketPhase.Type.BULL_TREND);
+        exchangeMoment();
+        activate(entryDefinition(DEFINITION, INSTRUMENT, MarketPhase.Type.BULL_TREND));
+        // Штатный допуск — минуты; сутки заведомо старше любого его
+        // разведочного значения (application.yaml, entry-scanner).
+        observedAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(1));
+
+        tick(Tick.ENTRY_SCANNER);
+
+        // Тик детекции, не исполнившийся вовсе, счёта слепоты не двигает, а
+        // возраст наблюдения растёт: гейт спрашивает возраст.
+        assertThat(rows.count("deals")).isZero();
+        assertThat(marketData.count()).isZero();
+        assertThat(((Number) rows.row("exchange_accounts", "internal_id", ACCOUNT).get("blind_pass_count"))
+                .intValue()).isZero();
+    }
+
     // ------------------------------------------------------------------
     // Предусловия и наблюдатели группы
     // ------------------------------------------------------------------
@@ -424,6 +479,26 @@ class EntryScanBoxTest extends SharedTradingCoreBox {
                                    entry_reason)
                 values (?, ?, ?, ?, 'LONG', 'RECOVERY')
                 """, internalId, accountId(ACCOUNT), instrumentId(instrumentInternalId), status);
+    }
+
+    /**
+     * Момент последнего наблюдённого прохода детекции прямой записью: это
+     * возраст данных, а он в ящике ставится в данных (шапка
+     * {@link TradingCoreBox}).
+     */
+    private void observedAt(OffsetDateTime moment) {
+        rows.put("update exchange_accounts set observed_pass_at = ? where internal_id = ?", moment, ACCOUNT);
+    }
+
+    /**
+     * Три среза проактивной детекции у стаба коннектора — все добыты и пусты:
+     * проход по счёту без сделок наблюдён и чист.
+     */
+    private void standCleanScan() {
+        String account = "/api/v1/accounts/" + ACCOUNT;
+        connector.answers(account + "/positions", Feed.emptyArray());
+        connector.answers(account + "/orders/pending", Feed.emptyArray());
+        connector.answers(account + "/algo-orders/pending", Feed.emptyArray());
     }
 
     /** Классы событий строк outbox в порядке записи. */

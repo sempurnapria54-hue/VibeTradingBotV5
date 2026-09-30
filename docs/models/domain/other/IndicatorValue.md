@@ -106,13 +106,11 @@ OBV; сейчас не заведён (каталог расширяем по п
 Все числовые поля — `BigDecimal`. Волатильность отдельной сущностью не
 моделируется — через `AtrValue` / `BollingerBandsValue.bandwidth`.
 
-**Адресный компонент в условии (D1).** Многокомпонентные типы (`MACD`,
-`STOCHASTIC`, `BOLLINGER_BANDS`) в операнде условия адресуются полем
-`StrategyConditionOperand.indicatorComponent` — автор выбирает осмысленную
-часть (например, `MACD_LINE`/`HISTOGRAM`, `STOCH_K`, `PERCENT_B`); снимает
-масштаб-зависимость абсолютного compare. Одно-компонентные (`EMA`/`RSI`/
-`ATR`/`OBV`/`EFFICIENCY_RATIO`) компонент не несут. Контракт и справочник
-«тип → компоненты» — `docs/rules/strategy-condition-contract.md`,
+**Адресный компонент в условии (D1).** Значение многокомпонентного типа
+операнд условия адресует компонентом
+(`StrategyConditionOperand.indicatorComponent`). Какие типы
+многокомпонентны, какие компоненты допустимы у каждого и какое поле
+значения компонент выбирает — дом `docs/rules/strategy-condition-contract.md`;
 грунт — `docs/models/domain/other/MarketStructure.md`.
 
 ## Персистентность

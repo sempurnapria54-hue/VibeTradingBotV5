@@ -79,6 +79,14 @@ public interface AccountInstrumentStateRepository extends JpaRepository<AccountI
                                         @Param("rungs") Collection<String> rungs);
 
     /**
+     * Строки пар счёта, стоящие в НАЗВАННЫХ ступенях, — для читателя,
+     * которому нужна сама ступень, а не факт её стояния. Одним запросом на
+     * счёт по тому же доводу, что у проекции выше.
+     */
+    List<AccountInstrumentStateEntity> findByExchangeAccountIdAndSafetyRungIn(Long exchangeAccountId,
+                                                                              Collection<String> safetyRungs);
+
+    /**
      * Подъём ступени пары, <b>гардированный стоящей ступенью</b>: строка
      * переставляется, только если она стои́т в одной из перечисленных
      * (более низких) ступеней. Возвращает число применённых строк — оно и

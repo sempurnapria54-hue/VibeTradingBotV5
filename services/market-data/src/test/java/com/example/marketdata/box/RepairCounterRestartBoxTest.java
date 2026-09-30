@@ -13,7 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
@@ -54,16 +53,13 @@ class RepairCounterRestartBoxTest extends MarketDataBox {
      * переживает рестарт (docs/models/domain/other/CandleGroup.md
      * §Структура).
      *
-     * <p>Сегодня счётчик лежит в памяти процесса
-     * ({@code CandleLoader.repairAttempts}), и после перезапуска отсчёт
-     * начинается заново — группа с неустранимой дырой не доходит до
-     * терминала никогда. Долг — `.claude/work/backlog.md` §«Дефекты
-     * донора, воспроизведённые портом».
+     * <p>Прежде счётчик лежал в памяти процесса, и после перезапуска отсчёт
+     * начинался заново — группа с неустранимой дырой не доходила до
+     * терминала никогда; клетка стояла красной под меткой {@code debt}.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("B3.9 — счётчик попыток не переживает рестарт")
-    void b3_9_theAttemptCounterDoesNotSurviveARestart() {
+    @DisplayName("B3.9 — счётчик попыток переживает рестарт")
+    void b3_9_theAttemptCounterSurvivesARestart() {
         String instrument = provisionInstruments(INSTRUMENT).getFirst();
         requireCandles(instrument, HOUR, 300L);
         connector.answers(ConnectorStub.HISTORY_CANDLES,

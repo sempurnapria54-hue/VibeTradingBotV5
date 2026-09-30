@@ -15,7 +15,7 @@ Snapshot — нормализованный граничный объект; е�
 |---|---|---|
 | `internalId` | `Order.internalId` | stable client id (сверка) |
 | `externalId` | `Order.externalId` | биржевой id (сохраняется при первом известном значении) |
-| `externalInstrumentId` | — | биржевое имя инструмента (`instId`). Приземляется в снапшот ради **счёт-широкого среза**: он читается по счёту, и строку адресует инструментом только это поле (`docs/components/AnomalyJob.md`). В `Order` не идёт — там инструмент известен из графа сделки |
+| `externalInstrumentId` | `Order.externalInstrumentId` | биржевое имя инструмента (`instId`), переносится по имени. **Атрибут границы, а не поле строки:** колонки под него нет, в наш числовой идентификатор на границе не резолвится — дом правила `docs/models/domain/core/Order.md`. Читает его **счёт-широкий срез**: строки там по разным инструментам, и адресует строку инструментом только это поле (`docs/components/AnomalyJob.md`) |
 | — | `Order.type` | **не выводится из снапшота**: бизнес-тип заявки наш, его ставит создатель ноги (`docs/models/domain/core/Order.md` §Структура), и эхо площадки его не трогает, как не трогает статус. Площадка отдаёт тип **исполнения** (`ordType`: `limit`, `market`), а не род заявки, — и в снапшот он не приземляется (§«`OrderOkxResponse` → `OrderExternalSnapshot`» ниже) |
 | `side` | `Order.side` | `BUY`/`SELL`. **Здесь и происходит перевод словаря площадки в доменный перечень:** в снапшоте лежит литерал источника (`buy`/`sell` у OKX), в домене — `Order.Side`. Снапшот принадлежит коннектору (`docs/architecture/services.md` §«Общие артефакты монорепозитория»), поэтому перевод не пересекает границу домена ни в одну сторону |
 | `externalStatus` | — | raw статус, режим diagnostic; в FSM не используется (`external-status-resolution.md`) |
@@ -120,6 +120,7 @@ evidence-cycle (специфика per-source — см. подразделы). �
 |---|---|
 | `clOrdId` | `internalId` |
 | `ordId` | `externalId` |
+| `instId` | `externalInstrumentId` |
 | `ordType` | **не маппится**: тип исполнения площадки доменного адресата не имеет — бизнес-тип заявки наш (§«`OrderExternalSnapshot` → `Order`» выше) |
 | `side` | `side` |
 | `state` | `externalStatus` (raw, не для FSM напрямую) |
@@ -327,11 +328,3 @@ required»). `algoId` материализованной записи нам н�
 `after`/`before` — якорь по `ordId` (не времени), `limit ≤ 100`.
 Глубокая выкачка: `after = min(ordId)` → следующая страница. История
 7 дней дополнительно поддерживает `begin`/`end` по `cTime` (ms).
-
-## Целевые расхождения с текущим кодом (target refactoring)
-
-- `createOrder` не должен принимать `tradeMode`/`positionSide`
-  аргументами — `OkxIntegrationService` сам ставит `isolated`/`net`.
-- `OrderResponse.state` комментарий: raw статус OKX; pending —
-  `live`/`partially_filled`; details/history — `filled`/`canceled`/
-  `mmp_canceled` и др. terminal.

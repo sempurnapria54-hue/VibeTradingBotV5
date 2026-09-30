@@ -125,7 +125,7 @@ class DealActiveInputChecksTest {
     @DisplayName("U7.5 — живая заявка сделки, не приписанная траншу: ошибочная тропа тем же составом")
     void u7_5_anUnattributedLiveOrderTakesTheErrorPath() {
         DealContext context = contextOf(exposedTranche("2"), livePosition("2"));
-        context.getDeal().getOrders().add(liveEntryLeg(90L, null));
+        context.getDeal().getUnattributedOrders().add(liveEntryLeg(90L, null));
         harness.givenSystemCommand(SystemActionType.FINALIZE_DEAL_ERROR_ACTION,
                 ServiceCommandType.MARK_DEAL_ERROR_COMMAND);
 

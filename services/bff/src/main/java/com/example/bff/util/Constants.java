@@ -95,10 +95,23 @@ public class Constants {
 
         /**
          * Идентичность последнего полученного события. Браузер шлёт её
-         * сам, пока переподключается своя подписка; после пересоздания
-         * подписки — клиент.
+         * сам, пока переподключается своя подписка; непустая — старше
+         * параметра адреса {@link StreamParameters#LAST_EVENT_ID}.
          */
         public static final String LAST_EVENT_ID = "Last-Event-ID";
+    }
+
+    /** Параметры адреса подписки на поток в браузер. */
+    @UtilityClass
+    public static class StreamParameters {
+
+        /**
+         * Идентичность последнего полученного события при ПЕРЕСОЗДАНИИ
+         * подписки: браузерный {@code EventSource} заголовков не ставит, и
+         * клиент передаёт её адресом рядом с билетом. Непустой заголовок
+         * {@link StreamHeaders#LAST_EVENT_ID} её старше.
+         */
+        public static final String LAST_EVENT_ID = "lastEventId";
     }
 
     /** Имена полей конверта события в заголовках сообщения. */

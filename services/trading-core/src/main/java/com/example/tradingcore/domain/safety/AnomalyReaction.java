@@ -9,6 +9,7 @@ import com.example.tradingcore.config.AnomalyJobProperties;
 import com.example.tradingcore.config.AnomalyReportProperties;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.persistence.service.AnomalyReportDataService;
+import com.example.tradingcore.util.Constants;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
@@ -52,11 +53,16 @@ public class AnomalyReaction {
     /**
      * Применить реакцию по находке: поднять ступень либо записать
      * наблюдение и ждать подтверждения следующим тиком.
+     *
+     * <p>Наблюдённые строки находки едут контекстом: по нему отчёт
+     * собирает внешний снимок на любой из троп — журнальной, мягкой и
+     * полной, — не читая площадку второй раз.
      */
     public void apply(AnomalyFinding finding, ExchangeAccount account) {
         DealContext context = DealContext.builder()
                 .exchangeAccount(account)
                 .instrument(finding.getInstrument())
+                .externalObservation(finding.getExternalObservation())
                 .build();
         if (isTrue(reactsOnFirstSight(finding))) {
             holdService.raise(signalOf(finding), context);
@@ -82,6 +88,23 @@ public class AnomalyReaction {
      */
     public void breakUnobservedSeries(ExchangeAccount account, OffsetDateTime passStartedAt) {
         reportDataService.breakSeries(account.getId(), passStartedAt);
+    }
+
+    /**
+     * Реакция на контролируемое исключение границы, пришедшее на чтении среза
+     * счёта: безусловная биржевая ступень 2 тем же кодом, что у всякой тропы
+     * (docs/rules/controlled-exchange-exceptions.md §«Реакция — безусловная
+     * биржевая ступень 2»).
+     *
+     * <p><b>Гистерезиса здесь нет, и это не пропуск.</b> Признак — не
+     * расхождение БД с биржей, которое производит гонка чтения, а ответ
+     * площадки, нарушивший контракт, — наш незавершённый ход его не
+     * производит. Сущности и сделки у отказа среза нет: из состава реакции
+     * остаётся её счётная часть, и контекст несёт только счёт.
+     */
+    public void controlledFailure(ExchangeAccount account) {
+        holdService.raise(HoldSignal.exchangeAccount(Constants.Hold.EXCHANGE_CONTROLLED_FAILURE),
+                DealContext.builder().exchangeAccount(account).build());
     }
 
     /**

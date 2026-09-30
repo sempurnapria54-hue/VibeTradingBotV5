@@ -25,10 +25,10 @@
 - **Query:** `ccy` — опционально, одна валюта или список до 20 через
   запятую. Для runtime бота передаётся settle currency инструмента
   (SWAP/USDT risk и sizing требуют обязательную `USDT`-запись).
-- **Auth headers (private REST):** `OK-ACCESS-KEY`, `OK-ACCESS-SIGN`,
-  `OK-ACCESS-TIMESTAMP`, `OK-ACCESS-PASSPHRASE`,
-  `Content-Type: application/json`. Demo trading:
-  `x-simulated-trading: 1`.
+- **Auth (private REST):** подпись и её заголовки —
+  `docs/integrations/okx/rules/request-signing.md`; контур demo —
+  `docs/integrations/okx/contracts/service-urls.md`;
+  `Content-Type: application/json`.
 
 ## Структура response (упрощённо)
 

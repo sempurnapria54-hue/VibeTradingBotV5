@@ -12,13 +12,4 @@ public interface MembershipRepository extends JpaRepository<MembershipEntity, Lo
 
     /** Членства пользователя — вход резолва контекста тенанта. */
     List<MembershipEntity> findAllByUserId(String userId);
-
-    /**
-     * Есть ли у тенанта членство с этой ролью.
-     *
-     * <p>Инвариант «ровно одно членство `OWNER`» держит уникальный
-     * частичный индекс схемы; предикат нужен исполнителю, чтобы отказать
-     * ДО вставки внятной причиной, а не ловить нарушение ограничения.
-     */
-    Boolean existsByTenantIdAndRole(String tenantId, String role);
 }

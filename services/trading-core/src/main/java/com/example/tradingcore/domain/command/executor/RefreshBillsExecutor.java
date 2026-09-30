@@ -36,11 +36,13 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -112,9 +114,14 @@ public class RefreshBillsExecutor implements CommandExecutor {
         reclassifyUnclassified(deal.getId(), contour);
         Boolean basketStood = dealCashFlowDataService.unclassifiedBasketStands(account.getId());
 
-        List<Long> persistedNow = new ArrayList<>();
+        Set<String> landedBefore = dealCashFlowDataService.findLandedBillIds(account.getId(),
+                fetched.stream().map(DealCashFlow::getExternalBillId).collect(Collectors.toList()));
+        Set<String> persistedNow = new HashSet<>();
         List<DealCashFlow> unclassifiedNow = new ArrayList<>();
         for (DealCashFlow flow : fetched) {
+            if (landedBefore.contains(flow.getExternalBillId())) {
+                continue;
+            }
             persistRow(flow, dealContext, contour, lowerBound, sourceTime, persistedNow, unclassifiedNow);
         }
         // Отчёт заводится ровно на ВОЗНИКНОВЕНИЕ состояния: корзина стояла
@@ -168,29 +175,34 @@ public class RefreshBillsExecutor implements CommandExecutor {
     }
 
     /**
-     * Приземление одной строки: дедуп по ключу идемпотентности, категория,
-     * линковка и курс — одной транзакцией. Строка, уже стоящая по ключу,
-     * пропускается: повторный проход перечитывает окно и новых строк не
-     * порождает.
+     * Приземление одной строки: категория, линковка и курс — и вставка по
+     * ключу идемпотентности, одной транзакцией.
+     *
+     * <p><b>Дедуп держит вставка, а не отсечка перед ней</b>
+     * (docs/rules/idempotency-via-unique.md): уже приземлённые записи
+     * отсекаются до этого метода ради объёма — лестница курса у них не
+     * гоняется заново, — а запись, приземлённая другим писателем между
+     * отсечкой и вставкой, поглощается ключом. Поглощённая строка этим
+     * проходом не приземлена: ни в перечень приземлённых сейчас, ни в
+     * возникновение корзины она не входит — её отчитал писатель-победитель.
      */
     private void persistRow(DealCashFlow flow, DealContext dealContext,
                             ExchangeContourProperties.Contour contour, OffsetDateTime lowerBound,
-                            OffsetDateTime sourceTime, List<Long> persistedNow,
+                            OffsetDateTime sourceTime, Set<String> persistedNow,
                             List<DealCashFlow> unclassifiedNow) {
-        Long accountId = dealContext.getExchangeAccount().getId();
-        if (isTrue(dealCashFlowDataService.exists(accountId, flow.getExternalBillId()))) {
-            return;
-        }
-        flow.setExchangeAccountId(accountId);
+        flow.setExchangeAccountId(dealContext.getExchangeAccount().getId());
         resolveCategory(flow, contour);
-        if (DealCashFlow.CashFlowCategory.OTHER.equals(flow.getCategory())) {
-            unclassifiedNow.add(flow);
-        }
         if (isTrue(linksToDeal(flow, dealContext, lowerBound, sourceTime))) {
             flow.setDealId(dealContext.getDeal().getId());
         }
         applyRateLadder(flow, dealContext);
-        persistedNow.add(dealCashFlowDataService.save(flow).getId());
+        if (isFalse(dealCashFlowDataService.saveIfAbsent(flow))) {
+            return;
+        }
+        persistedNow.add(flow.getExternalBillId());
+        if (DealCashFlow.CashFlowCategory.OTHER.equals(flow.getCategory())) {
+            unclassifiedNow.add(flow);
+        }
     }
 
     /**
@@ -351,16 +363,18 @@ public class RefreshBillsExecutor implements CommandExecutor {
     /**
      * Догон курса и счёт оставшихся блокирующих строк. Строки прежних
      * проходов пробуют лестницу заново; строки ЭТОГО прохода повторно не
-     * гоняются — их лестница только что отработала.
+     * гоняются — их лестница только что отработала. Строка этого прохода
+     * узнаётся по идентификатору записи: ключ идемпотентности уникален в
+     * пределах счёта, а строки сделки все одного счёта.
      */
     private Long retryAndCountBlocking(Long dealId, DealContext dealContext,
-                                       ExchangeContourProperties.Contour contour, List<Long> persistedNow) {
+                                       ExchangeContourProperties.Contour contour, Set<String> persistedNow) {
         long blocking = 0L;
         for (DealCashFlow flow : dealCashFlowDataService.findByDeal(dealId)) {
             if (isFalse(PENDING_RATE_STATUSES.contains(flow.getRateStatus()))) {
                 continue;
             }
-            if (isFalse(persistedNow.contains(flow.getId()))) {
+            if (isFalse(persistedNow.contains(flow.getExternalBillId()))) {
                 applyRateLadder(flow, dealContext);
                 dealCashFlowDataService.save(flow);
             }

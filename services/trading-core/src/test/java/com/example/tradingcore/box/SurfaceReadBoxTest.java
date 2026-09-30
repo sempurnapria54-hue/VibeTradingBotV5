@@ -134,7 +134,7 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
-    @DisplayName("B11.4 — торговое состояние счёта показывает ступень и инструменты со стоящей ступенью")
+    @DisplayName("B11.4 — торговое состояние счёта показывает свою ступень и ступени стоящих пар")
     void theSafetyStateOfAnAccountNamesItsRungAndOnlyThePairsThatStand() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT,
                 SECOND_INSTRUMENT, SECOND_EXTERNAL_INSTRUMENT));
@@ -146,12 +146,13 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
         assertThat(answer.status()).isEqualTo(200);
         assertThat(answer.asObject().get("exchangeAccountInternalId")).isEqualTo(ACCOUNT);
         assertThat(answer.asObject().get("accountSafetyRung")).isEqualTo("HOLD");
-        // Назван ровно тот инструмент, у которого ступень СТОИ́Т: второй в
-        // ответе не появляется — строки состояния у него нет вовсе
-        // (docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо и от
-        // автоматики, и друг от друга»).
-        assertThat(answer.asObject().get("instrumentInternalIdsWithStandingRung"))
-                .isEqualTo(List.of(INSTRUMENT));
+        // Назван ровно тот инструмент, у которого ступень СТОИ́Т, и названа
+        // сама ступень — мягкая ступень пары своей лестницей: второй
+        // инструмент в ответе не появляется — строки состояния у него нет
+        // вовсе (docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо
+        // и от автоматики, и друг от друга»).
+        assertThat(answer.asObject().get("standingInstrumentRungs"))
+                .isEqualTo(Map.of(INSTRUMENT, "ENTRY_BLOCKED"));
         assertThat(answer.body()).doesNotContain(SECOND_INSTRUMENT);
         assertThat(answer.body()).doesNotContain("\"id\":");
     }

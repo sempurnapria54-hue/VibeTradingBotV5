@@ -1,5 +1,6 @@
 package com.example.tradingcore.config;
 
+import com.example.tradingcore.integration.internal.event.StrategyFactErrorHandler;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -45,6 +46,12 @@ import org.springframework.kafka.core.ProducerFactory;
  * оставила бы ядро без копии определения, по которому оно торгует, а тема
  * фактов хранится сроком заведомо большим допустимого отставания
  * (docs/architecture/data-ownership.md §«Outbox и доставка»).
+ *
+ * <p><b>Исход отказа применения объявлен, а не взят умолчанием.</b>
+ * Умолчание клиента пропускало запись после десяти немедленных попыток,
+ * то есть теряло активацию молча; обработчик отказа откладывает применение
+ * всякой записи, кроме отравленной ({@link StrategyFactErrorHandler},
+ * docs/architecture/data-ownership.md §«Копии чужих данных»).
  *
  * <p><b>Слушатель не запускается при ненастроенной тропе.</b> Пустой адрес
  * брокера — объявленное состояние ({@link BrokerProperties}); контейнер,
@@ -93,13 +100,18 @@ public class CoreKafkaConfig {
      * {@code @KafkaListener} по умолчанию: фабрика у сервиса одна, и
      * называть её у каждого слушателя значило бы заводить выбор там, где
      * выбирать не из чего.
+     *
+     * <p><b>Обработчик отказа — часть конструкции, а не настройка:</b> без
+     * него умолчание даёт ветвь «смещение продвинулось, копии нет».
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
-            ConsumerFactory<String, String> coreConsumerFactory, BrokerProperties properties) {
+            ConsumerFactory<String, String> coreConsumerFactory, BrokerProperties properties,
+            StrategyFactErrorHandler errorHandler) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(coreConsumerFactory);
+        factory.setCommonErrorHandler(errorHandler);
         factory.setAutoStartup(properties.isConfigured());
         return factory;
     }

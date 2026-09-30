@@ -29,7 +29,8 @@ import org.apache.commons.collections4.MapUtils;
 import org.springframework.stereotype.Service;
 
 /**
- * Один проход сбора невосполнимых срезов по действующему листингу
+ * Один проход сбора невосполнимых срезов по действующему листингу — всему
+ * каталогу площадки, кроме снятого с торгов
  * (docs/processes/snapshot-collection.md).
  *
  * <p><b>Единица работы — проход, а не инструмент.</b> Срез имеет смысл
@@ -61,11 +62,20 @@ public class SnapshotCollector {
     /** Разделитель пары валют в имени индекса у площадки. */
     private static final String INDEX_KEY_SEPARATOR = "-";
 
-    /** Статусы, при которых инструмент считается действующим листингом. */
-    private static final Set<Instrument.Status> LISTED_STATUSES = Set.of(
-            Instrument.Status.SYNC,
-            Instrument.Status.CANDLES_LOADING,
-            Instrument.Status.ACTIVE);
+    /**
+     * Статусы, исключающие инструмент из прохода: снятый с торгов. Прочие —
+     * включая онбординговые {@code CREATED}, {@code HOLD} и {@code ERROR} —
+     * в проход входят.
+     *
+     * <p><b>Граница проведена по торгам, а не по онбордингу</b>
+     * (docs/architecture/market-data-collection.md §«Правило — по
+     * невосполнимости»): срезу нужна только биржевая идентичность, а она
+     * известна с листинга. Онбординговый статус говорит о готовности свечей
+     * под заказчика, то есть о восполнимом классе, и невосполнимое по нему
+     * не отбирается: окружение без заказчика иначе не собирало бы срезов
+     * вовсе.
+     */
+    private static final Set<Instrument.Status> WITHDRAWN_STATUSES = Set.of(Instrument.Status.CLOSED);
 
     private final ExchangeReadClient readClient;
     private final InstrumentDataService instrumentDataService;
@@ -75,8 +85,8 @@ public class SnapshotCollector {
 
     /** Снимает срез по всему действующему листингу за один проход. */
     public void collectPass() {
-        List<Instrument> listed = instrumentDataService.findListedWithin(
-                connectorProperties.getExchangeCode(), LISTED_STATUSES, properties.getPassLimit());
+        List<Instrument> listed = instrumentDataService.findCatalogExceptWithin(
+                connectorProperties.getExchangeCode(), WITHDRAWN_STATUSES, properties.getPassLimit());
         if (isEmpty(listed)) {
             return;
         }

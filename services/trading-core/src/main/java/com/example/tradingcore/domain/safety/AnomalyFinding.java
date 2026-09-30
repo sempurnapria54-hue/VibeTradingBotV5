@@ -1,6 +1,7 @@
 package com.example.tradingcore.domain.safety;
 
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import java.util.Map;
 import java.util.Objects;
 import lombok.Builder;
 import lombok.Value;
@@ -32,7 +33,8 @@ public class AnomalyFinding {
     /**
      * Инструмент радиуса; пуст у счётных детекторов. У счётного детектора,
      * нашедшего признак ПО инструменту (чужая заявка), он тоже пуст:
-     * радиус реакции счётный, а инструмент едет в предмет.
+     * радиус реакции счётный, а биржевое имя инструмента едет в
+     * наблюдённых строках ({@link #externalObservation}).
      */
     Instrument instrument;
 
@@ -58,6 +60,22 @@ public class AnomalyFinding {
      * (docs/components/models/HoldSignal.md §Фабрики).
      */
     Boolean journalOnly;
+
+    /**
+     * Строки среза прохода по адресу находки — биржевое имя инструмента
+     * плюс его позиции, заявки и условные заявки, какими их увидел проход
+     * (docs/models/domain/other/AnomalyReport.md §Структура).
+     *
+     * <p><b>Срез уже добыт, и второй раз площадку не читают.</b> Внешний
+     * снимок отчёта берёт эти строки, а не собственное чтение: оно стоило
+     * бы двух вызовов на находку и показывало бы другой момент, чем тот,
+     * на котором признак найден.
+     *
+     * <p><b>У отчёта с блокировкой это единственное место, где в данных
+     * видно, ЧТО его вызвало:</b> предмета в ключе у него нет, а у счётного
+     * детектора пуст и инструмент — биржевое имя едет здесь.
+     */
+    Map<String, Object> externalObservation;
 
     /** Реакция снимает принятый риск. */
     public Boolean tearsDownRisk() {

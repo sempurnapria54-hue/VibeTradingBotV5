@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.config.DealContextProperties;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.fsm.DealTrancheHandler;
@@ -81,15 +82,11 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
         // и ДО условия входа: под сворачиванием штатная ветвь не применяется
         // вовсе, и на пересечении окон пишется причина сделки
         // (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша»).
-        // Транш не ждёт конца сворачивания, а закрывается: ожидание оставило бы
-        // нетерминальный транш, и выходная проверка сделки не сошлась бы никогда.
-        // Вход уже отправлен — терминала отсюда нет: нога живая либо налитая
-        // несёт риск, и транш уходит через отправленный вход в выход, где ногу
-        // снимает дочистка, а экспозицию гасит закрытие сделки.
+        // Транш не ждёт конца сворачивания, а идёт к терминалу — прямо либо
+        // через выход: ожидание оставило бы нетерминальный транш, и выходная
+        // проверка сделки не сошлась бы никогда.
         if (isTrue(deal.isCollapsing())) {
-            return isTrue(tranche.entrySubmitted())
-                    ? TrancheTransition.moveTo(DealTranche.Status.ENTRY_SUBMITTED)
-                    : TrancheTransition.close(disposition.inheritedCloseReason(deal));
+            return underCollapse(dealContext, tranche);
         }
         // Свежий снимок средств обеспечивается ДО работы: на этой итерации
         // обработчик ни преконтроля, ни создания заявки не запускает
@@ -116,6 +113,44 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
             return TrancheTransition.stay();
         }
         return conditionFalse(tranche);
+    }
+
+    /**
+     * Исход предвходовой проверки под сворачиванием сделки — по судьбе
+     * входной ноги (docs/rules/exit-teardown-order.md, строка {@code PRECHECK}
+     * таблицы энфорсеров).
+     *
+     * <p><b>Ноги нет — терминал</b> причиной сделки: живого риска у транша
+     * нет, и выходная проверка сделки ждёт только его.
+     *
+     * <p><b>Нога вышла за локальное заведение — терминала отсюда нет:</b>
+     * живая либо налитая, она несёт риск, и транш уходит через отправленный
+     * вход в выход, где ногу снимает дочистка, а экспозицию гасит закрытие
+     * сделки.
+     *
+     * <p><b>Нога стоит созданной — её судьба добывается, а не
+     * назначается.</b> Приём площадкой не подтверждён: отправки не было, она
+     * отказана повторяемым классом либо её ответ потерян, и какое из трёх —
+     * знает только площадка. Терминал транша контракт отказывает — нога
+     * живая; отправка под сворачиванием была бы набором риска, а строка
+     * исполнения не доигрывается; снятие без добычи назначило бы «не дошла»
+     * ноге, которая могла встать. Добыча решает сама: найдена — нога
+     * становится отправленной, и следующий проход ведёт транш тропой выше;
+     * не найдена полным циклом — нога снимается как не дошедшая до площадки,
+     * живого риска не остаётся, и транш закрывает обработчик отправленного
+     * входа (docs/lifecycles/Order.md §«Неотправленная нога, не найденная
+     * добычей»). Добыча едет наблюдением — работой уровня сделки она проход
+     * не занимает.
+     */
+    private TrancheTransition underCollapse(DealContext dealContext, DealTranche tranche) {
+        Order entry = tranche.entryOrder();
+        if (isNull(entry)) {
+            return TrancheTransition.close(disposition.inheritedCloseReason(dealContext.getDeal()));
+        }
+        if (isTrue(tranche.entrySubmitted())) {
+            return TrancheTransition.moveTo(DealTranche.Status.ENTRY_SUBMITTED);
+        }
+        return TrancheTransition.observe(disposition.orderFetch(dealContext, entry.getId()).orElse(null));
     }
 
     /**

@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import lombok.Getter;
@@ -109,6 +110,34 @@ public class TradeFeeRate extends Auditable {
     public Boolean sameValueAs(String takerFeeRate, String makerFeeRate) {
         return equalRates(externalTakerFeeRate, takerFeeRate)
                 && equalRates(externalMakerFeeRate, makerFeeRate);
+    }
+
+    /**
+     * Ставка несвежа к моменту проверки: источник не подтверждал её дольше
+     * порога свежести (docs/rules/instrument-hold.md §«Несвежесть ставки
+     * комиссии»). Граница включена в свежесть: строка, подтверждённая ровно
+     * на пороге, ещё свежа.
+     *
+     * <p><b>Момент и порог — параметры, а не свойства модели.</b> Момент —
+     * время решения у вызывающего (к часам модель не ходит), порог —
+     * величина конфигурации детектора.
+     *
+     * <p><b>Пустой операнд читается несвежестью:</b> свежесть измеряется, а
+     * не предполагается (docs/models/domain/other/TradeFeeRate.md §«Запись и
+     * история»). Пуст момент подтверждения — свежесть не измерена; пусты
+     * момент проверки либо порог — мерить не против чего. Направление
+     * консервативное: несвежесть запрещает новые входы, а живой риск не
+     * трогает.
+     *
+     * @param moment             момент проверки
+     * @param freshnessThreshold порог свежести
+     * @return {@code true}, когда ставка несвежа либо свежесть не измерима
+     */
+    public Boolean isStaleAt(OffsetDateTime moment, Duration freshnessThreshold) {
+        if (isNull(externalModifiedAt) || isNull(moment) || isNull(freshnessThreshold)) {
+            return true;
+        }
+        return externalModifiedAt.isBefore(moment.minus(freshnessThreshold));
     }
 
     /** Подтверждение строки: счётчик растёт, метка времени источника обновляется на месте. */

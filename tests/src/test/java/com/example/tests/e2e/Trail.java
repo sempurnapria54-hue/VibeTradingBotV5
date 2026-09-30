@@ -124,6 +124,9 @@ public final class Trail implements AutoCloseable {
 
     public static final String EXCHANGE_POSITIONS = "/api/v5/account/positions";
 
+    /** Живые заявки счёта у площадки: второй срез проактивной детекции ядра. */
+    public static final String EXCHANGE_ORDERS_PENDING = "/api/v5/trade/orders-pending";
+
     public static final String EXTERNAL_ORDER = "okx-order-1";
 
     public static final String EXTERNAL_PROTECTION = "okx-algo-1";
@@ -154,6 +157,14 @@ public final class Trail implements AutoCloseable {
     public static final String ACCESS_KEY = "OK-ACCESS-KEY";
 
     private static final String NEVER = "0 0 0 1 1 *";
+
+    /** Допуск возраста наблюдения детекцией у ядра стенда: заведомо длиннее прогона. */
+    private static final String OBSERVATION_MAX_AGE = "30d";
+
+    /** Пустой срез площадки: ответ без строк. */
+    private static final String EMPTY_SLICE = """
+            {"code": "0", "msg": "", "data": []}
+            """;
 
     private static final Integer OWNER_PORT = 8080;
 
@@ -195,6 +206,7 @@ public final class Trail implements AutoCloseable {
     private Boolean riskAppetiteSet = Boolean.FALSE;
     private Boolean leverageAssigned = Boolean.FALSE;
     private Boolean feeRatesSynced = Boolean.FALSE;
+    private Boolean detectionObserved = Boolean.FALSE;
     private String tenant = TENANT;
     private String account = ACCOUNT;
     private Long acknowledgedAt = ACKNOWLEDGED_AT;
@@ -341,6 +353,7 @@ public final class Trail implements AutoCloseable {
             riskAppetiteSet = Boolean.FALSE;
             leverageAssigned = Boolean.FALSE;
             feeRatesSynced = Boolean.FALSE;
+            detectionObserved = Boolean.FALSE;
         }
     }
 
@@ -372,6 +385,7 @@ public final class Trail implements AutoCloseable {
         riskAppetiteSet = Boolean.FALSE;
         leverageAssigned = Boolean.FALSE;
         feeRatesSynced = Boolean.FALSE;
+        detectionObserved = Boolean.FALSE;
         startedSeries.forEach((eventType, payload) -> seriesStartedYesterday(eventType, payload.get()));
     }
 
@@ -605,6 +619,38 @@ public final class Trail implements AutoCloseable {
         riskAppetiteSet();
         leverageAssigned();
         feeRatesSynced();
+        detectionObserved();
+    }
+
+    /**
+     * Проактивная детекция наблюдала счёт ходов: без наблюдённого прохода ядро
+     * по счёту риска не набирает (docs/components/EntryScannerJob.md §«Гейт
+     * входа»). Ставится тиком детекции ядра, чей срез площадка отдаёт пустым
+     * целиком, — пара ещё без сделки, и проход по ней чист.
+     *
+     * <p><b>Срез отдаётся только на время тика</b> ({@link Stub#answersDuring}):
+     * ответ, оставленный на ключе этого счёта, отвечал бы ему и тогда, когда
+     * тропа уйдёт на свежую пару, — и проход детекции, читающий все счета
+     * стенда, сверял бы нынешние строки прежнего счёта с давно заданным срезом.
+     * Допуск возраста наблюдения стенд держит длинным ({@code settingsOf}): момент
+     * ставится один раз на пару.
+     *
+     * <p><b>След тика досылается реле тем же предусловием.</b> Проход идёт по
+     * всем счетам общего стенда, и у счетов прежних пар срезов нет — их проход
+     * неполон, и ядро пишет отчёт о нём. Досланный здесь, этот след ложится в
+     * тему ДО базовых замеров кейса; оставленный в outbox, он уехал бы первым
+     * же реле кейса и читался бы его следом.
+     */
+    public void detectionObserved() {
+        if (isTrue(detectionObserved)) {
+            return;
+        }
+        projectionsSynced();
+        exchange.answersDuring(List.of(EXCHANGE_POSITIONS, EXCHANGE_ORDERS_PENDING, EXCHANGE_ALGO_PENDING),
+                EMPTY_SLICE,
+                () -> tick(Party.TRADING_CORE, "/anomaly-detection", "Manual AnomalyJob trigger finished"));
+        relayCore();
+        detectionObserved = Boolean.TRUE;
     }
 
     /**
@@ -1386,13 +1432,19 @@ public final class Trail implements AutoCloseable {
         exchangeServesAccount();
     }
 
-    /** Площадка отвечает счёту ходов с первого хода: ставкой комиссии и приёмом команд. */
+    /**
+     * Площадка отвечает счёту ходов с первого хода: ставкой комиссии и приёмом команд.
+     *
+     * <p>Момент ставки — момент ответа, а не дата в прошлом: ядро мерит по нему свежесть
+     * ставки, и застывшая дата подняла бы мягкую ступень на каждом инструменте контура с
+     * первого же тика синка (docs/rules/instrument-hold.md §«Несвежесть ставки комиссии»).
+     */
     private void exchangeServesAccount() {
         exchange.answers(EXCHANGE_FEE, """
-                {"code": "0", "msg": "", "data": [{"instType": "SWAP", "level": "Lv1", "ts": "1758240000000",
+                {"code": "0", "msg": "", "data": [{"instType": "SWAP", "level": "Lv1", "ts": "%d",
                   "taker": "-0.0005", "maker": "-0.0002",
                   "feeGroup": [{"groupId": "1", "taker": "-0.0005", "maker": "-0.0002"}]}]}
-                """);
+                """.formatted(System.currentTimeMillis()));
         exchangeAcceptsCommands();
     }
 
@@ -1525,6 +1577,11 @@ public final class Trail implements AutoCloseable {
                         "projection-sync", "strategy-demand", "trade-fee-rate-sync")) {
                     values.put(job + ".cron", NEVER);
                 }
+                // Детекция тикается только ходом тропы, и наблюдённый проход
+                // ставится один раз на пару (detectionObserved): допуск
+                // возраста наблюдения длиннее жизни пары, иначе вход закрывал
+                // бы не стык, а время прогона класса.
+                values.put("entry-scanner.observation-max-age", OBSERVATION_MAX_AGE);
             }
             case CONNECTOR -> {
                 values.putAll(vault());

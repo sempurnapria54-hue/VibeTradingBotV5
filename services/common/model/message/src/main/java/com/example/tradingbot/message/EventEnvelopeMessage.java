@@ -1,8 +1,11 @@
 package com.example.tradingbot.message;
 
 import java.time.OffsetDateTime;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * Конверт события — один на все события платформы.
@@ -14,13 +17,30 @@ import lombok.Value;
  * производителя, потому что форму содержимого знает только тот, кто
  * событие порождает.
  *
- * <p><b>Почему конверт неизменяем.</b> Он публикуется и переживает
- * публикацию: потребитель дедуплицирует по {@code eventId}, брокер
- * партиционирует по {@code tenantId}. Изменяемый конверт означал бы, что
- * опубликованное можно переписать задним числом.
+ * <p><b>Форма — бин, а не неизменяемое значение Lombok.</b> Конверт —
+ * форма провода, и правило формы
+ * ({@code .claude/rules/codestyle.md} §«Неизменяемое значение,
+ * пересекающее сериализацию») действует на него независимо от того, что
+ * сегодня он едет заголовками поле за полем
+ * ({@code docs/architecture/contracts.md} §«Как конверт лежит на проводе —
+ * поимённо»): первый читатель формы целиком — тело сообщения либо
+ * потребитель за пределами монорепозитория — собирал бы её сериализатором,
+ * а неизменяемое значение не даёт ему ни пустого конструктора, ни
+ * инструкции по сборке. Из двух законных форм выбран бин: аксессоры
+ * {@code getXxx()} уже зовут оба писателя outbox, и запись переименовала
+ * бы их у каждого. Сборщик сохранён — им конверт собирают те же писатели.
+ *
+ * <p><b>Неприкосновенность опубликованного держит не форма класса.</b>
+ * Конверт живёт в памяти прохода писателя и переносится в строку outbox
+ * поле за полем; переписать опубликованное задним числом нельзя потому,
+ * что строка и запись брокера пишутся один раз, а потребитель
+ * дедуплицирует по {@code eventId}. Сеттеры бина этого не открывают.
  */
-@Value
+@Getter
+@Setter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class EventEnvelopeMessage {
 
     /**
@@ -30,7 +50,7 @@ public class EventEnvelopeMessage {
      * журнала. Повтор доставки безопасен по построению
      * ({@code docs/rules/idempotency-via-unique.md}).
      */
-    String eventId;
+    private String eventId;
 
     /**
      * Класс события — <b>дискриминатор содержимого</b>. Значение — имя из
@@ -43,14 +63,14 @@ public class EventEnvelopeMessage {
      * у каждого производителя: вторая запись одного и того же разошлась бы
      * с первой первой же правкой.
      */
-    String eventType;
+    private String eventType;
 
     /**
      * Тенант-владелец. Он же ключ партиции: даёт порядок событий внутри
      * тенанта и делает будущее разделение ядра вопросом числа реплик
      * ({@code docs/architecture/data-ownership.md}).
      */
-    String tenantId;
+    private String tenantId;
 
     /**
      * Момент <b>происшествия</b>, не публикации. Между ними есть окно —
@@ -58,13 +78,13 @@ public class EventEnvelopeMessage {
      * момент публикации как момент события, выстроил бы неверный порядок.
      * Время UTC ({@code docs/rules/time-utc.md}).
      */
-    OffsetDateTime occurredAt;
+    private OffsetDateTime occurredAt;
 
     /**
      * Версия формы события. Растёт, когда меняется состав полей
      * содержимого; потребитель старой версии обязан оставаться рабочим.
      */
-    Integer version;
+    private Integer version;
 
     /**
      * Контекст трассировки в форме W3C {@code traceparent}.
@@ -76,5 +96,5 @@ public class EventEnvelopeMessage {
      * Потребитель, читающий пустоту как потерю, поднял бы аномалию на
      * штатном состоянии.
      */
-    String traceContext;
+    private String traceContext;
 }

@@ -24,7 +24,8 @@ import org.springframework.http.client.ClientHttpResponse;
  * Подпись приватного запроса площадки ключами ОДНОГО счёта (HMAC-SHA256).
  *
  * <p>prehash = timestamp + метод + путь(+query) + тело; подпись =
- * base64(HMAC-SHA256(secret, prehash)).
+ * base64(HMAC-SHA256(secret, prehash)). Дом формы — офдок площадки,
+ * дистиллят — {@code docs/integrations/okx/rules/request-signing.md}.
  *
  * <p><b>Не бин, и это несущее.</b> В доноре перехватчик был компонентом
  * контекста и читал ключи из конфигурации процесса — форма, верная ровно

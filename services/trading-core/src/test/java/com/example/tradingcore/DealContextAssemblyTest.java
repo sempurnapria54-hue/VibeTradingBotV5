@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
@@ -237,6 +238,32 @@ class DealContextAssemblyTest {
         assertThat(context.getDeal().getTranches()).hasSize(2);
         assertThat(first.getOrders()).extracting(Order::getId).containsExactly(1L);
         assertThat(second.getOrders()).extracting(Order::getId).containsExactly(2L);
+        assertThat(context.getDeal().getUnattributedOrders()).extracting(Order::getId).containsExactly(3L);
+    }
+
+    /**
+     * Остаток раскладки — заявки, не легшие ни на один ЗАГРУЖЕННЫЙ транш:
+     * ключ транша пуст либо называет транш вне графа. Легшая на транш в
+     * остатке не бывает — иначе инвариант неприписанного живого риска видел
+     * бы её дважды (docs/models/domain/aggregate/Deal.md §Структура).
+     */
+    @Test
+    void legsLyingOnNoLoadedTrancheFormTheUnattributedRemainder() {
+        DealTranche tranche = filledTranche();
+        when(dealTrancheDataService.findByDealId(DEAL_ID)).thenReturn(List.of(tranche));
+        when(orderDataService.findByDealId(DEAL_ID))
+                .thenReturn(List.of(leg(1L, tranche.getId()), leg(3L, null), leg(4L, 99L)));
+        when(algoOrderDataService.findByDealId(DEAL_ID))
+                .thenReturn(List.of(algoLeg(5L, tranche.getId()), algoLeg(6L, null)));
+        when(positionDataService.findEpisodes(DEAL_ID)).thenReturn(List.of(new Position()));
+
+        DealContext context = service.build(fetchedDeal());
+
+        assertThat(context.getDeal().getUnattributedOrders()).extracting(Order::getId).containsExactly(3L, 4L);
+        assertThat(context.getDeal().getUnattributedAlgoOrders()).extracting(AlgoOrder::getId)
+                .containsExactly(6L);
+        assertThat(tranche.getOrders()).extracting(Order::getId).containsExactly(1L);
+        assertThat(tranche.getAlgoOrders()).extracting(AlgoOrder::getId).containsExactly(5L);
     }
 
     /**
@@ -315,6 +342,15 @@ class DealContextAssemblyTest {
         order.setPositionReducingOnly(Boolean.FALSE);
         order.setAccumulatedFillSize(BigDecimal.ONE);
         return order;
+    }
+
+    /** Отдельная условная заявка сделки с названным ключом транша. */
+    private AlgoOrder algoLeg(Long id, Long trancheId) {
+        AlgoOrder algoOrder = new AlgoOrder();
+        algoOrder.setId(id);
+        algoOrder.setDealId(DEAL_ID);
+        algoOrder.setDealTrancheId(trancheId);
+        return algoOrder;
     }
 
     private List<DealCashFlow> flows(Integer count) {

@@ -11,7 +11,6 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
@@ -20,7 +19,6 @@ import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -197,20 +195,18 @@ public class Deal extends Auditable {
     private RiskBenchmarkAvailability riskBenchmarkAvailability;
 
     /**
-     * Ordinary orders сделки (attached protection — внутри Order).
-     *
-     * <p><b>Целевой модели агрегата поле не принадлежит:</b> ноги висят на
-     * траншах и собираются их обходом
-     * (docs/models/domain/aggregate/Deal.md §Структура). Поле держал монолит
-     * фазы 1, удалённый 2026-09-16; сервисы монорепозитория ни его, ни
-     * {@link #algoOrders} не пишут и не читают. Снятие взято в работу —
-     * `.claude/work/backlog.md` §«Донорские поля агрегата сделки в общей
-     * библиотеке».
+     * <b>Заявки сделки, не приписанные ни одному её траншу</b> — остаток
+     * сборки графа: ключ транша у них пуст либо не называет ни одного
+     * загруженного транша. Ноги сделки висят на траншах и собираются их
+     * обходом (docs/models/domain/aggregate/Deal.md §Структура), поэтому
+     * штатно остаток пуст; непустой он есть операнд инварианта
+     * {@link #unattributedLiveRisk()}. Кладёт сборщик графа прохода
+     * (docs/components/DealContextService.md §«Объёмы загрузки»).
      */
-    private List<Order> orders;
+    private List<Order> unattributedOrders;
 
-    /** Standalone algo-orders сделки. Поле монолита фазы 1 — см. {@link #orders}. */
-    private List<AlgoOrder> algoOrders;
+    /** Отдельные условные заявки сделки, не приписанные ни одному её траншу, — тот же остаток. */
+    private List<AlgoOrder> unattributedAlgoOrders;
 
     /**
      * Эпизоды позиции: одна биржевая позиция — одна строка. Живой
@@ -321,45 +317,6 @@ public class Deal extends Auditable {
     }
 
     /**
-     * Live ordinary orders сделки (остаточный live-risk для teardown); пусто
-     * — нет. Читает донорское {@link #orders} — см. его javadoc.
-     */
-    public List<Order> liveOrders() {
-        return emptyIfNull(orders).stream()
-                .filter(order -> isTrue(order.isLive()))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Live standalone algo-orders сделки (остаточный live-risk для teardown);
-     * пусто — нет. Читает донорское {@link #algoOrders}.
-     */
-    public List<AlgoOrder> liveAlgoOrders() {
-        return emptyIfNull(algoOrders).stream()
-                .filter(algoOrder -> isTrue(algoOrder.isLive()))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Живые ВСТРОЕННЫЕ защиты сделки — остаточный live-risk для teardown
-     * наравне с отдельными условными заявками. Читает донорское
-     * {@link #orders}.
-     *
-     * <p>Перечень идёт по <b>всем</b> заявкам, а не по живым: встроенная
-     * защита материализуется самостоятельной заявкой на бирже при
-     * непустом наливе родителя (`docs/models/domain/core/Order.md`
-     * §«Встроенная защита»), то есть переживает терминал родителя. Обход
-     * по живым родителям пропустил бы ровно тот случай, ради которого
-     * перечень заведён.
-     */
-    public List<AttachedAlgoOrder> liveAttachedProtections() {
-        return emptyIfNull(orders).stream()
-                .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
-                .filter(protection -> isTrue(protection.isActiveLike()))
-                .collect(Collectors.toList());
-    }
-
-    /**
      * Живая сущность сделки, не приписанная ни одному её траншу.
      *
      * <p><b>Инвариант, а не находка сканера.</b> Всё живое по сделке
@@ -372,17 +329,16 @@ public class Deal extends Auditable {
      * <p>Предикат живёт на агрегате, а не в обработчике: тот же вопрос
      * задают предвходовая проверка, сопровождение и поиск нарушений
      * инвариантов, и ответ у них один.
+     *
+     * <p>Операнд — остаток сборки графа ({@link #unattributedOrders},
+     * {@link #unattributedAlgoOrders}): ноги, легшие на транш, в нём не
+     * бывают, и сверять их с перечнями траншей повторно нечего.
      */
     public Boolean unattributedLiveRisk() {
-        Set<Long> attributed = emptyIfNull(tranches).stream()
-                .flatMap(tranche -> Stream.concat(
-                        tranche.liveOrders().stream().map(Order::getId),
-                        tranche.liveAlgoOrders().stream().map(AlgoOrder::getId)))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        return Stream.concat(liveOrders().stream().map(Order::getId),
-                        liveAlgoOrders().stream().map(AlgoOrder::getId))
-                .anyMatch(id -> isFalse(attributed.contains(id)));
+        return emptyIfNull(unattributedOrders).stream()
+                .anyMatch(order -> isTrue(order.isLive()))
+                || emptyIfNull(unattributedAlgoOrders).stream()
+                .anyMatch(algoOrder -> isTrue(algoOrder.isLive()));
     }
 
     /**

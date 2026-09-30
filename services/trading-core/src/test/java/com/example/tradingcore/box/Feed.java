@@ -3,6 +3,9 @@ package com.example.tradingcore.box;
 import static java.util.Objects.isNull;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -131,6 +134,12 @@ final class Feed {
      * стопа ({@code RiskMath#stopDistanceFloor}) становился бы
      * отрицательным, и проверка, заведённая против стопа внутри
      * round-trip комиссии, не срабатывала бы НИКОГДА — то есть молча.
+     *
+     * <p><b>Момент данных — момент ответа, а не дата в прошлом.</b> Источник
+     * ставит в него время своего ответа, и синк мерит по нему свежесть:
+     * застывшая дата сделала бы ставку несвежей с первого же тика, и
+     * детектор несвежести поднял бы мягкую ступень на всём контуре ящика
+     * (docs/rules/instrument-hold.md §«Несвежесть ставки комиссии»).
      */
     static String tradeFeeRate() {
         return """
@@ -141,9 +150,10 @@ final class Feed {
                   "externalTakerFeeRate": "0.0005",
                   "externalMakerFeeRate": "0.0002",
                   "externalFeeLevel": "Lv1",
-                  "externalModifiedAt": "2026-09-20T00:00:00Z"
+                  "externalModifiedAt": "%s"
                 }
-                """.formatted(INSTRUMENT_TYPE, FEE_GROUP, INSTRUMENT_TYPE);
+                """.formatted(INSTRUMENT_TYPE, FEE_GROUP, INSTRUMENT_TYPE,
+                OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS));
     }
 
     /**

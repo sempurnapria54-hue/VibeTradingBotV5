@@ -62,6 +62,7 @@ class PerimeterRefusalPathTest {
         String owner = trail.identity().browserToken(subject, "Trader One");
         assertThat(trail.callWith(owner, Party.BFF, "GET", "/api/v1/bff/context", null, null).status())
                 .as("предусловие — состояние E1.1").isEqualTo(200);
+        Long authDenials = trail.database(Party.AUTH).count("access_denials");
         Long auditDenials = trail.database(Party.AUDIT).count("access_denials");
         Long statisticsDenials = trail.database(Party.STATISTICS).count("access_denials");
         Long logMark = trail.side(Party.BFF).logMark();
@@ -85,8 +86,9 @@ class PerimeterRefusalPathTest {
             assertThat(trail.accesses(side)).as("E7.4: к " + side.module() + " не ушло ни одного запроса").isEmpty();
         }
         assertThat(trail.marketData().requests()).as("E7.4: к стабу владельца рыночных данных тоже").isEmpty();
-        assertThat(trail.database(Party.AUTH).hasTable("access_denials"))
-                .as("E7.4: у владельца членств строки отказа доступа нет — у отказа периметра базы нет").isFalse();
+        assertThat(trail.database(Party.AUTH).count("access_denials"))
+                .as("E7.4: у владельца членств строк не изменилось — отвергнутые вызовы до него не дошли")
+                .isEqualTo(authDenials);
         assertThat(trail.database(Party.AUDIT).count("access_denials")).as("E7.4: у журнала строк не изменилось")
                 .isEqualTo(auditDenials);
         assertThat(trail.database(Party.STATISTICS).count("access_denials"))

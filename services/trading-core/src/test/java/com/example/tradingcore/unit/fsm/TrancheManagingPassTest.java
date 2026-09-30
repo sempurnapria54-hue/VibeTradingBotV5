@@ -60,7 +60,7 @@ class TrancheManagingPassTest {
     @DisplayName("U20.2 — чужой живой риск либо второй эпизод: просьба ошибочной тропы")
     void u20_2_aForeignLiveRiskEscalates() {
         DealContext context = coveredContext();
-        context.getDeal().getOrders().add(liveEntryLeg(90L, null));
+        context.getDeal().getUnattributedOrders().add(liveEntryLeg(90L, null));
 
         assertThat(handle(context).getDealErrorRequested()).isTrue();
     }

@@ -1,15 +1,12 @@
 package com.example.marketdata.persistence.service;
 
-import static org.apache.commons.lang3.BooleanUtils.isTrue;
-
 import com.example.marketdata.mapping.MarketSnapshotMapper;
-import com.example.marketdata.persistence.model.MarketSnapshotId;
+import com.example.marketdata.persistence.model.OrderBookSnapshotEntity;
+import com.example.marketdata.persistence.model.TickerSnapshotEntity;
 import com.example.marketdata.persistence.repository.OrderBookSnapshotRepository;
 import com.example.marketdata.persistence.repository.TickerSnapshotRepository;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketOrderBook;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketTicker;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,10 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
  * площадка на двух проходах отдала один и тот же момент, второго факта не
  * произошло, и запись его как нового исказила бы ряд задержки.
  *
- * <p>Вставка идёт {@code persist}: ключ присвоенный, и {@code save} на нём
- * означал бы select перед каждой вставкой — на проходе по всему листингу
- * это удвоение запросов ради проверки, которую уже делает существование
- * строки.
+ * <p><b>Отбрасывает повтор ключ, а не проверка перед вставкой</b>
+ * (docs/rules/idempotency-via-unique.md): вставка идёт безопасной формой
+ * {@code on conflict do nothing}. Проверка «есть ли уже» с последующей
+ * вставкой не атомарна — второй писатель того же момента падал бы
+ * нарушением ключа, — и стоила бы лишнего запроса на каждый срез прохода
+ * по всему листингу.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,30 +34,25 @@ public class MarketSnapshotDataService {
     private final OrderBookSnapshotRepository orderBookRepository;
     private final TickerSnapshotRepository tickerRepository;
     private final MarketSnapshotMapper mapper;
-
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final PointWriteAudit audit;
 
     /** Пишет срез книги, если среза этого момента ещё нет. */
     @Transactional
     public void saveIfNew(MarketOrderBook orderBook) {
-        MarketSnapshotId key = new MarketSnapshotId(
-                orderBook.getInstrumentId(), orderBook.getExternalTimestamp());
-        if (isTrue(orderBookRepository.existsById(key))) {
-            return;
-        }
-        entityManager.persist(mapper.domainToPersistence(orderBook));
+        OrderBookSnapshotEntity row = mapper.domainToPersistence(orderBook);
+        orderBookRepository.insertIfAbsent(row.getInstrumentId(), row.getExternalTimestamp(),
+                row.getObservedTimestamp(), row.getBids(), row.getAsks(), row.getExternalCreatedAt(),
+                row.getExternalModifiedAt(), audit.moment(), audit.writer());
     }
 
     /** Пишет срез цен, если среза этого момента ещё нет. */
     @Transactional
     public void saveIfNew(MarketTicker ticker) {
-        MarketSnapshotId key = new MarketSnapshotId(
-                ticker.getInstrumentId(), ticker.getExternalTimestamp());
-        if (isTrue(tickerRepository.existsById(key))) {
-            return;
-        }
-        entityManager.persist(mapper.domainToPersistence(ticker));
+        TickerSnapshotEntity row = mapper.domainToPersistence(ticker);
+        tickerRepository.insertIfAbsent(row.getInstrumentId(), row.getExternalTimestamp(),
+                row.getObservedTimestamp(), row.getLastPrice(), row.getVolume(), row.getMarkPrice(),
+                row.getIndexPrice(), row.getExternalCreatedAt(), row.getExternalModifiedAt(),
+                audit.moment(), audit.writer());
     }
 
     /** Последний срез книги инструмента. */

@@ -203,7 +203,7 @@ class DealExitPendingPassTest {
     @DisplayName("U10.11 — чужой живой риск: входной проверкой этого обработчика он не является")
     void u10_11_anUnattributedLiveOrderDoesNotBlockTheCollapse() {
         DealContext context = baseContext();
-        context.getDeal().getOrders().add(liveEntryLeg(90L, null));
+        context.getDeal().getUnattributedOrders().add(liveEntryLeg(90L, null));
 
         DealTransition transition = handler.handle(context);
 

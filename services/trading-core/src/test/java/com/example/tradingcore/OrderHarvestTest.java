@@ -499,6 +499,188 @@ class OrderHarvestTest {
         assertThat(algoOrder.getCloseReason()).isEqualTo(AlgoOrder.CloseReason.ORDER_FAILED);
     }
 
+    /**
+     * Неотправленная нога, найденная ИСПОЛНЕННОЙ, — ответ на отправку
+     * потерян, а запись на площадке и есть подтверждение приёма. Ребра
+     * «создана → исполнена» в матрице нет, и наблюдение проходит через
+     * отправленную, а не падает на охране модели.
+     */
+    @Test
+    void anUnsentOrderFoundCompletedPassesThroughPending() {
+        Order order = order(Order.Status.CREATED, null);
+        Deal deal = dealWith(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.COMPLETED, "1"));
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(order.getStatus()).isEqualTo(Order.Status.COMPLETED);
+        assertThat(order.getCloseReason()).isEqualTo(Order.CloseReason.FILLED);
+    }
+
+    /** Неотправленная нога, найденная живой, становится активной — через отправленную, а не сеттером мимо матрицы. */
+    @Test
+    void anUnsentOrderFoundLiveBecomesActiveThroughPending() {
+        Order order = order(Order.Status.CREATED, null);
+        Deal deal = dealWith(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.ACTIVE, "0"));
+
+        orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.ACTIVE);
+        assertThat(order.canTransitionTo(Order.Status.COMPLETED)).isTrue();
+    }
+
+    /**
+     * Терминальный родитель добывается ради живой защиты, и наблюдение его
+     * статуса не двигает: рёбер из терминала матрица не содержит. Судьба
+     * защиты при этом резолвится — по его локальному терминалу.
+     */
+    @Test
+    void aTerminalParentIsNotMovedByObservationAndItsProtectionIsResolved() {
+        Order order = order(Order.Status.ERROR, Order.CloseReason.MISSING_AFTER_REFRESH);
+        AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.ACTIVE);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        Deal deal = dealWith(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.COMPLETED, "1"));
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(order.getStatus()).isEqualTo(Order.Status.ERROR);
+        assertThat(order.getCloseReason()).isEqualTo(Order.CloseReason.MISSING_AFTER_REFRESH);
+        assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.ERROR);
+    }
+
+    /**
+     * Терминальный родитель, не найденный полным циклом, терминала не
+     * теряет: ребра в ошибочное из терминала нет. Бросок остаётся — исход
+     * отказа объявляет спека резолва, и локальной терминальности среди её
+     * операндов нет.
+     */
+    @Test
+    void aTerminalParentMissingAfterTheCycleKeepsItsTerminalAndThrows() {
+        Order order = order(Order.Status.COMPLETED, Order.CloseReason.FILLED);
+        Deal deal = dealWith(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID)).thenReturn(null);
+        when(exchange.getPendingOrders(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+        when(exchange.getOrderHistory(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> orderExecutor.execute(orderCommand(), row(), context(deal)))
+                .isInstanceOf(ExternalNotFoundException.class);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.COMPLETED);
+        assertThat(order.getCloseReason()).isEqualTo(Order.CloseReason.FILLED);
+    }
+
+    /**
+     * Отказ разбора статуса у терминального родителя уходит дальше — это
+     * факт об источнике, — но терминала не перетирает: ребра в ошибочное из
+     * терминала нет.
+     */
+    @Test
+    void aRefusedStatusOnATerminalParentPropagatesWithoutMovingIt() {
+        Order order = order(Order.Status.COMPLETED, Order.CloseReason.FILLED);
+        Deal deal = dealWith(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenThrow(new ExternalStatusException(ExternalStatusReason.UNKNOWN_EXTERNAL_STATUS, "wat"));
+
+        assertThatThrownBy(() -> orderExecutor.execute(orderCommand(), row(), context(deal)))
+                .isInstanceOf(ExternalStatusException.class);
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.COMPLETED);
+        assertThat(order.getCloseReason()).isEqualTo(Order.CloseReason.FILLED);
+        verify(orderDataService, never()).save(any());
+    }
+
+    /**
+     * Неотправленная условная заявка, найденная живой, становится активной
+     * через отправленную: прямого ребра из созданного в матрице нет.
+     */
+    @Test
+    void anUnsentAlgoOrderFoundLiveBecomesActiveThroughPending() {
+        AlgoOrder algoOrder = algoOrder(AlgoOrder.Status.CREATED);
+        Deal deal = dealWithAlgo(algoOrder);
+        givenSaves();
+        when(exchange.getAlgoOrder(ACCOUNT, INSTRUMENT, null, ALGO_CLIENT_ID))
+                .thenReturn(fetchedAlgo(AlgoOrder.Status.ACTIVE));
+
+        ServiceCommandExecutionResult result = algoExecutor.execute(algoCommand(), row(), context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(algoOrder.getStatus()).isEqualTo(AlgoOrder.Status.ACTIVE);
+    }
+
+    /**
+     * Частичное срабатывание отправленной условной заявки проходит через
+     * активную: сработать частично могла только вставшая заявка.
+     */
+    @Test
+    void aPartialTriggerOfAPendingAlgoOrderPassesThroughActive() {
+        AlgoOrder algoOrder = algoOrder(AlgoOrder.Status.PENDING);
+        Deal deal = dealWithAlgo(algoOrder);
+        givenSaves();
+        when(exchange.getAlgoOrder(ACCOUNT, INSTRUMENT, null, ALGO_CLIENT_ID))
+                .thenReturn(fetchedAlgo(AlgoOrder.Status.PARTIALLY_COMPLETED));
+
+        algoExecutor.execute(algoCommand(), row(), context(deal));
+
+        assertThat(algoOrder.getStatus()).isEqualTo(AlgoOrder.Status.PARTIALLY_COMPLETED);
+    }
+
+    /**
+     * Откат живого статуса назад — частично сработавшая заявка, наблюдённая
+     * активной, — состояния не двигает и прохода не роняет: ребра назад
+     * матрица не содержит, и исполнитель спрашивает её предикатом, а не
+     * отказом броском (docs/spec/algo-order-lifecycle.json,
+     * {@code algoTransitionAllowed}).
+     */
+    @Test
+    void anObservedRollbackOfALiveAlgoOrderDoesNotMoveIt() {
+        AlgoOrder algoOrder = algoOrder(AlgoOrder.Status.PARTIALLY_COMPLETED);
+        Deal deal = dealWithAlgo(algoOrder);
+        givenSaves();
+        when(exchange.getAlgoOrder(ACCOUNT, INSTRUMENT, null, ALGO_CLIENT_ID))
+                .thenReturn(fetchedAlgo(AlgoOrder.Status.ACTIVE));
+
+        ServiceCommandExecutionResult result = algoExecutor.execute(algoCommand(), row(), context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(algoOrder.getStatus()).isEqualTo(AlgoOrder.Status.PARTIALLY_COMPLETED);
+        assertThat(algoOrder.getCloseReason()).isNull();
+    }
+
+    /**
+     * Терминальная условная заявка, не найденная полным циклом, терминала
+     * не теряет — ребра в ошибочное из терминала нет, — а бросок остаётся.
+     */
+    @Test
+    void aTerminalAlgoOrderMissingAfterTheCycleKeepsItsTerminal() {
+        AlgoOrder algoOrder = algoOrder(AlgoOrder.Status.COMPLETED);
+        algoOrder.setCloseReason(AlgoOrder.CloseReason.TRIGGERED);
+        Deal deal = dealWithAlgo(algoOrder);
+        givenSaves();
+        when(exchange.getAlgoOrder(ACCOUNT, INSTRUMENT, null, ALGO_CLIENT_ID)).thenReturn(null);
+        when(exchange.getPendingAlgoOrders(ACCOUNT, INSTRUMENT, AlgoOrder.ConditionType.STOP_LOSS))
+                .thenReturn(List.of());
+        when(exchange.getAlgoOrderHistory(ACCOUNT, INSTRUMENT, AlgoOrder.ConditionType.STOP_LOSS, null))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> algoExecutor.execute(algoCommand(), row(), context(deal)))
+                .isInstanceOf(ExternalNotFoundException.class);
+
+        assertThat(algoOrder.getStatus()).isEqualTo(AlgoOrder.Status.COMPLETED);
+        assertThat(algoOrder.getCloseReason()).isEqualTo(AlgoOrder.CloseReason.TRIGGERED);
+    }
+
     private void givenSaves() {
         when(orderDataService.save(any())).thenAnswer(call -> call.getArgument(0));
         when(algoOrderDataService.save(any())).thenAnswer(call -> call.getArgument(0));

@@ -2,6 +2,7 @@ package com.example.marketdata.domain.service;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.marketdata.domain.model.IndicatorConfig;
@@ -14,6 +15,7 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,14 +62,37 @@ public class MarketDataDemandService {
         return candleGroupDataService.save(newGroup(instrument, timeframe, horizon));
     }
 
-    /** Требование индикатора: заводит идентичность вычисления либо возвращает уже заведённую. */
+    /**
+     * Требование индикатора: заводит идентичность вычисления либо возвращает
+     * уже заведённую. Параметры, на которых вычисление не определено,
+     * отвергаются здесь, а не у расчёта.
+     */
     public IndicatorConfig requireIndicator(IndicatorConfig config) {
+        rejectDefects(config.parameterDefects());
         return configDataService.ensureIndicatorConfig(config);
     }
 
-    /** Требование структуры рынка: заводит идентичность вычисления либо возвращает уже заведённую. */
+    /**
+     * Требование структуры рынка: заводит идентичность вычисления либо
+     * возвращает уже заведённую. Параметры, на которых вычисление не
+     * определено, отвергаются здесь, а не у расчёта.
+     */
     public MarketStructureConfig requireMarketStructure(MarketStructureConfig config) {
+        rejectDefects(config.parameterDefects());
         return configDataService.ensureMarketStructureConfig(config);
+    }
+
+    /**
+     * Отказ создания идентичности — классом негодного входа: вызывающий
+     * прислал то, что не посчитается никогда, и узнать это он обязан сейчас,
+     * а не пустотой на чтении фич (docs/architecture/market-data-collection.md
+     * §«Как потребность доходит до сбора»).
+     */
+    private void rejectDefects(List<String> defects) {
+        if (isNotEmpty(defects)) {
+            throw new IllegalArgumentException("Computation params are not computable: "
+                    + String.join("; ", defects));
+        }
     }
 
     /**
@@ -110,6 +135,7 @@ public class MarketDataDemandService {
         group.setStatus(CandleGroup.Status.CREATED);
         group.setPlannedFirstUtcMillis(horizon);
         group.setCount(0L);
+        group.resetRepairAttempts();
         return group;
     }
 

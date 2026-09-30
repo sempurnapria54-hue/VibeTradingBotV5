@@ -42,6 +42,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -335,7 +336,7 @@ class AnomalyReportDedupTest {
         assertThat(report.getStatus()).isEqualTo(AnomalyReport.Status.ERROR);
     }
 
-    /** Ноги берутся обходом траншей — донорского поля агрегата ядро не читает. */
+    /** Ноги берутся обходом траншей — остатка неприписанных заявок агрегата снимок не читает. */
     @Test
     @DisplayName("U9.18 — ноги лежат по траншам: перечень ног снимка собран их обходом")
     void u9_18_theLegsAreCollectedByWalkingTheTranches() throws Exception {
@@ -447,6 +448,81 @@ class AnomalyReportDedupTest {
         assertThat(returned).isNotNull();
         assertThat(saved().getStatus()).isEqualTo(AnomalyReport.Status.CREATED);
         assertThat(saved().getSeverity()).isEqualTo(AnomalyReport.Severity.CRITICAL);
+    }
+
+    /**
+     * Тропа, уже наблюдавшая площадку, приносит наблюдённое контекстом:
+     * внешний снимок «до» — это оно, и площадку второй раз не читают
+     * (docs/models/domain/other/AnomalyReport.md §Структура).
+     */
+    @Test
+    @DisplayName("U9.25 — контекст несёт наблюдённые строки: внешний снимок «до» — они, чтения площадки нет")
+    void u9_25_theObservedRowsAreTheExternalSnapshotWithoutARead() throws Exception {
+        DealContext observed = DealContext.builder().exchangeAccount(account()).instrument(instrument())
+                .externalObservation(observedRows(INSTRUMENT_EXTERNAL_ID, "ORD-9"))
+                .build();
+
+        service.journalState(observed, HoldSignal.instrumentSoft(CODE), null);
+
+        Map<String, Object> snapshot = snapshotOf(saved().getExternalBefore());
+        assertThat(snapshot).containsEntry("instrumentExternalId", INSTRUMENT_EXTERNAL_ID)
+                .containsEntry("pendingOrders", List.of("ORD-9"));
+        verify(exchangeClient, never()).getPosition(any(), any());
+        verify(exchangeClient, never()).getPendingOrders(any(), any());
+    }
+
+    /**
+     * Отчёт с блокировкой на счётном радиусе: инструмента у контекста нет,
+     * предмета в ключе нет — и сущность, его вызвавшая, всё равно читается в
+     * данных по биржевому имени из наблюдённого. Ключ дедупа при этом не
+     * меняется: в него наблюдённое не входит.
+     */
+    @Test
+    @DisplayName("U9.26 — счётный отчёт с блокировкой и наблюдённым: вызвавшая сущность в снимке, ключ без неё")
+    void u9_26_theAccountWideBlockingReportNamesItsCauseInTheSnapshot() throws Exception {
+        DealContext observed = DealContext.builder().exchangeAccount(account())
+                .externalObservation(observedRows("BTC-USDT-SWAP", "foreign-1"))
+                .build();
+
+        service.open(observed, HoldSignal.exchangeAccount(CODE));
+
+        AnomalyReport report = saved();
+        assertThat(report.getInstrumentId()).as("адреса в модели у чужого инструмента нет").isNull();
+        assertThat(report.getSubjectExternalId()).as("у отчёта с блокировкой предмета нет").isNull();
+        assertThat(snapshotOf(report.getExternalBefore()))
+                .containsEntry("instrumentExternalId", "BTC-USDT-SWAP")
+                .containsEntry("pendingOrders", List.of("foreign-1"));
+    }
+
+    /**
+     * Снимок «после» наблюдённого не берёт: он читается после снятия
+     * риска, и только площадка показывает остаточный риск.
+     */
+    @Test
+    @DisplayName("U9.27 — терминал критичной тропы при наблюдённом в контексте: снимок «после» читается у площадки")
+    void u9_27_theAfterSnapshotStillReadsTheExchange() {
+        DealContext observed = DealContext.builder().exchangeAccount(account()).instrument(instrument())
+                .externalObservation(observedRows(INSTRUMENT_EXTERNAL_ID, "ORD-9"))
+                .build();
+
+        service.complete(CoordinatorHarness.report(604L), observed);
+
+        verify(exchangeClient).getPosition(ACCOUNT_INTERNAL_ID, INSTRUMENT_EXTERNAL_ID);
+        verify(exchangeClient).getPendingOrders(ACCOUNT_INTERNAL_ID, INSTRUMENT_EXTERNAL_ID);
+    }
+
+    /**
+     * Наблюдённое тропой — в форме среза прохода; строки заменены их
+     * клиентскими идентификаторами: предмет клетки — откуда снимок берётся,
+     * а не сериализация доменной строки.
+     */
+    private static Map<String, Object> observedRows(String externalInstrumentId, String orderClientId) {
+        Map<String, Object> observed = new LinkedHashMap<>();
+        observed.put("instrumentExternalId", externalInstrumentId);
+        observed.put("positions", List.of());
+        observed.put("pendingOrders", List.of(orderClientId));
+        observed.put("pendingAlgoOrders", List.of());
+        return observed;
     }
 
     private Map<String, Object> snapshotOf(String json) throws JsonProcessingException {

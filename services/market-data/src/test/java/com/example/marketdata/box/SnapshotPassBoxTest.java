@@ -195,14 +195,18 @@ class SnapshotPassBoxTest extends SharedMarketDataBox {
     }
 
     @Test
-    @DisplayName("B5.11 — в проход входит только действующий листинг")
-    void b5_11_onlyTheStandingListingEntersThePass() {
+    @DisplayName("B5.11 — в проход входит весь каталог, кроме снятого с торгов")
+    void b5_11_theWholeCatalogExceptWithdrawnEntersThePass() {
         provisionInstruments(INSTRUMENT, SECOND_INSTRUMENT);
         stubFullMarket();
-        // CREATED не пишет ни одна тропа сервиса (находка F-3): заведение
-        // из листинга ставит SYNC сразу, и состояние ставится прямо.
-        rows.put("update instruments set status = 'CREATED' where external_id = ?", SECOND_INSTRUMENT);
-        rows.put("update instruments set status = 'ACTIVE' where external_id = ?", INSTRUMENT);
+        // Ни CREATED, ни CLOSED не пишет ни одна тропа сервиса (находка F-3;
+        // писателя снятия с торгов нет — .claude/work/backlog.md
+        // §«Периферийные статусы `Instrument` — онбординговый `HOLD`,
+        // `ERROR`-recovery, повторный онбординг, `CLOSED`»), и состояние
+        // ставится прямо. CREATED взят потому, что онбординговый статус
+        // срезов не отсекает: срезу нужна только биржевая идентичность.
+        rows.put("update instruments set status = 'CREATED' where external_id = ?", INSTRUMENT);
+        rows.put("update instruments set status = 'CLOSED' where external_id = ?", SECOND_INSTRUMENT);
 
         tick(Tick.SNAPSHOTS);
 

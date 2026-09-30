@@ -19,14 +19,15 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     List<InstrumentEntity> findByStatusIn(Collection<String> statuses);
 
     /**
-     * Действующий листинг площадки стабильным порядком и ограниченным
-     * окном — популяция прохода сбора срезов. Порядок по идентификатору:
-     * при нехватке бюджета усечённым оказывается один и тот же хвост, а
-     * не случайные инструменты (docs/processes/snapshot-collection.md).
+     * Каталог площадки за вычетом названных статусов, стабильным порядком и
+     * ограниченным окном — популяция прохода сбора срезов. Порядок по
+     * идентификатору: при нехватке бюджета усечённым оказывается один и тот
+     * же хвост, а не случайные инструменты
+     * (docs/processes/snapshot-collection.md).
      */
-    List<InstrumentEntity> findByExchangeCodeAndStatusInOrderByIdAsc(String exchangeCode,
-                                                                    Collection<String> statuses,
-                                                                    Pageable pageable);
+    List<InstrumentEntity> findByExchangeCodeAndStatusNotInOrderByIdAsc(String exchangeCode,
+                                                                       Collection<String> excludedStatuses,
+                                                                       Pageable pageable);
 
     /**
      * Первое окно действующего листинга наружу. Порядок по {@code internalId}:

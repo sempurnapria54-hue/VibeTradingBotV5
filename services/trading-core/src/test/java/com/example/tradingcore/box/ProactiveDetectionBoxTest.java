@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -96,6 +97,9 @@ class ProactiveDetectionBoxTest extends SharedLiveDealBox {
 
     /** Код ненаблюдённого прохода. */
     private static final String PASS_INCOMPLETE = "ANOMALY_PASS_INCOMPLETE";
+
+    /** Колонка момента последнего наблюдённого прохода на строке счёта. */
+    private static final String OBSERVED_PASS_AT = "observed_pass_at";
 
     /**
      * Клиентский идентификатор НАШЕЙ заявки: маркер контура впереди
@@ -430,6 +434,46 @@ class ProactiveDetectionBoxTest extends SharedLiveDealBox {
         assertThat(connector.requests(closurePath(ACCOUNT))).isEmpty();
     }
 
+    @Test
+    @DisplayName("B7.14 — наблюдённый проход отмечает свой момент, ненаблюдённый его не двигает")
+    void anObservedPassStampsItsMomentAndAnUnobservedOneDoesNot() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+        // Возраст данных ставится в данных: наблюдения у счёта ещё не было.
+        rows.put("update exchange_accounts set observed_pass_at = null where internal_id = ?", ACCOUNT);
+
+        standScan(Feed.emptyArray(), Feed.emptyArray(), null);
+        tick(Tick.ANOMALY_DETECTION);
+
+        // Ненаблюдённый проход считается слепым, а момента не ставит: его
+        // возраст — операнд гейта входа, и «не смотрели» не может его
+        // освежить.
+        assertThat(blindPasses()).isEqualTo(1);
+        assertThat(accountRow().get(OBSERVED_PASS_AT)).isNull();
+
+        standScan(Feed.emptyArray(), Feed.emptyArray(), Feed.emptyArray());
+        tick(Tick.ANOMALY_DETECTION);
+
+        OffsetDateTime firstObserved = (OffsetDateTime) accountRow().get(OBSERVED_PASS_AT);
+        assertThat(firstObserved).isNotNull();
+        assertThat(blindPasses()).isZero();
+        Object changedAt = accountRow().get("modified_at");
+
+        tick(Tick.ANOMALY_DETECTION);
+
+        // Следующий наблюдённый проход момент двигает вперёд, а момента
+        // изменения строки — нет: значение колонки и есть момент её
+        // изменения, и здоровый счёт иначе менял бы строку каждым тактом
+        // (docs/models/domain/core/ExchangeAccount.md §Персистентность).
+        assertThat((OffsetDateTime) accountRow().get(OBSERVED_PASS_AT)).isAfter(firstObserved);
+        assertThat(accountRow().get("modified_at")).isEqualTo(changedAt);
+        OffsetDateTime lastObserved = (OffsetDateTime) accountRow().get(OBSERVED_PASS_AT);
+
+        standScan(Feed.emptyArray(), Feed.emptyArray(), null);
+        tick(Tick.ANOMALY_DETECTION);
+
+        assertThat(accountRow().get(OBSERVED_PASS_AT)).isEqualTo(lastObserved);
+    }
+
     // ------------------------------------------------------------------
     // Предусловия группы
     // ------------------------------------------------------------------
@@ -458,7 +502,7 @@ class ProactiveDetectionBoxTest extends SharedLiveDealBox {
      * Одна выборка среза: добытая либо недобытая.
      *
      * <p><b>Недобытая ставится отказом БЕЗ класса границы.</b> Отказ с
-     * классом поднимает биржевую ступень 2 сам и до прохода не доходит
+     * классом поднимает биржевую ступень 2 ловцом прохода
      * (docs/rules/controlled-exchange-exceptions.md); гейту полноты нужен
      * ровно тот класс, до которого граница не достаёт, — молчание соседа
      * по ярусу.

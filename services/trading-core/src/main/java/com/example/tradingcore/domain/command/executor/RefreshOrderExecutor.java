@@ -68,6 +68,15 @@ import org.springframework.transaction.annotation.Transactional;
  * накопленный налив, средняя цена, комиссия; отдельной команды по сделкам
  * исполнения нет.
  *
+ * <p><b>Терминальный родитель добывается ради защиты, а не ради себя.</b>
+ * Его добывают, пока на нём стоит живая встроенная защита
+ * ({@code DealTranche.observedOrders()}, подтверждение снятия риска), и
+ * матрица жизненного цикла рёбер из терминала не содержит
+ * (docs/spec/order-lifecycle.json, {@code orderTransitionAllowed}): его
+ * статус не двигается ни наблюдением, ни отказом добычи — отказ уходит
+ * дальше, но терминала не перетирает, а судьба защиты по добытому
+ * родителю резолвится по его ЛОКАЛЬНОМУ терминалу.
+ *
  * <p><b>Отметку исхода транзакция сохраняет, хотя звено и бросает:</b>
  * контролируемое исключение изъято из отката, иначе обработчик прохода
  * поднял бы биржевую ступень по факту, которого в базе нет
@@ -139,20 +148,30 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * подтверждённой отправки не является: терминал ей ставит вызывающий,
      * биржевая ступень не поднимается (docs/lifecycles/Order.md
      * §«Неотправленная нога, не найденная добычей»).
+     *
+     * <p><b>Терминальному родителю ошибочное состояние не ставится</b> —
+     * рёбер из терминала матрица не содержит, — но отказ добычи уходит
+     * дальше тем же броском: исход отказа объявляет спека резолва
+     * (docs/spec/external-status-resolution.json), и локальной
+     * терминальности среди её операндов нет.
      */
     private Order fetchOrFail(Order order, DealContext dealContext) {
         Order fetched;
         try {
             fetched = findFetched(order, dealContext);
         } catch (ExternalStatusException e) {
-            failWith(order, toCloseReason(e.getReasonCode()));
+            if (isTrue(order.isLive())) {
+                failWith(order, toCloseReason(e.getReasonCode()));
+            }
             throw e;
         }
         if (isNull(fetched) && isTrue(order.isNotSubmitted())) {
             return null;
         }
         if (isNull(fetched)) {
-            failWith(order, Order.CloseReason.MISSING_AFTER_REFRESH);
+            if (isTrue(order.isLive())) {
+                failWith(order, Order.CloseReason.MISSING_AFTER_REFRESH);
+            }
             throw new ExternalNotFoundException(
                     "Order not found after full evidence cycle: " + order.getInternalId());
         }
@@ -203,10 +222,25 @@ public class RefreshOrderExecutor implements CommandExecutor {
      *
      * <p>Подтверждение прежнего статуса переходом не является: наблюдение
      * живой заявки идёт каждым тиком и состояния не двигает.
+     *
+     * <p><b>Найденная неотправленная нога сначала становится отправленной</b>
+     * — ответ на отправку потерян, но запись на площадке и есть
+     * подтверждение приёма. Прямых рёбер из созданного в исполненный,
+     * активный и частично исполненный матрица не содержит, и наблюдение
+     * проходит тем же путём, что и встроенная защита
+     * ({@code AttachedAlgoOrder.applyObservedTerminal}).
+     *
+     * <p><b>Ребро вне матрицы не применяется</b> — ни терминалом, ни
+     * сеттером живого статуса: у терминального родителя рёбер нет вовсе, а
+     * откат живого статуса назад (частично исполненная, наблюдённая
+     * активной) состояния не двигает.
      */
     private void applyStatus(Order order, Order fetched) {
         Order.Status observed = fetched.getStatus();
-        if (Objects.equals(observed, order.getStatus())) {
+        if (isTrue(order.isNotSubmitted()) && isFalse(Objects.equals(observed, Order.Status.CREATED))) {
+            order.setStatus(Order.Status.PENDING);
+        }
+        if (Objects.equals(observed, order.getStatus()) || isFalse(order.canTransitionTo(observed))) {
             return;
         }
         switch (observed) {
@@ -355,10 +389,19 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * «неподтверждена → сработала» в матрице нет намеренно, и без
      * промежуточной активации терминал по найденному факту применить было
      * бы нечем (docs/lifecycles/Order.md §«Разбор истории»).
+     *
+     * <p><b>Неотправленная защита сначала становится отправленной</b> тем
+     * же доводом, что и её родитель: у родителя с потерянным ответом на
+     * отправку, найденного добычей, защита стоит созданной, а прямых рёбер
+     * из созданного в активный и терминал исполнения матрица не содержит.
      */
     private void applyResolution(AttachedAlgoOrder attached, AttachedProtectionResolution resolution) {
         if (isFalse(resolution.hasStatus()) || Objects.equals(resolution.getStatus(), attached.getStatus())) {
             return;
+        }
+        if (AttachedAlgoOrder.Status.CREATED.equals(attached.getStatus())
+                && isFalse(attached.canTransitionTo(resolution.getStatus()))) {
+            attached.toPending();
         }
         switch (resolution.getStatus()) {
             case PENDING -> attached.toPending();

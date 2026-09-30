@@ -2,11 +2,15 @@ package com.example.tradingcore.persistence.service;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingcore.mapping.InstrumentExternalRulesJsonConverter;
 import com.example.tradingcore.persistence.repository.InstrumentRepository;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -56,6 +60,29 @@ public class InstrumentExternalRulesDataService {
                 .map(entity -> converter.jsonToRules(entity.getExternalRules()))
                 .filter(carried -> nonNull(carried));
         rules.ifPresent(carried -> hydrateFeeRate(carried, exchangeAccountId));
+        return rules;
+    }
+
+    /**
+     * Навесы правил пачки инструментов — ОДНИМ чтением, без гидрации
+     * ставки. Читатель — детектор несвежести ставки: ему нужен ключ
+     * комиссионной группы инструмента, а не значение ставки, и строка
+     * ставки читается им самим — вместе с моментом её подтверждения
+     * (docs/rules/instrument-hold.md §«Несвежесть ставки комиссии»).
+     * Инструмент без материализованного навеса в раскладку не попадает.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, InstrumentExternalRules> findByInstrumentIds(Collection<Long> instrumentIds) {
+        Map<Long, InstrumentExternalRules> rules = new HashMap<>();
+        if (isEmpty(instrumentIds)) {
+            return rules;
+        }
+        repository.findAllById(instrumentIds).forEach(entity -> {
+            InstrumentExternalRules carried = converter.jsonToRules(entity.getExternalRules());
+            if (nonNull(carried)) {
+                rules.put(entity.getId(), carried);
+            }
+        });
         return rules;
     }
 

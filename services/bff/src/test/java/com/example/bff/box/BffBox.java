@@ -489,8 +489,42 @@ abstract class BffBox {
      * @param lastEventId позиция чтения; пусто — заголовка нет вовсе
      */
     protected Subscription subscribeAt(Integer replicaPort, String ticket, String lastEventId) {
-        return subscriptionOf(streamRequest(addressOf(replicaPort,
-                STREAM + "?ticket=" + URLEncoder.encode(ticket, StandardCharsets.UTF_8)), lastEventId));
+        return subscribeAt(replicaPort, ticket, lastEventId, null);
+    }
+
+    /**
+     * Открывает подписку, передав позицию чтения обеими формами приёма —
+     * так переподключается ПЕРЕСОЗДАННАЯ подписка: адрес несёт позицию
+     * пересоздания, заголовок браузер ставит сам.
+     *
+     * @param ticket          билет открытия
+     * @param headerPosition  позиция заголовком; пусто — заголовка нет
+     * @param addressPosition позиция параметром адреса; пусто — параметра нет
+     */
+    protected Subscription subscribe(String ticket, String headerPosition, String addressPosition) {
+        return subscribeAt(port, ticket, headerPosition, addressPosition);
+    }
+
+    /**
+     * Пересоздаёт подписку у реплики НАЗВАННОГО порта так, как это делает
+     * браузерный клиент: позиция едет ПАРАМЕТРОМ адреса рядом с билетом, а
+     * заголовка нет — {@code EventSource} заголовков не ставит.
+     *
+     * @param replicaPort порт реплики
+     * @param ticket      новый билет
+     * @param lastEventId идентичность последнего полученного события
+     */
+    protected Subscription recreateAt(Integer replicaPort, String ticket, String lastEventId) {
+        return subscribeAt(replicaPort, ticket, null, lastEventId);
+    }
+
+    private Subscription subscribeAt(Integer replicaPort, String ticket, String headerPosition,
+                                     String addressPosition) {
+        String query = "?ticket=" + URLEncoder.encode(ticket, StandardCharsets.UTF_8);
+        if (Objects.nonNull(addressPosition)) {
+            query = query + "&lastEventId=" + URLEncoder.encode(addressPosition, StandardCharsets.UTF_8);
+        }
+        return subscriptionOf(streamRequest(addressOf(replicaPort, STREAM + query), headerPosition));
     }
 
     /**

@@ -165,6 +165,19 @@ public class DealContext {
     Boolean computationAllowed;
 
     /**
+     * <b>Внешнее состояние, уже наблюдённое тропой, собравшей контекст</b>:
+     * строки среза прохода детекции по адресу находки, ставка группы у
+     * синка ставок. Операнд внешнего снимка «до» журнала происшествий —
+     * снимок берёт его, а не читает площадку второй раз
+     * (docs/models/domain/other/AnomalyReport.md §Структура).
+     *
+     * <p>Пусто у тропы, которая площадку не читала: снимок тогда добывает
+     * её сам. Снимка «после» это поле не касается — он читается после
+     * снятия риска, и наблюдённое до него остаточного риска не покажет.
+     */
+    Map<String, Object> externalObservation;
+
+    /**
      * Строки исполнения, чей <b>риск-создающий вход решён этим проходом</b>
      * — команда заведения ноги выдана, а ноги в графе ещё нет.
      *
@@ -192,7 +205,7 @@ public class DealContext {
                         BalanceContainer balanceContainer,
                         List<DealActionState> actionStates, List<DealCashFlow> cashFlows,
                         MarketFeatures marketFeatures, Boolean graphComplete, Boolean flowsComplete,
-                        Boolean computationAllowed) {
+                        Boolean computationAllowed, Map<String, Object> externalObservation) {
         this.deal = deal;
         this.exchangeAccount = exchangeAccount;
         this.instrument = instrument;
@@ -205,6 +218,7 @@ public class DealContext {
         this.graphComplete = graphComplete;
         this.flowsComplete = flowsComplete;
         this.computationAllowed = computationAllowed;
+        this.externalObservation = externalObservation;
     }
 
     /**

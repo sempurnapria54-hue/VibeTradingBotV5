@@ -6,6 +6,7 @@ import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.dec;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.order;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.orderWith;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.standaloneStop;
+import static java.util.Objects.isNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,10 +25,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -71,6 +72,16 @@ class StatusEdgeTest {
                     AttachedAlgoOrder.Status.CANCELED, AttachedAlgoOrder.Status.ERROR),
             AttachedAlgoOrder.Status.ACTIVE, EnumSet.of(AttachedAlgoOrder.Status.COMPLETED,
                     AttachedAlgoOrder.Status.CANCELED, AttachedAlgoOrder.Status.ERROR));
+
+    /** Матрица рёбер обычной заявки — docs/spec/order-lifecycle.json, {@code orderTransitionAllowed}. */
+    private static final Map<Order.Status, Set<Order.Status>> ORDER_MATRIX = Map.of(
+            Order.Status.CREATED, EnumSet.of(Order.Status.PENDING, Order.Status.CANCELED, Order.Status.ERROR),
+            Order.Status.PENDING, EnumSet.of(Order.Status.ACTIVE, Order.Status.PARTIALLY_COMPLETED,
+                    Order.Status.COMPLETED, Order.Status.CANCELED, Order.Status.ERROR),
+            Order.Status.ACTIVE, EnumSet.of(Order.Status.PARTIALLY_COMPLETED, Order.Status.COMPLETED,
+                    Order.Status.CANCELED, Order.Status.ERROR),
+            Order.Status.PARTIALLY_COMPLETED, EnumSet.of(Order.Status.COMPLETED, Order.Status.CANCELED,
+                    Order.Status.ERROR));
 
     /**
      * Пустое «откуда» допускает только созданный, и ПЕРЕВОДЯЩЕГО метода в
@@ -267,16 +278,13 @@ class StatusEdgeTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Матрица
-     * {@code orderTransitionAllowed} (docs/spec/order-lifecycle.json) из
-     * завершённого статуса не допускает ни одного ребра, а модель
-     * переводит статус БЕЗУСЛОВНО: охранника у обычной заявки нет ни
-     * одного, хотя у двух её соседей по тому же жизненному циклу охрана
-     * стои́т на самой модели (находка `D-7`, `.claude/work/backlog.md`
-     * §«Матрица рёбер обычной заявки не исполняется ни одним носителем»).
+     * Матрица {@code orderTransitionAllowed} (docs/spec/order-lifecycle.json)
+     * из завершённого статуса не допускает ни одного ребра. Прежде кейс нёс
+     * метку {@code debt}: модель переводила статус безусловно (находка
+     * `D-7`); охрана встала на модель той же формой, что у двух соседей по
+     * жизненному циклу, и метка снята.
      */
     @Test
-    @Tag("debt")
     @DisplayName("U11.17 — обычная заявка: перевод из завершённого в отмену")
     void u11_17_aForbiddenOrderEdgeIsRefused() {
         Order subject = order(1L, Order.Status.COMPLETED, "10", false);
@@ -494,6 +502,105 @@ class StatusEdgeTest {
                 .containsExactly(AlgoOrder.Status.CREATED);
     }
 
+    /**
+     * Предикат допустимости — вся матрица, включая рёбра без переводящего
+     * метода у модели (в отправленный, активный, частично исполненный): их
+     * ставят исполнители, и спросить матрицу им нечем, кроме предиката.
+     */
+    @ParameterizedTest(name = "U11.35 — {0} -> {1}")
+    @MethodSource("everyOrderPair")
+    @DisplayName("U11.35 — обычная заявка: предикат допустимости на каждой паре статусов")
+    void u11_35_theOrderPredicateIsTheWholeMatrix(Order.Status from, Order.Status to) {
+        Order subject = order(1L, from, "10", false);
+        Boolean expected = isNull(from)
+                ? Order.Status.CREATED.equals(to)
+                : ORDER_MATRIX.getOrDefault(from, EnumSet.noneOf(Order.Status.class)).contains(to);
+
+        assertThat(subject.canTransitionTo(to)).isEqualTo(expected);
+        assertThat(subject.getStatus()).isEqualTo(from);
+    }
+
+    @ParameterizedTest(name = "U11.36 — {0} -> {1}")
+    @MethodSource("allowedOrderEdges")
+    @DisplayName("U11.36 — обычная заявка: каждое ребро матрицы с публичным переводящим методом")
+    void u11_36_everyAllowedOrderEdgeMovesTheStatus(Order.Status from, Order.Status to) {
+        Order subject = order(1L, from, "10", false);
+
+        applyOrderTransition(subject, to);
+
+        assertThat(subject.getStatus()).isEqualTo(to);
+        assertThat(subject.getCloseReason()).isEqualTo(orderReasonFor(to));
+    }
+
+    @ParameterizedTest(name = "U11.37 — {0} -> {1}")
+    @MethodSource("forbiddenOrderEdges")
+    @DisplayName("U11.37 — обычная заявка: каждая пара вне матрицы порознь, в том числе из терминального")
+    void u11_37_everyForbiddenOrderEdgeLeavesTheModelUntouched(Order.Status from, Order.Status to) {
+        Order subject = order(1L, from, "10", false);
+        subject.setCloseReason(Order.CloseReason.UNKNOWN);
+
+        assertThatThrownBy(() -> applyOrderTransition(subject, to)).isInstanceOf(IllegalStateException.class);
+        assertThat(subject.getStatus()).isEqualTo(from);
+        assertThat(subject.getCloseReason()).isEqualTo(Order.CloseReason.UNKNOWN);
+    }
+
+    /**
+     * Снятие как не дошедшей до площадки — ребро из созданного; у
+     * отправленной ненайденность есть пропажа, а не несостоявшаяся
+     * постановка. Отказ стои́т до снятия защиты: её намерение не уходит с
+     * родителем, который не снялся.
+     */
+    @Test
+    @DisplayName("U11.38 — обычная заявка: отправленная снимается как не дошедшая до площадки")
+    void u11_38_aSubmittedOrderIsNotWithdrawnAsUnplaced() {
+        AttachedAlgoOrder protection = attached(AttachedAlgoOrder.Status.PENDING, "5", "90");
+        Order subject = orderWith(order(1L, Order.Status.PENDING, null, false), protection);
+
+        assertThatThrownBy(subject::toNotPlaced).isInstanceOf(IllegalStateException.class);
+        assertThat(subject.getStatus()).isEqualTo(Order.Status.PENDING);
+        assertThat(subject.getCloseReason()).isNull();
+        assertThat(protection.getStatus()).isEqualTo(AttachedAlgoOrder.Status.PENDING);
+        assertThat(protection.getCloseReason()).isNull();
+    }
+
+    /**
+     * Снятие условной заявки как не дошедшей до площадки — ребро из
+     * созданного; у отправленной и дальше ненайденность есть пропажа, а у
+     * терминальной рёбер нет вовсе. Отказ стои́т до перевода: статус и
+     * причина прежние.
+     */
+    @ParameterizedTest(name = "U11.39 — {0}")
+    @EnumSource(value = AlgoOrder.Status.class, names = "CREATED", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("U11.39 — условная заявка вне созданного снимается как не дошедшая до площадки")
+    void u11_39_onlyACreatedAlgoOrderIsWithdrawnAsUnplaced(AlgoOrder.Status from) {
+        AlgoOrder subject = standaloneStop(1L, from, "10", "90");
+
+        assertThatThrownBy(subject::toNotPlaced).isInstanceOf(IllegalStateException.class);
+        assertThat(subject.getStatus()).isEqualTo(from);
+        assertThat(subject.getCloseReason()).isNull();
+    }
+
+    /** Предикат допустимости условной заявки — вся матрица, включая пустое «откуда»; статуса он не двигает. */
+    @ParameterizedTest(name = "U11.40 — {0} -> {1}")
+    @MethodSource("everyAlgoPair")
+    @DisplayName("U11.40 — условная заявка: предикат допустимости на каждой паре статусов")
+    void u11_40_theAlgoPredicateIsTheWholeMatrix(AlgoOrder.Status from, AlgoOrder.Status to) {
+        AlgoOrder subject = standaloneStop(1L, from, "10", "90");
+        Boolean expected = isNull(from)
+                ? AlgoOrder.Status.CREATED.equals(to)
+                : ALGO_MATRIX.getOrDefault(from, EnumSet.noneOf(AlgoOrder.Status.class)).contains(to);
+
+        assertThat(subject.canTransitionTo(to)).isEqualTo(expected);
+        assertThat(subject.getStatus()).isEqualTo(from);
+    }
+
+    private static Stream<Arguments> everyAlgoPair() {
+        List<AlgoOrder.Status> origins = new ArrayList<>(EnumSet.allOf(AlgoOrder.Status.class));
+        origins.add(null);
+        return origins.stream()
+                .flatMap(from -> EnumSet.allOf(AlgoOrder.Status.class).stream().map(to -> Arguments.of(from, to)));
+    }
+
     private static Stream<Arguments> allowedAlgoEdges() {
         return ALGO_MATRIX.entrySet().stream()
                 .flatMap(entry -> entry.getValue().stream().map(to -> Arguments.of(entry.getKey(), to)));
@@ -510,6 +617,51 @@ class StatusEdgeTest {
     private static Stream<Arguments> allowedAttachedEdges() {
         return ATTACHED_MATRIX.entrySet().stream()
                 .flatMap(entry -> entry.getValue().stream().map(to -> Arguments.of(entry.getKey(), to)));
+    }
+
+    private static Stream<Arguments> everyOrderPair() {
+        List<Order.Status> origins = new ArrayList<>(EnumSet.allOf(Order.Status.class));
+        origins.add(null);
+        return origins.stream()
+                .flatMap(from -> EnumSet.allOf(Order.Status.class).stream().map(to -> Arguments.of(from, to)));
+    }
+
+    private static Stream<Arguments> allowedOrderEdges() {
+        return ORDER_MATRIX.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                        .filter(orderTransitionTargets()::contains)
+                        .map(to -> Arguments.of(entry.getKey(), to)));
+    }
+
+    private static Stream<Arguments> forbiddenOrderEdges() {
+        return EnumSet.allOf(Order.Status.class).stream()
+                .flatMap(from -> orderTransitionTargets().stream()
+                        .filter(to -> !ORDER_MATRIX.getOrDefault(from,
+                                EnumSet.noneOf(Order.Status.class)).contains(to))
+                        .map(to -> Arguments.of(from, to)));
+    }
+
+    /** Целевые статусы обычной заявки, у которых есть публичный переводящий метод. */
+    private static Set<Order.Status> orderTransitionTargets() {
+        return EnumSet.of(Order.Status.COMPLETED, Order.Status.CANCELED, Order.Status.ERROR);
+    }
+
+    private static void applyOrderTransition(Order subject, Order.Status target) {
+        switch (target) {
+            case COMPLETED -> subject.toComplete();
+            case CANCELED -> subject.toCancel(orderReasonFor(target));
+            case ERROR -> subject.toError(orderReasonFor(target));
+            default -> throw new IllegalArgumentException("переводящего метода в " + target + " нет");
+        }
+    }
+
+    /** Причина, с которой ребро подаётся и которую оно оставляет на пустом поле. */
+    private static Order.CloseReason orderReasonFor(Order.Status target) {
+        return switch (target) {
+            case COMPLETED -> Order.CloseReason.FILLED;
+            case CANCELED -> Order.CloseReason.CANCELED_BY_STRATEGY;
+            default -> Order.CloseReason.UNKNOWN_EXTERNAL_STATUS;
+        };
     }
 
     /** Целевые статусы, у которых есть публичный переводящий метод. */

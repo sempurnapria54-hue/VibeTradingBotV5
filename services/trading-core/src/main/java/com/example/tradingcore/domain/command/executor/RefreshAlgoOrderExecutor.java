@@ -117,22 +117,32 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
      * бросок. Контролируемое исключение чтения помечает сущность своей
      * причиной и уходит дальше нетронутым.
      *
-     * <p><b>Пусто — только у неотправленной заявки:</b> исчерпанный цикл
+     * <p><b>Пусто — у неотправленной заявки:</b> исчерпанный цикл
      * доказывает, что на площадке её нет, и терминал ей ставит вызывающий.
+     *
+     * <p><b>Терминальной заявке ошибочное состояние не ставится</b> — рёбер
+     * из терминала матрица жизненного цикла не содержит
+     * (docs/spec/order-lifecycle.json), — но отказ добычи уходит дальше тем
+     * же броском: исход отказа объявляет спека резолва
+     * (docs/spec/external-status-resolution.json).
      */
     private AlgoOrder fetchOrFail(AlgoOrder algoOrder, DealContext dealContext) {
         AlgoOrder fetched;
         try {
             fetched = findFetched(algoOrder, dealContext);
         } catch (ExternalStatusException e) {
-            failWith(algoOrder, toCloseReason(e.getReasonCode()));
+            if (isTrue(algoOrder.isLive())) {
+                failWith(algoOrder, toCloseReason(e.getReasonCode()));
+            }
             throw e;
         }
         if (isNull(fetched) && isTrue(algoOrder.isNotSubmitted())) {
             return null;
         }
         if (isNull(fetched)) {
-            failWith(algoOrder, AlgoOrder.CloseReason.MISSING_AFTER_REFRESH);
+            if (isTrue(algoOrder.isLive())) {
+                failWith(algoOrder, AlgoOrder.CloseReason.MISSING_AFTER_REFRESH);
+            }
             throw new ExternalNotFoundException(
                     "Algo order not found after full evidence cycle: " + algoOrder.getInternalId());
         }
@@ -191,11 +201,33 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
      *
      * <p>{@code CREATED}, {@code PENDING} и {@code ERROR} площадкой не
      * наблюдаются: первые два локальны, третий — наше safety-состояние.
-     * Их появление здесь означает наш дефект, а не факт источника.
+     * Появление ошибочного у живой заявки означает наш дефект и роняет
+     * проход; первые два отсекаются матрицей раньше — рёбер в них из
+     * отправленного и дальше нет.
+     *
+     * <p><b>Найденная неотправленная заявка сначала становится
+     * отправленной</b> — ответ на отправку потерян, но запись на площадке и
+     * есть подтверждение приёма; прямых рёбер из созданного в наблюдаемые
+     * статусы матрица не содержит. <b>Частичное срабатывание отправленной
+     * проходит через активную</b> по тому же доводу: сработать частично
+     * могла только вставшая заявка, а ребра «отправлена → частично
+     * сработала» в матрице нет.
+     *
+     * <p><b>Ребро вне матрицы не применяется</b> — модель его спрашивает
+     * предикатом допустимости, а не отказом броском: у терминальной заявки
+     * рёбер нет вовсе, а откат живого статуса назад (частично сработавшая,
+     * наблюдённая активной) состояния не двигает.
      */
     private void applyStatus(AlgoOrder algoOrder, AlgoOrder fetched) {
         AlgoOrder.Status observed = fetched.getStatus();
-        if (Objects.equals(observed, algoOrder.getStatus())) {
+        if (isTrue(algoOrder.isNotSubmitted())) {
+            algoOrder.toPending();
+        }
+        if (AlgoOrder.Status.PARTIALLY_COMPLETED.equals(observed)
+                && AlgoOrder.Status.PENDING.equals(algoOrder.getStatus())) {
+            algoOrder.toActive();
+        }
+        if (Objects.equals(observed, algoOrder.getStatus()) || isFalse(algoOrder.canTransitionTo(observed))) {
             return;
         }
         switch (observed) {

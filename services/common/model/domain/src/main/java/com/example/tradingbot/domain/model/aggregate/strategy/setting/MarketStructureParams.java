@@ -33,7 +33,11 @@ public class MarketStructureParams {
     /** Максимальная ширина диапазона, % (шире — диапазон не признаётся). */
     private BigDecimal maxRangeWidthPercents;
 
-    /** Буфер подтверждения пробоя, % от ширины диапазона. */
+    /**
+     * Буфер подтверждения пробоя, % от цены пробиваемого уровня; база
+     * процента — docs/models/domain/other/MarketStructure.md §«Семантика
+     * классификации (как считается)», пункт о пробое.
+     */
     private BigDecimal breakoutBufferPercents;
 
     /** Число баров подтверждения пробоя. */

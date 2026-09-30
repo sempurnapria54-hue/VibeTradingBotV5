@@ -26,7 +26,14 @@ public class SchemaMigrationConfig {
     /** Цепочка базы журнала. */
     public static final String JOURNAL_LOCATION = "classpath:db/migration/audit";
 
-    @Bean(initMethod = "migrate")
+    /**
+     * Имя бина миграций: на него ссылается порядок подъёма фабрики
+     * сущностей ({@link JournalPersistenceConfig}), сверяющей отображение
+     * со схемой, которую кладёт эта цепочка.
+     */
+    public static final String JOURNAL_MIGRATION = "journalMigration";
+
+    @Bean(name = JOURNAL_MIGRATION, initMethod = "migrate")
     public Flyway journalMigration(
             @Qualifier(PersistenceConfig.JOURNAL_DATA_SOURCE) DataSource journalDataSource) {
         return Flyway.configure()

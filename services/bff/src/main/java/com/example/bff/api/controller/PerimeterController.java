@@ -1,5 +1,7 @@
 package com.example.bff.api.controller;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 import com.example.bff.api.model.SubscriptionTicketApiResponse;
 import com.example.bff.api.model.TenantContextApiResponse;
 import com.example.bff.config.PerimeterProperties;
@@ -10,6 +12,7 @@ import com.example.bff.domain.TenantContextResolver;
 import com.example.bff.domain.stream.StreamRegistry;
 import com.example.bff.util.Constants;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.time.Instant;
@@ -98,10 +101,18 @@ public class PerimeterController {
      * истечении срока не рвётся — иначе живой поток обрывался бы по
      * таймеру без всякой причины.
      *
-     * @param ticket      билет, выданный точкой выше
-     * @param lastEventId идентичность последнего полученного события;
-     *                    браузер шлёт её сам, пока переподключается своя
-     *                    подписка, а после пересоздания — клиент
+     * <p><b>Идентичность последнего события принимается в двух формах, и
+     * старшинство у них названо</b> (docs/architecture/contracts.md
+     * §«Живые данные в браузер», клауза «Обязанность клиента, которую это
+     * заводит, названа»): заголовок ставит браузер на своих
+     * переподключениях, параметр адреса передаёт клиент при пересоздании
+     * подписки — браузерный {@code EventSource} заголовков не принимает.
+     *
+     * @param ticket          билет, выданный точкой выше
+     * @param addressPosition идентичность последнего полученного события,
+     *                        переданная клиентом при пересоздании подписки
+     * @param headerPosition  идентичность последнего полученного события,
+     *                        которую браузер шлёт сам на переподключении
      * @return поток записей тенанта
      */
     @Operation(summary = "Открыть подписку на поток живых данных")
@@ -110,11 +121,38 @@ public class PerimeterController {
             @ApiResponse(responseCode = "401", description = "Билет не предъявлен, испорчен либо просрочен")
     })
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(@RequestParam(required = false) String ticket,
-                             @RequestHeader(value = Constants.StreamHeaders.LAST_EVENT_ID,
-                                     required = false) String lastEventId) {
+    public SseEmitter stream(
+            @RequestParam(required = false)
+            @Parameter(description = "Билет подписки, выданный точкой выдачи билетов под bearer-токеном")
+            String ticket,
+            @RequestParam(value = Constants.StreamParameters.LAST_EVENT_ID, required = false)
+            @Parameter(description = "Идентичность последнего полученного события при ПЕРЕСОЗДАНИИ подписки "
+                    + "(новым билетом): браузерный EventSource заголовков не ставит, и клиент передаёт её "
+                    + "адресом. Непустой заголовок Last-Event-ID старше этого параметра")
+            String addressPosition,
+            @RequestHeader(value = Constants.StreamHeaders.LAST_EVENT_ID, required = false)
+            @Parameter(description = "Идентичность последнего полученного события на штатном "
+                    + "переподключении: ставит браузер сам. Непустой — старше параметра lastEventId")
+            String headerPosition) {
         SubscriptionTicket verified = ticketService.verify(ticket);
-        return streamRegistry.open(verified.tenantId(), lastEventId);
+        return streamRegistry.open(verified.tenantId(), positionOf(headerPosition, addressPosition));
+    }
+
+    /**
+     * Позиция чтения из двух форм приёма: непустой заголовок старше
+     * параметра адреса.
+     *
+     * <p><b>Старше то, что свежее, и свежее по построению заголовок.</b>
+     * Параметр заморожен в адресе с момента пересоздания, а
+     * автоматическое переподключение {@code EventSource} идёт ТЕМ ЖЕ
+     * адресом, прикладывая заголовок с последним, что получила уже эта
+     * подписка. Старший параметр переигрывал бы каждое переподключение с
+     * момента пересоздания — повтором, а как только позиция пересоздания
+     * покинет окно, ложным разрывом. Заголовка нет, пока пересозданная
+     * подписка не получила ни одного события, — и тогда параметр верен.
+     */
+    private String positionOf(String headerPosition, String addressPosition) {
+        return isNotBlank(headerPosition) ? headerPosition : addressPosition;
     }
 
     /**

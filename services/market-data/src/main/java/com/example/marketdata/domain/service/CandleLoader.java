@@ -13,8 +13,6 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -37,9 +35,13 @@ import org.springframework.stereotype.Component;
  * (docs/models/domain/other/Candle.md). Второй фильтр по признаку,
  * которого в ответе нет, был бы фикцией.
  *
- * <p>Счётчик попыток докачки держится в памяти: на доменной модели поля
- * нет, и при рестарте счётчик обнуляется — цена названа, и она меньше,
- * чем колонка состояния, которую никто, кроме этого цикла, не читает.
+ * <p><b>Счётчик попыток докачки лежит на группе и едет её же записью</b>
+ * (docs/models/domain/other/CandleGroup.md §Структура): гарантия
+ * «исчерпаны попытки — {@code ERROR}» переживает рестарт. Попытка
+ * засчитывается состоявшимся проходом починки — тем, что записал группу;
+ * проход, упавший на чтении у площадки, группу не пишет и бюджета не
+ * расходует: неустранимую дыру от временного отказа отличает ответ
+ * площадки, а не его отсутствие.
  */
 @Slf4j
 @Component
@@ -51,8 +53,6 @@ public class CandleLoader {
     private final CandleGroupDataService candleGroupDataService;
     private final InstrumentDataService instrumentDataService;
     private final CandleLoadingProperties properties;
-
-    private final Map<Long, Integer> repairAttempts = new ConcurrentHashMap<>();
 
     /** Продвигает группу на один шаг согласно её статусу. */
     public void advance(CandleGroup group) {
@@ -98,7 +98,7 @@ public class CandleLoader {
     private void check(CandleGroup group) {
         reconcile(group);
         if (group.isDense()) {
-            repairAttempts.remove(group.getId());
+            group.resetRepairAttempts();
             group.setStatus(CandleGroup.Status.ACTIVE);
         } else {
             group.setStatus(CandleGroup.Status.REPAIR);
@@ -107,11 +107,10 @@ public class CandleLoader {
     }
 
     private void repair(CandleGroup group) {
-        int attempts = repairAttempts.merge(group.getId(), 1, Integer::sum);
-        if (attempts > properties.getMaxRepairAttempts()) {
+        group.registerRepairAttempt();
+        if (group.hasExceededRepairAttempts(properties.getMaxRepairAttempts())) {
             log.error("CandleGroup {} exceeded {} repair attempts -> ERROR",
                     group.getId(), properties.getMaxRepairAttempts());
-            repairAttempts.remove(group.getId());
             group.setStatus(CandleGroup.Status.ERROR);
             candleGroupDataService.save(group);
             return;

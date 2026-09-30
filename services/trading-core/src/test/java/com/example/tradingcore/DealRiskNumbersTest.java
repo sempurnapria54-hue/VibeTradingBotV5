@@ -22,25 +22,25 @@ import org.junit.jupiter.api.Test;
  * <p><b>Проба РАЗДЕЛЕНА, а не снята.</b> Одиннадцать её прежних ожиданий
  * поглощены группами {@code U27} и {@code U28} документа
  * `.claude/tests/cases/trading-core-risk.md`; двенадцатое — что нога,
- * лежащая только в донорском поле агрегата, в числа не входит, — ни
- * одной клеткой не покрыто: клетки говорят об обходе траншей, а не о
- * том, что соседнее поле общей библиотеки ядром не читается
- * (`.claude/work/backlog.md` §«Донорские поля агрегата сделки в общей
- * библиотеке»).
+ * лежащая только в остатке неприписанных заявок агрегата, в числа не
+ * входит, — ни одной клеткой не покрыто: клетки говорят об обходе
+ * траншей, а не о том, что остаток агрегата числами риска не читается
+ * (docs/models/domain/aggregate/Deal.md §Структура).
  */
 class DealRiskNumbersTest {
 
     private final DealRiskNumbersService service = new DealRiskNumbersService(mock(DealDataService.class));
 
     /**
-     * Ноги берутся ОБХОДОМ ТРАНШЕЙ: донорское поле агрегата ядром не
-     * читается, и нога, лежащая только в нём, в числа не входит.
+     * Ноги берутся ОБХОДОМ ТРАНШЕЙ: остаток неприписанных заявок агрегата
+     * в числа риска не входит — у неприписанной ноги своя реакция, инвариант
+     * неприписанного живого риска, а не слагаемое чисел сделки.
      */
     @Test
-    void legsComeFromTranchesNotFromTheAggregateField() {
+    void legsComeFromTranchesNotFromTheUnattributedRemainder() {
         Order onlyInAggregate = entryLeg();
         Deal deal = deal(livePosition(), tranche());
-        deal.setOrders(List.of(onlyInAggregate));
+        deal.setUnattributedOrders(List.of(onlyInAggregate));
 
         DealRiskNumbers numbers = service.compute(deal);
 

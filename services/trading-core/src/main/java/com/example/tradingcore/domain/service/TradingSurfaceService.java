@@ -4,6 +4,7 @@ import static java.util.Objects.nonNull;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.deal.DealContextService;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -87,17 +89,26 @@ public class TradingSurfaceService {
     }
 
     /**
-     * Инструменты счёта со стоящей ступенью пары — их идентичности.
+     * Ступени пар счёта, которые стоя́т: идентичность инструмента → ступень.
      * Одно чтение на радиус плюс одно на резолв идентичностей.
+     *
+     * <p><b>Отдаётся сама ступень, а не факт её стояния:</b> снятие
+     * называет ступень явно, и мягкая с жёсткой в ответе обязаны
+     * различаться (docs/rules/manual-halt.md §«Наблюдаемость: ручное
+     * отличимо и от автоматики, и друг от друга»). Пара, которой в ответе
+     * нет, стои́т в рабочем состоянии — строка пары материализуется лениво, и
+     * её отсутствие означает то же самое.
      */
-    public List<String> instrumentInternalIdsWithStandingRung(Long exchangeAccountId) {
-        List<Long> instrumentIds =
-                accountInstrumentStateDataService.findInstrumentIdsWithStandingRung(exchangeAccountId);
-        Map<Long, String> identities = instrumentDataService.findInternalIdsByIds(instrumentIds);
-        return instrumentIds.stream()
-                .map(identities::get)
-                .filter(identity -> nonNull(identity))
-                .collect(Collectors.toList());
+    public Map<String, Instrument.SafetyRung> standingInstrumentRungs(Long exchangeAccountId) {
+        List<AccountInstrumentState> standing =
+                accountInstrumentStateDataService.findWithStandingRung(exchangeAccountId);
+        Map<Long, String> identities = instrumentDataService.findInternalIdsByIds(standing.stream()
+                .map(AccountInstrumentState::getInstrumentId)
+                .collect(Collectors.toList()));
+        return standing.stream()
+                .filter(state -> nonNull(identities.get(state.getInstrumentId())))
+                .collect(Collectors.toMap(state -> identities.get(state.getInstrumentId()),
+                        AccountInstrumentState::getSafetyRung, (first, second) -> first, TreeMap::new));
     }
 
     /** Раскладка «ключ инструмента → идентичность» на пачку ключей. */

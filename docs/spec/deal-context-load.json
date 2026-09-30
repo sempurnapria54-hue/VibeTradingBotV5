@@ -7,13 +7,14 @@
     "protection-coverage",
     "order-lifecycle",
     "algo-order-lifecycle",
-    "deal-risk-numbers"
+    "deal-risk-numbers",
+    "deal-result"
   ],
   "operands": {
     "deal.billsWindowBegin": "Deal.billsWindowBegin — время создания первой ОТПРАВЛЕННОЙ входной заявки сделки; write-once, единственный писатель SubmitOrderExecutor (docs/models/domain/aggregate/Deal.md). Durable-колонка сделки: её значение не выводится из загружаемых коллекций и потому годится в удостоверители их пустоты",
     "deal.entryReason": "Deal.entryReason; RECOVERY — сделка заведена восстановлением существующего живого риска, то есть позиция наблюдалась ДО её создания. Пишет DealOpeningService при создании сделки, значением своей тропы: восстановительную зовёт AnomalyJob, нашедший активную позицию без объясняющей её сделки (docs/components/DealOpeningService.md). Write-once; пустым поле не бывает, и третьего значения у перечня нет",
     "episodes[].loaded": "эпизод позиции попал в загруженный контекст",
-    "episodes[].exitAt": "положение закрытия эпизода добыто",
+    "episodes[].externalRealizedProfit": "net-результат записи закрытия эпизода (Position.externalRealizedProfit, docs/models/domain/core/Position.md); пусто — запись закрытия не добыта. Предикат «запись закрытия добыта» и его агрегат по эпизодам — дом docs/spec/deal-result.json (closeRecordFetched, allCloseRecordsFetched)",
     "tranches[].loaded": "транш сделки попал в загруженный контекст; транши грузятся все, включая терминальные",
     "legs[].entryAnchor": "плановая цена входа ноги — себестоимость её риска; операнд дома закрытой формы docs/spec/risk-at-stop.json",
     "legs[].plannedStopPrice": "ПЛАНОВЫЙ уровень стопа ноги — операнд обратной задачи ставки комиссии (docs/spec/deal-risk-numbers.json, feeRate)",
@@ -195,13 +196,7 @@
       "op": "all",
       "over": "episodes",
       "where": "loaded",
-      "of": "notNull(exitAt)"
-    },
-    {
-      "name": "exitObtainedFull",
-      "op": "all",
-      "over": "episodes",
-      "of": "notNull(exitAt)"
+      "of": "closeRecordFetched"
     },
     {
       "name": "plannedRiskLoaded",
@@ -244,7 +239,7 @@
     {
       "name": "exitAnswerDistorted",
       "note": "Недогруженный эпизод делает предикат «положение закрытия добыто у всех» истинным молча — искажение в разрешающую сторону.",
-      "expr": "exitObtainedLoaded != exitObtainedFull"
+      "expr": "exitObtainedLoaded != allCloseRecordsFetched"
     }
   ],
   "examples": [
@@ -262,11 +257,11 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           },
           {
             "loaded": true,
-            "exitAt": 200
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -351,7 +346,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -427,7 +422,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -486,7 +481,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [],
@@ -671,7 +666,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": null
+            "externalRealizedProfit": null
           }
         ],
         "tranches": [
@@ -733,7 +728,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -796,11 +791,11 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           },
           {
             "loaded": false,
-            "exitAt": null
+            "externalRealizedProfit": null
           }
         ],
         "tranches": [
@@ -838,8 +833,8 @@
         "episodesComplete": false,
         "computationAllowed": false,
         "exitObtainedLoaded": true,
-        "exitObtainedFull": false,
-        "exitAnswerDistorted": true
+        "exitAnswerDistorted": true,
+        "allCloseRecordsFetched": false
       }
     },
     {
@@ -856,7 +851,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -919,7 +914,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -983,7 +978,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -1041,7 +1036,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -1094,7 +1089,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -1153,7 +1148,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -1213,7 +1208,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": null
+            "externalRealizedProfit": null
           }
         ],
         "tranches": [
@@ -1294,7 +1289,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": null
+            "externalRealizedProfit": null
           }
         ],
         "tranches": [
@@ -1377,7 +1372,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": null
+            "externalRealizedProfit": null
           }
         ],
         "tranches": [
@@ -1455,7 +1450,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": null
+            "externalRealizedProfit": null
           }
         ],
         "tranches": [
@@ -1533,7 +1528,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": null
+            "externalRealizedProfit": null
           }
         ],
         "tranches": [
@@ -1609,7 +1604,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -1657,11 +1652,11 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           },
           {
             "loaded": true,
-            "exitAt": 200
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -1722,8 +1717,8 @@
       "expect": {
         "flowsComplete": true,
         "exitObtainedLoaded": true,
-        "exitObtainedFull": true,
-        "exitAnswerDistorted": false
+        "exitAnswerDistorted": false,
+        "allCloseRecordsFetched": true
       }
     },
     {
@@ -1736,18 +1731,18 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           },
           {
             "loaded": true,
-            "exitAt": null
+            "externalRealizedProfit": null
           }
         ]
       },
       "expect": {
         "exitObtainedLoaded": false,
-        "exitObtainedFull": false,
-        "exitAnswerDistorted": false
+        "exitAnswerDistorted": false,
+        "allCloseRecordsFetched": false
       }
     },
     {
@@ -1764,7 +1759,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": 100
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [
@@ -1825,7 +1820,7 @@
         "episodes": [
           {
             "loaded": true,
-            "exitAt": "2026-08-30T10:00:00Z"
+            "externalRealizedProfit": 1
           }
         ],
         "tranches": [

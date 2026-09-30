@@ -26,7 +26,7 @@
     "tolerance.relativeShare": "относительный член: доля валового оборота",
     "tolerance.omissionMultiplier": "омиссионный член: множитель ожидаемой комиссии сделки",
     "tolerance.floor": "пол допуска в расчётной валюте",
-    "duty.closeRecordsFetchedForAllEpisodes": "записи закрытия добыты у всех эпизодов",
+    "duty.closeRecordsFetchedForAllEpisodes": "записи закрытия добыты у всех эпизодов. Значение берётся из дома-спеки: allCloseRecordsFetched в docs/spec/deal-result.json (конъюнкция closeRecordFetched по эпизодам); здесь форма не переписывается",
     "duty.coverageProven": "порог доказанного покрытия непуст — факт закрытия эпизода наблюдался (Deal.coverageProvenThrough)",
     "duty.flowsFetched": "добыча движений выполнялась"
   },

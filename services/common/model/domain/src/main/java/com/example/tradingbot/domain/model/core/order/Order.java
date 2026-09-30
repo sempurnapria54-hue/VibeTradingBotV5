@@ -11,6 +11,7 @@ import com.example.tradingbot.domain.model.Auditable;
 import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -165,6 +166,13 @@ public class Order extends Auditable {
     private static final Set<Status> LIVE_STATUSES =
             EnumSet.of(Status.CREATED, Status.PENDING, Status.ACTIVE, Status.PARTIALLY_COMPLETED);
 
+    private static final Map<Status, Set<Status>> ALLOWED_TRANSITIONS = Map.of(
+            Status.CREATED, EnumSet.of(Status.PENDING, Status.CANCELED, Status.ERROR),
+            Status.PENDING, EnumSet.of(Status.ACTIVE, Status.PARTIALLY_COMPLETED, Status.COMPLETED,
+                    Status.CANCELED, Status.ERROR),
+            Status.ACTIVE, EnumSet.of(Status.PARTIALLY_COMPLETED, Status.COMPLETED, Status.CANCELED, Status.ERROR),
+            Status.PARTIALLY_COMPLETED, EnumSet.of(Status.COMPLETED, Status.CANCELED, Status.ERROR));
+
     /** Live: ещё существует на бирже / влияет на risk (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED). */
     public Boolean isLive() {
         return LIVE_STATUSES.contains(status);
@@ -235,32 +243,73 @@ public class Order extends Auditable {
      * Контролируемого исключения здесь нет: пропавшей сущностью нога,
      * которой на площадке не было, не является
      * (docs/rules/controlled-exchange-exceptions.md).
+     *
+     * <p><b>Ребро одно — из созданного</b> (docs/spec/order-lifecycle.json):
+     * у отправленной ненайденность есть пропажа, а не несостоявшаяся
+     * постановка, и отказ стои́т до снятия защиты.
      */
     public void toNotPlaced() {
+        if (isFalse(isNotSubmitted())) {
+            throw new IllegalStateException("Only an unsubmitted Order is withdrawn as not placed: " + status);
+        }
         toCancel(CloseReason.NOT_PLACED);
         emptyIfNull(attachedAlgoOrders).stream()
                 .filter(protection -> isTrue(protection.canTransitionTo(AttachedAlgoOrder.Status.CANCELED)))
                 .forEach(protection -> protection.toCancel(AttachedAlgoOrder.CloseReason.PARENT_ORDER_CANCELED));
     }
 
-    /** Полностью исполнен: COMPLETED + closeReason FILLED (write-once). */
+    /**
+     * Ребро из текущего статуса в целевой допустимо матрицей жизненного
+     * цикла (docs/spec/order-lifecycle.json, величина
+     * {@code orderTransitionAllowed}). Пустое «откуда» допускает только
+     * созданный; из терминальных рёбер нет, петель матрица не содержит.
+     *
+     * <p><b>Охрана стои́т на модели, как у двух соседей по той же спеке</b>
+     * — отдельной условной заявки и встроенной защиты: так её видит всякий
+     * вызывающий, а запрещённое ребро (отмена завершённой заявки) не
+     * затирает терминал молча.
+     *
+     * <p><b>Охват назван:</b> переводящие методы у модели есть только у
+     * терминальных рёбер. Рёбра в отправленный, активный и частично
+     * исполненный ставят исполнители отправки и добычи сеттером, и этот
+     * предикат их не охраняет, пока они его не спрашивают.
+     */
+    public Boolean canTransitionTo(Status target) {
+        Set<Status> allowed = isNull(status)
+                ? EnumSet.of(Status.CREATED)
+                : ALLOWED_TRANSITIONS.getOrDefault(status, EnumSet.noneOf(Status.class));
+        return allowed.contains(target);
+    }
+
+    /** Полностью исполнен: COMPLETED + closeReason FILLED (write-once); ребро вне матрицы — отказ. */
     public void toComplete() {
-        this.status = Status.COMPLETED;
+        transitTo(Status.COMPLETED);
         applyCloseReason(CloseReason.FILLED);
     }
 
-    /** Отменён: требует ненулевой reason. */
+    /** Отменён: требует ненулевой reason; ребро вне матрицы — отказ. */
     public void toCancel(CloseReason reason) {
         requireReason(reason);
-        this.status = Status.CANCELED;
+        transitTo(Status.CANCELED);
         applyCloseReason(reason);
     }
 
-    /** Ошибочное состояние: требует ненулевой reason. */
+    /** Ошибочное состояние: требует ненулевой reason; ребро вне матрицы — отказ. */
     public void toError(CloseReason reason) {
         requireReason(reason);
-        this.status = Status.ERROR;
+        transitTo(Status.ERROR);
         applyCloseReason(reason);
+    }
+
+    /**
+     * Перевод по матрице. Отказ стои́т ДО записи статуса и причины: не
+     * состоявшееся ребро не оставляет модель наполовину переведённой.
+     */
+    private void transitTo(Status target) {
+        if (isFalse(canTransitionTo(target))) {
+            throw new IllegalStateException("Illegal Order transition " + status + " -> " + target);
+        }
+        this.status = target;
     }
 
     private void applyCloseReason(CloseReason reason) {

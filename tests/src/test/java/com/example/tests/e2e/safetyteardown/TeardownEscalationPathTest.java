@@ -35,6 +35,7 @@ import static com.example.tests.e2e.safetyteardown.TeardownTrail.halt;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.incidents;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.outbox;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.payload;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.pairRung;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.safetyState;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.walkToExposure;
 import static java.util.Objects.nonNull;
@@ -110,8 +111,8 @@ class TeardownEscalationPathTest {
 
         assertThat(answer.status()).as("E5.1: постановка на паре принята — " + answer.body()).isEqualTo(202);
         JsonNode state = safetyState(trail);
-        assertThat(state.path("instrumentInternalIdsWithStandingRung")).as("E5.1: ступень пары стои́т")
-                .extracting(JsonNode::asString).contains(Trail.INSTRUMENT);
+        assertThat(state.path("standingInstrumentRungs").path(Trail.INSTRUMENT).asString())
+                .as("E5.1: ступень пары — сворачивание").isEqualTo("TRADE_BLOCKED");
         assertThat(state.path("accountSafetyRung").asString()).as("E5.1: сверх неё — жёсткая ступень счёта")
                 .isEqualTo("TRADE_BLOCKED");
         List<Map<String, Object>> raised = outbox(trail, HOLD_RAISED);
@@ -211,8 +212,7 @@ class TeardownEscalationPathTest {
         List<Map<String, Object>> rows = outbox(trail, HOLD_RAISED);
         assertThat(rows).as("E5.3: факт подъёма один — пары").hasSize(raised + 1);
         assertThat(payload(rows.getLast()).path("scope").asString()).isEqualTo("INSTRUMENT");
-        assertThat(safetyState(trail).path("instrumentInternalIdsWithStandingRung"))
-                .as("E5.3: ступень пары переставлена").extracting(JsonNode::asString).contains(Trail.INSTRUMENT);
+        assertThat(pairRung(trail)).as("E5.3: ступень пары переставлена — сворачивание").isEqualTo("TRADE_BLOCKED");
         assertThat(counter(incidents(trail), "raised_holds")).as("E5.3: подъёмов ровно на один больше")
                 .isEqualTo(counter(before, "raised_holds") + 1);
     }

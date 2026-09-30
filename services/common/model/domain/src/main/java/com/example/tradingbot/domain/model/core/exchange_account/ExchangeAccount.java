@@ -1,7 +1,12 @@
 package com.example.tradingbot.domain.model.core.exchange_account;
 
+import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 import com.example.tradingbot.domain.model.Auditable;
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,7 +18,8 @@ import lombok.Setter;
  *
  * <p><b>Писателей два, и они пишут разные наборы полей:</b> реестровую
  * часть (идентичность, контур, статус) — {@code auth}; торговое состояние
- * (база риска, серия убытков, счётчик слепых проходов) —
+ * (база риска, серия убытков, счётчик слепых проходов, момент наблюдённого
+ * прохода) —
  * {@code trading-core}. Физически это две таблицы в двух базах с общим
  * {@link #internalId}, поэтому правило «у таблицы один писатель»
  * соблюдено. Класс один, потому что одна и та же сущность: разведение по
@@ -76,12 +82,38 @@ public class ExchangeAccount extends Auditable {
     private Integer blindPassCount;
 
     /**
+     * Момент начала последнего НАБЛЮДЁННОГО прохода проактивной детекции по
+     * этому счёту: срез добыт целиком и детекция по нему отработала. Пусто —
+     * наблюдения не было ни разу.
+     *
+     * <p><b>Операнд тропы, набирающей риск, а не счётчика слепоты.</b> Счёт
+     * слепоты двигают только состоявшиеся проходы; тик, не исполнившийся
+     * вовсе, оставляет его нулевым. Возраст этого момента растёт и тогда —
+     * поэтому отбор входа спрашивает его, а не счёт
+     * (docs/components/EntryScannerJob.md §«Гейт входа»).
+     */
+    private OffsetDateTime observedPassAt;
+
+    /**
      * Ступень лестницы реакций, стоящая на этом счёте
      * (docs/rules/exchange-hold.md). Пишет её {@code trading-core} — он её
      * и поднимает; в реестровой таблице {@code auth} ступени нет ни в
      * каком виде.
      */
     private SafetyRung safetyRung;
+
+    /**
+     * Проход проактивной детекции наблюдал счёт не раньше, чем {@code maxAge}
+     * до {@code now}. Ложь — и когда наблюдение старше допуска, и когда его
+     * не было вовсе: молчание детекции разрешением набирать риск не является
+     * (docs/components/EntryScannerJob.md §«Гейт входа»).
+     *
+     * @param maxAge допустимый возраст наблюдения
+     * @param now    момент вопроса
+     */
+    public Boolean observedWithin(Duration maxAge, OffsetDateTime now) {
+        return nonNull(observedPassAt) && isFalse(observedPassAt.plus(maxAge).isBefore(now));
+    }
 
     /** Контур площадки, к которому принадлежат ключи счёта. */
     public enum Contour {

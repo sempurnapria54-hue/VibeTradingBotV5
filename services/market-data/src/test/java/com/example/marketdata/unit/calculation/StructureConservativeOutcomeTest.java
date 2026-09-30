@@ -150,13 +150,20 @@ class StructureConservativeOutcomeTest {
                 .containsExactly(List.class, BigDecimal.class, BigDecimal.class, MarketStructureParams.class);
     }
 
-    /** Момент подтверждения выводится из бара: своих часов резолвер не читает. */
+    /**
+     * Момент подтверждения выводится из бара: своих часов резолвер не читает.
+     *
+     * <p><b>Бар — 5, а не конец окна 8.</b> Прежде ожидание стояло на баре 8
+     * и пинило находку `M-4` вместо предмета клетки. Диапазон подтверждён,
+     * когда подтверждены обе границы; второе касание пола (пивот бара 4)
+     * известно на баре 5, потолка — раньше, на баре 4.
+     */
     @Test
-    @DisplayName("U15.9 — базовая сборка: момент подтверждения равен моменту бара 8 и лежит в прошлом")
+    @DisplayName("U15.9 — базовая сборка: момент подтверждения равен моменту бара 5 и лежит в прошлом")
     void u15_9_theConfirmationMomentComesFromTheBarAndNotFromAClock() {
         MarketStructure structure = resolver.resolve(rangeWindow(), new BigDecimal("0.1"), null, structureParams());
 
-        assertThat(structure.getConfirmedAt()).isEqualTo(barAt(8));
+        assertThat(structure.getConfirmedAt()).isEqualTo(barAt(5));
         assertThat(structure.getConfirmedAt())
                 .as("свежести резолвер не проверяет: момент взят из данных")
                 .isBefore(OffsetDateTime.now());

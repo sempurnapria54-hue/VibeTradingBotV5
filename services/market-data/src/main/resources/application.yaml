@@ -47,7 +47,10 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
-    locations: classpath:db/migration
+    # Подкаталог имени сервиса, а не корень локации: обход рекурсивный, и на
+    # общем classpath корень собрал бы цепочки всех сервисов
+    # (.claude/rules/codestyle.md §«Схема БД»).
+    locations: classpath:db/migration/market-data
 
 # Привязка к коннектору площадки. Один коннектор — одна площадка
 # (docs/architecture/services.md); вторая приезжает вторым блоком, а не

@@ -29,7 +29,7 @@
 | `externalFundingCost` | `BigDecimal` | накопленное финансирование, **знак нормализован**: издержка положительна — правый операнд третьей пары |
 | `externalLiquidationPenalty` | `BigDecimal` | штраф ликвидации, **сырой знак** — правый операнд четвёртой пары |
 | `externalPosId` | `String` | идентификатор позиции: **половина** оси адресации записи (вторая — `externalCreatedAt`), а на тропе материализации — данные |
-| `externalInstrumentId` | `String` | сырой идентификатор инструмента — операнд **структурной проверки** принадлежности записи; на позицию не приземляется |
+| `externalInstrumentId` | `String` | сырой идентификатор инструмента — операнд **структурной проверки** принадлежности записи; на позицию переносится по имени — атрибутом границы, без колонки (дом правила `docs/models/domain/core/Position.md`) |
 | `direction` | `Direction` | направление закрытой позиции — **доменное значение, нормализованное в слое интеграции** |
 | `externalCreatedAt`, `externalModifiedAt` | `OffsetDateTime` | время создания и обновления записи |
 
@@ -71,7 +71,7 @@
 | `externalFee`, `externalFundingCost`, `externalLiquidationPenalty` | одноимённые поля | обе |
 | `externalModifiedAt` | `externalModifiedAt` **и порог доказанного покрытия на сделке** (`Deal.coverageProvenThrough`) — той же транзакцией | обе |
 | `externalPosId` + `externalCreatedAt` | сверка **парой** со строкой эпизода (дом единицы — `docs/models/domain/core/Position.md`): одинокого идентификатора мало, `posId` переиспользуется | обновление |
-| `externalInstrumentId` | сверка с инструментом запроса | обе |
+| `externalInstrumentId` | сверка с инструментом запроса — до маппинга; затем `externalInstrumentId` позиции, атрибут границы без колонки | обе |
 | `externalPosId` | `externalId` — **запись** | материализация |
 | `direction` | `direction` — перенос доменного значения, без резолва здесь | материализация |
 | `externalCreatedAt` | `externalCreatedAt` позиции | материализация |

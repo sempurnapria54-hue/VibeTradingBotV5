@@ -11,7 +11,7 @@
 | Snapshot field | Domain | Семантика |
 |---|---|---|
 | `externalId` | `Position.externalId` | биржевой id позиции |
-| `externalInstrumentId` | — | биржевое имя инструмента; в домен не переносится (позиция знает инструмент ссылкой), служит адресацией снапшота внутри среза |
+| `externalInstrumentId` | `Position.externalInstrumentId` | биржевое имя инструмента, переносится по имени. **Атрибут границы, а не поле строки:** колонки под него нет (у строки эпизода инструмент идёт через сделку), в наш числовой идентификатор на границе не резолвится — дом правила `docs/models/domain/core/Position.md`. Адресует позицию внутри **счёт-широкого среза** (`docs/components/AnomalyJob.md`) |
 | `externalSize` | `Position.externalSize` | размер по модулю |
 | `direction` | `Position.direction` | `LONG`/`SHORT` (из знака) |
 | `externalAverageEntryPrice` | `Position.externalAverageEntryPrice` | средняя цена входа |
@@ -122,10 +122,10 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 
 `instType`, `mgnMode`, `posSide`, `lever` — adapter use
 (validation / request constants), в `Position` /
-`PositionExternalSnapshot` не хранятся. **`instId` маппится** — но
-только в снапшот, не в `Position`: у доменной позиции инструмент уже
-известен ссылкой, а снапшот приходит и СРЕЗОМ по множеству инструментов
-(чтение всех живых позиций одним запросом), где адресат каждого не задан
+`PositionExternalSnapshot` не хранятся. **`instId` маппится** — в
+снапшот и дальше в `Position.externalInstrumentId`, атрибут границы без
+колонки: снапшот приходит и СРЕЗОМ по множеству инструментов (чтение
+всех живых позиций одним запросом), где адресат каждого не задан
 запросом.
 
 ### OKX response validation (adapter-layer)
@@ -141,8 +141,9 @@ lever   <= биржевой максимум (externalMaxLeverage)
 
 `POST /api/v5/trade/close-position`: `instId`, `mgnMode`, `posSide`,
 `ccy` (опц.), `autoCxl` (опц.). Берутся **не** из `Position`, а из
-`DealContext` / `Instrument` / Exchange-Account settings /
-`OkxIntegrationService` policy:
+аргументов операции «закрыть позицию» (инструмент, расчётная валюта —
+`docs/components/IntegrationService.md`) и политики коннектора — тело
+собирает читатель источника `OkxSourceReader`:
 
 ```text
 Instrument.externalId     → instId

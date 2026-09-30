@@ -21,6 +21,8 @@ import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.util.Constants;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,10 @@ import org.mockito.ArgumentCaptor;
  */
 class BlindPassLimitTest {
 
+    /** Момент начала прохода: им проход и отмечается. */
+    private static final OffsetDateTime PASS_STARTED_AT =
+            OffsetDateTime.of(2026, 9, 30, 10, 0, 30, 0, ZoneOffset.UTC);
+
     private final ExchangeAccountDataService accounts = mock(ExchangeAccountDataService.class);
     private final AnomalyReportService reportService = mock(AnomalyReportService.class);
     private final HoldService holdService = mock(HoldService.class);
@@ -48,11 +54,11 @@ class BlindPassLimitTest {
     @BeforeEach
     void setUp() {
         gate = new AnomalyPassGate(accounts, reportService, holdService, properties);
-        when(accounts.markPass(anyLong(), any())).thenReturn(0);
+        when(accounts.markPass(anyLong(), any(), any())).thenReturn(0);
     }
 
     private void blindPasses(Integer count) {
-        when(accounts.markPass(anyLong(), any())).thenReturn(count);
+        when(accounts.markPass(anyLong(), any(), any())).thenReturn(count);
     }
 
     private HoldSignal journalledSignal() {
@@ -71,9 +77,9 @@ class BlindPassLimitTest {
     @Test
     @DisplayName("U11.1 — проход наблюдён: отметка исходом «наблюдён», ступень не запрошена, строка не пишется")
     void u11_1_anObservedPassOnlyMarksItself() {
-        gate.apply(true, account());
+        gate.apply(true, account(), PASS_STARTED_AT);
 
-        verify(accounts).markPass(ACCOUNT_ID, true);
+        verify(accounts).markPass(ACCOUNT_ID, true, PASS_STARTED_AT);
         verify(holdService, never()).raise(any(), any());
         verify(reportService, never()).journalState(any(), any(), any());
     }
@@ -91,7 +97,7 @@ class BlindPassLimitTest {
     void u11_2_aSubLimitBlindPassWritesAJournalRow() {
         blindPasses(properties.getBlindPassLimit() - 1);
 
-        gate.apply(false, account());
+        gate.apply(false, account(), PASS_STARTED_AT);
 
         HoldSignal signal = journalledSignal();
         assertThat(signal.getScope()).isEqualTo(HoldScope.EXCHANGE_ACCOUNT);
@@ -106,7 +112,7 @@ class BlindPassLimitTest {
     void u11_3_theLimitRaisesTheSoftAccountRung() {
         blindPasses(properties.getBlindPassLimit());
 
-        gate.apply(false, account());
+        gate.apply(false, account(), PASS_STARTED_AT);
 
         assertThat(raisedSignal())
                 .isEqualTo(HoldSignal.exchangeAccountSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE));
@@ -119,7 +125,7 @@ class BlindPassLimitTest {
     void u11_4_aboveTheLimitRaisesTheSameRung() {
         blindPasses(properties.getBlindPassLimit() + 5);
 
-        gate.apply(false, account());
+        gate.apply(false, account(), PASS_STARTED_AT);
 
         assertThat(raisedSignal())
                 .isEqualTo(HoldSignal.exchangeAccountSoft(Constants.Hold.ANOMALY_PASS_INCOMPLETE));
@@ -129,9 +135,9 @@ class BlindPassLimitTest {
     @Test
     @DisplayName("U11.5 — срез добыт целиком, но детекция не отработала: та же слепота")
     void u11_5_theOperandIsTheObservationOutcome() {
-        gate.apply(false, account());
+        gate.apply(false, account(), PASS_STARTED_AT);
 
-        verify(accounts).markPass(ACCOUNT_ID, false);
+        verify(accounts).markPass(ACCOUNT_ID, false, PASS_STARTED_AT);
     }
 
     /** Ступень мягкая — снятия риска в составе нет. */
@@ -140,7 +146,7 @@ class BlindPassLimitTest {
     void u11_6_theLimitRungIsSoft() {
         blindPasses(properties.getBlindPassLimit());
 
-        gate.apply(false, account());
+        gate.apply(false, account(), PASS_STARTED_AT);
 
         assertThat(raisedSignal().tearsDownRisk())
                 .as("снятия риска в составе слепоты нет")
@@ -153,7 +159,7 @@ class BlindPassLimitTest {
     void u11_7_theBlindPassContextCarriesOnlyTheAccount() {
         blindPasses(properties.getBlindPassLimit());
 
-        gate.apply(false, account());
+        gate.apply(false, account(), PASS_STARTED_AT);
 
         ArgumentCaptor<DealContext> context = ArgumentCaptor.forClass(DealContext.class);
         verify(holdService).raise(any(), context.capture());
@@ -167,7 +173,7 @@ class BlindPassLimitTest {
     void u11_8_theLimitPathWritesNoSecondRow() {
         blindPasses(properties.getBlindPassLimit());
 
-        gate.apply(false, account());
+        gate.apply(false, account(), PASS_STARTED_AT);
 
         verify(reportService, never()).journalState(any(), any(), any());
     }
@@ -184,7 +190,7 @@ class BlindPassLimitTest {
         when(reportService.journalState(any(), any(), any()))
                 .thenThrow(new IllegalStateException("db is down"));
 
-        assertThatThrownBy(() -> gate.apply(false, account()))
+        assertThatThrownBy(() -> gate.apply(false, account(), PASS_STARTED_AT))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -194,10 +200,24 @@ class BlindPassLimitTest {
     void u11_10_anObservedPassResetsTheCounterAndClearsNothing() {
         blindPasses(0);
 
-        gate.apply(true, account());
+        gate.apply(true, account(), PASS_STARTED_AT);
 
-        verify(accounts).markPass(ACCOUNT_ID, true);
+        verify(accounts).markPass(ACCOUNT_ID, true, PASS_STARTED_AT);
         verify(accounts, never()).clearRung(anyLong(), any(), any());
         verify(holdService, never()).raise(any(), any());
+    }
+
+    /**
+     * Наблюдённый проход отмечается МОМЕНТОМ СВОЕГО НАЧАЛА: его возраст —
+     * операнд гейта входа, и он растёт и тогда, когда тик не исполнился
+     * вовсе, — то, чего счёт слепоты не видит по построению. Момент начала,
+     * а не конца: наблюдения прохода его не старше.
+     */
+    @Test
+    @DisplayName("U11.11 — наблюдённый проход: отметка несёт момент начала прохода")
+    void u11_11_anObservedPassIsMarkedWithItsStartMoment() {
+        gate.apply(true, account(), PASS_STARTED_AT);
+
+        verify(accounts).markPass(ACCOUNT_ID, true, PASS_STARTED_AT);
     }
 }

@@ -72,6 +72,27 @@ public class StrategyCondition {
         return operandKeys(StrategyConditionSourceType.INDICATOR, StrategyConditionOperand::getIndicatorKey);
     }
 
+    /**
+     * Авторские имена индикаторов, чьё ПРЕДЫДУЩЕЕ значение читает оценка
+     * условия, — вторая половина сравнения, которую гейт покрытия обязан
+     * мерить наравне с последней (docs/rules/market-data-freshness.md).
+     *
+     * <p><b>Прошлое читают пересечение — обоими операндами — и объёмный
+     * фильтр — левым;</b> прочие правила его не спрашивают. Цена предыдущей
+     * половины не имеет вовсе и сюда не входит: её пустоту оценщик читает
+     * ложью сам. Перечень — зеркало оценки
+     * (docs/components/StrategyConditionEvaluator.md) и живёт у грамматики
+     * рядом с {@link #indicatorKeys()}, а не у каждого читателя: новый тип
+     * правила, читающий прошлое, пополняет его той же правкой, что заводит
+     * его оценку.
+     */
+    public Set<String> pastIndicatorKeys() {
+        return keysOf(emptyIfNull(rules).stream()
+                        .filter(Objects::nonNull)
+                        .flatMap(this::pastOperands),
+                StrategyConditionSourceType.INDICATOR, StrategyConditionOperand::getIndicatorKey);
+    }
+
     /** Авторские имена операндов-структур рынка, названные условием. */
     public Set<String> structureKeys() {
         return operandKeys(StrategyConditionSourceType.MARKET_STRUCTURE, StrategyConditionOperand::getStructureKey);
@@ -96,13 +117,32 @@ public class StrategyCondition {
 
     private Set<String> operandKeys(StrategyConditionSourceType sourceType,
                                     Function<StrategyConditionOperand, String> accessor) {
-        return emptyIfNull(rules).stream()
-                .flatMap(rule -> Stream.of(rule.getLeftOperand(), rule.getRightOperand()))
+        return keysOf(emptyIfNull(rules).stream()
+                        .flatMap(rule -> Stream.of(rule.getLeftOperand(), rule.getRightOperand())),
+                sourceType, accessor);
+    }
+
+    /** Непустые имена операндов данного типа источника; отбор по типу, затем своё поле. */
+    private Set<String> keysOf(Stream<StrategyConditionOperand> operands,
+                               StrategyConditionSourceType sourceType,
+                               Function<StrategyConditionOperand, String> accessor) {
+        return operands
                 .filter(Objects::nonNull)
                 .filter(operand -> Objects.equals(sourceType, operand.getSourceType()))
                 .map(accessor)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
+    }
+
+    /** Операнды правила, чьё предыдущее значение читает его оценка; пусто — прошлое не читается. */
+    private Stream<StrategyConditionOperand> pastOperands(StrategyConditionRule rule) {
+        if (Objects.equals(StrategyConditionRuleType.CROSSOVER, rule.getRuleType())) {
+            return Stream.of(rule.getLeftOperand(), rule.getRightOperand());
+        }
+        if (Objects.equals(StrategyConditionRuleType.VOLUME_FILTER_PASSED, rule.getRuleType())) {
+            return Stream.of(rule.getLeftOperand());
+        }
+        return Stream.empty();
     }
 
     private Boolean namesSource(StrategyConditionSourceType sourceType) {

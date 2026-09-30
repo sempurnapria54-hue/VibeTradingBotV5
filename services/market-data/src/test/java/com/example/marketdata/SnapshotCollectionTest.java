@@ -23,6 +23,7 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketOrderBook;
 import com.example.tradingbot.domain.model.trade.market_snapshot.MarketTicker;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -152,8 +153,53 @@ class SnapshotCollectionTest {
         verify(snapshotDataService, times(2)).saveIfNew(any(MarketOrderBook.class));
     }
 
+    /**
+     * Популяция прохода — весь каталог площадки, кроме снятого с торгов:
+     * исключается ровно {@code CLOSED}, и никакой онбординговый статус.
+     *
+     * <p>Граница проведена по торгам, а не по готовности свечей
+     * (docs/architecture/market-data-collection.md §«Правило — по
+     * невосполнимости»): прежняя популяция по онбордингу оставляла
+     * окружение без заказчика без единого среза.
+     */
+    @Test
+    void passPopulationExcludesOnlyWithdrawnInstruments() {
+        givenListing(instrument(1L, FIRST));
+        givenNoTickers();
+        when(readClient.getOrderBook(anyString(), anyInt())).thenReturn(orderBook());
+
+        collector.collectPass();
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<Instrument.Status>> excluded = ArgumentCaptor.forClass(Collection.class);
+        verify(instrumentDataService).findCatalogExceptWithin(eq(EXCHANGE), excluded.capture(), anyInt());
+        assertThat(excluded.getValue()).containsExactly(Instrument.Status.CLOSED);
+    }
+
+    /**
+     * Инструмент в онбординговом статусе, который прежняя популяция
+     * отсекала, снимается наравне с готовым: срезу нужна только биржевая
+     * идентичность.
+     */
+    @Test
+    void onboardingStatusDoesNotKeepAnInstrumentOutOfThePass() {
+        Instrument created = instrument(1L, FIRST);
+        created.setStatus(Instrument.Status.CREATED);
+        Instrument held = instrument(2L, SECOND);
+        held.setStatus(Instrument.Status.HOLD);
+        givenListing(created, held);
+        givenNoTickers();
+        when(readClient.getOrderBook(anyString(), anyInt())).thenReturn(orderBook());
+
+        collector.collectPass();
+
+        verify(readClient).getOrderBook(eq(FIRST), anyInt());
+        verify(readClient).getOrderBook(eq(SECOND), anyInt());
+        verify(snapshotDataService, times(2)).saveIfNew(any(MarketOrderBook.class));
+    }
+
     private void givenListing(Instrument... instruments) {
-        when(instrumentDataService.findListedWithin(eq(EXCHANGE), any(), anyInt()))
+        when(instrumentDataService.findCatalogExceptWithin(eq(EXCHANGE), any(), anyInt()))
                 .thenReturn(List.of(instruments));
     }
 

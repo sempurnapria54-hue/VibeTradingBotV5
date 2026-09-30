@@ -1276,7 +1276,7 @@ RETIRED = [
         # (.claude/work/backlog.md §«Снятый термин через javadoc-перенос:
         # энфорсер слеп к кодовому носителю»).
         'population': (('docs/rules/risk-policy.md', None),
-                       ('docs/models/domain/core/Exchange.md', None),
+                       ('docs/models/domain/core/ExchangeAccount.md', None),
                        ('docs/spec/risk-limits.json',
                         r'вверх\s+автоматически\s+не\s+ходит'),
                        ('docs/components/RefreshBalanceExecutor.md',

@@ -1,13 +1,14 @@
 package com.example.marketdata.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Схема и хранилище как вход — клетки {@code B9.6} и {@code B9.8}
- * документа `.claude/tests/cases/market-data.md`.
+ * Схема и хранилище как вход — клетки {@code B9.6}, {@code B9.8} и
+ * {@code B9.9} документа `.claude/tests/cases/market-data.md`.
  *
  * <p><b>Обе клетки о том, чего у сервиса НЕТ и что у него ЕСТЬ по
  * построению.</b> Схема накатывается миграциями и сверяется с
@@ -29,6 +30,23 @@ class ConfigurationInputBoxTest extends SharedMarketDataBox {
                 "market_structures", "order_book_snapshots", "ticker_snapshots");
         assertThat(rows.hypertableNames())
                 .contains("candles", "order_book_snapshots", "ticker_snapshots");
+    }
+
+    /**
+     * Сжатие стоит только на невосполнимых срезах: их писатель пишет лишь
+     * момент прохода, а свечи бэкфилл и починка пишут в произвольно старые
+     * чанки. Порог — неделя в миллисекундах, единице времени рядов
+     * (docs/architecture/data-ownership.md §«Временные ряды»).
+     */
+    @Test
+    @DisplayName("B9.9 — старые чанки срезов сжимаются политикой, свечи — нет")
+    void b9_9_oldSnapshotChunksAreCompressedByPolicyAndCandlesAreNot() {
+        assertThat(rows.appliedMigrations()).contains("4");
+        assertThat(rows.compressedHypertableNames())
+                .containsExactlyInAnyOrder("order_book_snapshots", "ticker_snapshots");
+        assertThat(rows.compressionThresholds())
+                .containsOnly(entry("order_book_snapshots", "604800000"),
+                        entry("ticker_snapshots", "604800000"));
     }
 
     @Test

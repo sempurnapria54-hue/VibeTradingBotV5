@@ -49,6 +49,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -295,6 +296,42 @@ class EntryScanPassTest {
         verify(strategyDataService, never()).findActiveOnPairWithTree(ACCOUNT_ID, SECOND_INSTRUMENT_ID);
     }
 
+    /**
+     * Счёт, которого проактивная детекция не наблюдала ни разу, риска не
+     * набирает: молчание детекции разрешением не является. Гейт стои́т до
+     * всякого чтения — ни вопроса о сделках счёта, ни обхода инструментов.
+     */
+    @Test
+    @DisplayName("U18.5 — счёт не наблюдался детекцией: отбор по нему не начинается")
+    void aNeverObservedAccountIsNotScanned() {
+        stubAccount(null);
+
+        job().tick();
+
+        verify(dealDataService, never()).existsActiveOnAccount(any());
+        verify(instrumentDataService, never()).findTradable(any(), any());
+        verify(dealOpeningService, never()).openDeal(any(), any(), any(), any(), any(), any());
+    }
+
+    /**
+     * Наблюдение старше допуска закрывает вход так же, как его отсутствие:
+     * тик детекции, не исполнившийся вовсе, счёта слепоты не двигает, а
+     * возраст наблюдения растёт.
+     */
+    @Test
+    @DisplayName("U18.6 — наблюдение старше допуска: отбор по счёту не начинается")
+    void anObservationOlderThanTheToleranceClosesTheEntry() {
+        EntryScannerProperties properties = new EntryScannerProperties();
+        stubAccount(OffsetDateTime.now(ZoneOffset.UTC)
+                .minus(properties.getObservationMaxAge())
+                .minusSeconds(1));
+
+        job(properties).tick();
+
+        verify(instrumentDataService, never()).findTradable(any(), any());
+        verify(dealOpeningService, never()).openDeal(any(), any(), any(), any(), any(), any());
+    }
+
     /** Выключенный отбор не делает ничего — ни выборки счетов, ни обхода. */
     @Test
     void aDisabledScanDoesNothing() {
@@ -319,11 +356,20 @@ class EntryScanPassTest {
                 exchangeOperationsClient);
     }
 
-    /** Один счёт, доступный для входа, без стоящих ступеней на парах. */
+    /**
+     * Один счёт, доступный для входа, без стоящих ступеней на парах; детекция
+     * наблюдала его только что — гейт возраста наблюдения открыт.
+     */
     private void stubAccount() {
+        stubAccount(OffsetDateTime.now(ZoneOffset.UTC));
+    }
+
+    /** Тот же счёт с названным моментом последнего наблюдённого прохода. */
+    private void stubAccount(OffsetDateTime observedPassAt) {
         ExchangeAccount account = new ExchangeAccount();
         account.setId(ACCOUNT_ID);
         account.setExchangeCode(EXCHANGE_CODE);
+        account.setObservedPassAt(observedPassAt);
         when(exchangeAccountDataService.findEntryEligibleAccounts())
                 .thenReturn(new ArrayList<>(List.of(account)));
         when(accountInstrumentStateDataService.findInstrumentIdsWithStandingRung(ACCOUNT_ID))

@@ -1,10 +1,8 @@
 package com.example.tradingbot.domain.unit.predicate;
 
-import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.attached;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.deal;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.episode;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.order;
-import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.orderWith;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.standaloneStop;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.trancheOf;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.trancheWithExposure;
@@ -14,7 +12,6 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.util.List;
@@ -145,7 +142,7 @@ class DealAggregateTest {
     @DisplayName("U6.15 — живая заявка сделки, не приписанная ни одному траншу")
     void u6_15_anUnattributedLiveOrderIsRisk() {
         Deal subject = deal(Deal.Status.ACTIVE, quietTranche());
-        subject.setOrders(List.of(order(1L, Order.Status.ACTIVE, null, false)));
+        subject.setUnattributedOrders(List.of(order(1L, Order.Status.ACTIVE, null, false)));
 
         assertThat(subject.unattributedLiveRisk()).isTrue();
     }
@@ -157,21 +154,10 @@ class DealAggregateTest {
         DealTranche tranche = trancheOf(trancheWithExposure(null), List.of(live), List.of());
         tranche.setStatus(DealTranche.Status.MANAGING);
         Deal subject = deal(Deal.Status.ACTIVE, tranche);
-        subject.setOrders(List.of(live));
+        subject.setUnattributedOrders(List.of());
+        subject.setUnattributedAlgoOrders(List.of());
 
         assertThat(subject.unattributedLiveRisk()).isFalse();
-    }
-
-    /** Пустые ключи отсеиваются только при сборке множества приписанных. */
-    @Test
-    @DisplayName("U6.17 — живая заявка без ключа строки у сделки и у транша")
-    void u6_17_aKeylessLiveOrderIsNeverAttributed() {
-        Order live = order(null, Order.Status.ACTIVE, null, false);
-        DealTranche tranche = trancheOf(trancheWithExposure(null), List.of(live), List.of());
-        Deal subject = deal(Deal.Status.ACTIVE, tranche);
-        subject.setOrders(List.of(live));
-
-        assertThat(subject.unattributedLiveRisk()).isTrue();
     }
 
     @Test
@@ -230,46 +216,24 @@ class DealAggregateTest {
         assertThat(unfilled.episodeNotPresented()).isFalse();
     }
 
-    /**
-     * Сделочные перечни обходят СВОИ коллекции, а не коллекции траншей
-     * (пробел `G4` документа, добран под-шагом 3).
-     */
+    /** Та же ось у отдельных условных заявок: остаток читается обоими перечнями. */
     @Test
-    @DisplayName("U6.21 — живые заявки сделки против живых заявок транша")
-    void u6_21_dealLiveOrdersTraverseTheDealCollection() {
-        Order ofDeal = order(1L, Order.Status.ACTIVE, null, false);
-        Order ofTranche = order(2L, Order.Status.ACTIVE, null, false);
-        Deal subject = deal(Deal.Status.ACTIVE,
-                trancheOf(trancheWithExposure(null), List.of(ofTranche), List.of()));
-        subject.setOrders(List.of(ofDeal));
+    @DisplayName("U6.25 — живая отдельная условная заявка сделки, не приписанная ни одному траншу")
+    void u6_25_anUnattributedLiveAlgoOrderIsRisk() {
+        Deal subject = deal(Deal.Status.ACTIVE, quietTranche());
+        subject.setUnattributedAlgoOrders(List.of(standaloneStop(1L, AlgoOrder.Status.ACTIVE, "10", "90")));
 
-        assertThat(subject.liveOrders()).containsExactly(ofDeal);
+        assertThat(subject.unattributedLiveRisk()).isTrue();
     }
 
-    /** Та же ось у отдельных условных заявок (пробел `G4`). */
+    /** Остаток несёт риск только живой частью: терминальная нога риска не держит. */
     @Test
-    @DisplayName("U6.22 — живые отдельные условные заявки сделки")
-    void u6_22_dealLiveAlgoOrdersTraverseTheDealCollection() {
-        AlgoOrder ofDeal = standaloneStop(1L, AlgoOrder.Status.ACTIVE, "10", "90");
-        AlgoOrder ofTranche = standaloneStop(2L, AlgoOrder.Status.ACTIVE, "10", "90");
-        Deal subject = deal(Deal.Status.ACTIVE,
-                trancheOf(trancheWithExposure(null), List.of(), List.of(ofTranche)));
-        subject.setAlgoOrders(List.of(ofDeal));
+    @DisplayName("U6.26 — в остатке неприписанных только терминальная заявка")
+    void u6_26_aTerminalUnattributedOrderIsNotRisk() {
+        Deal subject = deal(Deal.Status.ACTIVE, quietTranche());
+        subject.setUnattributedOrders(List.of(order(1L, Order.Status.CANCELED, null, false)));
 
-        assertThat(subject.liveAlgoOrders()).containsExactly(ofDeal);
-    }
-
-    /** Та же ось у встроенных защит (пробел `G4`). */
-    @Test
-    @DisplayName("U6.23 — живые встроенные защиты сделки")
-    void u6_23_dealLiveAttachedProtectionsTraverseTheDealOrders() {
-        AttachedAlgoOrder ofDeal = attached(AttachedAlgoOrder.Status.ACTIVE, "10", "90");
-        AttachedAlgoOrder ofTranche = attached(AttachedAlgoOrder.Status.ACTIVE, "10", "80");
-        Deal subject = deal(Deal.Status.ACTIVE, trancheOf(trancheWithExposure(null),
-                List.of(orderWith(order(2L, Order.Status.ACTIVE, "10", false), ofTranche)), List.of()));
-        subject.setOrders(List.of(orderWith(order(1L, Order.Status.ACTIVE, "10", false), ofDeal)));
-
-        assertThat(subject.liveAttachedProtections()).containsExactly(ofDeal);
+        assertThat(subject.unattributedLiveRisk()).isFalse();
     }
 
     /**

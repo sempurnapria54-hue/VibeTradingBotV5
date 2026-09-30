@@ -235,6 +235,7 @@ abstract class TradingCoreBox {
         auth.answers(PEER_ACCOUNTS, Feed.array(listed));
         marketData.answers(PEER_INSTRUMENTS, Feed.emptyArray());
         tick(Tick.REGISTRY_PROJECTIONS);
+        tenantByAccount.keySet().forEach(this::observedByDetection);
         PeerStub.all().forEach(PeerStub::forgetRequests);
     }
 
@@ -256,7 +257,28 @@ abstract class TradingCoreBox {
         auth.answers(PEER_ACCOUNTS, Feed.array(listedAccounts));
         marketData.answers(PEER_INSTRUMENTS, Feed.array(listedInstruments));
         tick(Tick.REGISTRY_PROJECTIONS);
+        accounts.forEach(this::observedByDetection);
         PeerStub.all().forEach(PeerStub::forgetRequests);
+    }
+
+    /**
+     * Детекция наблюдала счёт только что: момент последнего наблюдённого
+     * прохода ставится В ДАННЫХ — предусловие всякого входа
+     * (docs/components/EntryScannerJob.md §«Гейт входа»).
+     *
+     * <p><b>Прямой записью, а не тиком детекции, и довод назван.</b> Момент —
+     * возраст данных, а он в этом ящике ставится в данных (шапка класса).
+     * Тик детекции поставил бы его тропой ящика, но ценой трёх срезов у стаба
+     * коннектора, которые остались бы заданными на всю клетку, — а клетки
+     * неполного прохода держатся ровно на незаданном срезе. Клетки о самом
+     * гейте сдвигают этот момент сами ({@code B1.15}, {@code B1.16}); писателя
+     * момента наблюдает своя клетка ({@code B7.14}).
+     *
+     * @param accountInternalId идентичность счёта проекции
+     */
+    protected void observedByDetection(String accountInternalId) {
+        rows.put("update exchange_accounts set observed_pass_at = now() where internal_id = ?",
+                accountInternalId);
     }
 
     /**

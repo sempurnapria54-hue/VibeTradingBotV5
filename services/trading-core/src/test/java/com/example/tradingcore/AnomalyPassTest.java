@@ -74,6 +74,8 @@ class AnomalyPassTest {
     private static final String EXTERNAL_INSTRUMENT_ID = "ETH-USDT-SWAP";
     private static final OffsetDateTime OPENED_AT =
             OffsetDateTime.of(2026, 9, 6, 9, 0, 0, 0, ZoneOffset.UTC);
+    private static final OffsetDateTime PASS_STARTED_AT =
+            OffsetDateTime.of(2026, 9, 30, 10, 0, 30, 0, ZoneOffset.UTC);
 
     private final ExchangeOperationsClient exchangeOperationsClient = mock(ExchangeOperationsClient.class);
     private final ExchangeAccountDataService exchangeAccountDataService =
@@ -132,8 +134,9 @@ class AnomalyPassTest {
 
     /**
      * Контролируемое исключение наверх проходит и пометкой «проход
-     * неполон» не подменяется: оно поднимает биржевую ступень 2 само, а
-     * подмена смягчила бы ратифицированный исход.
+     * неполон» у сборщика среза не подменяется: его исход — биржевая
+     * ступень 2, которую поднимает ловец прохода, а подмена смягчила бы
+     * ратифицированный исход.
      */
     @Test
     void aControlledFailureIsNotDowngradedToAnIncompletePass() {
@@ -160,9 +163,9 @@ class AnomalyPassTest {
     /** Наблюдённый проход сбрасывает счёт слепоты и реакции не поднимает. */
     @Test
     void anObservedPassResetsTheBlindCount() {
-        when(exchangeAccountDataService.markPass(ACCOUNT_ID, Boolean.TRUE)).thenReturn(0);
+        when(exchangeAccountDataService.markPass(ACCOUNT_ID, Boolean.TRUE, PASS_STARTED_AT)).thenReturn(0);
 
-        gate().apply(Boolean.TRUE, account());
+        gate().apply(Boolean.TRUE, account(), PASS_STARTED_AT);
 
         verify(holdService, never()).raise(any(), any());
         verify(reportService, never()).journalState(any(), any(), any());
@@ -174,9 +177,9 @@ class AnomalyPassTest {
      */
     @Test
     void aBlindPassBelowTheLimitOnlyJournals() {
-        when(exchangeAccountDataService.markPass(ACCOUNT_ID, Boolean.FALSE)).thenReturn(2);
+        when(exchangeAccountDataService.markPass(ACCOUNT_ID, Boolean.FALSE, PASS_STARTED_AT)).thenReturn(2);
 
-        gate().apply(Boolean.FALSE, account());
+        gate().apply(Boolean.FALSE, account(), PASS_STARTED_AT);
 
         verify(reportService).journalState(any(), eq(HoldSignal.exchangeAccountJournal(
                 Constants.Hold.ANOMALY_PASS_INCOMPLETE)), eq(null));
@@ -190,9 +193,9 @@ class AnomalyPassTest {
      */
     @Test
     void theBlindLimitRaisesTheSoftAccountRung() {
-        when(exchangeAccountDataService.markPass(ACCOUNT_ID, Boolean.FALSE)).thenReturn(3);
+        when(exchangeAccountDataService.markPass(ACCOUNT_ID, Boolean.FALSE, PASS_STARTED_AT)).thenReturn(3);
 
-        gate().apply(Boolean.FALSE, account());
+        gate().apply(Boolean.FALSE, account(), PASS_STARTED_AT);
 
         verify(holdService).raise(eq(new HoldSignal(HoldScope.EXCHANGE_ACCOUNT, HoldRung.SOFT,
                 Constants.Hold.ANOMALY_PASS_INCOMPLETE)), any(DealContext.class));
@@ -209,8 +212,8 @@ class AnomalyPassTest {
         job().tick();
 
         verify(exchangeSideDetectors, never()).detect(any(), any(), any());
-        verify(dealInvariantDetectors, never()).detect(any());
-        verify(passGate).apply(Boolean.FALSE, account());
+        verify(dealInvariantDetectors, never()).detect(any(), any());
+        verify(passGate).apply(eq(Boolean.FALSE), eq(account()), any());
     }
 
     /**
@@ -230,7 +233,7 @@ class AnomalyPassTest {
         job(narrow).tick();
 
         verify(exchangeSideDetectors, never()).detect(any(), any(), any());
-        verify(passGate).apply(Boolean.FALSE, account());
+        verify(passGate).apply(eq(Boolean.FALSE), eq(account()), any());
     }
 
     /**
@@ -250,7 +253,7 @@ class AnomalyPassTest {
 
         InOrder order = inOrder(exchangeSideDetectors, passGate);
         order.verify(exchangeSideDetectors).detect(any(), any(), any());
-        order.verify(passGate).apply(Boolean.FALSE, account());
+        order.verify(passGate).apply(eq(Boolean.FALSE), eq(account()), any());
     }
 
     /**
@@ -268,11 +271,15 @@ class AnomalyPassTest {
         job().tick();
 
         ArgumentCaptor<OffsetDateTime> passStartedAt = ArgumentCaptor.forClass(OffsetDateTime.class);
+        ArgumentCaptor<OffsetDateTime> markedAt = ArgumentCaptor.forClass(OffsetDateTime.class);
         InOrder order = inOrder(dealInvariantDetectors, anomalyReaction, passGate);
-        order.verify(dealInvariantDetectors).detect(any());
+        order.verify(dealInvariantDetectors).detect(any(), any());
         order.verify(anomalyReaction).breakUnobservedSeries(any(), passStartedAt.capture());
-        order.verify(passGate).apply(Boolean.TRUE, account());
+        order.verify(passGate).apply(eq(Boolean.TRUE), eq(account()), markedAt.capture());
         assertThat(passStartedAt.getValue()).isAfterOrEqualTo(before);
+        // Проход отмечается тем же моментом, что прерывает серии: снятым до
+        // среза. Его возраст спрашивает отбор входа.
+        assertThat(markedAt.getValue()).isEqualTo(passStartedAt.getValue());
     }
 
     /** На неполном проходе детекторы молчат, и молчание серий не прерывает. */
@@ -300,7 +307,44 @@ class AnomalyPassTest {
 
         job().tick();
 
-        verify(passGate).apply(Boolean.FALSE, account());
+        verify(passGate).apply(eq(Boolean.FALSE), eq(account()), any());
+    }
+
+    /**
+     * Контролируемое исключение на чтении среза поднимает биржевую ступень 2
+     * ловцом прохода — ратифицированный исход всякой тропы, — а проход
+     * отмечается ненаблюдённым: детекция по нему не отработала, и прочие
+     * детекторы молчат.
+     */
+    @Test
+    @DisplayName("U11.12 — контролируемое исключение среза: биржевая ступень 2 и ненаблюдённый проход")
+    void u11_12_aControlledFailureOnTheScanRaisesTheExchangeRung() {
+        givenAccount();
+        when(scanReader.read(ACCOUNT_INTERNAL_ID))
+                .thenThrow(new ExternalInvariantViolationException("margin mode is not isolated"));
+
+        job().tick();
+
+        verify(anomalyReaction).controlledFailure(account());
+        verify(exchangeSideDetectors, never()).detect(any(), any(), any());
+        verify(passGate).apply(eq(Boolean.FALSE), eq(account()), any());
+    }
+
+    /**
+     * Отказ самой реакции проход не прерывает: отметка ненаблюдённого прохода
+     * всё равно делается, и соседние счета не задеты.
+     */
+    @Test
+    @DisplayName("U11.13 — реакция на контролируемое исключение бросает: проход всё равно отмечен ненаблюдённым")
+    void u11_13_aFailedControlledReactionStillMarksTheBlindPass() {
+        givenAccount();
+        when(scanReader.read(ACCOUNT_INTERNAL_ID))
+                .thenThrow(new ExternalInvariantViolationException("margin mode is not isolated"));
+        doThrow(new IllegalStateException("db is down")).when(anomalyReaction).controlledFailure(any());
+
+        job().tick();
+
+        verify(passGate).apply(eq(Boolean.FALSE), eq(account()), any());
     }
 
     /**

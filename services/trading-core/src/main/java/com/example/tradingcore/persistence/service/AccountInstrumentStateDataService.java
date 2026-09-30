@@ -109,6 +109,22 @@ public class AccountInstrumentStateDataService {
     }
 
     /**
+     * Пары счёта со стоящей ступенью — вместе с САМОЙ ступенью. Читатель —
+     * поверхность торгового состояния: снятие обязано назвать ступень явно
+     * (docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо и от
+     * автоматики, и друг от друга»), и факта «ступень стои́т» ему мало.
+     *
+     * <p>Строкой, а не проекцией колонки: ступень едет доменным перечнем
+     * через маппер строки, а строк со стоящей ступенью у счёта единицы.
+     */
+    @Transactional(readOnly = true)
+    public List<AccountInstrumentState> findWithStandingRung(Long exchangeAccountId) {
+        return repository.findByExchangeAccountIdAndSafetyRungIn(exchangeAccountId, standingRungs()).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Инструменты счёта под ЖЁСТКОЙ ступенью — популяция детектора
      * «жёсткая ступень радиуса не проэнфорсена»
      * (docs/components/AnomalyJob.md §«Что ищет»).

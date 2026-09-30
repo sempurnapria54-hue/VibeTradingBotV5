@@ -284,7 +284,7 @@ class TeardownTracePathTest {
 
         assertThat(safetyState(trail).path("accountSafetyRung").asString()).as("E8.3: ступень счёта та же")
                 .isEqualTo("TRADE_BLOCKED");
-        assertThat(safetyState(trail).path("instrumentInternalIdsWithStandingRung")).as("E8.3: и одна").isEmpty();
+        assertThat(safetyState(trail).path("standingInstrumentRungs")).as("E8.3: и одна").isEmpty();
         assertThat(outbox(trail, HOLD_RAISED)).as("E8.3: перестановки не было").hasSize(raised);
         assertThat(reports(trail, FOREIGN_ORDER)).as("E8.3: вторых строк отчёта по тем же ключам нет")
                 .hasSize(reportRows);

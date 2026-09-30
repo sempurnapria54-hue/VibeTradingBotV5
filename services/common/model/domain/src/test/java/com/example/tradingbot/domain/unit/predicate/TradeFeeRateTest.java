@@ -4,21 +4,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.other.TradeFeeRate;
 import java.lang.reflect.Method;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Ставка комиссии: тождество группы и тождество значения — группа `U14`
- * документа `.claude/tests/cases/domain-model-predicates.md`
+ * Ставка комиссии: тождество группы, тождество значения и несвежесть —
+ * группа `U14` документа `.claude/tests/cases/domain-model-predicates.md`
  * (docs/models/domain/other/TradeFeeRate.md §«Масштаб — группа, а не
- * инструмент» и §«Запись и история»).
+ * инструмент» и §«Запись и история»; docs/rules/instrument-hold.md
+ * §«Несвежесть ставки комиссии»).
  *
  * <p><b>Базовая сборка:</b> строка ставки с сырыми строковыми
  * значениями: тип инструмента, идентификатор группы, ставки тейкера и
  * мейкера.
  */
 class TradeFeeRateTest {
+
+    /** Момент проверки несвежести. */
+    private static final OffsetDateTime CHECKED_AT = OffsetDateTime.of(2026, 9, 6, 10, 0, 0, 0, ZoneOffset.UTC);
+
+    /** Порог свежести — умолчание конфигурации детектора. */
+    private static final Duration THRESHOLD = Duration.ofHours(27);
 
     @Test
     @DisplayName("U14.1 — тот же тип инструмента и тот же идентификатор группы")
@@ -102,6 +112,43 @@ class TradeFeeRateTest {
         assertThat(rate("SWAP", "1", "0.0005", "n/a").makerFeeRate()).isNull();
         assertThat(Stream.of(TradeFeeRate.class.getDeclaredMethods()).map(Method::getName))
                 .doesNotContain("hasMakerFeeRate");
+    }
+
+    /** Одиночный пропущенный такт синка ступени не поднимает. */
+    @Test
+    @DisplayName("U14.12 — ставка подтверждена позже порога свежести")
+    void u14_12_aRowConfirmedWithinTheThresholdIsFresh() {
+        assertThat(confirmedAt(CHECKED_AT.minusHours(7)).isStaleAt(CHECKED_AT, THRESHOLD)).isFalse();
+    }
+
+    @Test
+    @DisplayName("U14.13 — ставка подтверждена раньше порога свежести")
+    void u14_13_aRowConfirmedBeforeTheThresholdIsStale() {
+        assertThat(confirmedAt(CHECKED_AT.minusHours(40)).isStaleAt(CHECKED_AT, THRESHOLD)).isTrue();
+    }
+
+    /** Граница включена в свежесть. */
+    @Test
+    @DisplayName("U14.14 — ставка подтверждена ровно на пороге свежести")
+    void u14_14_theThresholdItselfIsStillFresh() {
+        assertThat(confirmedAt(CHECKED_AT.minus(THRESHOLD)).isStaleAt(CHECKED_AT, THRESHOLD)).isFalse();
+        assertThat(confirmedAt(CHECKED_AT.minus(THRESHOLD).minusSeconds(1)).isStaleAt(CHECKED_AT, THRESHOLD))
+                .isTrue();
+    }
+
+    /** Свежесть измеряется, а не предполагается: пустой операнд читается несвежестью. */
+    @Test
+    @DisplayName("U14.15 — момент подтверждения, момент проверки либо порог пусты")
+    void u14_15_anUnmeasurableFreshnessReadsAsStale() {
+        assertThat(confirmedAt(null).isStaleAt(CHECKED_AT, THRESHOLD)).isTrue();
+        assertThat(confirmedAt(CHECKED_AT).isStaleAt(null, THRESHOLD)).isTrue();
+        assertThat(confirmedAt(CHECKED_AT).isStaleAt(CHECKED_AT, null)).isTrue();
+    }
+
+    private static TradeFeeRate confirmedAt(OffsetDateTime confirmedAt) {
+        TradeFeeRate rate = rate("SWAP", "1", "0.0005", "0.0002");
+        rate.setExternalModifiedAt(confirmedAt);
+        return rate;
     }
 
     private static TradeFeeRate rate(String instrumentType, String feeGroupId,

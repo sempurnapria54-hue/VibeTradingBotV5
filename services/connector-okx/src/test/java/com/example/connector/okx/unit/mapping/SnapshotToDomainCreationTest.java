@@ -14,6 +14,7 @@ import com.example.connector.okx.snapshot.AlgoOrderExternalSnapshot;
 import com.example.connector.okx.snapshot.AttachedAlgoOrderExternalSnapshot;
 import com.example.connector.okx.snapshot.BalanceContainerExternalSnapshot;
 import com.example.connector.okx.snapshot.OrderExternalSnapshot;
+import com.example.connector.okx.snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
@@ -42,10 +43,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  * создаёт, и пустым остаётся ровно то, чего у источника нет. Доменного
  * статуса ни один переход не ставит — его ставит резолвер, последним
  * шагом чтения, у шлюза.
- *
- * <p>Кейс {@code U21.6} в код не пошёл: дом и код называют разное —
- * `.claude/work/backlog.md` §«Четыре таблицы маппинга отрицают поле,
- * которое их модели несут».
  */
 class SnapshotToDomainCreationTest {
 
@@ -139,6 +136,35 @@ class SnapshotToDomainCreationTest {
         assertThat(Order.class.getDeclaredFields())
                 .extracting(Field::getName)
                 .doesNotContain("stopLossTriggerPrice", "takeProfitTriggerPrice");
+    }
+
+    /**
+     * Биржевое имя инструмента — атрибут границы: колонки под ним нет, и
+     * резолва в наш идентификатор на переходе не бывает — имя переносится
+     * по имени у каждой из трёх моделей.
+     */
+    @Test
+    @DisplayName("U21.6 — биржевое имя инструмента переносится по имени у заявки, условной заявки и позиции")
+    void u21_6_theExchangeInstrumentNameIsCarriedByName() {
+        OrderExternalSnapshot orderSnapshot = orderSnapshot();
+        AlgoOrderExternalSnapshot algoOrderSnapshot =
+                algoOrderMapper.integrationToSnapshot(OkxFixture.algoOrder());
+        PositionExternalSnapshot positionSnapshot =
+                positionMapper.integrationToSnapshot(OkxFixture.position());
+
+        assertThat(orderSnapshot.getExternalInstrumentId()).isEqualTo(OkxFixture.INSTRUMENT);
+        assertThat(algoOrderSnapshot.getExternalInstrumentId()).isEqualTo(OkxFixture.INSTRUMENT);
+        assertThat(positionSnapshot.getExternalInstrumentId()).isEqualTo(OkxFixture.INSTRUMENT);
+
+        assertThat(orderMapper.snapshotToDomain(orderSnapshot).getExternalInstrumentId())
+                .as("U21.6: заявка, снапшот с externalInstrumentId = %s", OkxFixture.INSTRUMENT)
+                .isEqualTo(OkxFixture.INSTRUMENT);
+        assertThat(algoOrderMapper.snapshotToDomain(algoOrderSnapshot).getExternalInstrumentId())
+                .as("U21.6: условная заявка, снапшот с externalInstrumentId = %s", OkxFixture.INSTRUMENT)
+                .isEqualTo(OkxFixture.INSTRUMENT);
+        assertThat(positionMapper.snapshotToDomain(positionSnapshot).getExternalInstrumentId())
+                .as("U21.6: позиция, снапшот с externalInstrumentId = %s", OkxFixture.INSTRUMENT)
+                .isEqualTo(OkxFixture.INSTRUMENT);
     }
 
     /** Отказ приходит на этом переходе, а не на построении снапшота. */

@@ -70,7 +70,9 @@ public class MarketDataDemandController {
     @Operation(summary = "Требование индикатора: идентичность вычисления")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Идентичность заведена либо уже существовала"),
-            @ApiResponse(responseCode = "400", description = "Параметры не разбираются под заявленный тип")
+            @ApiResponse(responseCode = "400",
+                    description = "Параметры не разбираются под заявленный тип либо не вычислимы: "
+                            + "период пуст или не положителен, быстрый период MACD не меньше медленного")
     })
     @PostMapping("/indicators")
     public IndicatorConfigApiResponse requireIndicator(@Valid @RequestBody IndicatorConfigApiRequest request) {
@@ -84,7 +86,9 @@ public class MarketDataDemandController {
     @Operation(summary = "Требование структуры рынка: идентичность вычисления вместе с идентичностями входов")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Идентичность заведена либо уже существовала"),
-            @ApiResponse(responseCode = "400", description = "Названного входа нет либо параметры не разбираются")
+            @ApiResponse(responseCode = "400",
+                    description = "Названного входа нет, параметры не разбираются либо глубина окна "
+                            + "или поиска свингов не положительна")
     })
     @PostMapping("/market-structures")
     public MarketStructureConfigApiResponse requireMarketStructure(

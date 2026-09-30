@@ -55,6 +55,11 @@ import org.springframework.stereotype.Component;
  * сделка закрывает счёт до следующего тика, поэтому обход по нему
  * прекращается.
  *
+ * <p><b>Молчание детекции разрешением не является.</b> Счёт, который
+ * проактивная детекция не наблюдала в пределах допуска, из обхода выпадает
+ * до всякого чтения: набирать риск вслепую нельзя, и различает «аномалий
+ * нет» от «не смотрели» только возраст наблюдённого прохода.
+ *
  * <p><b>Гейт свежести данных входа выражен раскладкой фич.</b> Владелец
  * отдаёт только свежее по сроку спрашивающей настройки, поэтому
  * отсутствующий ключ и есть ответ «данным доверять нельзя»: шаг, чьи
@@ -105,7 +110,24 @@ public class EntryScannerJob {
         }
     }
 
+    /**
+     * Отбор по одному счёту.
+     *
+     * <p><b>Первым стои́т возраст наблюдения детекцией</b> — до всякого чтения:
+     * счёт, который проактивная детекция не наблюдала в пределах допуска либо
+     * не наблюдала вовсе, риска не набирает. Счёт слепоты этого не заменяет:
+     * его двигают только состоявшиеся проходы, а тик, не исполнившийся вовсе,
+     * оставляет его нулевым (docs/components/EntryScannerJob.md §«Гейт
+     * входа»). Живые сделки счёта гейт не трогает — гасится только новый вход.
+     */
     private void scanAccount(ExchangeAccount account) {
+        if (isFalse(account.observedWithin(properties.getObservationMaxAge(),
+                OffsetDateTime.now(ZoneOffset.UTC)))) {
+            log.warn("Entry scan skipped: no anomaly detection pass observed the account within {}"
+                    + " exchangeAccountId={} observedPassAt={}", properties.getObservationMaxAge(),
+                    account.getId(), account.getObservedPassAt());
+            return;
+        }
         if (isTrue(dealDataService.existsActiveOnAccount(account.getId()))) {
             return;
         }

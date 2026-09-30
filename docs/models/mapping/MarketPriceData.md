@@ -69,4 +69,8 @@ epoch-millis-строка `ts` → `OffsetDateTime` UTC) и
 
 Не маппится: `lastSz`, `open24h`, `high24h`/`low24h`,
 `vol24h`/`volCcy24h`, `sodUtc0`/`sodUtc8` (24h-агрегаты и SOD-метрики —
-доменно не используются).
+**этим переходом** не используются). `vol24h` той же формы читает второй
+переход — срез тикера кладёт его в `MarketTicker.volume`
+(`docs/models/domain/other/MarketTicker.md`); что заведено и используется
+у формы источника, держит её инвентарь
+`docs/models/integrations/okx/TickerOkxResponse.md`.

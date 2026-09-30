@@ -116,7 +116,7 @@ public class AnomalyReportService {
         report.setStatus(status);
         report.setCode(signal.getCode());
         report.setInternalBefore(internalSnapshot(dealContext, operands));
-        report.setExternalBefore(externalSnapshot(dealContext));
+        report.setExternalBefore(externalSnapshotBefore(dealContext));
         AnomalyReport saved = dataService.save(report);
         publishReported(dealContext, saved);
         return saved;
@@ -340,6 +340,23 @@ public class AnomalyReportService {
                 .flatMap(tranche -> emptyIfNull(tranche.getOrders()).stream())
                 .map(Order::getId)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Снимок внешнего состояния «до»: то, что тропа УЖЕ наблюдала, если
+     * она площадку читала, иначе собственное чтение.
+     *
+     * <p><b>Наблюдённое берётся, а не перечитывается.</b> Проход детекции
+     * добыл срез до находки, и второе чтение стоило бы двух вызовов на
+     * отчёт и показывало бы другой момент, чем тот, на котором признак
+     * найден. У счётного отчёта оно к тому же единственное, что называет в
+     * данных вызвавшую его сущность: инструмента у контекста нет, а
+     * биржевое имя едет в наблюдённом
+     * (docs/models/domain/other/AnomalyReport.md §Структура).
+     */
+    private String externalSnapshotBefore(DealContext dealContext) {
+        Map<String, Object> observed = dealContext.getExternalObservation();
+        return nonNull(observed) ? writeJson(observed) : externalSnapshot(dealContext);
     }
 
     /**

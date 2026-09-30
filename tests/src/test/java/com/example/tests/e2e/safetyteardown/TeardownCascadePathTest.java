@@ -37,6 +37,7 @@ import static com.example.tests.e2e.safetyteardown.TeardownTrail.halt;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.outbox;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.passUntilEmergencyClosed;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.payload;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.pairRung;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.recoverAfterCascade;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.safetyState;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.standAtObservation;
@@ -202,8 +203,7 @@ class TeardownCascadePathTest {
         trail.relayCore();
 
         assertThat(pair.status()).as("E3.2: постановка на паре принята — " + pair.body()).isEqualTo(202);
-        assertThat(safetyState(trail).path("instrumentInternalIdsWithStandingRung"))
-                .as("E3.2: ступень стои́т на паре").extracting(node -> node.asString()).contains(Trail.INSTRUMENT);
+        assertThat(pairRung(trail)).as("E3.2: ступень пары — сворачивание").isEqualTo("TRADE_BLOCKED");
         Map<String, Object> row = trail.database(Party.TRADING_CORE)
                 .query("select status, shutdown_reason from deals where internal_id = ?", recovered).getFirst();
         assertThat(row.get("status")).as("E3.2: сделка в ошибочном состоянии").isEqualTo("ERROR");

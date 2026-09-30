@@ -1,10 +1,14 @@
 package com.example.audit.config;
 
 import jakarta.persistence.EntityManagerFactory;
+import java.util.Map;
 import javax.sql.DataSource;
+import org.hibernate.cfg.AvailableSettings;
+import org.hibernate.tool.schema.Action;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
@@ -83,8 +87,24 @@ public class JournalPersistenceConfig {
      * <p>Схему ведёт цепочка миграций, а не Hibernate: генерация DDL
      * выключена умолчанием адаптера и здесь не включается — иначе у схемы
      * появился бы второй писатель.
+     *
+     * <p><b>Сверка отображения со схемой — на подъёме, и носитель её здесь,
+     * а не в {@code application.yaml}.</b> Ключ {@code spring.jpa.hibernate.ddl-auto}
+     * читает автоконфигурация JPA, а она при собственном объявлении фабрики
+     * отступает; поэтому режим {@code validate} — тот же, что у сервисов с
+     * автоконфигурацией, — назван свойством самой фабрики
+     * ({@code hibernate.hbm2ddl.auto}). Он схему не пишет, а только сверяет:
+     * колонка, объявленная отображением и не заведённая цепочкой, роняет
+     * подъём, а не первую тропу, которая её коснётся.
+     *
+     * <p><b>Подъём — после наката цепочки, и порядок назван, а не
+     * подразумевается.</b> Бин миграций объявлен своей формой, мимо
+     * автоконфигурации Flyway, и её упорядочение фабрик сущностей после
+     * миграций на него не распространяется: без {@code @DependsOn} сверка
+     * на чистой базе шла бы раньше наката и роняла подъём отсутствием таблиц.
      */
     @Bean(JOURNAL_ENTITY_MANAGER_FACTORY)
+    @DependsOn(SchemaMigrationConfig.JOURNAL_MIGRATION)
     public LocalContainerEntityManagerFactoryBean journalEntityManagerFactory(
             @Qualifier(PersistenceConfig.JOURNAL_DATA_SOURCE) DataSource dataSource) {
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
@@ -92,6 +112,7 @@ public class JournalPersistenceConfig {
         factory.setPackagesToScan(ENTITY_PACKAGE, SHARED_ENTITY_PACKAGE);
         factory.setPersistenceUnitName("journal");
         factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+        factory.setJpaPropertyMap(Map.of(AvailableSettings.HBM2DDL_AUTO, Action.VALIDATE));
         return factory;
     }
 

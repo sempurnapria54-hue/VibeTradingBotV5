@@ -71,6 +71,18 @@ public class CandleGroup extends Auditable {
     private Long count;
 
     /**
+     * Попытки докачки дыр, израсходованные с последнего подтверждения
+     * плотности; пусто читается нулём.
+     *
+     * <p><b>Счётчик — поле группы, а не память процесса:</b> гарантия
+     * «исчерпаны попытки — {@code ERROR}» обязана пережить рестарт, иначе
+     * группа с неустранимой дырой, чей цикл пересекает перезапуск, не
+     * доходит до терминала никогда (docs/lifecycles/CandleGroup.md
+     * §«Докачка дыр (`REPAIR`)»).
+     */
+    private Integer repairAttempts;
+
+    /**
      * Ожидаемое по density-инварианту число свечей на фактических
      * границах [actualFirst, actualLast]:
      * {@code (actualLast - actualFirst) / step + 1}. Для пустой
@@ -93,6 +105,29 @@ public class CandleGroup extends Auditable {
         long expected = expectedCount();
         long actual = isNull(count) ? 0L : count;
         return actual == expected;
+    }
+
+    /** Расходует одну попытку докачки дыр. */
+    public void registerRepairAttempt() {
+        repairAttempts = spentRepairAttempts() + 1;
+    }
+
+    /**
+     * Израсходовано больше попыток докачки, чем разрешено: неустранимая
+     * дыра отличается от временного отказа только этим числом, и исход
+     * у неё терминальный.
+     */
+    public Boolean hasExceededRepairAttempts(Integer maxAttempts) {
+        return spentRepairAttempts() > maxAttempts;
+    }
+
+    /** Плотность подтверждена — бюджет докачки следующего инцидента начинается заново. */
+    public void resetRepairAttempts() {
+        repairAttempts = 0;
+    }
+
+    private int spentRepairAttempts() {
+        return isNull(repairAttempts) ? 0 : repairAttempts;
     }
 
     /** Группа готова (покрытие подтверждено, дыр нет). */

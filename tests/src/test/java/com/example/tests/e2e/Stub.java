@@ -7,7 +7,9 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
+import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -123,6 +125,31 @@ public final class Stub {
     /** Отвечает на {@code GET} по пути телом JSON. */
     public void answers(String path, String json) {
         server.stubFor(scoped(WireMock.get(WireMock.urlPathEqualTo(path)), path).willReturn(WireMock.okJson(json)));
+    }
+
+    /**
+     * Отвечает на {@code GET} по путям телом JSON, пока идёт ход, и после хода
+     * эти ответы снимает.
+     *
+     * <p><b>Ответ живёт ходом, а не стендом.</b> Область стаба — ключ счёта, и
+     * ответ, оставленный на ключе прежнего счёта, отвечал бы ему и тогда, когда
+     * тропа ходит уже другим: проход, читающий все счета стенда, получил бы
+     * по прежнему счёту заданные давно срезы и сверил бы с ними его нынешние
+     * строки. Прочие ответы на тех же путях ход не трогает.
+     *
+     * @param paths пути
+     * @param json  тело ответа
+     * @param move  ход, на время которого ответы стоят
+     */
+    public void answersDuring(List<String> paths, String json, Runnable move) {
+        List<StubMapping> stubs = new ArrayList<>();
+        paths.forEach(path -> stubs.add(server.stubFor(
+                scoped(WireMock.get(WireMock.urlPathEqualTo(path)), path).willReturn(WireMock.okJson(json)))));
+        try {
+            move.run();
+        } finally {
+            stubs.forEach(server::removeStub);
+        }
     }
 
     /** Отвечает на {@code POST} по пути телом JSON. */

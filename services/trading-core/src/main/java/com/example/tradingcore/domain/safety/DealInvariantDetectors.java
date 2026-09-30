@@ -1,5 +1,6 @@
 package com.example.tradingcore.domain.safety;
 
+import static java.util.Objects.isNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
@@ -9,6 +10,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskValidator;
 import com.example.tradingcore.domain.deal.DealContextService;
@@ -16,6 +18,7 @@ import com.example.tradingcore.domain.deal.DealTerminalGate;
 import com.example.tradingcore.domain.deal.ProtectionCoverageGate;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.util.Constants;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -52,17 +55,23 @@ public class DealInvariantDetectors {
     private final RiskValidator riskValidator;
     private final AnomalyReaction reaction;
 
-    /** Обход нетерминальных сделок счёта. */
-    public void detect(ExchangeAccount account) {
+    /**
+     * Обход нетерминальных сделок счёта.
+     *
+     * @param scan срез прохода: его строки по инструменту сделки едут во
+     *             внешний снимок отчёта, и площадку второй раз не читают
+     */
+    public void detect(AnomalyScan scan, ExchangeAccount account) {
         for (Deal deal : dealDataService.findNonTerminalByExchangeAccountId(account.getId())) {
             try {
                 DealContext context = dealContextService.build(deal);
                 if (isNotTrue(context.getGraphComplete())) {
                     continue;
                 }
-                uncoveredLiveRisk(context, account);
-                exposureMismatch(context, account);
-                riskPolicyBreach(context, account);
+                Map<String, Object> observed = observedRows(scan, context);
+                uncoveredLiveRisk(context, account, observed);
+                exposureMismatch(context, account, observed);
+                riskPolicyBreach(context, account, observed);
             } catch (RuntimeException e) {
                 log.error("Deal invariants are not checked dealId={}", deal.getId(), e);
             }
@@ -83,7 +92,8 @@ public class DealInvariantDetectors {
      * второй транш с тем же нарушением добавил бы вторую строку по тому
      * же ключу.
      */
-    private void uncoveredLiveRisk(DealContext context, ExchangeAccount account) {
+    private void uncoveredLiveRisk(DealContext context, ExchangeAccount account,
+                                   Map<String, Object> observed) {
         for (DealTranche tranche : emptyIfNull(context.getDeal().getTranches())) {
             if (isFalse(protectionCoverageGate.trancheViolated(context, tranche))) {
                 continue;
@@ -95,6 +105,7 @@ public class DealInvariantDetectors {
                     .rung(HoldRung.HARD)
                     .code(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED)
                     .instrument(context.getInstrument())
+                    .externalObservation(observed)
                     .hysteresisTicks(CONFIRMED_NEXT_TICK)
                     .journalOnly(false)
                     .build(), account);
@@ -109,7 +120,8 @@ public class DealInvariantDetectors {
      * направления одинаково опасны: наш счёт экспозиции разошёлся с
      * биржей.
      */
-    private void exposureMismatch(DealContext context, ExchangeAccount account) {
+    private void exposureMismatch(DealContext context, ExchangeAccount account,
+                                  Map<String, Object> observed) {
         Deal deal = context.getDeal();
         if (isEmpty(deal.getTranches())) {
             return;
@@ -123,6 +135,7 @@ public class DealInvariantDetectors {
                 .rung(HoldRung.HARD)
                 .code(Constants.Hold.EXCHANGE_EXPOSURE_MISMATCH)
                 .instrument(context.getInstrument())
+                .externalObservation(observed)
                 .hysteresisTicks(CONFIRMED_NEXT_TICK)
                 .journalOnly(false)
                 .build(), account);
@@ -140,7 +153,8 @@ public class DealInvariantDetectors {
      * (docs/components/RiskValidator.md §«Что делает»). Собственных
      * величин детектор не заводит.
      */
-    private void riskPolicyBreach(DealContext context, ExchangeAccount account) {
+    private void riskPolicyBreach(DealContext context, ExchangeAccount account,
+                                  Map<String, Object> observed) {
         if (isEmpty(riskValidator.ceilingsBreachedWithoutAct(context))) {
             return;
         }
@@ -151,8 +165,18 @@ public class DealInvariantDetectors {
                 .rung(HoldRung.SOFT)
                 .code(Constants.Hold.RISK_POLICY_BREACH_UNDER_PROTECTION)
                 .instrument(context.getInstrument())
+                .externalObservation(observed)
                 .hysteresisTicks(CONFIRMED_NEXT_TICK)
                 .journalOnly(false)
                 .build(), account);
+    }
+
+    /**
+     * Строки среза по инструменту сделки. Инструмента в контексте нет —
+     * адресовать срез нечем, и снимок отчёта добывает площадку сам.
+     */
+    private Map<String, Object> observedRows(AnomalyScan scan, DealContext context) {
+        Instrument instrument = context.getInstrument();
+        return isNull(instrument) ? null : scan.observedRowsOf(instrument.getExternalId());
     }
 }

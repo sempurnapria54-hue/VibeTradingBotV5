@@ -29,9 +29,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  *
  * <p><b>Опустошение между клетками идёт БЕЗ сброса идентичности.</b>
  * Числовые ключи продолжают расти, и это несущее: часть состояния тиков
- * живёт в памяти процесса ключом группы (счётчик попыток докачки,
- * курсор обхода правил), а сброшенная последовательность выдала бы новой
- * группе ключ выбывшей — и клетка получила бы наследство соседки.
+ * живёт в памяти процесса позицией курсора обхода правил, а сброшенная
+ * последовательность выдала бы новому инструменту ключ выбывшего — и
+ * клетка получила бы наследство соседки.
  */
 final class Rows {
 
@@ -143,6 +143,24 @@ final class Rows {
         return rows("select hypertable_name from timescaledb_information.hypertables").stream()
                 .map(row -> String.valueOf(row.get("hypertable_name")))
                 .toList();
+    }
+
+    /** Имена гипертаблиц со включённым сжатием: ими наблюдается, какие ряды сжимаются. */
+    List<String> compressedHypertableNames() {
+        return rows("select hypertable_name from timescaledb_information.hypertables "
+                + "where compression_enabled").stream()
+                .map(row -> String.valueOf(row.get("hypertable_name")))
+                .toList();
+    }
+
+    /** Порог политики сжатия по гипертаблице: имя ряда → {@code compress_after} конфигурации задания. */
+    Map<String, String> compressionThresholds() {
+        Map<String, String> thresholds = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows("select hypertable_name, config ->> 'compress_after' as threshold "
+                + "from timescaledb_information.jobs where proc_name = 'policy_compression'")) {
+            thresholds.put(String.valueOf(row.get("hypertable_name")), String.valueOf(row.get("threshold")));
+        }
+        return thresholds;
     }
 
     /** Применённые версии миграций. */

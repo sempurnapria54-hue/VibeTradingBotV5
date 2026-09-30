@@ -1,5 +1,6 @@
 package com.example.tradingcore.config;
 
+import java.time.Duration;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -30,4 +31,20 @@ public class EntryScannerProperties {
      * пропуск входов по инструментам, до которых тик не дошёл.
      */
     private Integer instrumentWindow = 200;
+
+    /**
+     * Допустимый возраст последнего наблюдённого прохода проактивной
+     * детекции: старше — либо наблюдения не было вовсе — счёт риска не
+     * набирает (docs/components/EntryScannerJob.md §«Гейт входа»).
+     *
+     * <p><b>Число разведочное и выведено из такта детекции</b>, а не из
+     * риск-аппетита: три такта — принятый предел слепоты
+     * ({@code anomaly-job.blind-pass-limit}) — плюс четверть такта, чтобы
+     * порог не совпал ни с одним возрастом, который дают сдвиг расписаний
+     * отбора и детекции на ноль либо полтакта. Направление названо: ложный
+     * отказ снимается сам ближайшим наблюдённым проходом, а пропуск — вход
+     * вслепую. Дом числа и условие выхода из разведочного режима —
+     * docs/components/AnomalyJob.md §«Гейт полноты среза».
+     */
+    private Duration observationMaxAge = Duration.ofSeconds(195);
 }

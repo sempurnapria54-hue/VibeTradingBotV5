@@ -105,6 +105,16 @@ public class MarketFeatures {
      *
      * <p>Своего носителя свежести у ядра поэтому не заводится: он был бы
      * вторым ответом на вопрос, на который уже ответил владелец.
+     *
+     * <p><b>Покрытие мерится по ОБЕИМ половинам сравнения.</b> Правило,
+     * читающее прошлое, спрашивает и раскладку предыдущих значений, а
+     * владелец кладёт туда значение, только если оно у него есть. Гейт,
+     * меривший одни последние, пропускал такой шаг к оценке, и тот
+     * оказывался ложным из-за половины, которой не было: «условие не
+     * выполнено» становилось неотличимо от «операнда не было»
+     * (docs/rules/market-data-freshness.md). Какие правила читают прошлое,
+     * отвечает грамматика условия ({@link StrategyCondition#pastIndicatorKeys()}),
+     * а не гейт: перечень у читателя повторял бы знание оценщика.
      */
     public Boolean covers(StrategyCondition condition) {
         if (isNull(condition)) {
@@ -117,6 +127,7 @@ public class MarketFeatures {
             return false;
         }
         return emptyIfNull(latestIndicators).keySet().containsAll(condition.indicatorKeys())
+                && emptyIfNull(previousIndicators).keySet().containsAll(condition.pastIndicatorKeys())
                 && emptyIfNull(structures).keySet().containsAll(condition.structureKeys());
     }
 }

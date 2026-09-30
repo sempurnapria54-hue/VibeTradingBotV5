@@ -45,6 +45,7 @@ public interface ExchangeAccountMapper {
     @Mapping(target = "riskBaseCurrency", ignore = true)
     @Mapping(target = "consecutiveLossCount", ignore = true)
     @Mapping(target = "blindPassCount", ignore = true)
+    @Mapping(target = "observedPassAt", ignore = true)
     @Mapping(target = "safetyRung", ignore = true)
     @Mapping(target = "tenantInternalId", source = "tenantId")
     void updateProjection(ExchangeAccount account, @MappingTarget ExchangeAccountEntity entity);

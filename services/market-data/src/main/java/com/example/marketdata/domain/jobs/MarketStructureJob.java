@@ -159,17 +159,21 @@ public class MarketStructureJob {
         return null;
     }
 
-    /** Консервативный UNKNOWN на окне: объявленный вход не готов, торговать нельзя. */
+    /**
+     * Консервативный UNKNOWN на окне: объявленный вход не готов, торговать
+     * нельзя. Момента подтверждения у него нет — подтверждать нечего, и
+     * конец окна на его место не встаёт (docs/models/domain/other/MarketStructure.md
+     * §«Семантика классификации (как считается)», пункт о моменте
+     * подтверждения).
+     */
     private MarketStructure unknownStructure(Long instrumentId, Long configId, List<Candle> window) {
         MarketStructure structure = new MarketStructure();
         structure.setInstrumentId(instrumentId);
         structure.setMarketStructureConfigId(configId);
         structure.setType(MarketStructure.Type.UNKNOWN);
         structure.setLevels(new ArrayList<>());
-        OffsetDateTime windowEndAt = timestampOf(window.get(window.size() - 1));
         structure.setWindowStartAt(timestampOf(window.get(0)));
-        structure.setWindowEndAt(windowEndAt);
-        structure.setConfirmedAt(windowEndAt);
+        structure.setWindowEndAt(timestampOf(window.get(window.size() - 1)));
         return structure;
     }
 

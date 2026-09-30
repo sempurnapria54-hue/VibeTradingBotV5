@@ -111,8 +111,8 @@ public class TradingSurfaceController {
     public SafetyStateApiResponse getSafetyState(@PathVariable String exchangeAccountInternalId) {
         ExchangeAccount account = tradingSurfaceService.getAccount(exchangeAccountInternalId);
         SafetyStateApiResponse response = mapper.domainToApi(account);
-        response.setInstrumentInternalIdsWithStandingRung(
-                tradingSurfaceService.instrumentInternalIdsWithStandingRung(account.getId()));
+        response.setStandingInstrumentRungs(
+                mapper.domainToApi(tradingSurfaceService.standingInstrumentRungs(account.getId())));
         return response;
     }
 

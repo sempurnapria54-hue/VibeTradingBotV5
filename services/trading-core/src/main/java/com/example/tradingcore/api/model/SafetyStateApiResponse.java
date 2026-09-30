@@ -1,13 +1,13 @@
 package com.example.tradingcore.api.model;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.util.List;
+import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Торговое состояние биржевого счёта: его ступень плюс пары со стоящей
- * ступенью.
+ * Торговое состояние биржевого счёта: его ступень плюс ступени пар
+ * «счёт, инструмент», которые стоят.
  *
  * <p><b>Читатель этой поверхности — тот же держатель, что вызывает
  * ручную остановку.</b> Без неё операция остановки ненаблюдаема: статус
@@ -34,6 +34,8 @@ public class SafetyStateApiResponse {
     @Schema(description = "Подряд идущие НЕнаблюдённые проходы проактивной детекции")
     private Integer blindPassCount;
 
-    @Schema(description = "Инструменты счёта со стоящей ступенью пары; пусто — стоящих нет")
-    private List<String> instrumentInternalIdsWithStandingRung;
+    @Schema(description = "Ступени пар «счёт, инструмент», которые стоят: ключ — идентичность инструмента,"
+            + " значение — ступень его лестницы (ENTRY_BLOCKED — мягкий запрет входов, TRADE_BLOCKED —"
+            + " сворачивание). Инструмента нет в перечне — его пара в рабочем состоянии; пусто — стоящих нет")
+    private Map<String, String> standingInstrumentRungs;
 }

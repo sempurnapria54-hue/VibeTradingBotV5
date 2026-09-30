@@ -26,7 +26,14 @@ public class SchemaMigrationConfig {
     /** Цепочка базы статистики. */
     public static final String STATISTICS_LOCATION = "classpath:db/migration/statistics";
 
-    @Bean(initMethod = "migrate")
+    /**
+     * Имя бина миграций: на него ссылается порядок подъёма фабрики
+     * сущностей ({@link StatisticsPersistenceConfig}), сверяющей
+     * отображение со схемой, которую кладёт эта цепочка.
+     */
+    public static final String STATISTICS_MIGRATION = "statisticsMigration";
+
+    @Bean(name = STATISTICS_MIGRATION, initMethod = "migrate")
     public Flyway statisticsMigration(
             @Qualifier(PersistenceConfig.STATISTICS_DATA_SOURCE) DataSource statisticsDataSource) {
         return Flyway.configure()

@@ -132,6 +132,41 @@ class AnomalyDetectorTest {
         verify(reaction, never()).apply(any(), any());
     }
 
+    /**
+     * Находка счётного детектора несёт строки среза по своему адресу: у
+     * отчёта с блокировкой это единственное место в данных, где видно, ЧТО
+     * его вызвало, — инструмента у находки нет, предмета в ключе нет
+     * (docs/models/domain/other/AnomalyReport.md §Структура).
+     */
+    @Test
+    void anAccountWideFindingCarriesTheObservedRowsOfItsAddress() {
+        Order foreign = order(FOREIGN_CLIENT_ID);
+        AnomalyScan scan = scan(Map.of(), Map.of(EXTERNAL_INSTRUMENT_ID, List.of(foreign)), Map.of());
+
+        exchangeSideDetectors().detect(scan, account, Set.of(EXTERNAL_INSTRUMENT_ID));
+
+        AnomalyFinding finding = captured();
+        assertThat(finding.getInstrument()).isNull();
+        assertThat(finding.getExternalObservation())
+                .containsEntry("instrumentExternalId", EXTERNAL_INSTRUMENT_ID)
+                .containsEntry("pendingOrders", List.of(foreign))
+                .containsEntry("positions", List.of())
+                .containsEntry("pendingAlgoOrders", List.of());
+    }
+
+    /** Инструмента вне контура в модели нет вовсе — его имя едет в наблюдённом. */
+    @Test
+    void aForeignInstrumentFindingNamesTheInstrumentInTheObservedRows() {
+        Position foreign = position(new BigDecimal("5"));
+        AnomalyScan scan = scan(Map.of("BTC-USDT-SWAP", List.of(foreign)), Map.of(), Map.of());
+
+        exchangeSideDetectors().detect(scan, account, Set.of(EXTERNAL_INSTRUMENT_ID));
+
+        assertThat(captured().getExternalObservation())
+                .containsEntry("instrumentExternalId", "BTC-USDT-SWAP")
+                .containsEntry("positions", List.of(foreign));
+    }
+
     // --- сверка наших строк с биржей ---------------------------------------
 
     /**
@@ -200,6 +235,10 @@ class AnomalyDetectorTest {
         AnomalyFinding finding = capturedWithCode(Constants.Hold.INSTRUMENT_ORPHAN_ORDERS);
         assertThat(finding.getScope()).isEqualTo(HoldScope.INSTRUMENT);
         assertThat(finding.getRung()).isEqualTo(HoldRung.SOFT);
+        assertThat(finding.getExternalObservation())
+                .as("срез уже добыт — снимок отчёта берёт его строки, а не читает площадку")
+                .containsEntry("instrumentExternalId", EXTERNAL_INSTRUMENT_ID)
+                .containsEntry("pendingOrders", scan.ordersOf(EXTERNAL_INSTRUMENT_ID));
     }
 
     /**
@@ -268,6 +307,30 @@ class AnomalyDetectorTest {
         anomalyReaction().apply(finding(2, true, HoldScope.INSTRUMENT, HoldRung.SOFT), account);
 
         verify(holdService, never()).raise(any(), any());
+    }
+
+    /**
+     * Наблюдённые строки находки едут контекстом реакции — на любой из
+     * троп: по нему отчёт собирает внешний снимок, не читая площадку.
+     */
+    @Test
+    void theReactionContextCarriesTheObservedRowsOfTheFinding() {
+        Map<String, Object> observed = Map.of("instrumentExternalId", EXTERNAL_INSTRUMENT_ID);
+        AnomalyFinding finding = AnomalyFinding.builder()
+                .scope(HoldScope.EXCHANGE_ACCOUNT)
+                .rung(HoldRung.HARD)
+                .code("CODE")
+                .externalObservation(observed)
+                .hysteresisTicks(1)
+                .journalOnly(false)
+                .build();
+
+        anomalyReaction().apply(finding, account);
+
+        ArgumentCaptor<DealContext> context = ArgumentCaptor.forClass(DealContext.class);
+        verify(holdService).raise(any(HoldSignal.class), context.capture());
+        assertThat(context.getValue().getExternalObservation()).isEqualTo(observed);
+        assertThat(context.getValue().getInstrument()).isNull();
     }
 
     // --- сборка ------------------------------------------------------------

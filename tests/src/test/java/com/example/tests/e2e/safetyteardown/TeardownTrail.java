@@ -420,12 +420,9 @@ final class TeardownTrail {
                 + "where deal_id = (select id from deals where internal_id = ?) order by id", deal);
     }
 
-    /** Ступень пары «счёт, второй инструмент» прямым чтением базы; пусто — строки пары нет. */
+    /** Ступень пары «счёт, второй инструмент» поверхностью торгового состояния — как у {@link #pairRung}. */
     static String secondPairRung(Trail trail) {
-        List<Map<String, Object>> rows = trail.database(Party.TRADING_CORE).query("select s.safety_rung "
-                + "from account_instrument_states s join instruments i on i.id = s.instrument_id "
-                + "where i.internal_id = ? and s." + Trail.BY_ACCOUNT, SECOND_INSTRUMENT, trail.account());
-        return rows.isEmpty() ? null : String.valueOf(rows.getFirst().get("safety_rung"));
+        return pairRungOf(trail, SECOND_INSTRUMENT);
     }
 
     /** Команды площадке по пути — телами, в порядке прихода. */
@@ -560,15 +557,20 @@ final class TeardownTrail {
     }
 
     /**
-     * Ступень пары «счёт, инструмент» тропы — прямым чтением базы ядра:
-     * поверхность торгового состояния отдаёт по паре только факт стоящей
-     * ступени, а не её саму (находка {@code F2} документа).
+     * Ступень пары «счёт, инструмент» тропы — поверхностью торгового
+     * состояния: она отдаёт ступень каждой стоящей пары под идентичностью
+     * инструмента. Инструмента в перечне нет — пара в рабочем состоянии
+     * (docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо и от
+     * автоматики, и друг от друга»).
      */
     static String pairRung(Trail trail) {
-        return String.valueOf(trail.database(Party.TRADING_CORE).query("select s.safety_rung "
-                + "from account_instrument_states s join instruments i on i.id = s.instrument_id "
-                + "where i.internal_id = ? and s." + Trail.BY_ACCOUNT, Trail.INSTRUMENT, trail.account()).getFirst()
-                .get("safety_rung"));
+        return pairRungOf(trail, Trail.INSTRUMENT);
+    }
+
+    /** Ступень пары «счёт тропы, названный инструмент»; нет в перечне стоящих — рабочее состояние. */
+    private static String pairRungOf(Trail trail, String instrument) {
+        JsonNode rung = safetyState(trail).path("standingInstrumentRungs").path(instrument);
+        return rung.isMissingNode() ? "ACTIVE" : rung.asString();
     }
 
     /** Строки отчёта аномалий ядра по коду — в порядке заведения. */

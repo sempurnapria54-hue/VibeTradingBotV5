@@ -3,8 +3,10 @@ package com.example.tradingcore.box;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +41,15 @@ class DefinitionIntakeBoxTest extends SharedTradingCoreBox {
 
     /** Класс события вне перечня: производитель вправе завести его раньше читателя. */
     private static final String UNKNOWN_EVENT_TYPE = "STRATEGY_REHEARSED";
+
+    /** Идентичность активации, чьё применение откладывается. */
+    private static final String DEFERRED_EVENT = "ev-deferred-activation";
+
+    /**
+     * Потолок ожидания первой отложенной попытки: применение пробуется
+     * сразу по приёму, и строка отложения ложится первой же неудачей.
+     */
+    private static final Duration DEFERRAL_TIMEOUT = Duration.ofSeconds(60);
 
     @Test
     @DisplayName("B8.1 — активация заводит копию дерева и делает её активной")
@@ -171,11 +182,40 @@ class DefinitionIntakeBoxTest extends SharedTradingCoreBox {
                 unreadableActivation(), TENANT);
         barrier();
 
-        // Вторая РОНЯЕТ обработку: пропуск оставил бы копию в прежнем
-        // состоянии молча, а событие — потерянным без следа.
+        // Вторая РОНЯЕТ обработку классом отравленной записи и
+        // пропускается со следом — координатами и первопричиной, а не
+        // молча; барьер за ней прошёл, то есть приём не встал.
         assertThat(AppLog.since(second)).contains("Strategy fact payload is not readable as");
+        assertThat(AppLog.since(second)).contains("Strategy fact is poison and is skipped");
         assertThat(rows.countWhere("inbox_events", "event_id", "ev-unreadable")).isZero();
         assertThat(statusOf(DEFINITION)).isEqualTo(Strategy.Status.ACTIVE.name());
+    }
+
+    @Test
+    @DisplayName("B8.9 — активация, чьих проекций у ядра ещё нет, откладывается, а не теряется")
+    void anActivationWithoutProjectionsIsDeferredUntilTheProjectionsArrive() {
+        Strategy definition = Definitions.withDetail(DEFINITION, ACCOUNT, INSTRUMENT);
+        Integer mark = AppLog.mark();
+
+        // Проекций счёта и инструмента нет: тик синка ещё не отработал.
+        Wire.publishStrategyFact(strategyTopic(), DEFERRED_EVENT, STRATEGY_ACTIVATED,
+                Definitions.activated(definition), TENANT);
+        Awaitility.await().atMost(DEFERRAL_TIMEOUT).pollInterval(Duration.ofMillis(50))
+                .until(() -> AppLog.since(mark).contains("Strategy fact application is deferred"));
+
+        // Отложено, а не пропущено: ни копии, ни отметки — смещение стоит
+        // на записи, и она повторяется.
+        assertThat(AppLog.since(mark)).contains("ExchangeAccount not found: " + ACCOUNT);
+        assertThat(AppLog.since(mark)).doesNotContain("Strategy fact is poison and is skipped");
+        assertThat(rows.countWhere("strategies", "internal_id", DEFINITION)).isZero();
+        assertThat(rows.countWhere("inbox_events", "event_id", DEFERRED_EVENT)).isZero();
+
+        // Проекции пришли своим проходом — отложенное применение доезжает
+        // само, без повторной публикации.
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+        awaitStrategyStatus(DEFINITION, Strategy.Status.ACTIVE.name());
+
+        assertThat(rows.countWhere("inbox_events", "event_id", DEFERRED_EVENT)).isEqualTo(1L);
     }
 
     @Test

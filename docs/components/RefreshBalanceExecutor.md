@@ -84,7 +84,7 @@ balances`. Исполнение команды объясняется истор
 | `code` | `RISK_BASE_NOT_OBSERVED` (дом кода — этот файл) |
 | природа | **состояние** — факт держится: пока остаток неположителен, команда тикает каждым проходом, и природа происшествия дала бы строку на каждый тик |
 | `severity` | `NON_CRITICAL` — kill-switch в составе реакции нет, отказ и так громкий |
-| `scope` | **биржа**: база живёт на строке `Exchange` (`docs/models/domain/core/Exchange.md`) |
+| `scope` | **биржевой счёт**: база живёт на строке торгового состояния счёта (`docs/models/domain/core/ExchangeAccount.md`) |
 
 Правила дедупа и критичности — `docs/models/domain/other/AnomalyReport.md`.
 
@@ -98,6 +98,6 @@ balances`. Исполнение команды объясняется истор
 ## Связи
 
 - База риска и её движение — `docs/rules/risk-policy.md`.
-- Строка биржевого счёта — `docs/models/domain/core/Exchange.md`.
+- Строка биржевого счёта — `docs/models/domain/core/ExchangeAccount.md`.
 - Снимок средств — `docs/models/domain/core/BalanceContainer.md`.
 - Носитель наблюдаемости — `docs/models/domain/other/AnomalyReport.md`.

@@ -21,6 +21,7 @@ import com.example.tradingcore.domain.safety.AnomalyScan;
 import com.example.tradingcore.domain.safety.AnomalyScanReader;
 import com.example.tradingcore.domain.safety.DealInvariantDetectors;
 import com.example.tradingcore.domain.safety.ExchangeSideDetectors;
+import com.example.tradingcore.exception.ControlledExchangeException;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
@@ -104,20 +105,48 @@ public class AnomalyJob {
      * <p>Популяция — счета <b>реестрового</b> статуса, ступенью не сужая:
      * счёт под ступенью наблюдается наравне с прочими, и именно он —
      * популяция детектора непроэнфорсенной блокировки.
+     *
+     * <p><b>Момент прохода снимается ДО среза</b> — наблюдения этого
+     * прохода его не старше, — и им же отмечается наблюдённый проход: его
+     * возраст спрашивает отбор входа (docs/components/AnomalyJob.md §«Гейт
+     * полноты среза»).
+     *
+     * <p><b>Контролируемое исключение границы ловится здесь и поднимает
+     * биржевую ступень 2</b>, как на всякой тропе: у прохода детекции ловца
+     * иначе нет, а ратифицированный исход — безусловная ступень, а не пометка
+     * «проход неполон» (docs/rules/controlled-exchange-exceptions.md). Проход
+     * при этом ненаблюдён: детекция по нему не отработала.
      */
     private void run() {
         for (ExchangeAccount account : exchangeAccountDataService.findTradingAccounts()) {
+            OffsetDateTime passStartedAt = OffsetDateTime.now(ZoneOffset.UTC);
             Boolean observed = false;
             try {
-                observed = observe(account);
+                observed = observe(account, passStartedAt);
+            } catch (ControlledExchangeException e) {
+                reactOnControlledFailure(account, e);
             } catch (RuntimeException e) {
                 log.error("Anomaly detection failed exchangeAccountId={}", account.getId(), e);
             }
             try {
-                passGate.apply(observed, account);
+                passGate.apply(observed, account, passStartedAt);
             } catch (RuntimeException e) {
                 log.error("Anomaly pass gate failed exchangeAccountId={}", account.getId(), e);
             }
+        }
+    }
+
+    /**
+     * Выделенный ловец: площадка ответила на чтение среза отказом, который
+     * граница опознаёт поимённо. Отказ самой реакции проход по остальным
+     * счетам не прерывает — счета независимы.
+     */
+    private void reactOnControlledFailure(ExchangeAccount account, ControlledExchangeException e) {
+        log.error("Controlled exchange failure on the anomaly scan exchangeAccountId={}", account.getId(), e);
+        try {
+            anomalyReaction.controlledFailure(account);
+        } catch (RuntimeException failure) {
+            log.error("Controlled failure reaction failed exchangeAccountId={}", account.getId(), failure);
         }
     }
 
@@ -134,8 +163,7 @@ public class AnomalyJob {
      * промолчавшего локально (отказ по инструменту, по сделке, неполный
      * граф), прерывание тоже гасит — ошибка в сторону задержки, выбор дома.
      */
-    private Boolean observe(ExchangeAccount account) {
-        OffsetDateTime passStartedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    private Boolean observe(ExchangeAccount account, OffsetDateTime passStartedAt) {
         AnomalyScan scan = scanReader.read(account.getInternalId());
         List<Instrument> contour = instrumentDataService.findContourWithin(account.getExchangeCode(),
                 properties.getContourWindow());
@@ -150,7 +178,7 @@ public class AnomalyJob {
     /** Детекторы прохода. Каждый молчит на неполном срезе — гейт выше. */
     private void detect(AnomalyScan scan, ExchangeAccount account, List<Instrument> contour) {
         exchangeSideDetectors.detect(scan, account, contourNames(contour));
-        dealInvariantDetectors.detect(account);
+        dealInvariantDetectors.detect(scan, account);
         Boolean accountHardRung = ExchangeAccount.SafetyRung.TRADE_BLOCKED.equals(account.getSafetyRung());
         Set<Long> hardRungPairs = new HashSet<>(
                 accountInstrumentStateDataService.findInstrumentIdsUnderHardRung(account.getId()));

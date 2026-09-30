@@ -2,7 +2,6 @@ package com.example.tradingbot.domain.unit.predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.tradingbot.domain.model.core.exchange.Exchange;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
@@ -22,41 +21,16 @@ import org.junit.jupiter.params.provider.ValueSource;
  * docs/models/domain/other/InstrumentExternalRules.md,
  * docs/lifecycles/Instrument.md).
  *
- * <p><b>Базовая сборка:</b> биржа, биржевой счёт и инструмент со своими
+ * <p><b>Базовая сборка:</b> биржевой счёт и инструмент со своими
  * статусами; справочные правила инструмента — с сырыми строковыми
  * значениями площадки.
  *
- * <p><b>Клетка `U13.10` не прогоняется, и это не пропуск.</b> Оба
- * ступенчатых предиката инструмента читают значения перечня, которых ни
- * один сервис не пишет: ступень целевой конструкции стои́т на паре
- * «счёт, инструмент» (находка `D-6`).
+ * <p><b>Меток `U13.1`-`U13.3` и `U13.10` нет, и это не пропуск:</b> их
+ * предметом были ступенчатые предикаты площадки и инструмента формы
+ * монолита, снятые вместе с донорскими значениями перечней — ступень
+ * целевой конструкции стои́т на счёте и на паре «счёт, инструмент».
  */
 class SafetyRungAndInstrumentRulesTest {
-
-    @Test
-    @DisplayName("U13.1 — биржа в жёсткой ступени")
-    void u13_1_aHardRungBlocksTradeAndEntry() {
-        Exchange subject = exchange(Exchange.Status.TRADE_BLOCKED);
-
-        assertThat(subject.isTradeBlocked()).isTrue();
-        assertThat(subject.blocksEntry()).isTrue();
-    }
-
-    /** Ступени различаются судьбой принятого риска, а не правом набирать новый. */
-    @Test
-    @DisplayName("U13.2 — биржа в мягкой ступени")
-    void u13_2_aSoftRungBlocksEntryOnly() {
-        Exchange subject = exchange(Exchange.Status.HOLD);
-
-        assertThat(subject.isTradeBlocked()).isFalse();
-        assertThat(subject.blocksEntry()).isTrue();
-    }
-
-    @Test
-    @DisplayName("U13.3 — биржа в рабочем статусе")
-    void u13_3_anActiveExchangeDoesNotBlockEntry() {
-        assertThat(exchange(Exchange.Status.ACTIVE).blocksEntry()).isFalse();
-    }
 
     @Test
     @DisplayName("U13.4 — ранг по каждому из трёх статусов счёта порознь")
@@ -175,12 +149,6 @@ class SafetyRungAndInstrumentRulesTest {
     @DisplayName("U13.18 — статус справочных правил — любой иной из перечня")
     void u13_18_anyOtherStatusIsNotTradable(InstrumentExternalRules.Status status) {
         assertThat(rulesWithStatus(status).isLive()).isFalse();
-    }
-
-    private static Exchange exchange(Exchange.Status status) {
-        Exchange exchange = new Exchange();
-        exchange.setStatus(status);
-        return exchange;
     }
 
     private static Instrument instrument(Instrument.Status status, List<CandleGroup> groups) {

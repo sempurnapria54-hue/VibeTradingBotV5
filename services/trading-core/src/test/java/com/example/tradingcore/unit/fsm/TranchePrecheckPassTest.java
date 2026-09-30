@@ -21,6 +21,7 @@ import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
+import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -146,7 +147,7 @@ class TranchePrecheckPassTest {
     @DisplayName("U17.7 — чужой живой риск на сделке: блок не запускался")
     void u17_7_aForeignLiveRiskEscalatesBeforeTheWorkBlock() {
         DealContext context = baseContext();
-        context.getDeal().getOrders().add(liveEntryLeg(90L, null));
+        context.getDeal().getUnattributedOrders().add(liveEntryLeg(90L, null));
 
         TrancheTransition transition = handle(context);
 
@@ -211,6 +212,62 @@ class TranchePrecheckPassTest {
         assertThat(transition.getNextStatus()).isEqualTo(DealTranche.Status.ENTRY_SUBMITTED);
         assertThat(transition.getCloseReason()).isNull();
         assertThat(transition.hasCommands()).isFalse();
+        harness.verifyWorkPassNotRun();
+    }
+
+    /**
+     * Нога, о приёме которой площадка не сказала, под сворачиванием не
+     * отправляется, не снимается назначением и терминала транша не получает
+     * — её судьбу добывает звено названной ноги, наблюдением, а не работой
+     * (docs/components/TranchePrecheckHandler.md §«Рабочая логика»).
+     */
+    @Test
+    @DisplayName("U17.18 — сделка сворачивается, входная нога созданная, строка ждёт повтора: добыча ноги, ребра нет")
+    void u17_18_aCollapsingDealObservesAnUnsubmittedEntryInsteadOfClosing() {
+        DealTranche candidate = precheckTranche();
+        candidate.getOrders().add(leg(30L, TRANCHE_ID, Order.Status.CREATED, Boolean.FALSE, "0"));
+        Deal collapsing = deal(Deal.Status.EXIT_PENDING, candidate);
+        collapsing.setCloseReason(Deal.CloseReason.STRATEGY_EXIT);
+        DealContext context = contextBuilder(collapsing)
+                .balanceContainer(balance(minutesAgo(0)))
+                .actionStates(new ArrayList<>(List.of(
+                        strategyRow(5L, TRANCHE_ID, 1, DealActionStateStatus.RETRY_PENDING))))
+                .build();
+        harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.getCloseReason()).isNull();
+        assertThat(transition.getDealErrorRequested()).isFalse();
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.getObservations()).extracting(ServiceCommand::getType)
+                .containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND);
+        RefreshOrderCommandPayload payload =
+                (RefreshOrderCommandPayload) transition.getObservations().getFirst().getPayload();
+        assertThat(payload.getOrderId()).isEqualTo(30L);
+        harness.verifyWorkPassNotRun();
+    }
+
+    /**
+     * Добыча не нашла ногу и сняла её как не дошедшую до площадки: живого
+     * риска нет, и транш уходит тропой отправленного входа, где его
+     * закрывает обработчик отправленного входа.
+     */
+    @Test
+    @DisplayName("U17.19 — сделка сворачивается, входная нога снята как не дошедшая до площадки: ребро в отправленный вход")
+    void u17_19_anUnplacedEntryUnderCollapseLeavesThePrecheck() {
+        DealTranche candidate = precheckTranche();
+        Order withdrawn = leg(30L, TRANCHE_ID, Order.Status.CREATED, Boolean.FALSE, "0");
+        withdrawn.toNotPlaced();
+        candidate.getOrders().add(withdrawn);
+        DealContext context = contextOf(Deal.Status.EXIT_PENDING, candidate);
+        context.getDeal().setCloseReason(Deal.CloseReason.STRATEGY_EXIT);
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.getNextStatus()).isEqualTo(DealTranche.Status.ENTRY_SUBMITTED);
+        assertThat(transition.getObservations()).isEmpty();
         harness.verifyWorkPassNotRun();
     }
 

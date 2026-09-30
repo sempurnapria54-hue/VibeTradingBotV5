@@ -7,6 +7,7 @@ import com.example.tradingcore.config.AnomalyJobProperties;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.util.Constants;
+import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,9 +17,10 @@ import org.springframework.stereotype.Service;
  * (docs/components/AnomalyJob.md §«Гейт полноты среза»).
  *
  * <p><b>Предмет — неполнота ПРОХОДА, а не отказ вызова.</b> Отказ,
- * нарушающий контракт интеграции, поднимает биржевую ступень 2 сам и до
- * прохода не доходит. Сюда приходит класс, до которого граница не
- * достаёт, потому что бросает на вызов, а не на проход: два среза из трёх
+ * нарушающий контракт интеграции, поднимает биржевую ступень 2 своим
+ * ловцом у джобы, и этот гейт ему не реакция, а только отметка: такой
+ * проход тоже ненаблюдён. Своя реакция здесь — у класса, до которого граница
+ * не достаёт, потому что бросает на вызов, а не на проход: два среза из трёх
  * получены, третий — нет.
  *
  * <p><b>Слепота счётна.</b> Отчёт заводится с первого же неполного
@@ -50,9 +52,13 @@ public class AnomalyPassGate {
      * чей срез добыт целиком, но детекция по нему не отработала, есть
      * такая же слепота. Различать их значило бы засчитывать чистым
      * проход, на котором никто не смотрел.
+     *
+     * <p>Наблюдённый проход отмечается своим моментом начала: его возраст —
+     * операнд гейта входа, который видит и тик, не исполнившийся вовсе
+     * (docs/components/AnomalyJob.md §«Гейт полноты среза»).
      */
-    public void apply(Boolean observed, ExchangeAccount account) {
-        Integer blindPasses = exchangeAccountDataService.markPass(account.getId(), observed);
+    public void apply(Boolean observed, ExchangeAccount account, OffsetDateTime passStartedAt) {
+        Integer blindPasses = exchangeAccountDataService.markPass(account.getId(), observed, passStartedAt);
         if (isTrue(observed)) {
             return;
         }

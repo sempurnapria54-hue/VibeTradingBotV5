@@ -81,17 +81,19 @@ public class InstrumentDataService {
     }
 
     /**
-     * Популяция прохода сбора срезов: действующий листинг площадки
-     * стабильным порядком и ограниченным окном. Порядок по
-     * идентификатору — при нехватке бюджета усечённым оказывается один и
+     * Популяция прохода сбора срезов: каталог площадки за вычетом
+     * названных статусов, стабильным порядком и ограниченным окном. Порядок
+     * по идентификатору — при нехватке бюджета усечённым оказывается один и
      * тот же хвост, а не случайные инструменты
      * (docs/processes/snapshot-collection.md).
      */
     @Transactional(readOnly = true)
-    public List<Instrument> findListedWithin(String exchangeCode, Collection<Instrument.Status> statuses,
-                                             Integer limit) {
+    public List<Instrument> findCatalogExceptWithin(String exchangeCode,
+                                                    Collection<Instrument.Status> excludedStatuses,
+                                                    Integer limit) {
         return repository
-                .findByExchangeCodeAndStatusInOrderByIdAsc(exchangeCode, names(statuses), PageRequest.of(0, limit))
+                .findByExchangeCodeAndStatusNotInOrderByIdAsc(exchangeCode, names(excludedStatuses),
+                        PageRequest.of(0, limit))
                 .stream()
                 .map(mapper::persistenceToDomain)
                 .collect(toList());

@@ -107,7 +107,7 @@ class TeardownDetectionPathTest {
 
         JsonNode state = safetyState(trail);
         assertThat(state.path("accountSafetyRung").asString()).as("E1.1: ступени счёта нет").isEqualTo("ACTIVE");
-        assertThat(state.path("instrumentInternalIdsWithStandingRung")).as("E1.1: ступени пары нет").isEmpty();
+        assertThat(state.path("standingInstrumentRungs")).as("E1.1: ступени пары нет").isEmpty();
         List<Map<String, Object>> rows = reports(trail, FOREIGN_ORDER);
         assertThat(rows).as("E1.1: строка отчёта кодом чужой заявки одна").hasSize(1);
         assertThat(rows.getFirst().get("severity")).as("E1.1: некритичная").isEqualTo("NON_CRITICAL");
@@ -195,7 +195,7 @@ class TeardownDetectionPathTest {
 
         JsonNode state = safetyState(trail);
         assertThat(state.path("accountSafetyRung").asString()).as("E1.3: ступени счёта нет").isEqualTo("ACTIVE");
-        assertThat(state.path("instrumentInternalIdsWithStandingRung")).as("E1.3: ступени пары нет").isEmpty();
+        assertThat(state.path("standingInstrumentRungs")).as("E1.3: ступени пары нет").isEmpty();
         List<Map<String, Object>> rows = reports(trail, FOREIGN_ORDER);
         assertThat(rows).as("E1.3: второй строки отчёта нет, строка наблюдения осталась").hasSize(1);
         assertThat(rows.getFirst().get("severity")).isEqualTo("NON_CRITICAL");
@@ -227,7 +227,7 @@ class TeardownDetectionPathTest {
 
         JsonNode state = safetyState(trail);
         assertThat(state.path("accountSafetyRung").asString()).as("E1.6: ступени счёта нет").isEqualTo("ACTIVE");
-        assertThat(state.path("instrumentInternalIdsWithStandingRung")).as("E1.6: ступени пары нет").isEmpty();
+        assertThat(state.path("standingInstrumentRungs")).as("E1.6: ступени пары нет").isEmpty();
         assertThat(state.path("blindPassCount").asInt()).as("E1.6: счёт слепоты — единица").isEqualTo(1);
         List<Map<String, Object>> rows = reports(trail, PASS_INCOMPLETE);
         assertThat(rows).as("E1.6: строка отчёта кодом неполного прохода одна").hasSize(1);

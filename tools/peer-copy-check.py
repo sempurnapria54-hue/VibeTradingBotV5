@@ -245,6 +245,25 @@ FAMILIES = [
         ],
         "различия": [r"^@Transactional\(transactionManager = \w+PersistenceConfig\.\w+_TRANSACTION_MANAGER,$"],
     },
+    # Автор и момент точечной записи мимо сущности
+    # (docs/models/domain/other/Auditable.md §«Системные поля и точечная
+    # запись»). Признак неустранимости из .claude/rules/carrier-levels.md
+    # буквально НЕ выполнен: тело ссылается только на интерфейсы каркаса
+    # (AuditorAware, DateTimeProvider). Семейство, а не сведение, выбрано по
+    # цене следа: общий артефакт бинов (`platform`) spring-data не несёт, и
+    # ввести её туда значило бы навязать зависимость сервисам без базы
+    # (`bff`, `connector-okx`) без предъявленной потребности
+    # (.claude/rules/codestyle.md §«Новый модуль монорепозитория»), а
+    # `persistence-model` — артефакт форм, бинов в нём нет. Сведение остаётся
+    # открытым ходом; до него расхождение копий мерит этот реестр.
+    {
+        "имя": "PointWriteAudit — автор и момент точечной записи",
+        "пути": [
+            TC + "/persistence/service/PointWriteAudit.java",
+            MD + "/persistence/service/PointWriteAudit.java",
+        ],
+        "различия": [],
+    },
 ]
 
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)

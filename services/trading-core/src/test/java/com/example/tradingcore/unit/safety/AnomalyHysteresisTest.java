@@ -20,6 +20,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.tradingcore.config.AnomalyJobProperties;
 import com.example.tradingcore.config.AnomalyReportProperties;
+import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.safety.AnomalyFinding;
 import com.example.tradingcore.domain.safety.AnomalyReaction;
 import com.example.tradingcore.domain.safety.AnomalyReport;
@@ -29,6 +30,7 @@ import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.persistence.service.AnomalyReportDataService;
+import com.example.tradingcore.util.Constants;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -387,5 +389,26 @@ class AnomalyHysteresisTest {
         reaction.breakUnobservedSeries(account(), passStartedAt);
 
         verify(reportDataService).breakSeries(ACCOUNT_ID, passStartedAt);
+    }
+
+    /**
+     * Контролируемое исключение на чтении среза: реакция с первого взгляда,
+     * гистерезиса нет — признак производит ответ площадки, а не наш
+     * незавершённый ход. Ступень — жёсткая счётная кодом контролируемого
+     * отказа, серии не спрашиваются, а контекст несёт только счёт: сделки и
+     * инструмента у отказа среза нет.
+     */
+    @Test
+    @DisplayName("U10.27 — контролируемое исключение среза: жёсткая счётная ступень без гистерезиса, контекст — только счёт")
+    void u10_27_aControlledScanFailureRaisesTheHardAccountRungAtOnce() {
+        reaction.controlledFailure(account());
+
+        ArgumentCaptor<DealContext> context = ArgumentCaptor.forClass(DealContext.class);
+        verify(holdService).raise(eq(HoldSignal.exchangeAccount(Constants.Hold.EXCHANGE_CONTROLLED_FAILURE)),
+                context.capture());
+        assertThat(context.getValue().getExchangeAccount().getId()).isEqualTo(ACCOUNT_ID);
+        assertThat(context.getValue().getInstrument()).isNull();
+        assertThat(context.getValue().getDeal()).isNull();
+        verify(reportDataService, never()).existsSeries(any(), any(), any(), any(), any(), any(), any());
     }
 }

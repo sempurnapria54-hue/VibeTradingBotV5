@@ -232,9 +232,35 @@ public class AlgoOrder extends Auditable {
      * намерение, иначе {@code NOT_PLACED} (write-once). Контролируемого
      * исключения нет: пропавшей сущностью заявка, которой на площадке не
      * было, не является (docs/rules/controlled-exchange-exceptions.md).
+     *
+     * <p><b>Ребро одно — из созданного</b> (docs/spec/algo-order-lifecycle.json,
+     * величина {@code algoTransitionAllowed}): у отправленной ненайденность
+     * есть пропажа, а не несостоявшаяся постановка, и матрица, допускающая
+     * отмену из отправленного, этой тропы не различает — поэтому отказ стои́т
+     * здесь, до перевода.
      */
     public void toNotPlaced() {
+        if (isFalse(isNotSubmitted())) {
+            throw new IllegalStateException("Only an unsubmitted AlgoOrder is withdrawn as not placed: " + status);
+        }
         toCancel(CloseReason.NOT_PLACED);
+    }
+
+    /**
+     * Ребро из текущего статуса в целевой допустимо матрицей жизненного
+     * цикла (docs/spec/algo-order-lifecycle.json, величина
+     * {@code algoTransitionAllowed}). Пустое «откуда» допускает только
+     * созданный; из терминальных рёбер нет, петель матрица не содержит.
+     *
+     * <p>Предикат спрашивает исполнитель добычи: наблюдённый статус,
+     * ребра в который из текущего матрица не содержит (откат живого статуса,
+     * терминал), состояния не двигает, а не роняет проход броском.
+     */
+    public Boolean canTransitionTo(Status target) {
+        Set<Status> allowed = isNull(status)
+                ? EnumSet.of(Status.CREATED)
+                : ALLOWED_TRANSITIONS.getOrDefault(status, EnumSet.noneOf(Status.class));
+        return allowed.contains(target);
     }
 
     /** Отменён: требует ненулевой reason. */
@@ -259,11 +285,12 @@ public class AlgoOrder extends Auditable {
         }
     }
 
+    /**
+     * Перевод по матрице. Отказ стои́т ДО записи статуса и причины: не
+     * состоявшееся ребро не оставляет модель наполовину переведённой.
+     */
     private void transitTo(Status target) {
-        Set<Status> allowed = isNull(status)
-                ? EnumSet.of(Status.CREATED)
-                : ALLOWED_TRANSITIONS.getOrDefault(status, EnumSet.noneOf(Status.class));
-        if (isFalse(allowed.contains(target))) {
+        if (isFalse(canTransitionTo(target))) {
             throw new IllegalStateException("Illegal AlgoOrder transition " + status + " -> " + target);
         }
         this.status = target;

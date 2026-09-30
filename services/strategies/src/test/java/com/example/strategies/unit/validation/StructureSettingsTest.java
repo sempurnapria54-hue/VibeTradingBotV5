@@ -18,7 +18,8 @@ import org.junit.jupiter.api.Test;
  * Настройки структуры рынка и типизованные ссылки — группа {@code U25}
  * документа `.claude/tests/cases/strategy-definition-validation.md` (дом
  * — docs/rules/strategy-condition-contract.md §«Настройка индикатора»;
- * типизация ссылок — звено {@code validateIndicatorKeyOfType}).
+ * типизация ссылок — звено {@code validateIndicatorKeyOfType}; окно
+ * расчёта — docs/rules/strategy-validation.md §«Что проверяется на создании»).
  *
  * <p><b>Типизация объявлена КАЖДОЙ ссылке отдельно</b>, а не одна на
  * настройку: ссылка на индикатор эффективности требует своего типа,
@@ -122,5 +123,61 @@ class StructureSettingsTest {
                 .singleElement()
                 .asString()
                 .contains(".expirationDuration: invalid ISO-8601 duration два часа");
+    }
+
+    @Test
+    @DisplayName("U25.9 — окно расчёта структуры опущено: нарушение обязательности, диапазона нет")
+    void u25_9_anUndeclaredLookbackWindowIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).getParams().setLookbackBars(null);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".params.lookbackBars STRATEGY_STRUCTURE_LOOKBACK_NOT_DECLARED");
+    }
+
+    @Test
+    @DisplayName("U25.10 — окно расчёта структуры нулевое: нарушение диапазона, обязательность молчит")
+    void u25_10_aZeroLookbackWindowIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).getParams().setLookbackBars(0);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".params.lookbackBars STRATEGY_STRUCTURE_LOOKBACK_NOT_POSITIVE")
+                .contains("получено 0");
+    }
+
+    @Test
+    @DisplayName("U25.11 — окно расчёта структуры отрицательное: то же нарушение диапазона")
+    void u25_11_aNegativeLookbackWindowIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).getParams().setLookbackBars(-5);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".params.lookbackBars STRATEGY_STRUCTURE_LOOKBACK_NOT_POSITIVE")
+                .contains("получено -5");
+    }
+
+    @Test
+    @DisplayName("U25.12 — окно в один бар: нижняя граница диапазона включена")
+    void u25_12_aOneBarLookbackWindowPasses() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).getParams().setLookbackBars(1);
+
+        assertThat(violations(request)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U25.13 — блок параметров структуры опущен целиком: окно не проверяется")
+    void u25_13_anAbsentParamsBlockIsNotCheckedForTheWindow() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).setParams(null);
+
+        assertThat(violations(request)).isEmpty();
     }
 }

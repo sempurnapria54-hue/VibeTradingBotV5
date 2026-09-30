@@ -47,9 +47,9 @@ py tools/pure-logic-candidates.py | grep -i 'Converter'
 ```bash
 export LC_ALL=C.UTF-8
 grep -rln 'writeValueAsString\|convertValue' services/trading-core/src/main/java services/market-data/src/main/java services/strategies/src/main/java
-grep -c 'jsonb' services/trading-core/src/main/resources/db/migration/V1__trading_core_baseline.sql
-grep -c 'jsonb' services/market-data/src/main/resources/db/migration/V1__market_data_baseline.sql
-grep -c 'jsonb' services/strategies/src/main/resources/db/migration/V1__strategies_baseline.sql
+grep -c 'jsonb' services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql
+grep -c 'jsonb' services/market-data/src/main/resources/db/migration/market-data/V1__market_data_baseline.sql
+grep -c 'jsonb' services/strategies/src/main/resources/db/migration/strategies/V1__strategies_baseline.sql
 ```
 
   Первая команда печатает семь конвертеров и **четыре** класса сверх них: два

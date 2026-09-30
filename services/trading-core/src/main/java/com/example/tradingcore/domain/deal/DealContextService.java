@@ -3,6 +3,7 @@ package com.example.tradingcore.domain.deal;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static java.util.stream.Collectors.groupingBy;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -29,6 +30,9 @@ import com.example.tradingcore.persistence.service.PositionDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -117,10 +121,13 @@ public class DealContextService {
     public void reloadRuntimeGraph(Deal deal) {
         List<Order> orders = orderDataService.findByDealId(deal.getId());
         List<AlgoOrder> algoOrders = algoOrderDataService.findByDealId(deal.getId());
-        deal.setOrders(orders);
-        deal.setAlgoOrders(algoOrders);
+        List<DealTranche> tranches = withOwnOrders(dealTrancheDataService.findByDealId(deal.getId()),
+                orders, algoOrders);
+        Set<Long> trancheIds = tranches.stream().map(DealTranche::getId).collect(Collectors.toSet());
         deal.setPositions(positionDataService.findEpisodes(deal.getId()));
-        deal.setTranches(withOwnOrders(dealTrancheDataService.findByDealId(deal.getId()), orders, algoOrders));
+        deal.setTranches(tranches);
+        deal.setUnattributedOrders(unattributed(orders, Order::getDealTrancheId, trancheIds));
+        deal.setUnattributedAlgoOrders(unattributed(algoOrders, AlgoOrder::getDealTrancheId, trancheIds));
         // Экспозиция транша производна от наблюдённых фактов и пересчитывается
         // целиком каждой сборкой графа: колонки налива на строке транша не
         // пишет никто, и прочитанные оттуда слагаемые были бы пусты всегда.
@@ -180,6 +187,18 @@ public class DealContextService {
         return isNull(detail)
                 ? null
                 : strategyDataService.findOwnerOfDetailWithSettings(detail.getId()).orElse(null);
+    }
+
+    /**
+     * Остаток раскладки: заявки сделки, чей ключ транша пуст либо не называет
+     * ни одного загруженного транша. Транши грузятся все, поэтому штатно
+     * остаток пуст; непустой — операнд инварианта неприписанного живого риска
+     * (docs/models/domain/aggregate/Deal.md §Структура).
+     */
+    private static <T> List<T> unattributed(List<T> legs, Function<T, Long> trancheKey, Set<Long> trancheIds) {
+        return legs.stream()
+                .filter(leg -> isFalse(trancheIds.contains(trancheKey.apply(leg))))
+                .collect(Collectors.toList());
     }
 
     /** Разложить заявки сделки по их траншам; заявка без транша ничьей не становится. */

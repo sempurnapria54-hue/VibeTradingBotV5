@@ -50,6 +50,15 @@ public class BrokerProperties {
      */
     private Duration publishBlockTimeout;
 
+    /**
+     * Пауза между попытками применить факт владельца определений, чьё
+     * применение отложено ({@code StrategyFactErrorHandler}). Управляет
+     * только частотой, с которой повтор бьётся в базу: числа попыток у
+     * отложенного применения нет, сдача была бы пропуском
+     * (docs/architecture/data-ownership.md §«Копии чужих данных»).
+     */
+    private Duration intakeRetryInterval;
+
     /** Настроена ли тропа событий: им решается запуск слушателя. */
     public Boolean isConfigured() {
         return StringUtils.isNotBlank(bootstrapServers);

@@ -1,10 +1,11 @@
 package com.example.tradingcore.domain.service;
 
 import static java.util.Objects.isNull;
-import static org.apache.commons.lang3.BooleanUtils.isTrue;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.event.StrategyEventType;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
+import com.example.tradingcore.exception.PoisonStrategyFactException;
 import com.example.tradingcore.persistence.service.InboxDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,20 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>Отметка обработки ложится ТОЙ ЖЕ транзакцией</b>, что и
  * следствие: отметка без следствия потеряла бы событие навсегда, а
  * следствие без отметки применилось бы дважды.
+ *
+ * <p><b>Дедуп — безопасной вставкой отметки ПЕРВЫМ ходом, а не проверкой
+ * «обработано ли уже»</b> (docs/rules/idempotency-via-unique.md). Проверка
+ * и следствие не атомарны: два конкурентных применения одного события оба
+ * прочли бы «не обработано», и второе падало бы нарушением ключа отметки
+ * уже ПОСЛЕ своего следствия. Вставка по ключу решает, кто первый, до
+ * следствия; проигравший ждёт исхода победителя и уходит холостым. Отказ
+ * следствия откатывает и отметку — транзакция одна.
+ *
+ * <p><b>Отказ применения не глотается здесь, а объявлен у приёма</b>
+ * (docs/architecture/data-ownership.md §«Копии чужих данных»): отказ,
+ * который лечит время (проекции счёта либо инструмента ещё нет), всплывает
+ * как есть, и применение откладывается; дефект самой записи — класс
+ * {@link PoisonStrategyFactException}, и запись пропускается со следом.
  *
  * <p><b>Событие о определении, копии которого нет, — штатный исход, а не
  * авария.</b> Копия заводится ТОЛЬКО активацией, а удалить определение
@@ -60,11 +75,11 @@ public class StrategyDefinitionApplier {
      */
     @Transactional
     public void applyActivated(String eventId, Strategy definition) {
-        if (isTrue(inboxDataService.isConsumed(eventId))) {
-            return;
-        }
         if (isNull(definition) || isNull(definition.getInternalId())) {
-            throw new IllegalArgumentException("Activation event carries no definition identity: " + eventId);
+            throw new PoisonStrategyFactException("Activation event carries no definition identity: " + eventId);
+        }
+        if (isFalse(inboxDataService.markConsumedIfAbsent(eventId, StrategyEventType.STRATEGY_ACTIVATED.name()))) {
+            return;
         }
         definition.setStatus(Strategy.Status.ACTIVE);
         if (strategyDataService.findByInternalId(definition.getInternalId()).isPresent()) {
@@ -72,7 +87,6 @@ public class StrategyDefinitionApplier {
         } else {
             strategyDataService.saveTree(definition);
         }
-        inboxDataService.markConsumed(eventId, StrategyEventType.STRATEGY_ACTIVATED.name());
         log.info("Strategy copy activated internalId={}", definition.getInternalId());
     }
 
@@ -82,17 +96,15 @@ public class StrategyDefinitionApplier {
      */
     @Transactional
     public void applyLifecycle(String eventId, StrategyEventType type, String internalId) {
-        if (isTrue(inboxDataService.isConsumed(eventId))) {
+        if (isFalse(inboxDataService.markConsumedIfAbsent(eventId, type.name()))) {
             return;
         }
         if (strategyDataService.findByInternalId(internalId).isEmpty()) {
-            inboxDataService.markConsumed(eventId, type.name());
             log.info("Strategy fact concerns a definition that was never activated: no copy to move "
                     + "internalId={} eventType={}", internalId, type);
             return;
         }
         strategyDataService.applyStatus(internalId, targetStatus(type));
-        inboxDataService.markConsumed(eventId, type.name());
         log.info("Strategy copy moved internalId={} status={}", internalId, targetStatus(type));
     }
 

@@ -184,6 +184,26 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
                             @Param("modifiedAt") OffsetDateTime modifiedAt,
                             @Param("modifiedBy") String modifiedBy);
 
+    /**
+     * Момент наблюдённого прохода: операнд возраста наблюдения у отбора
+     * входа (docs/models/domain/core/ExchangeAccount.md §Персистентность).
+     *
+     * <p><b>Момент изменения строки эта запись не двигает, и это названное
+     * исключение.</b> Значение колонки и есть момент её изменения — второй
+     * записи он не прибавляет ничего, — а наблюдённый проход идёт каждым
+     * тактом: двигай запись {@code modifiedAt}, у здорового счёта он означал
+     * бы «последний проход», а не «последнее изменение торгового состояния».
+     *
+     * <p><b>Момент только растёт.</b> Проход, начатый раньше и закончившийся
+     * позже соседнего, отметку назад не сдвигает.
+     */
+    @Modifying
+    @Query("""
+            update ExchangeAccountEntity a set a.observedPassAt = :observedAt
+            where a.id = :id and (a.observedPassAt is null or a.observedPassAt < :observedAt)""")
+    int markObservedPassAt(@Param("id") Long id,
+                           @Param("observedAt") OffsetDateTime observedAt);
+
     /** Текущий счёт слепоты ПРОЕКЦИЕЙ поля — операнд предела, не строка счёта. */
     @Query("select a.blindPassCount from ExchangeAccountEntity a where a.id = :id")
     Optional<Integer> findBlindPassCount(@Param("id") Long id);

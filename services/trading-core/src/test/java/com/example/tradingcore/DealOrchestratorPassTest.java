@@ -623,8 +623,8 @@ class DealOrchestratorPassTest {
         deal.setExchangeAccountId(ACCOUNT_ID);
         deal.setInstrumentId(INSTRUMENT_ID);
         deal.setTranches(new ArrayList<>(List.of(tranche)));
-        deal.setOrders(new ArrayList<>());
-        deal.setAlgoOrders(new ArrayList<>());
+        deal.setUnattributedOrders(new ArrayList<>());
+        deal.setUnattributedAlgoOrders(new ArrayList<>());
         deal.setPositions(new ArrayList<>());
         ExchangeAccount account = new ExchangeAccount();
         account.setId(ACCOUNT_ID);

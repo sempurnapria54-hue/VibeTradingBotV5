@@ -23,6 +23,10 @@ import lombok.Setter;
  * называет требование потребителя, и у 1m и 1D одного инструмента она
  * разная (docs/processes/candle-loading.md §«Кто заводит группу»).
  *
+ * <p><b>Счётчик попыток докачки — тоже колонка группы:</b> гарантия
+ * «исчерпаны попытки — ERROR» обязана пережить рестарт
+ * (docs/models/domain/other/CandleGroup.md §Персистентность).
+ *
  * <p>Енумы — только в домене; таймфрейм и статус хранятся строкой
  * (значение = {@code name()}).
  */
@@ -59,4 +63,7 @@ public class CandleGroupEntity extends AuditableEntity {
 
     @Column(name = "count", nullable = false)
     private Long count;
+
+    @Column(name = "repair_attempts", nullable = false)
+    private Integer repairAttempts;
 }

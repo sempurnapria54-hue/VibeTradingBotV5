@@ -7,6 +7,7 @@ import com.example.tradingbot.domain.event.StrategyEventType;
 import com.example.tradingbot.message.StrategyActivatedMessage;
 import com.example.tradingbot.message.StrategyLifecycleMessage;
 import com.example.tradingcore.domain.service.StrategyDefinitionApplier;
+import com.example.tradingcore.exception.PoisonStrategyFactException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -81,15 +82,21 @@ public class StrategyDefinitionConsumer {
     }
 
     /**
-     * Разбор содержимого. Отказ разбора <b>роняет обработку</b>: пропуск
-     * оставил бы копию в прежнем состоянии молча, а событие — потерянным
-     * без следа.
+     * Разбор содержимого. Отказ разбора <b>роняет обработку</b> как
+     * отравленная запись: повтор её не исправит, и обработчик отказа
+     * пропускает её со строкой журнала, несущей координаты и первопричину,
+     * а не молча ({@link StrategyFactErrorHandler}). Пустое содержимое —
+     * тот же класс: разбирать нечего при любом состоянии базы.
      */
     private <T> T read(String payload, Class<T> form) {
+        if (isNull(payload)) {
+            throw new PoisonStrategyFactException("Strategy fact payload is empty, expected " + form.getSimpleName());
+        }
         try {
             return objectMapper.readValue(payload, form);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Strategy fact payload is not readable as " + form.getSimpleName(), e);
+            throw new PoisonStrategyFactException(
+                    "Strategy fact payload is not readable as " + form.getSimpleName(), e);
         }
     }
 

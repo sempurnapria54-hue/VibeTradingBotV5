@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.event.StrategyEventType;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingcore.domain.service.StrategyDefinitionApplier;
+import com.example.tradingcore.exception.PoisonStrategyFactException;
 import com.example.tradingcore.persistence.service.InboxDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
 import java.util.Optional;
@@ -33,6 +34,11 @@ import org.junit.jupiter.api.Test;
  *   <li><b>отметка обработки ставится только вместе со следствием</b> —
  *       отметка без следствия потеряла бы событие навсегда.</li>
  * </ul>
+ *
+ * <p><b>Дедуп решает безопасная вставка отметки, а не проверка перед
+ * ней</b> (docs/rules/idempotency-via-unique.md): здесь её исход задаётся
+ * ответом {@code markConsumedIfAbsent}, а атомарность самой вставки держит
+ * ключ базы и мерит чёрный ящик (группа {@code B8}).
  */
 class StrategyDefinitionApplierTest {
 
@@ -48,13 +54,13 @@ class StrategyDefinitionApplierTest {
     /** Первая активация заводит копию деревом. */
     @Test
     void theFirstActivationWritesTheTree() {
-        when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
+        firstDelivery(StrategyEventType.STRATEGY_ACTIVATED);
         when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.empty());
 
         applier.applyActivated(EVENT, definition());
 
         verify(strategyDataService).saveTree(any());
-        verify(inboxDataService).markConsumed(EVENT, StrategyEventType.STRATEGY_ACTIVATED.name());
+        verify(inboxDataService).markConsumedIfAbsent(EVENT, StrategyEventType.STRATEGY_ACTIVATED.name());
     }
 
     /**
@@ -64,7 +70,7 @@ class StrategyDefinitionApplierTest {
      */
     @Test
     void aRepeatedActivationMovesTheStatusWithoutRewritingTheTree() {
-        when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
+        firstDelivery(StrategyEventType.STRATEGY_ACTIVATED);
         when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.of(definition()));
 
         applier.applyActivated(EVENT, definition());
@@ -73,28 +79,45 @@ class StrategyDefinitionApplierTest {
         verify(strategyDataService, never()).saveTree(any());
     }
 
-    /** Повтор доставки не применяется дважды: дедуп по идентичности события. */
+    /**
+     * Повтор доставки не применяется дважды: отметка по идентичности
+     * события уже стоит, вставка поглощена, и следствия нет — ни
+     * заведения копии, ни даже чтения её.
+     */
     @Test
     void aRedeliveredEventIsNotAppliedTwice() {
-        when(inboxDataService.isConsumed(EVENT)).thenReturn(true);
+        when(inboxDataService.markConsumedIfAbsent(EVENT, StrategyEventType.STRATEGY_ACTIVATED.name()))
+                .thenReturn(false);
 
         applier.applyActivated(EVENT, definition());
 
+        verify(strategyDataService, never()).findByInternalId(any());
         verify(strategyDataService, never()).saveTree(any());
         verify(strategyDataService, never()).applyStatus(any(), any());
-        verify(inboxDataService, never()).markConsumed(any(), any());
+    }
+
+    /** Повтор доставки факта жизненного цикла статуса копии не двигает. */
+    @Test
+    void aRedeliveredLifecycleFactDoesNotMoveTheStatus() {
+        when(inboxDataService.markConsumedIfAbsent(EVENT, StrategyEventType.STRATEGY_DELETED.name()))
+                .thenReturn(false);
+
+        applier.applyLifecycle(EVENT, StrategyEventType.STRATEGY_DELETED, STRATEGY);
+
+        verify(strategyDataService, never()).findByInternalId(any());
+        verify(strategyDataService, never()).applyStatus(any(), any());
     }
 
     /** Удаление двигает статус копии; строка копии при этом остаётся. */
     @Test
     void deletionMovesTheCopyStatusAndKeepsTheRow() {
-        when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
+        firstDelivery(StrategyEventType.STRATEGY_DELETED);
         when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.of(definition()));
 
         applier.applyLifecycle(EVENT, StrategyEventType.STRATEGY_DELETED, STRATEGY);
 
         verify(strategyDataService).applyStatus(STRATEGY, Strategy.Status.DELETED);
-        verify(inboxDataService).markConsumed(EVENT, StrategyEventType.STRATEGY_DELETED.name());
+        verify(inboxDataService).markConsumedIfAbsent(EVENT, StrategyEventType.STRATEGY_DELETED.name());
     }
 
     /**
@@ -108,7 +131,7 @@ class StrategyDefinitionApplierTest {
      */
     @Test
     void aLifecycleFactWithoutACopyIsConsumedWithoutEffect() {
-        when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
+        firstDelivery(StrategyEventType.STRATEGY_DELETED);
         when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.empty());
 
         applier.applyLifecycle(EVENT, StrategyEventType.STRATEGY_DELETED, STRATEGY);
@@ -116,23 +139,46 @@ class StrategyDefinitionApplierTest {
         verify(strategyDataService, never()).applyStatus(any(), any());
         // Отметка ставится: событие обработано — следствия у него нет, и
         // повторная доставка искала бы ту же несуществующую копию.
-        verify(inboxDataService).markConsumed(EVENT, StrategyEventType.STRATEGY_DELETED.name());
+        verify(inboxDataService).markConsumedIfAbsent(EVENT, StrategyEventType.STRATEGY_DELETED.name());
     }
 
     /**
-     * Событие активации без идентичности определения роняет обработку.
+     * Событие активации без идентичности определения роняет обработку
+     * классом ОТРАВЛЕННОЙ записи.
      *
-     * <p>Пропуск оставил бы копию отсутствующей молча, и отбор входа не
-     * нашёл бы стратегию, которую владелец считает активной.
+     * <p>Класс несущий: им одним обработчик отказа приёма отличает запись,
+     * которую не исправит никакой повтор, от отложенного применения. Под
+     * общим классом такая запись встала бы в бесконечный повтор и
+     * остановила бы применение всех следующих фактов темы.
      */
     @Test
-    void anActivationWithoutIdentityIsRefused() {
-        when(inboxDataService.isConsumed(EVENT)).thenReturn(false);
-
+    void anActivationWithoutIdentityIsRefusedAsPoison() {
         assertThatThrownBy(() -> applier.applyActivated(EVENT, null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(PoisonStrategyFactException.class)
                 .hasMessageContaining("carries no definition identity");
-        verify(inboxDataService, never()).markConsumed(any(), any());
+        verify(inboxDataService, never()).markConsumedIfAbsent(any(), any());
+    }
+
+    /**
+     * Проекции счёта у ядра ещё нет — отказ всплывает КАК ЕСТЬ, а не
+     * классом отравленной записи: его лечит время (тик синка проекций), и
+     * применение откладывается, а не пропускается.
+     */
+    @Test
+    void anUnresolvedProjectionIsNotPoisonAndPropagates() {
+        firstDelivery(StrategyEventType.STRATEGY_ACTIVATED);
+        when(strategyDataService.findByInternalId(STRATEGY)).thenReturn(Optional.empty());
+        when(strategyDataService.saveTree(any()))
+                .thenThrow(new IllegalArgumentException("ExchangeAccount not found: ea-0001"));
+
+        assertThatThrownBy(() -> applier.applyActivated(EVENT, definition()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .isNotInstanceOf(PoisonStrategyFactException.class);
+    }
+
+    /** Первая доставка: отметка по идентичности события ложится этим вызовом. */
+    private void firstDelivery(StrategyEventType type) {
+        when(inboxDataService.markConsumedIfAbsent(EVENT, type.name())).thenReturn(true);
     }
 
     private Strategy definition() {

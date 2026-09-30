@@ -1,5 +1,6 @@
 package com.example.marketdata.unit.calculation;
 
+import static com.example.marketdata.unit.calculation.CalcFixture.barAt;
 import static com.example.marketdata.unit.calculation.CalcFixture.loneSpikeUptrendWindow;
 import static com.example.marketdata.unit.calculation.CalcFixture.monotoneUptrendWindow;
 import static com.example.marketdata.unit.calculation.CalcFixture.rangeWindow;
@@ -27,12 +28,12 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка:</b> та же, что у группы `U12`; наблюдается
  * <b>состав уровней</b> результата.
  *
- * <p><b>Четыре клетки этой группы красны по построению, и это не дефект
+ * <p><b>Три клетки этой группы красны по построению, и это не дефект
  * теста.</b> Их ожидание взято из дома, а дерево кода несёт иначе; красный
- * прогон и есть предъявление находок `M-3` (подтверждение уровня касаниями
- * к выдаваемым уровням не применяется) и `M-4` (момент подтверждения равен
- * концу окна всегда). Такие клетки помечены меткой {@code debt} и в
- * умолчание прогона не входят.
+ * прогон и есть предъявление находки `M-3` (подтверждение уровня касаниями
+ * к выдаваемым уровням не применяется). Такие клетки помечены меткой
+ * {@code debt} и в умолчание прогона не входят. Четвёртая — `U13.5`,
+ * находка `M-4` — метку сняла: моменты уровня выводятся из свидетельства.
  *
  * <p><b>Окно одинокого потолка выведено под находку `M-3`:</b> кластер из
  * двух пивотов стои́т на {@code 100} — два касания, то есть ровно
@@ -100,26 +101,57 @@ class StructureLevelsTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Дом разводит
-     * момент обнаружения (бар пивота), момент подтверждения (бар требуемого
-     * касания) и конец окна; код ставит оба момента равными концу окна.
-     * Красный прогон предъявляет находку `M-4`
-     * (`.claude/work/backlog.md` §«Момент подтверждения структуры равен
-     * концу окна всегда»).
+     * Дом разводит момент обнаружения (бар пивота), момент подтверждения
+     * (касание номер {@code minTouches}) и конец окна. Метка {@code debt}
+     * снята находкой `M-4`: оба момента выводятся из свидетельства.
+     *
+     * <p><b>Окно — диапазон, а не тренд, и это несущее.</b> У границ
+     * тренда базовой сборки касаний меньше требуемого (находка `M-3`), и
+     * момент подтверждения у них пуст: ассерт «не равен концу окна» прошёл
+     * бы на пустоте, ничего не измерив. У диапазона обе границы
+     * подтверждены, и моменты читаются числом. Пивоты потолка стоя́т на
+     * барах 1, 3, 5, 7, пола — на 2, 4, 6; глубина поиска равна единице,
+     * поэтому касание известно на следующем баре, и второе касание потолка
+     * известно на баре 4, пола — на баре 5.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U13.5 — граничный уровень тренда: моменты обнаружения и подтверждения не равны концу окна")
+    @DisplayName("U13.5 — границы диапазона: найдены на барах 1 и 2, подтверждены на барах 4 и 5, а не на конце окна 8")
     void u13_5_theBoundaryLevelMomentsAreNotIdenticalToTheWindowEnd() {
+        MarketStructure structure = resolve(rangeWindow(), "0.1", structureParams());
+        MarketPriceLevel ceiling = structure.findLevel(MarketPriceLevel.Type.RANGE_HIGH);
+        MarketPriceLevel floor = structure.findLevel(MarketPriceLevel.Type.RANGE_LOW);
+
+        assertThat(structure.getType()).as("предпосылка кейса — тип RANGE").isEqualTo(MarketStructure.Type.RANGE);
+        assertThat(ceiling.getDetectedAt())
+                .as("момент обнаружения — бар самого раннего пивота уровня")
+                .isEqualTo(barAt(1));
+        assertThat(ceiling.getConfirmedAt())
+                .as("момент подтверждения — второе касание, известное на баре после своего пивота")
+                .isEqualTo(barAt(4));
+        assertThat(floor.getDetectedAt()).isEqualTo(barAt(2));
+        assertThat(floor.getConfirmedAt()).isEqualTo(barAt(5));
+        assertThat(List.of(ceiling.getDetectedAt(), ceiling.getConfirmedAt(),
+                floor.getDetectedAt(), floor.getConfirmedAt()))
+                .as("концу окна тождественно не равен ни один из моментов")
+                .doesNotContain(structure.getWindowEndAt());
+    }
+
+    /**
+     * Касаний у границы меньше требуемого — подтверждения нет, и момент
+     * подтверждения остаётся пустым, а не встаёт концом окна. Клетка
+     * добрана находкой `M-4`: без неё пустота момента у неподтверждённой
+     * границы не наблюдалась бы ни одной клеткой.
+     */
+    @Test
+    @DisplayName("U13.9 — у сопротивления тренда касание одно при требуемых двух: найдено на баре 7, подтверждения нет")
+    void u13_9_anUnconfirmedBoundaryHasNoConfirmationMoment() {
         MarketStructure structure = resolve(monotoneUptrendWindow(), "0.9", withThreshold("0.3"));
         MarketPriceLevel resistance = structure.findLevel(MarketPriceLevel.Type.RESISTANCE);
 
-        assertThat(resistance.getDetectedAt())
-                .as("момент обнаружения — бар пивота, образовавшего уровень")
-                .isNotEqualTo(structure.getWindowEndAt());
+        assertThat(resistance.getDetectedAt()).isEqualTo(barAt(7));
         assertThat(resistance.getConfirmedAt())
-                .as("момент подтверждения — бар требуемого касания")
-                .isNotEqualTo(structure.getWindowEndAt());
+                .as("требуемое число касаний не достигнуто — момента подтверждения нет")
+                .isNull();
     }
 
     /**

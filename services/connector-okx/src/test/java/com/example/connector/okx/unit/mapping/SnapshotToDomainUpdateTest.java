@@ -27,10 +27,6 @@ import org.junit.jupiter.api.Test;
  * у инструмента пустое поле снапшота <b>затирает</b> цель (стратегии
  * игнорирования нет); у материализации эпизода — <b>не затирает</b>,
  * потому что строка заводится первой ногой и наполняется второй.
- *
- * <p>Кейс {@code U22.9} в код не пошёл: дом и код называют разное —
- * `.claude/work/backlog.md` §«Четыре таблицы маппинга отрицают поле,
- * которое их модели несут».
  */
 class SnapshotToDomainUpdateTest {
 
@@ -203,6 +199,25 @@ class SnapshotToDomainUpdateTest {
         assertThat(position.getExternalFee()).isEqualByComparingTo("0");
         assertThat(position.getExternalFundingCost()).isEqualByComparingTo("0");
         assertThat(position.getExternalLiquidationPenalty()).isEqualByComparingTo("0");
+    }
+
+    /**
+     * Перенос по имени атрибутом границы; принадлежность записи инструменту
+     * проверена раньше, на разборе ответа, и переход её не повторяет.
+     */
+    @Test
+    @DisplayName("U22.9 — биржевое имя инструмента ложится на эпизод по имени")
+    void u22_9_theExchangeInstrumentNameLandsOnTheEpisode() {
+        Position position = closedEpisodeWithoutRecord();
+        PositionCloseResultExternalSnapshot snapshot = closeSnapshot();
+
+        assertThat(snapshot.getExternalInstrumentId()).isEqualTo(OkxFixture.INSTRUMENT);
+
+        positionMapper.materializeFromCloseSnapshot(snapshot, position);
+
+        assertThat(position.getExternalInstrumentId())
+                .as("U22.9: эпизод, снапшот закрытия с externalInstrumentId = %s", OkxFixture.INSTRUMENT)
+                .isEqualTo(OkxFixture.INSTRUMENT);
     }
 
     @Test

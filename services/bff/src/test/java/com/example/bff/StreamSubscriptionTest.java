@@ -44,6 +44,12 @@ class StreamSubscriptionTest {
     private static final String SUBJECT = "user-42";
     private static final String LAST_EVENT_ID_HEADER = "Last-Event-ID";
 
+    /**
+     * Имя параметра — слово провода, которое пишет в адрес браузерный
+     * клиент; пинится литералом, как и имя заголовка рядом.
+     */
+    private static final String LAST_EVENT_ID_PARAMETER = "lastEventId";
+
     @Autowired
     private WebApplicationContext context;
 
@@ -137,11 +143,65 @@ class StreamSubscriptionTest {
                 .doesNotContain("id:");
     }
 
+    /**
+     * Пересоздание подписки: позиция едет ПАРАМЕТРОМ адреса — браузерный
+     * {@code EventSource} заголовков не ставит, и другой формы у клиента
+     * нет.
+     */
+    @Test
+    @DisplayName("Позиция параметром адреса продолжает поток с неё")
+    void aPositionInTheAddressContinuesTheStream() throws Exception {
+        streamRegistry.publish(PerimeterSurfaceContext.TENANT, fact("e-address-1"));
+        streamRegistry.publish(PerimeterSurfaceContext.TENANT, fact("e-address-2"));
+
+        MvcResult result = openStream(null, "e-address-1");
+
+        assertThat(bodyOf(result))
+                .as("хвост после позиции из адреса переигрывается")
+                .contains("id:e-address-2")
+                .doesNotContain("id:e-address-1")
+                .doesNotContain(Constants.StreamRecords.GAP);
+    }
+
+    /**
+     * Обе формы сразу — так переподключается пересозданная подписка: адрес
+     * несёт позицию пересоздания, заголовок — последнее, что получила уже
+     * она. Старше заголовок; победи адрес — хвост начался бы со второй
+     * записи. Идентичности у клетки свои: окно тенанта контекст делит со
+     * всеми клетками класса, а хвост берётся от ПЕРВОГО совпадения.
+     */
+    @Test
+    @DisplayName("При обеих формах позицию задаёт непустой заголовок")
+    void theHeaderOutranksTheAddressWhenBothArePresent() throws Exception {
+        streamRegistry.publish(PerimeterSurfaceContext.TENANT, fact("e-both-1"));
+        streamRegistry.publish(PerimeterSurfaceContext.TENANT, fact("e-both-2"));
+        streamRegistry.publish(PerimeterSurfaceContext.TENANT, fact("e-both-3"));
+
+        MvcResult result = openStream("e-both-2", "e-both-1");
+
+        assertThat(bodyOf(result))
+                .as("хвост идёт от позиции заголовка, а не адреса")
+                .contains("id:e-both-3")
+                .doesNotContain("id:e-both-2")
+                .doesNotContain(Constants.StreamRecords.GAP);
+    }
+
     private MvcResult openStream(String lastEventId) throws Exception {
+        return openStream(lastEventId, null);
+    }
+
+    /**
+     * @param headerPosition  позиция заголовком; пусто — заголовка нет
+     * @param addressPosition позиция параметром адреса; пусто — параметра нет
+     */
+    private MvcResult openStream(String headerPosition, String addressPosition) throws Exception {
         MockHttpServletRequestBuilder call = get(STREAM_PATH)
                 .param("ticket", ticketService.issue(SUBJECT, PerimeterSurfaceContext.TENANT));
-        if (nonNull(lastEventId)) {
-            call = call.header(LAST_EVENT_ID_HEADER, lastEventId);
+        if (nonNull(headerPosition)) {
+            call = call.header(LAST_EVENT_ID_HEADER, headerPosition);
+        }
+        if (nonNull(addressPosition)) {
+            call = call.param(LAST_EVENT_ID_PARAMETER, addressPosition);
         }
         return mockMvc.perform(call).andExpect(request().asyncStarted()).andReturn();
     }

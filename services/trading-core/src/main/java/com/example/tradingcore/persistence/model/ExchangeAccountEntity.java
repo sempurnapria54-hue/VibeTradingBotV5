@@ -22,7 +22,7 @@ import org.hibernate.annotations.DynamicUpdate;
  * проекционные ({@code tenantInternalId}, {@code exchangeCode},
  * {@code label}, {@code contour}, {@code status}, {@code projectedAt})
  * пишет тик синка, торговые ({@code riskBase}, счётчики,
- * {@code safetyRung}) пишет торговый код ядра
+ * {@code observedPassAt}, {@code safetyRung}) пишет торговый код ядра
  * (docs/models/domain/core/ExchangeAccount.md §Персистентность).
  *
  * <p><b>Тенант назван внешней идентичностью:</b> числовой ключ базы
@@ -89,6 +89,14 @@ public class ExchangeAccountEntity extends AuditableEntity {
 
     @Column(name = "blind_pass_count", nullable = false)
     private Integer blindPassCount;
+
+    /**
+     * Момент начала последнего наблюдённого прохода проактивной детекции;
+     * пусто — наблюдения не было. Пишет только отметка прохода
+     * (docs/models/domain/core/ExchangeAccount.md §Персистентность).
+     */
+    @Column(name = "observed_pass_at")
+    private OffsetDateTime observedPassAt;
 
     /** Ступень лестницы реакций, стоящая на счёте (docs/rules/exchange-hold.md). */
     @Column(name = "safety_rung", nullable = false)

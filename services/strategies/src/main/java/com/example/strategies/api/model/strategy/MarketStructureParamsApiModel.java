@@ -12,8 +12,19 @@ import lombok.Setter;
 @Setter
 public class MarketStructureParamsApiModel {
 
-    @Positive
-    @Schema(description = "Глубина окна расчёта структуры, баров")
+    /**
+     * Глубина окна расчёта структуры.
+     *
+     * <p>Обязательность и положительность держит не аннотация, а
+     * {@code StrategyDefinitionValidator} кодами
+     * {@code STRATEGY_STRUCTURE_LOOKBACK_NOT_DECLARED} и
+     * {@code STRATEGY_STRUCTURE_LOOKBACK_NOT_POSITIVE}: реджект создания
+     * объявлен доком (docs/rules/strategy-validation.md), а Bean Validation
+     * отвечает до тела обработчика — с аннотацией именованный код был бы
+     * недостижим.
+     */
+    @Schema(description = "Глубина окна расчёта структуры, баров (> 0)",
+            requiredMode = Schema.RequiredMode.REQUIRED)
     private Integer lookbackBars;
 
     @Positive

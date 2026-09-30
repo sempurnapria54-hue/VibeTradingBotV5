@@ -40,6 +40,10 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+    # Подкаталог имени сервиса, а не корень локации: обход рекурсивный, и на
+    # общем classpath корень собрал бы цепочки всех сервисов
+    # (.claude/rules/codestyle.md §«Схема БД»).
+    locations: classpath:db/migration/auth
 
 platform:
   identity:

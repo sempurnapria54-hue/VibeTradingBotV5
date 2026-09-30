@@ -81,6 +81,7 @@ public class AccountingDetectors {
                 .rung(HoldRung.SOFT)
                 .code(Constants.Hold.SAFETY_RUNG_NOT_ENFORCED)
                 .instrument(instrument)
+                .externalObservation(scan.observedRowsOf(instrument.getExternalId()))
                 .hysteresisTicks(CONFIRMED_NEXT_TICK)
                 .journalOnly(true)
                 .build(), account);
@@ -107,6 +108,7 @@ public class AccountingDetectors {
                     .rung(HoldRung.SOFT)
                     .code(Constants.Hold.LOCAL_TERMINAL_ALIVE_ON_EXCHANGE)
                     .instrument(instrument)
+                    .externalObservation(scan.observedRowsOf(instrument.getExternalId()))
                     .subjectExternalId(clientId)
                     .hysteresisTicks(CONFIRMED_NEXT_TICK)
                     .journalOnly(true)
@@ -142,6 +144,7 @@ public class AccountingDetectors {
                 .rung(HoldRung.SOFT)
                 .code(Constants.Hold.INSTRUMENT_ORPHAN_ORDERS)
                 .instrument(instrument)
+                .externalObservation(scan.observedRowsOf(instrument.getExternalId()))
                 .hysteresisTicks(CONFIRMED_NEXT_TICK)
                 .journalOnly(false)
                 .build(), account);

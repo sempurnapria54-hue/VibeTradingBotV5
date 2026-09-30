@@ -8,8 +8,7 @@ import com.example.marketdata.mapping.CandleMapper;
 import com.example.marketdata.persistence.model.CandleEntity;
 import com.example.marketdata.persistence.repository.CandleRepository;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -24,11 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
  * свеча с уже присутствующим временем открытия в группе повторно не
  * вставляется (естественный ключ (группа, открытие бара)).
  *
- * <p><b>Вставка идёт {@code persist}, а не {@code save}.</b> Ключ у ряда
- * присвоенный, и {@code save} на присвоенном ключе означает для JPA
- * слияние — то есть select перед каждой вставкой. На бэкфилле, где
- * страницы идут сотнями, это удваивает число запросов ровно там, где их
- * и так много; новизна строк здесь уже установлена отбором выше.
+ * <p><b>Дедуп держит ключ {@code pk_candle}, а не отбор перед вставкой</b>
+ * (docs/rules/idempotency-via-unique.md): каждая свеча идёт безопасной
+ * вставкой {@code on conflict do nothing}. Отбор по окну остаётся, но как
+ * <b>отсечка объёма</b> — страница бэкфилла, целиком лежащая в ряду, не
+ * порождает ни одной вставки, — а не как механизм: при конкурентном
+ * писателе отбор и вставка не атомарны, и повтор, проскочивший отбор,
+ * поглощается ключом, а не роняет страницу.
  */
 @Service
 @RequiredArgsConstructor
@@ -36,14 +37,14 @@ public class CandleDataService {
 
     private final CandleRepository repository;
     private final CandleMapper mapper;
-
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final PointWriteAudit audit;
 
     /**
      * Сохраняет только новые свечи группы.
      *
-     * @return число фактически вставленных свечей.
+     * @return число фактически вставленных свечей — по ответу базы, а не по
+     *         отбору: свеча, которую отбор счёл новой, а ключ поглотил, в
+     *         счёт не входит.
      */
     @Transactional
     public Integer saveCandles(Long candleGroupId, List<Candle> candles) {
@@ -53,12 +54,20 @@ public class CandleDataService {
         long from = candles.stream().mapToLong(Candle::getOpenTimestamp).min().orElseThrow();
         long to = candles.stream().mapToLong(Candle::getOpenTimestamp).max().orElseThrow();
         Set<Long> existing = new HashSet<>(repository.findOpenTimestampsInRange(candleGroupId, from, to));
-        List<CandleEntity> toInsert = candles.stream()
+        List<CandleEntity> candidates = candles.stream()
                 .filter(candle -> isFalse(existing.contains(candle.getOpenTimestamp())))
                 .map(candle -> toEntity(candleGroupId, candle))
                 .collect(toList());
-        toInsert.forEach(entityManager::persist);
-        return toInsert.size();
+        OffsetDateTime writtenAt = audit.moment();
+        String writer = audit.writer();
+        int inserted = 0;
+        for (CandleEntity candidate : candidates) {
+            inserted += repository.insertIfAbsent(candidate.getCandleGroupId(), candidate.getOpenTimestamp(),
+                    candidate.getOpen(), candidate.getHigh(), candidate.getLow(), candidate.getClose(),
+                    candidate.getVolume(), candidate.getExternalCreatedAt(), candidate.getExternalModifiedAt(),
+                    writtenAt, writer);
+        }
+        return inserted;
     }
 
     @Transactional(readOnly = true)

@@ -7,6 +7,7 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,8 +26,9 @@ import lombok.Value;
  * контура»: резолв имени в наш инструмент погасил бы находку.
  *
  * <p><b>Полнота — свойство ПРОХОДА, а не отдельного вызова.</b> Отказ,
- * нарушающий контракт интеграции, поднимает биржевую ступень 2 сам и
- * сюда не доходит; здесь живёт класс, до которого граница не достаёт: два
+ * нарушающий контракт интеграции, сюда не доходит: его исход — биржевая
+ * ступень 2, и поднимает её ловец прохода у {@code AnomalyJob}. Здесь живёт
+ * класс, до которого граница не достаёт: два
  * среза из трёх получены, третий — нет. Такой проход не ложен, он
  * частичен, и на нём детекторы молчат.
  *
@@ -63,6 +65,21 @@ public class AnomalyScan {
 
     public List<AlgoOrder> algoOrdersOf(String externalInstrumentId) {
         return List.copyOf(emptyIfNull(emptyIfNull(algoOrders).get(externalInstrumentId)));
+    }
+
+    /**
+     * Строки среза по одному биржевому имени — внешний снимок находки,
+     * найденной по этому адресу (docs/models/domain/other/AnomalyReport.md
+     * §Структура). Позиции списком: признак «больше одной позиции» иначе
+     * пропал бы из снимка ровно того отчёта, который он вызвал.
+     */
+    public Map<String, Object> observedRowsOf(String externalInstrumentId) {
+        Map<String, Object> observed = new LinkedHashMap<>();
+        observed.put("instrumentExternalId", externalInstrumentId);
+        observed.put("positions", positionsOf(externalInstrumentId));
+        observed.put("pendingOrders", ordersOf(externalInstrumentId));
+        observed.put("pendingAlgoOrders", algoOrdersOf(externalInstrumentId));
+        return observed;
     }
 
     /** Биржевые имена инструментов, по которым срез несёт хоть что-то живое. */
