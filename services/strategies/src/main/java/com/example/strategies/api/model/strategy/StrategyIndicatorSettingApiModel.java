@@ -42,8 +42,14 @@ public class StrategyIndicatorSettingApiModel {
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String destiny;
 
-    @NotBlank
-    @Schema(description = "Срок свежести значения, ISO-8601 duration (например PT15M)",
+    /**
+     * Обязательность держит валидатор создания кодом
+     * {@code STRATEGY_MARKET_DATA_EXPIRATION_NOT_DECLARED}, а не аннотация:
+     * Bean Validation отвечает до тела обработчика, и именованный код с ней
+     * был бы недостижим (docs/rules/strategy-validation.md).
+     */
+    @Schema(description = "Срок свежести значения, ISO-8601 duration (например PT15M); обязателен — "
+            + "без него объявление в запрос рыночных данных не входит",
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String expirationDuration;
 }

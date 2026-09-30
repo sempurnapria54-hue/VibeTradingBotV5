@@ -110,8 +110,13 @@ public class StrategyWorkRunner {
     private ActionPlan plan(StrategyStep step, StrategyAction action, DealActionState state,
                             DealContext dealContext, DealTranche tranche) {
         ActionPlan plan = orchestrator.plan(step, action, state, dealContext, tranche);
-        if (isTrue(plan.hasCalculationError())) {
-            accountCalculationFailure(plan.getCalculationError(), dealContext, action, tranche);
+        if (isFalse(plan.hasCalculationError())) {
+            return plan;
+        }
+        CalculationError error = plan.getCalculationError();
+        Boolean rowFailed = accountCalculationFailure(error, dealContext, action, tranche);
+        if (isTrue(rowFailed) && CalculationErrorType.TEMPORARY.equals(error.getType())) {
+            return ActionPlan.calculationFailed(CalculationError.permanent(error.getCode(), error.getMessage()));
         }
         return plan;
     }
@@ -123,7 +128,14 @@ public class StrategyWorkRunner {
 
     /**
      * Учёт контролируемой ошибки расчёта на строке исполнения: временная —
-     * ожидание отката, постоянная — отказ строки.
+     * ожидание отката, постоянная — отказ строки. Ответ — ушла ли строка в
+     * отказ.
+     *
+     * <p><b>Временная ошибка с исчерпанным бюджетом дальше едет
+     * постоянной.</b> Её строка отказала так же, как у постоянной, и
+     * доиграть надобность больше некому; оставь её временной — диспозиция
+     * сочла бы отказ ожиданием, и защитный шаг потерялся бы молча
+     * (docs/components/models/CalculationError.md).
      *
      * <p><b>Отказ по стороне уровня в учёт не попадает вовсе.</b> Он есть
      * сработавший контроль, а не неудача исполнения: строка остаётся
@@ -135,16 +147,16 @@ public class StrategyWorkRunner {
      * политику по команде, которой не было, значило бы приписать отказу
      * чужой бюджет.
      */
-    private void accountCalculationFailure(CalculationError error, DealContext dealContext,
-                                           StrategyAction action, DealTranche tranche) {
+    private Boolean accountCalculationFailure(CalculationError error, DealContext dealContext,
+                                              StrategyAction action, DealTranche tranche) {
         if (STOP_LEVEL_NOT_ON_LOSS_SIDE_FOR_SIZING.equals(error.getCode())) {
             log.info("Calculation refused by control, step not executed actionKey={} code={}",
                     action.getKey(), error.getCode());
-            return;
+            return false;
         }
         DealActionState state = dealContext.actionState(action.getId(), tranche).orElse(null);
         if (isNull(state)) {
-            return;
+            return false;
         }
         Integer attemptCount = isNull(state.getAttemptCount()) ? 0 : state.getAttemptCount();
         state.setAttemptCount(attemptCount + 1);
@@ -156,6 +168,7 @@ public class StrategyWorkRunner {
         }
         state.setStatus(retry ? DealActionStateStatus.RETRY_PENDING : DealActionStateStatus.FAILED);
         dealActionStateDataService.save(state);
+        return isFalse(retry);
     }
 
     /**

@@ -1,0 +1,110 @@
+{
+  "subject": "candle-group-integrity",
+  "question": "Плотна ли группа свечей на своих фактических границах",
+  "home": "docs/models/domain/other/CandleGroup.md",
+  "operands": {
+    "actualFirstUtcMillis": "время открытия первой фактически загруженной свечи группы, UTC мс; пусто у группы без свечей",
+    "actualLastUtcMillis": "время открытия последней фактически загруженной свечи группы, UTC мс; пусто у группы без свечей",
+    "count": "поддерживаемое число свечей группы; пусто читается нулём",
+    "stepMillis": "длительность бара таймфрейма группы, мс",
+    "plannedFirstUtcMillis": "горизонт бэкфилла группы, UTC мс; в плотность не входит — дотягивание нижней границы до него есть забота BACKFILL"
+  },
+  "values": [
+    {
+      "name": "expectedCandleCount",
+      "note": "Ожидаемое число баров на фактических границах: обе границы включены, поэтому число шагов между ними плюс один. Границы — время открытия баров одной сетки таймфрейма, и их разность кратна длительности бара. Группа без границ ожидает ноль: пустая граница числом не подменяется, и формула на ней не вычисляется.",
+      "expr": "if(isNull(actualFirstUtcMillis) || isNull(actualLastUtcMillis), 0, (actualLastUtcMillis - actualFirstUtcMillis) / stepMillis + 1)"
+    },
+    {
+      "name": "candleGroupDense",
+      "note": "Предикат целостности группы: поддерживаемое число свечей равно ожидаемому. Сравнение — на равенство: дефицит ведёт в докачку дыр, избыток плотностью тоже не является. Меряется на фактических границах, горизонт бэкфилла в него не входит.",
+      "expr": "coalesce(count, 0) == expectedCandleCount"
+    }
+  ],
+  "examples": [
+    {
+      "case": "плотный ряд: свечей столько, сколько шагов между границами, плюс одна",
+      "state": {
+        "actualFirstUtcMillis": 600000,
+        "actualLastUtcMillis": 780000,
+        "count": 4,
+        "stepMillis": 60000,
+        "plannedFirstUtcMillis": null
+      },
+      "expect": {
+        "expectedCandleCount": 4,
+        "candleGroupDense": true
+      }
+    },
+    {
+      "case": "дыра внутри ряда: дефицит числа свечей — ряд не плотен",
+      "state": {
+        "actualFirstUtcMillis": 600000,
+        "actualLastUtcMillis": 780000,
+        "count": 3,
+        "stepMillis": 60000,
+        "plannedFirstUtcMillis": null
+      },
+      "expect": {
+        "expectedCandleCount": 4,
+        "candleGroupDense": false
+      }
+    },
+    {
+      "case": "одна свеча: границы совпадают, и ожидается ровно одна",
+      "state": {
+        "actualFirstUtcMillis": 600000,
+        "actualLastUtcMillis": 600000,
+        "count": 1,
+        "stepMillis": 60000,
+        "plannedFirstUtcMillis": null
+      },
+      "expect": {
+        "expectedCandleCount": 1,
+        "candleGroupDense": true
+      }
+    },
+    {
+      "case": "группа без свечей: площадка отдала пусто с первой страницы, границ нет, ожидается ноль — и ноль плотен",
+      "state": {
+        "actualFirstUtcMillis": null,
+        "actualLastUtcMillis": null,
+        "count": 0,
+        "stepMillis": 60000,
+        "plannedFirstUtcMillis": null
+      },
+      "expect": {
+        "expectedCandleCount": 0,
+        "candleGroupDense": true
+      }
+    },
+    {
+      "case": "длительность бара берётся из таймфрейма группы: у часового ряда те же три свечи на двух часах плотны",
+      "state": {
+        "actualFirstUtcMillis": 3600000,
+        "actualLastUtcMillis": 10800000,
+        "count": 3,
+        "stepMillis": 3600000,
+        "plannedFirstUtcMillis": null
+      },
+      "expect": {
+        "expectedCandleCount": 3,
+        "candleGroupDense": true
+      }
+    },
+    {
+      "case": "плотность меряется на фактических границах: недотянутый горизонт бэкфилла плотности не отнимает",
+      "state": {
+        "actualFirstUtcMillis": 600000,
+        "actualLastUtcMillis": 780000,
+        "count": 4,
+        "stepMillis": 60000,
+        "plannedFirstUtcMillis": 0
+      },
+      "expect": {
+        "expectedCandleCount": 4,
+        "candleGroupDense": true
+      }
+    }
+  ]
+}

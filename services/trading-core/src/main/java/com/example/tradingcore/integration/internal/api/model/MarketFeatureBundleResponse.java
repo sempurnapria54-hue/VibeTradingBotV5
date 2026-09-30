@@ -1,6 +1,7 @@
 package com.example.tradingcore.integration.internal.api.model;
 
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
+import java.math.BigDecimal;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -30,6 +31,12 @@ public class MarketFeatureBundleResponse {
 
     /** Предыдущие значения тех же идентичностей — вторая половина сравнений. */
     private Map<String, IndicatorValueResponse> previousIndicators;
+
+    /**
+     * Цены прошлой половины сравнения по нашему имени индикатора-пары —
+     * закрытие свечи его предыдущего значения; ключа нет — прошлого нет.
+     */
+    private Map<String, BigDecimal> previousPrices;
 
     /** Последние свежие структуры рынка по авторскому имени операнда. */
     private Map<String, MarketStructureResponse> structures;

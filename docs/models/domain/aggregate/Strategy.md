@@ -126,9 +126,13 @@ domain → persistence копии (`docs/models/mapping/Strategy.md`), а не �
 вычисляемая идентичность ради шаринга: шаринга настроек между
 стратегиями нет.
 
-Результат расчёта ссылается на свою настройку **одной типизированной
-FK**. Отсюда настройки хранятся строками, а не JSONB-листьями: у листа
-нет цели для FK.
+Результат расчёта на настройку **не ссылается**: он ключуется
+идентичностью вычисления у владельца рыночных данных
+(`docs/models/domain/other/IndicatorValue.md`). Настройки хранятся
+строками, а не JSONB-листьями, потому что пара «стратегия, ключ» — операнд
+ключа уникальности, а у JSONB-листа нет цели для индекса-ключа
+(`docs/rules/persistence-representation.md`); на той же строке копия ядра
+держит выданную ей идентичность вычисления.
 
 Необъявленный ключ отвергается валидацией создания.
 
@@ -140,14 +144,40 @@ FK**. Отсюда настройки хранятся строками, а не
 свежести у настройки нет: фаза не персистится, её свежесть наследуется
 от входов, и устаревший вход даёт неизвестную фазу.
 
-**`StrategyIndicatorSetting`** — `{ key, indicatorType, params }`;
-параметры — JSONB на строке настройки. Подтип `params` читается по
-`indicatorType` той же настройки — и в базе, и на проводе (тело команды
-приёма, снимок в событии активации); второго тега внутри `params` нет
-(`docs/rules/persistence-representation.md` §«Полиморфный JSONB»).
+**`StrategyIndicatorSetting`** — объявление индикатора в каталоге.
 
-**`StrategyMarketStructureSetting`** — то же для структуры рынка; её
-параметры несут в том числе буфер и подтверждение пробоя.
+| Поле | Тип | Назначение |
+|---|---|---|
+| `id` | `Long` | Технический идентификатор. |
+| `key` | `String` | Ключ адресации в каталоге; уникален в пределах стратегии. По нему ссылается индикаторный операнд условия. |
+| `indicatorType` | `IndicatorValue.Type` | Тип индикатора; дискриминатор подтипа `params`. |
+| `params` | `IndicatorParams` | Параметры расчёта: таймфрейм, переопределение прогрева, параметры типа. JSONB на строке настройки. |
+| `destiny` | `Destiny` | Назначение результата внутри стратегии. Обязательно на создании; ни одна тропа расчёта, оценки или преконтроля поле не читает. |
+| `expirationDuration` | `Duration` | Срок свежести значения для этого объявления; едет операндом чтения к владельцу рыночных данных (`docs/components/MarketDataExpirationChecker.md`). Обязательно на создании (`docs/rules/strategy-validation.md`); **пусто на чтении — объявление не читается вовсе**: операнд недоступен, и предикат на нём консервативно ложен, — срок за автора не подставляется (`docs/rules/absent-value-semantics.md`). |
+| `computationConfigInternalId` | `String` | Идентичность вычисления у владельца рыночных данных; живёт только у копии ядра, пишет её тик объявления потребности — колонка названа в персистентности этого дока. Пусто — потребность ещё не объявлена, значения по объявлению не читаются. |
+
+Подтип `params` читается по `indicatorType` той же настройки — и в базе, и
+на проводе (тело команды приёма, снимок в событии активации); второго тега
+внутри `params` нет (`docs/rules/persistence-representation.md`).
+
+**`StrategyMarketStructureSetting`** — объявление расчёта структуры рынка
+в каталоге.
+
+| Поле | Тип | Назначение |
+|---|---|---|
+| `id` | `Long` | Технический идентификатор. |
+| `key` | `String` | Ключ адресации в каталоге; уникален в пределах стратегии. По нему ссылается операнд структуры. |
+| `timeframe` | `TimeFrame` | Таймфрейм серии, по которой считается структура. |
+| `efficiencyRatioKey` | `String` | Ключ индикатора `EFFICIENCY_RATIO` каталога — готовый вход резолвера; пусто — резолвер считает внутренний прокси. Смысл входа — `docs/models/domain/other/MarketStructure.md`. |
+| `atrKey` | `String` | Ключ индикатора `ATR` каталога — вход толеранса кластеризации уровней; пусто — толеранс долей цены. Смысл входа — там же. |
+| `params` | `MarketStructureParams` | Параметры расчёта структуры, в том числе буфер и подтверждение пробоя. |
+| `destiny` | `Destiny` | То же, что у индикатора. |
+| `expirationDuration` | `Duration` | То же, что у индикатора, включая исход пустого значения. |
+| `computationConfigInternalId` | `String` | То же, что у индикатора. |
+
+`Destiny` — `MARKET_PHASE` (классификация фазы), `ENTRY_CONDITION`
+(условие входа), `ACTION_PRICE` (расчёт цены действия), `PROTECTION`
+(уровень защиты и его перенос), `EXIT_CONDITION` (условие выхода).
 
 Контракт авторинга — `docs/rules/strategy-condition-contract.md`.
 
@@ -164,7 +194,7 @@ FK**. Отсюда настройки хранятся строками, а не
 | `cumulativeRiskPerDealMultiplier` | `BigDecimal` | Множитель кумулятивного потолка сделки. |
 | `strategySimultaneousRiskPerDealPercent` | `BigDecimal` | Максимум одновременного риска, который стратегия допускает под ударом на одной сделке. |
 | `strategyCatastrophicRiskPerDealMultiplier` | `BigDecimal` | Множитель катастрофического потолка сделки; ограничен сверху конфигурацией, проверяется на создании. |
-| `targetRiskRewardRatio` | `BigDecimal` | Ориентир соотношения риска и прибыли. |
+| `targetRiskRewardRatio` | `BigDecimal` | Ориентир автора: на какое соотношение прибыли к риску рассчитана деталь. **Контролем не является и потребителя не имеет** — ни валидация создания, ни расчёт действия, ни преконтроль, ни отчётность его не читают; необязательно, умолчания нет. Совпадение с тем, что деталь фактически настраивает (дистанции тейка и стопа), не проверяется ничем. |
 | `tranches` | `List<StrategyTranche>` | **Объявленные транши**: что заводится и как ведётся каждый вход. |
 | `stepsByStatus` | `Map<Deal.Status, List<StrategyStep>>` | Шаги уровня **сделки**, сгруппированные по статусу агрегата. Поверхность узкая — см. ниже. |
 
@@ -298,10 +328,11 @@ FK**. Отсюда настройки хранятся строками, а не
 `MAIN_PROTECTION_EXISTS`, `PROFIT_PERCENTS_REACHED`,
 `LOSS_PERCENTS_REACHED`, `RANGE_BREAKOUT_CONFIRMED`, `TREND_CHANGED`,
 `MARKET_PHASE_IS`, `MARKET_STRUCTURE_IS`, `INDICATOR_COMPARE`,
-`PRICE_COMPARE`, `CROSSOVER`, `VOLUME_FILTER_PASSED`, `CANDLE_CLOSED`.
+`PRICE_COMPARE`, `CROSSOVER`, `VOLUME_FILTER_PASSED`.
 
 Когда именованный тип оправдан, а когда это алиас —
-`docs/rules/condition-ruletype-granularity.md`.
+`docs/rules/condition-ruletype-granularity.md`; почему в перечне нет типа
+без читаемого операнда — `docs/rules/strategy-condition-contract.md`.
 
 **`StrategyConditionSourceType`** — `PRICE`, `INDICATOR`,
 `MARKET_PHASE`, `MARKET_STRUCTURE`, `POSITION`, `ORDER`, `ALGO_ORDER`,
@@ -422,7 +453,7 @@ runtime-сущность связывается строкой исполнен�
 
 | Поле | Что задаёт | Пусто означает |
 |---|---|---|
-| `baseType` | база цены: `RANGE_LOW` / `RANGE_HIGH` / `SWING_LOW` / `SWING_HIGH` / `SUPPORT` / `RESISTANCE` / `ENTRY_PRICE` / `MARKET_PRICE` | блок обязателен целиком: пустой `baseType` при объявленном блоке — отказ создания |
+| `baseType` | база цены: `RANGE_LOW` / `RANGE_HIGH` / `SWING_LOW` / `SWING_HIGH` / `SUPPORT` / `RESISTANCE` / `ENTRY_PRICE` / `MARKET_PRICE`; чем резолвится каждая — дом расчёта цены (`docs/components/PriceCalculator.md`) | блок обязателен целиком: пустой `baseType` при объявленном блоке — отказ создания |
 | `priceSource` | источник рыночной цены; читается **только** при `baseType = MARKET_PRICE` | у прочих баз не объявляется |
 | `structureKey` | ключ настройки структуры рынка у структурных баз | у неструктурных баз не объявляется |
 | `offsetSide` | сторона смещения от базы: `ABOVE` / `BELOW` | смещения нет |
@@ -437,7 +468,8 @@ runtime-сущность связывается строкой исполнен�
 
 **Перечень источников рыночной цены — `StrategyPriceSource`:**
 `LAST_PRICE`, `MARK_PRICE`, `INDEX_PRICE`, `BEST_BID_PRICE`,
-`BEST_ASK_PRICE`, `MID_PRICE`.
+`BEST_ASK_PRICE`, `MID_PRICE`. Середина спреда — величина модели цены
+момента, и дом её формулы — `docs/components/models/MarketPriceData.md`.
 
 **`MARK_PRICE` и `INDEX_PRICE` отвергаются на создании, пока источник их
 не отдаёт.** Тикер источника несёт последнюю цену и лучшие бид/аск;

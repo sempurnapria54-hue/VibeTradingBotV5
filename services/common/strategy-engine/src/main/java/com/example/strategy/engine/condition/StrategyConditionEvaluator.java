@@ -59,6 +59,15 @@ import org.springframework.stereotype.Service;
  * реестр сделок пары, и приносит его сканер входа, а не проход сделки.
  * Молчаливой ложью такой тип не оборачивается.
  *
+ * <p><b>Прошлое индикатора оценка читает только у типов, названных
+ * перечнем {@link StrategyCondition#pastIndicatorKeys()}:</b> по нему гейт
+ * покрытия ищет предыдущие значения. Тип правила, начинающий читать
+ * раскладку предыдущих значений, пополняет перечень той же правкой;
+ * сверяет их проба {@code PastReadDeclarationTest}. Прошлое ЦЕНЫ
+ * пересечение читает раскладкой {@code previousPrices} по ключу
+ * индикатора-пары; его ключи называет перечень
+ * {@link StrategyCondition#pastPriceKeys()}, и сверяет их та же проба.
+ *
  * <p>Скалярная проекция многокомпонентных индикаторов (MACD→линия,
  * Stochastic→%K, Bollinger→%B) — деталь реализации.
  * См. docs/components/StrategyConditionEvaluator.md,
@@ -71,7 +80,10 @@ public class StrategyConditionEvaluator {
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     /**
-     * Условие истинно, когда истинны все его правила (пустое условие — истинно).
+     * Условие истинно, когда истинны все его правила; пустое условие — нет
+     * его, перечень пуст либо пустой ссылкой — истинно как нейтральный
+     * элемент конъюнкции, а авторской формой не бывает
+     * (docs/components/StrategyConditionEvaluator.md §Границы).
      * Правило, которое оценить нечем, — пустой элемент перечня, пустой тип
      * или оператор, неразбираемый литерал, несобранная раскладка, — ложно, а
      * не бросает (docs/components/StrategyConditionEvaluator.md §Границы).
@@ -92,7 +104,6 @@ public class StrategyConditionEvaluator {
             case CROSSOVER -> evaluateCrossover(rule, context);
             case MARKET_STRUCTURE_IS -> evaluateMarketStructureIs(rule, context);
             case RANGE_BREAKOUT_CONFIRMED -> evaluateRangeBreakout(rule, context);
-            case CANDLE_CLOSED -> true;
             case VOLUME_FILTER_PASSED -> evaluateVolumeFilter(rule, context);
             case MARKET_PHASE_IS -> evaluateMarketPhaseIs(rule, context);
             case TREND_CHANGED -> evaluateTrendChanged(context);
@@ -122,8 +133,8 @@ public class StrategyConditionEvaluator {
     private boolean evaluateCrossover(StrategyConditionRule rule, ConditionEvaluationContext context) {
         BigDecimal currentLeft = resolveScalar(rule.getLeftOperand(), context, true);
         BigDecimal currentRight = resolveScalar(rule.getRightOperand(), context, true);
-        BigDecimal previousLeft = resolveScalar(rule.getLeftOperand(), context, false);
-        BigDecimal previousRight = resolveScalar(rule.getRightOperand(), context, false);
+        BigDecimal previousLeft = resolvePrevious(rule.getLeftOperand(), rule.getRightOperand(), context);
+        BigDecimal previousRight = resolvePrevious(rule.getRightOperand(), rule.getLeftOperand(), context);
         if (isNull(rule.getOperator())
                 || isNull(currentLeft) || isNull(currentRight) || isNull(previousLeft) || isNull(previousRight)) {
             return false;
@@ -306,6 +317,32 @@ public class StrategyConditionEvaluator {
     private BigDecimal entryAnchor(ConditionEvaluationContext context) {
         Position position = context.getActivePosition();
         return isNull(position) ? null : position.getExternalAverageEntryPrice();
+    }
+
+    /**
+     * Значение операнда в ПРЕДЫДУЩЕЙ половине пересечения
+     * (docs/components/StrategyConditionEvaluator.md §«Вторая половина
+     * времени»).
+     *
+     * <p><b>У цены своего прошлого нет — его задаёт пара.</b> Прошлое цены —
+     * цена закрытия свечи, на которой посчитано предыдущее значение
+     * индикатора-ПАРЫ, и берётся оно по ключу пары: обе стороны прошлой
+     * половины сняты в один момент. Пара не индикатор — момента прошлого у
+     * цены нет, и операнд недоступен.
+     */
+    private BigDecimal resolvePrevious(StrategyConditionOperand operand, StrategyConditionOperand pair,
+                                       ConditionEvaluationContext context) {
+        if (isFalse(isOfSource(operand, StrategyConditionSourceType.PRICE))) {
+            return resolveScalar(operand, context, false);
+        }
+        if (isFalse(isOfSource(pair, StrategyConditionSourceType.INDICATOR)) || isNull(pair.getIndicatorKey())) {
+            return null;
+        }
+        return context.getPreviousPrices().get(pair.getIndicatorKey());
+    }
+
+    private Boolean isOfSource(StrategyConditionOperand operand, StrategyConditionSourceType sourceType) {
+        return nonNull(operand) && Objects.equals(operand.getSourceType(), sourceType);
     }
 
     private BigDecimal resolveScalar(StrategyConditionOperand operand, ConditionEvaluationContext context,

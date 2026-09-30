@@ -28,6 +28,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.StrategyMa
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.trade.indicator.EmaValue;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
+import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketPriceLevel;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.market.MarketFeatureService;
@@ -91,6 +92,28 @@ class MarketFeatureAssemblyTest {
 
         assertThat(evaluator.evaluate(crossedAbove(), context)).isTrue();
         assertThat(evaluator.evaluate(crossedAbove(), withoutPreviousValues(context))).isFalse();
+    }
+
+    /**
+     * Прошлое цены доезжает от ответа владельца до контекста оценки.
+     *
+     * <p>Пересечение цены с медленной средней: сейчас цена {@code 11} выше
+     * последнего значения {@code 10}, прежде закрытие {@code 9} было не выше
+     * предыдущего {@code 10}. Тот же ответ без раскладки предыдущих цен обязан
+     * дать ложь — иначе тест прошёл бы и на маппере, который её теряет.
+     */
+    @Test
+    void thePastPriceTravelsFromTheAnswerToTheEvaluationContext() {
+        MarketFeatureBundleResponse answer = crossingBundle();
+        answer.setMarketPriceData(prices("11"));
+        answer.setPreviousPrices(Map.of(SLOW, new BigDecimal("9")));
+        when(readClient.readFeatures(anyString(), any())).thenReturn(answer);
+
+        assertThat(evaluator.evaluate(priceCrossedAbove(), dealContext())).isTrue();
+
+        answer.setPreviousPrices(null);
+
+        assertThat(evaluator.evaluate(priceCrossedAbove(), dealContext())).isFalse();
     }
 
     /**
@@ -185,6 +208,37 @@ class MarketFeatureAssemblyTest {
 
         service.readForEvaluation(strategy(), detailReadingPrice(), instrument());
         assertThat(capturedRequest().getPriceRequired()).isTrue();
+    }
+
+    /** Контекст оценки прохода сделки на фичах, снятых для детали. */
+    private ConditionEvaluationContext dealContext() {
+        return DealContext.builder()
+                .deal(new Deal())
+                .marketFeatures(service.readForEvaluation(strategy(), detailReadingPrice(), instrument()))
+                .build()
+                .conditionContext(null);
+    }
+
+    private MarketPriceData prices(String lastPrice) {
+        MarketPriceData prices = new MarketPriceData();
+        prices.setExternalLastPrice(new BigDecimal(lastPrice));
+        return prices;
+    }
+
+    /** Условие «цена пересекла медленную среднюю снизу вверх». */
+    private StrategyCondition priceCrossedAbove() {
+        StrategyConditionOperand price = new StrategyConditionOperand();
+        price.setSourceType(StrategyConditionSourceType.PRICE);
+
+        StrategyConditionRule rule = new StrategyConditionRule();
+        rule.setRuleType(StrategyConditionRuleType.CROSSOVER);
+        rule.setOperator(StrategyConditionOperator.CROSSED_ABOVE);
+        rule.setLeftOperand(price);
+        rule.setRightOperand(indicatorOperand(SLOW));
+
+        StrategyCondition condition = new StrategyCondition();
+        condition.setRules(List.of(rule));
+        return condition;
     }
 
     private List<String> requestedIndicatorKeys() {

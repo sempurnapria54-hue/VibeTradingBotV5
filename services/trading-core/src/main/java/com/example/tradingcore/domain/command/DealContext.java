@@ -15,6 +15,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
+import com.example.tradingbot.domain.model.core.balance.Balance;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
@@ -22,6 +23,7 @@ import com.example.tradingbot.domain.model.other.DealCashFlow;
 import com.example.strategy.engine.condition.ConditionEvaluationContext;
 import com.example.tradingcore.domain.market.MarketFeatures;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -103,8 +105,8 @@ public class DealContext {
 
     /**
      * Последний снимок средств счёта. <b>Свежесть контекст не
-     * гарантирует</b> — её проверяет обработчик перед чувствительным к
-     * риску действием.
+     * гарантирует</b> — предикат свежести {@link #balanceFresh(Duration)}
+     * спрашивают обработчик предвходовой проверки и преконтроль.
      */
     BalanceContainer balanceContainer;
 
@@ -305,6 +307,45 @@ public class DealContext {
             return frozen;
         }
         return isNull(exchangeAccount) ? null : exchangeAccount.getRiskBase();
+    }
+
+    /**
+     * <b>Снимок средств счёта свеж</b>: он есть, и момент, на который
+     * площадка собрала сведения о счёте, лежит позже рубежа «сейчас минус
+     * толерантность» (docs/models/mapping/Balance.md). Момент последнего
+     * изменения остатка валюты базой свежести не служит: у счёта без
+     * движения средств он стоит на месте.
+     *
+     * <p>Читателей у предиката двое — предвходовая проверка транша, которая
+     * по нему заказывает добычу, и преконтроль, который по нему решает,
+     * мерить ли проверки средств, — и вторая копия разошлась бы с первой
+     * ровно там, где расхождение означает проверку по снимку, который
+     * обработчик счёл бы несвежим. Необъявленная толерантность — снимок
+     * несвеж: срок годности не измерен, а «возраст не ограничен» было бы
+     * благоприятным умолчанием (docs/rules/absent-value-semantics.md).
+     */
+    public Boolean balanceFresh(Duration tolerance) {
+        if (isNull(balanceContainer) || isNull(tolerance)) {
+            return false;
+        }
+        return balanceContainer.isFresherThan(OffsetDateTime.now(ZoneOffset.UTC).minus(tolerance));
+    }
+
+    /**
+     * Строка <b>расчётной валюты инструмента</b> в снимке средств счёта —
+     * единица остатков, в которой меряются проверки средств преконтроля
+     * (docs/models/domain/core/BalanceContainer.md). Пусто — снимка, валюты
+     * инструмента либо такой строки нет.
+     */
+    public Balance settlementBalance() {
+        if (isNull(balanceContainer) || isNull(instrument)) {
+            return null;
+        }
+        String currency = instrument.getExternalSettlementCurrency();
+        return emptyIfNull(balanceContainer.getBalances()).stream()
+                .filter(balance -> nonNull(currency) && Objects.equals(currency, balance.getExternalCurrency()))
+                .findFirst()
+                .orElse(null);
     }
 
     /**

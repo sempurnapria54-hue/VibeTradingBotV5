@@ -113,8 +113,8 @@
     },
     {
       "name": "trancheCloseReasonRank",
-      "note": "Ранг причины закрытия транша в закрытом перечне старшинства (1 — старшая). Порядок объявлен домом docs/lifecycles/Deal.md: EXTERNAL_CLOSE, RISK_CONTROL, STOP_LOSS, TIME_STOP, STRATEGY_EXIT, TAKE_PROFIT, ENTRY_CONDITION_EXPIRED. Значение вне перечня даёт 99 — оно не выигрывает никогда; у транша таких значений нет: EMERGENCY_CLOSE на транше не пишется, UNKNOWN тоже (docs/lifecycles/DealTranche.md).",
-      "expr": "if(closeReason == 'EXTERNAL_CLOSE', 1, if(closeReason == 'RISK_CONTROL', 2, if(closeReason == 'STOP_LOSS', 3, if(closeReason == 'TIME_STOP', 4, if(closeReason == 'STRATEGY_EXIT', 5, if(closeReason == 'TAKE_PROFIT', 6, if(closeReason == 'ENTRY_CONDITION_EXPIRED', 7, 99)))))))"
+      "note": "Ранг причины закрытия транша в закрытом перечне старшинства (1 — старшая). Порядок объявлен домом docs/lifecycles/Deal.md: EXTERNAL_CLOSE, RISK_CONTROL, STOP_LOSS, STRATEGY_EXIT, TAKE_PROFIT, ENTRY_CONDITION_EXPIRED. Значение вне перечня даёт 99 — оно не выигрывает никогда; у транша таких значений нет: EMERGENCY_CLOSE на транше не пишется, UNKNOWN тоже (docs/lifecycles/DealTranche.md).",
+      "expr": "if(closeReason == 'EXTERNAL_CLOSE', 1, if(closeReason == 'RISK_CONTROL', 2, if(closeReason == 'STOP_LOSS', 3, if(closeReason == 'STRATEGY_EXIT', 4, if(closeReason == 'TAKE_PROFIT', 5, if(closeReason == 'ENTRY_CONDITION_EXPIRED', 6, 99))))))"
     },
     {
       "name": "topTrancheReasonRank",
@@ -127,7 +127,7 @@
     {
       "name": "dealCloseReasonBySeniority",
       "note": "Причина закрытия сделки на маршрутах, где её дают транши: «все транши терминальны при состоявшемся входе» (ребро ACTIVE - EXIT_PENDING) и тропы закрытия без входа (ребро ACTIVE - CLOSED). Резолв детерминирован и операнда сверх причин траншей не требует: сделку объясняет самый далёкий от плана исход среди её траншей. Дом порядка — docs/lifecycles/Deal.md; перечень значений объявлен популяцией этой спеки.",
-      "expr": "if(topTrancheReasonRank == 1, 'EXTERNAL_CLOSE', if(topTrancheReasonRank == 2, 'RISK_CONTROL', if(topTrancheReasonRank == 3, 'STOP_LOSS', if(topTrancheReasonRank == 4, 'TIME_STOP', if(topTrancheReasonRank == 5, 'STRATEGY_EXIT', if(topTrancheReasonRank == 6, 'TAKE_PROFIT', if(topTrancheReasonRank == 7, 'ENTRY_CONDITION_EXPIRED', null)))))))"
+      "expr": "if(topTrancheReasonRank == 1, 'EXTERNAL_CLOSE', if(topTrancheReasonRank == 2, 'RISK_CONTROL', if(topTrancheReasonRank == 3, 'STOP_LOSS', if(topTrancheReasonRank == 4, 'STRATEGY_EXIT', if(topTrancheReasonRank == 5, 'TAKE_PROFIT', if(topTrancheReasonRank == 6, 'ENTRY_CONDITION_EXPIRED', null))))))"
     },
     {
       "name": "transitionAllowed",
@@ -307,7 +307,7 @@
         "dealCloseReasonBySeniority"
       ],
       "where": "in(to, 'EXIT_PENDING', 'CLOSED')",
-      "excludes": "примеры, не предъявляющие ребра, на котором резолв ПОТРЕБЛЯЕТСЯ. Резолв читают два ребра — ACTIVE → EXIT_PENDING (маршрут «все транши терминальны») и ACTIVE → CLOSED (тропы без входа); на прочих рёбрах причина либо уже стои́т, либо не пишется вовсе (docs/lifecycles/Deal.md §«Причина закрытия — писатель и момент»). Фильтр выражен операндом состояния и ни одного значения резолва из перечня не выводит: фальсифицирующее состояние (пустая причина на потребляющем ребре) фильтр ПРОПУСКАЕТ и предъявляется членом «null».",
+      "excludes": "примеры, чей целевой статус — не EXIT_PENDING и не CLOSED. Резолв потребляют только рёбра в эти два статуса — ACTIVE → EXIT_PENDING (маршрут «все транши терминальны») и ACTIVE → CLOSED (тропы без входа); на рёбрах в прочие статусы причина не пишется вовсе (docs/lifecycles/Deal.md §«Причина закрытия — писатель и момент»). Фильтр режет по ЦЕЛЕВОМУ статусу, а не по ребру: прочие рёбра в эти два статуса — EXIT_PENDING → CLOSED, где причина уже стои́т, и недостижимые — он пропускает, и это безвредно: член засчитывается только примером, ожидающим резолв, а такие примеры исходного статуса не называют. Фильтр выражен операндом состояния и ни одного значения резолва из перечня не выводит: фальсифицирующее состояние (пустая причина на потребляющем ребре) фильтр ПРОПУСКАЕТ и предъявляется членом «null».",
       "members": [
         {
           "member": [
@@ -322,11 +322,6 @@
         {
           "member": [
             "STOP_LOSS"
-          ]
-        },
-        {
-          "member": [
-            "TIME_STOP"
           ]
         },
         {
@@ -1647,7 +1642,7 @@
     },
     {
       "case": "решение обработчика уводит активную сделку в ошибочное состояние: причина закрытия на этом ребре не пишется",
-      "note": "Ребро ACTIVE → ERROR достижимо решением обработчика активной сделки (расхождение экспозиций, отказ транша) и перехватом петли (энфорсмент жёсткой ступени холда, контролируемое исключение). Обе тропы ведут в НЕтерминальный статус, поэтому итоговая бизнес-причина ещё не определена и не пишется; тропа перехвата обработчика не имеет вовсе (docs/processes/fsm-execution-layering.md), и назначать ей писателя было бы некому.",
+      "note": "Ребро ACTIVE → ERROR достижимо тремя тропами (docs/processes/fsm-execution-layering.md): решением обработчика активной сделки (расхождение экспозиций, отказ транша), энфорсментом жёсткой ступени холда и перехватом петли (контролируемое исключение, граница исполнения прохода). Все три ведут в НЕтерминальный статус, поэтому итоговая бизнес-причина ещё не определена и причина закрытия не пишется ни одной; тропа перехвата обработчика не имеет вовсе, и назначать ей писателя было бы некому. Энфорсмент писателя имеет — затребователя ступени, — но пишет он причину остановки, а не закрытия (docs/lifecycles/Deal.md).",
       "state": {
         "from": "ACTIVE",
         "to": "ERROR",
@@ -1751,7 +1746,7 @@
       }
     },
     {
-      "case": "старшинство: адверсный выход старше временного и планового",
+      "case": "старшинство: адверсный выход старше планового и прибыльного",
       "state": {
         "to": "EXIT_PENDING",
         "tranches": [
@@ -1769,7 +1764,7 @@
           },
           {
             "status": "CLOSED",
-            "closeReason": "TIME_STOP",
+            "closeReason": "STRATEGY_EXIT",
             "orders": [],
             "protections": []
           }
@@ -1777,29 +1772,6 @@
       },
       "expect": {
         "dealCloseReasonBySeniority": "STOP_LOSS"
-      }
-    },
-    {
-      "case": "старшинство: временной стоп старше планового выхода",
-      "state": {
-        "to": "EXIT_PENDING",
-        "tranches": [
-          {
-            "status": "CLOSED",
-            "closeReason": "STRATEGY_EXIT",
-            "orders": [],
-            "protections": []
-          },
-          {
-            "status": "CLOSED",
-            "closeReason": "TIME_STOP",
-            "orders": [],
-            "protections": []
-          }
-        ]
-      },
-      "expect": {
-        "dealCloseReasonBySeniority": "TIME_STOP"
       }
     },
     {
@@ -2094,6 +2066,30 @@
       },
       "expect": {
         "dealCloseReasonBySeniority": null
+      }
+    },
+    {
+      "case": "перечень траншей пуст: терминальность всех траншей истинна вакуумно, признаки живого риска ложны — штатный терминал держит охрана полноты графа, а не агрегаты",
+      "note": "Сделки без траншей домен не производит: пустой перечень есть недогрузка графа, и ложным graphComplete его делает непустота траншей (docs/spec/deal-context-load.json, tranchesPresent).",
+      "state": {
+        "from": "ACTIVE",
+        "to": "CLOSED",
+        "deal": {
+          "status": "ACTIVE"
+        },
+        "tranches": [],
+        "resultProfit": 10,
+        "resultProfitCurrency": "USDT",
+        "hadEntry": true,
+        "graphComplete": false
+      },
+      "expect": {
+        "allTranchesTerminal": true,
+        "anyLiveOrder": false,
+        "anyLiveProtection": false,
+        "anyTrancheHasLiveEntryLeg": false,
+        "riskProvenAbsent": false,
+        "transitionAllowed": false
       }
     }
   ]

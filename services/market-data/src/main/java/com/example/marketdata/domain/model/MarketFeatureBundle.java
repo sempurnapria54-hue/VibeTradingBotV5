@@ -4,6 +4,7 @@ import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
+import java.math.BigDecimal;
 import java.util.Map;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,6 +21,14 @@ import lombok.Getter;
  * только последнее, вычислил бы такое правило на пустом операнде и
  * получил бы ЛОЖЬ — то есть шаг стратегии не исполнился бы молча, без
  * отказа и без записи в журнале.
+ *
+ * <p><b>У цены прошлого своего нет — его задаёт индикатор-пара.</b>
+ * Пересечение цены с индикатором сравнивает и прошлую половину: предыдущее
+ * значение индикатора против закрытия свечи, на которой оно посчитано.
+ * Раскладка предыдущих цен поэтому ключуется именем индикатора, и обе
+ * стороны прошлой половины сняты в один момент
+ * (docs/components/StrategyConditionEvaluator.md §«Вторая половина
+ * времени»).
  *
  * <p><b>Свежестью гейтится только последнее значение.</b> Предыдущее —
  * направление, а не точка решения: гейтить его собственным сроком значило
@@ -41,6 +50,14 @@ public class MarketFeatureBundle {
 
     /** Предыдущие значения тех же идентичностей — вторая половина сравнений. */
     private final Map<String, IndicatorValue> previousIndicators;
+
+    /**
+     * Цены прошлой половины сравнения по авторскому имени индикатора:
+     * закрытие свечи, на которой посчитано его предыдущее значение. Ключа
+     * нет — предыдущего значения либо его свечи нет, либо цену читатель не
+     * спрашивал.
+     */
+    private final Map<String, BigDecimal> previousPrices;
 
     /** Последние свежие структуры рынка по авторскому имени операнда. */
     private final Map<String, MarketStructure> structures;

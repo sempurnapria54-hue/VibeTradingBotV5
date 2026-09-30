@@ -605,15 +605,13 @@ public class Deal extends Auditable {
             case EXTERNAL_CLOSE -> 1;
             case RISK_CONTROL -> 2;
             case STOP_LOSS -> 3;
-            case TIME_STOP -> 4;
-            case STRATEGY_EXIT -> 5;
-            case TAKE_PROFIT -> 6;
-            case ENTRY_CONDITION_EXPIRED -> 7;
+            case STRATEGY_EXIT -> 4;
+            case TAKE_PROFIT -> 5;
+            case ENTRY_CONDITION_EXPIRED -> 6;
             default -> 99;
         };
     }
 
-    /** Причина транша в перечне сделки; перечни пересекаются по этим семи значениям. */
     /**
      * Причина, которую НАСЛЕДУЕТ транш, закрытый каскадом сворачивания
      * сделки; пусто — наследовать нечего.
@@ -638,18 +636,17 @@ public class Deal extends Auditable {
             case STRATEGY_EXIT -> DealTranche.CloseReason.STRATEGY_EXIT;
             case TAKE_PROFIT -> DealTranche.CloseReason.TAKE_PROFIT;
             case STOP_LOSS -> DealTranche.CloseReason.STOP_LOSS;
-            case TIME_STOP -> DealTranche.CloseReason.TIME_STOP;
             case RISK_CONTROL -> DealTranche.CloseReason.RISK_CONTROL;
             case EMERGENCY_CLOSE -> null;
         };
     }
 
+    /** Причина транша в перечне сделки; перечни пересекаются по этим шести значениям. */
     private static CloseReason toDealReason(DealTranche.CloseReason reason) {
         return switch (reason) {
             case EXTERNAL_CLOSE -> CloseReason.EXTERNAL_CLOSE;
             case RISK_CONTROL -> CloseReason.RISK_CONTROL;
             case STOP_LOSS -> CloseReason.STOP_LOSS;
-            case TIME_STOP -> CloseReason.TIME_STOP;
             case STRATEGY_EXIT -> CloseReason.STRATEGY_EXIT;
             case TAKE_PROFIT -> CloseReason.TAKE_PROFIT;
             case ENTRY_CONDITION_EXPIRED -> CloseReason.ENTRY_CONDITION_EXPIRED;
@@ -809,9 +806,6 @@ public class Deal extends Auditable {
 
         /** Stop-loss (включая fixed и trailing; механизм — в Order/AlgoOrder/DealActionState/audit). */
         STOP_LOSS,
-
-        /** Time stop. */
-        TIME_STOP,
 
         /** Штатное risk-control завершение (включая risk-block в PRECHECK). */
         RISK_CONTROL,

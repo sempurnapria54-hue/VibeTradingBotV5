@@ -2,6 +2,9 @@ package com.example.marketdata.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -269,6 +272,44 @@ class FeatureReadBoxTest extends SharedMarketDataBox {
         assertThat(answer.nested("structures")).isEmpty();
         assertThat(answer.asObject().get("marketPriceData")).isNull();
         assertThat(answer.asObject().get("marketPhase")).isNull();
+    }
+
+    @Test
+    @DisplayName("B6.15 — прошлое цены — закрытие свечи предыдущего значения, и только когда цену спрашивают")
+    void b6_15_thePreviousPriceIsTheCloseOfThePreviousValueCandle() {
+        Series series = series();
+        connector.answers(ConnectorStub.pricesOf(INSTRUMENT), Feed.prices(INSTRUMENT, "50500"));
+
+        Answer silent = post(features(series.instrument()), Bodies.featureRead(
+                Bodies.array(Bodies.binding(FAST, series.atr(), WIDE)),
+                Bodies.array(), Boolean.FALSE));
+        Answer asking = post(features(series.instrument()), Bodies.featureRead(
+                Bodies.array(Bodies.binding(FAST, series.atr(), WIDE),
+                        Bodies.binding(SLOW, series.ema(), WIDE)),
+                Bodies.array(), Boolean.TRUE));
+
+        assertThat(silent.status()).isEqualTo(200);
+        assertThat(silent.nested("previousPrices")).isEmpty();
+        assertThat(asking.status()).isEqualTo(200);
+        assertThat(asking.nested("previousPrices")).containsOnlyKeys(FAST, SLOW);
+        assertThat(new BigDecimal(String.valueOf(asking.nested("previousPrices").get(FAST))))
+                .isEqualByComparingTo(closeOfPreviousValueCandle(series.atr()));
+    }
+
+    /**
+     * Закрытие свечи, на которой посчитано ПРЕДЫДУЩЕЕ значение идентичности:
+     * второе по свежести значение ряда, его метка — открытие бара свечи.
+     * Ожидание читается у базы, а не у поверхности: ответ и есть предмет.
+     */
+    private BigDecimal closeOfPreviousValueCandle(String configInternalId) {
+        Object configId = rows.row("indicator_configs", "internal_id", configInternalId).get("id");
+        OffsetDateTime previous = rows.rowsWhere("indicator_values", "indicator_config_id", configId).stream()
+                .map(row -> (OffsetDateTime) row.get("candle_timestamp"))
+                .sorted(Comparator.reverseOrder())
+                .skip(1)
+                .findFirst()
+                .orElseThrow();
+        return (BigDecimal) rows.row("candles", "open_timestamp", previous.toInstant().toEpochMilli()).get("close");
     }
 
     /**

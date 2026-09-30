@@ -51,12 +51,16 @@ class DealLevelStepScopeTest {
         assertThat(matching(violations(reference()), OUT_OF_SCOPE)).isEmpty();
     }
 
+    /**
+     * Шаг объявлен под активной сделкой: под иным статусом сделки шаги не
+     * отбираются, и клетка мерила бы отказ статуса, а не узость типа.
+     */
     @Test
     @DisplayName("U14.2 — шаг страховки на уровне сделки: второй допустимый тип")
     void u14_2_theFailSafeStepIsTheSecondAllowedType() {
         CreateStrategyApiRequest request = reference();
-        dealStepsByStatus(bull(request)).put("EXIT_PENDING",
-                List.of(newStep("FAIL_SAFE", newPositionAction("deal_fail_safe"))));
+        dealStepsByStatus(bull(request)).get("ACTIVE")
+                .add(newStep("FAIL_SAFE", newPositionAction("deal_fail_safe")));
 
         assertThat(violations(request)).isEmpty();
     }
@@ -174,12 +178,12 @@ class DealLevelStepScopeTest {
         CreateStrategyApiRequest request = reference();
         StrategyPositionActionApiModel position = newPositionAction("deal_fail_safe");
         position.setActionType("CREATE_ACTION");
-        dealStepsByStatus(bull(request)).put("EXIT_PENDING", List.of(newStep("FAIL_SAFE", position)));
+        dealStepsByStatus(bull(request)).get("ACTIVE").add(newStep("FAIL_SAFE", position));
 
         assertThat(violations(request))
                 .singleElement()
                 .asString()
-                .contains("details[0].stepsByStatus[EXIT_PENDING][0].actions[0] " + ACTION_OUT_OF_SCOPE)
+                .contains("details[0].stepsByStatus[ACTIVE][1].actions[0] " + ACTION_OUT_OF_SCOPE)
                 .endsWith("объявлено CREATE_ACTION");
     }
 

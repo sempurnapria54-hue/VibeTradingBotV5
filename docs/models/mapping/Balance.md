@@ -23,7 +23,7 @@ Raw DTO не выходит за пределы `IntegrationService` / adapter-l
 | Snapshot field | Семантика |
 |---|---|
 | `exchangeAccountId` | внутренний ключ строки биржевого счёта у ядра |
-| `externalUpdatedAt` | время обновления account snapshot |
+| `externalUpdatedAt` | момент, на который источник собрал сведения о счёте; база свежести снимка (`docs/models/domain/core/BalanceContainer.md`) |
 | `externalTotalEquity` | total equity аккаунта |
 | `externalAdjustedEquity` | adjusted / effective equity |
 | `externalAvailableEquity` | account-level available equity |
@@ -34,7 +34,7 @@ Raw DTO не выходит за пределы `IntegrationService` / adapter-l
 | Snapshot field | Семантика |
 |---|---|
 | `externalCurrency` | валюта (`USDT`) |
-| `externalUpdatedAt` | время обновления currency snapshot |
+| `externalUpdatedAt` | время последнего изменения остатка валюты; у счёта без движения средств стоит на месте и базой свежести не служит |
 | `externalEquity` | equity по валюте |
 | `externalCashBalance` | cash balance |
 | `externalAvailableBalance` | available balance |
@@ -64,14 +64,19 @@ snapshot полностью заменяет старый список currency 
   settle currency — controlled external/account error.
 - **Numeric:** числа приходят строками; обязательные парсятся в
   `BigDecimal`; пустая строка в обязательном поле недопустима;
-  отрицательные equity/cash/available/frozen запрещены, если не
-  разрешены явной policy.
-- **Project policy:** нет borrow/debt признаков (если borrow
-  запрещён); нет активных liability (торгуем только собственными
-  средствами); нет account-режима, конфликтующего с isolated-only
-  policy; settle currency соответствует инструменту. Validation-only
-  поля используются только внутри `IntegrationService`, в snapshot не
-  попадают.
+  отрицательные available/frozen запрещены. Отрицательные equity и
+  cash граница пропускает: это признак обязательства, и читает его
+  преконтроль ядра (ниже).
+- **Project policy:** нет account-режима, конфликтующего с
+  isolated-only policy; settle currency соответствует инструменту.
+  Validation-only поля используются только внутри `IntegrationService`,
+  в snapshot не попадают.
+- **Признаков заёмных средств граница не проверяет:** полей обязательств
+  (`liab`, `borrowFroz`, `interest` и соседних) сырой DTO не несёт.
+  Правило «только свои средства» (`docs/rules/trading-constraints.md`)
+  проверяет преконтроль ядра по той части, которую снимок выражает, —
+  отрицательному остатку либо капиталу строки расчётной валюты
+  (`docs/components/RiskValidator.md`).
 
 ### Error policy
 
@@ -81,10 +86,10 @@ snapshot полностью заменяет старый список currency 
   опасной аномалии.
 - **Invalid response / account invariant violation** (`code != "0"`,
   пустой/множественный `data`, нет settleCurrency, пустые
-  обязательные поля, числа не парсятся, borrow/debt признаки,
-  inconsistent response): controlled external/account error;
-  risk-creating action не выполняется; `RiskValidator` при
-  absent/stale/invalid возвращает `BLOCKED`; для active Deal возможен
+  обязательные поля, числа не парсятся, inconsistent response):
+  controlled external/account error; risk-creating action не
+  выполняется; свежий снимок без строки расчётной валюты преконтроль
+  отвергает (`docs/components/RiskValidator.md`); для active Deal возможен
   переход `Deal → ERROR` по FSM policy; для account-level safety
   problem возможен `ExchangeAccount.safetyRung = TRADE_BLOCKED` (ступень 2).
 - **Normal null contract не используется:** успешный refresh обязан
@@ -117,6 +122,12 @@ snapshot полностью заменяет старый список currency 
 | `details[*].cashBal` | `externalCashBalance` |
 | `details[*].availBal` | `externalAvailableBalance` |
 | `details[*].frozenBal` | `externalFrozenBalance` |
+
+**Два `uTime` ответа значат разное**, и потому снимок датируется полем
+счёта, а не строки валюты: `data[0].uTime` — момент сбора сведений о
+счёте, `details[*].uTime` — последнее изменение остатка валюты, у тихого
+счёта сколь угодно старое. Семантика и её офдок — инвентарь
+`docs/models/integrations/okx/BalanceOkxResponse.md`.
 
 Числовые поля в snapshot остаются строками, но уже провалидированы
 как parseable decimal. Список не маппимых полей — в

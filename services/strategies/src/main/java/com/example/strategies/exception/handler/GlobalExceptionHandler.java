@@ -52,17 +52,44 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    /** Отказы валидации и жизненного цикла несут свой статус и свой код. */
+    /** Пояснение негодного входа: текст ветви, у платформенного исключения своего текста наружу нет. */
+    private static final String INVALID_REQUEST_EXPLANATION =
+            "Вход вызова не принят: значение не разобрано прикладным кодом";
+
+    /**
+     * Отказы валидации и жизненного цикла несут свой статус и свой код.
+     *
+     * <p>Пояснение здесь — {@code reason}, то есть причина, которую бросающий
+     * задал ЯВНО, а не текст исключения: дом разрешает её наружу
+     * (docs/rules/error-handling-policy.md §«Пояснение отказа пишет наша
+     * сторона, а не платформа»). Подклассы контейнера, названные
+     * унаследованным обработчиком поимённо (отказ валидации параметров
+     * метода), сюда не доходят: резолвер выбирает ближайший класс.
+     */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorApiResponse> onResponseStatus(ResponseStatusException failure) {
         return response(HttpStatus.valueOf(failure.getStatusCode().value()),
                 "STRATEGY_REQUEST_REJECTED", failure.getReason());
     }
 
-    /** Негодный вход вызова: неизвестная идентичность, неразобранное значение перечня. */
+    /**
+     * Негодный вход вызова, распознанный прикладным кодом: неразобранное
+     * значение перечня, негодная строка числа либо момента.
+     *
+     * <p><b>Пояснение — постоянный текст ветви, а не текст исключения.</b>
+     * Класс платформенный: тот же {@code IllegalArgumentException} бросает
+     * разбор значения вне перечня, кладя в текст полное имя доменного класса,
+     * и автора текста обработчик по классу не различает
+     * (docs/rules/error-handling-policy.md §«Пояснение отказа пишет наша
+     * сторона, а не платформа»). Текст исключения уходит в лог — там его
+     * читает держатель.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorApiResponse> onIllegalArgument(IllegalArgumentException failure) {
-        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", failure.getMessage());
+    public ResponseEntity<ErrorApiResponse> onIllegalArgument(IllegalArgumentException failure,
+                                                              HttpServletRequest request) {
+        log.warn("Invalid request input operation={} {}: {}",
+                request.getMethod(), request.getRequestURI(), failure.getMessage());
+        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", INVALID_REQUEST_EXPLANATION);
     }
 
     /**

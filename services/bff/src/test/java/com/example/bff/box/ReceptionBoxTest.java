@@ -139,22 +139,28 @@ class ReceptionBoxTest extends SharedBffBox {
         }
     }
 
+    /**
+     * Пустой момент — признак «не добыт», а не повод подставить свой:
+     * клиент строит от момента нижнюю границу дочитывания после разрыва
+     * (docs/architecture/contracts.md, раздел «Живые данные в браузер»).
+     * Ожидание не пинит форму пустоты в JSON — отсутствие поля и
+     * {@code null} читаются одинаково.
+     */
     @Test
-    @DisplayName("B6.5 — Момента происшествия нет — периметр показывает момент раздачи")
-    void b6_5_withoutAnOccurrenceMomentThePerimeterShowsTheDeliveryMoment() {
+    @DisplayName("B6.5 — Момента происшествия нет — запись уходит без момента")
+    void b6_5_withoutAnOccurrenceMomentTheRecordGoesWithoutOne() {
         String tenant = "TE5";
         String ticket = ticketOf(tenant);
 
         try (Subscription stream = openedStreamOf(tenant, ticket, "e-b6-5-open")) {
-            OffsetDateTime before = OffsetDateTime.now();
             wire.publish(Wire.CORE_TOPIC, tenant, envelope("e-b6-5", FACT, null), Bodies.dealOpened("D-e-b6-5"));
             stream.awaitFrames(2);
-            OffsetDateTime after = OffsetDateTime.now();
 
             Subscription.Frame frame = stream.frames().get(1);
             assertThat(frame.id()).isEqualTo("e-b6-5");
-            assertThat(OffsetDateTime.parse(String.valueOf(frame.content().get("occurredAt"))).toInstant())
-                    .isBetween(before.toInstant(), after.toInstant());
+            assertThat(frame.type()).isEqualTo(FACT);
+            assertThat(frame.content().get("occurredAt")).as("момент не подставлен").isNull();
+            assertThat(frame.data()).contains("D-e-b6-5");
         }
     }
 

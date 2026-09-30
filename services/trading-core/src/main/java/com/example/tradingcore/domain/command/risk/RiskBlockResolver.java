@@ -63,6 +63,7 @@ public class RiskBlockResolver {
             RiskCheckCode.LEVERAGE_NOT_CONFIGURED,
             RiskCheckCode.BALANCE_NOT_ENOUGH,
             RiskCheckCode.RISK_CREATING_UNDER_COLLAPSE,
+            RiskCheckCode.INSTRUMENT_NOT_LIVE,
             RiskCheckCode.INSTRUMENT_SAFETY_HOLD);
 
     /** Стадии транша, на которых живой риск уже есть либо мог появиться. */

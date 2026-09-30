@@ -58,7 +58,9 @@ transaction.
   `REFRESH_BALANCE_COMMAND`/`IntegrationService`.
 - Controlled calculation errors → `CalculationError` (суб-калькуляторы бросают
   `CalculationException`, `StrategyActionCalculator` перехватывает →
-  `ERROR`-результат; `TEMPORARY`→RETRY_PENDING / `PERMANENT`→FAILED→Deal ERROR,
+  `ERROR`-результат; `TEMPORARY`→RETRY_PENDING, а по исчерпании бюджета —
+  как `PERMANENT`; `PERMANENT`→FAILED→Deal ERROR (какой код временный —
+  `docs/components/models/CalculationError.md`),
   **кроме отказа по стороне уровня** — он есть сработавший контроль и
   ведёт к неисполнению шага, а не к аварии
   (`docs/processes/risk-evaluation.md` — дом развязки исходов));

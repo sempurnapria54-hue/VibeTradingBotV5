@@ -65,11 +65,6 @@ spec:
             - name: http
               containerPort: 8080
           env:
-            - name: PLATFORM_ENVIRONMENT
-              valueFrom:
-                configMapKeyRef:
-                  name: environment-axes
-                  key: environment
             - name: OIDC_ISSUER_URI
               value: http://platform-identity-service:8080/realms/vibetrading
             - name: OIDC_TOKEN_URI

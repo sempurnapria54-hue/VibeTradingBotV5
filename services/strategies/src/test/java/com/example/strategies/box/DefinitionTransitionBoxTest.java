@@ -35,6 +35,9 @@ class DefinitionTransitionBoxTest extends SharedStrategiesBox {
     /** Реджект-код недопустимого ребра матрицы. */
     private static final String NOT_ALLOWED = "STRATEGY_TRANSITION_NOT_ALLOWED";
 
+    /** Реджект-код ненайденности определения, названного путём. */
+    private static final String NOT_FOUND = "STRATEGY_NOT_FOUND";
+
     @Test
     @DisplayName("B4.1 — Черновик деактивировать нельзя")
     void b4_1_aDraftCannotBeDeactivated() {
@@ -200,11 +203,13 @@ class DefinitionTransitionBoxTest extends SharedStrategiesBox {
         Answer absent = get(STRATEGIES + "/st-absent-b4-8", SECOND_TENANT);
 
         assertThat(foreign.carriesErrorDto()).isTrue();
+        assertThat(foreign.errorCode()).isEqualTo(REJECTED);
         assertThat(foreign.status())
                 .as("исход тот же, что у несуществующего: о чужой сущности поверхность не отвечает")
                 .isEqualTo(absent.status());
         assertThat(foreign.errorMessage())
                 .as("отказ ненайденности, а не отказ ребра: матрицы дело не дошло")
+                .contains(NOT_FOUND)
                 .doesNotContain(NOT_ALLOWED);
         assertThat(statusOf(internalId, TENANT)).isEqualTo("CREATED");
         assertThat(rows.count(OUTBOX_TABLE)).isEqualTo(eventsBefore);

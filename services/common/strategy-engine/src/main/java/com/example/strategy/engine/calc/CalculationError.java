@@ -31,7 +31,11 @@ public class CalculationError {
     /** Можно ли повторить расчёт позже без правки стратегии. */
     Boolean retryable;
 
-    /** Временная нехватка данных — повторяется бюджетом действия. */
+    /**
+     * Временная нехватка НАБЛЮДЕНИЯ — повторяется бюджетом действия; какие
+     * коды временны́ — docs/components/models/CalculationError.md §«Тип
+     * выводится из повода».
+     */
     public static CalculationError temporary(String code, String message) {
         return CalculationError.builder()
                 .code(code)
@@ -41,7 +45,7 @@ public class CalculationError {
                 .build();
     }
 
-    /** Постоянная невыразимость — действие исполнения не получает. */
+    /** Постоянная невыразимость либо вырожденная величина — действие исполнения не получает. */
     public static CalculationError permanent(String code, String message) {
         return CalculationError.builder()
                 .code(code)

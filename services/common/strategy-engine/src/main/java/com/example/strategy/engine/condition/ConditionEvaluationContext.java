@@ -17,7 +17,8 @@ import lombok.Getter;
 /**
  * Готовые данные для проверки StrategyCondition: значения индикаторов и
  * структуры по ключам настроек (latest + previous для slope/crossover),
- * текущая цена, время оценки и — в контексте сделки — её факты.
+ * текущая цена и её предыдущая половина, время оценки и — в контексте
+ * сделки — её факты.
  * Собирается потребителем из готовых результатов; evaluator по свечам
  * ничего не считает. Runtime-объект.
  * См. docs/components/StrategyConditionEvaluator.md.
@@ -58,6 +59,22 @@ public class ConditionEvaluationContext {
 
     /** Текущая рыночная цена для PRICE-операндов; null — недоступна. */
     private final BigDecimal price;
+
+    /**
+     * Цена ПРЕДЫДУЩЕЙ половины сравнения по авторскому имени индикатора
+     * (indicatorKey): цена закрытия свечи, на которой посчитано предыдущее
+     * значение этого индикатора (previousIndicators того же ключа); не
+     * собраны — пусто.
+     *
+     * <p><b>Ключ — индикатор, а не цена, и это несущее.</b> Обе стороны
+     * прошлой половины пересечения обязаны быть сняты в один момент, а
+     * момент задаёт серия свечей индикатора-пары: у цены своего таймфрейма
+     * нет, и один скаляр на несколько таймфреймов условия был бы прошлым
+     * не той свечи (docs/components/StrategyConditionEvaluator.md §«Вторая
+     * половина времени»).
+     */
+    @Builder.Default
+    private final Map<String, BigDecimal> previousPrices = emptyMap();
 
     /** Время оценки (UTC) — точка отсчёта TIME-операндов. */
     private final OffsetDateTime evaluationTime;

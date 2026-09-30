@@ -161,7 +161,7 @@ public class DealReconciliationCalculator {
      */
     private BigDecimal flowFeeComponent(DealCashFlow flow, boolean separateFeeGranularity) {
         if (isFeeCategory(flow.getCategory())) {
-            return zeroIfNull(flow.getAmount());
+            return requiredAmount(flow);
         }
         return separateFeeGranularity ? ZERO : zeroIfNull(flow.getExternalFee());
     }
@@ -171,7 +171,7 @@ public class DealReconciliationCalculator {
      * композицию независимой от гранулярности записи источника.
      */
     private BigDecimal flowAmountNetOfFee(DealCashFlow flow, boolean separateFeeGranularity) {
-        return zeroIfNull(flow.getAmount()).subtract(flowFeeComponent(flow, separateFeeGranularity));
+        return requiredAmount(flow).subtract(flowFeeComponent(flow, separateFeeGranularity));
     }
 
     /**
@@ -242,7 +242,7 @@ public class DealReconciliationCalculator {
     /** Валовой оборот — якорь относительного члена; обе стороны теста однородны по покрытию. */
     private BigDecimal grossTurnover(List<DealCashFlow> scope) {
         return scope.stream()
-                .map(flow -> zeroIfNull(flow.getAmount()).abs())
+                .map(flow -> requiredAmount(flow).abs())
                 .reduce(ZERO, BigDecimal::add);
     }
 
@@ -270,6 +270,26 @@ public class DealReconciliationCalculator {
                 .multiply(zeroIfNull(leg.getPlannedSizeContracts()))
                 .multiply(zeroIfNull(leg.getPlannedContractValue()))
                 .multiply(DealRiskNumbersService.filledShare(leg));
+    }
+
+    /**
+     * Сумма движения строки области сверки. Поле обязательное, и пустота его
+     * есть недобытый операнд, а не «вносить нечего»: прочтённая нулём, она
+     * вносила бы ноль в четыре слагаемых сразу — валовой оборот, комиссионную
+     * компоненту, сумму за вычетом компоненты и левую сторону пары, — и давала
+     * бы «сошлась» по неполным данным. Поэтому расчёт отказывает, как и
+     * исполнимая форма (docs/spec/pnl-reconciliation.json, пример «пустая
+     * сумма движения отказывает, а не читается нулём»): благоприятное
+     * умолчание запрещено (docs/rules/absent-value-semantics.md), а
+     * названного исключения у суммы движения нет. Обязательность колонки
+     * схемы остаётся второй охраной, а не единственной.
+     */
+    private BigDecimal requiredAmount(DealCashFlow flow) {
+        if (isNull(flow.getAmount())) {
+            throw new IllegalStateException("Cash flow amount is empty in the reconciliation scope: bill "
+                    + flow.getExternalBillId());
+        }
+        return flow.getAmount();
     }
 
     /** Пустое слагаемое вносит ноль — «вносить нечего», не «величина равна нулю». */

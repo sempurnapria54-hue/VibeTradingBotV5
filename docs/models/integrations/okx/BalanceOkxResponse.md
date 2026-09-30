@@ -19,7 +19,7 @@
       "details": [
         {
           "ccy": "USDT",
-          "uTime": "1769253296789",
+          "uTime": "1769228737644",
           "eq": "1023.45",
           "cashBal": "1023.45",
           "availBal": "900.00",
@@ -38,7 +38,7 @@
 
 | OKX field | Тип (raw) | Назначение |
 |---|---|---|
-| `uTime` | string (epoch millis) | Время обновления account snapshot. |
+| `uTime` | string (epoch millis) | Момент, на который площадка собрала сведения о счёте, — не время последнего изменения средств. Офдок: «Trading Account → WebSocket → Account channel», то же поле того же объекта — «The latest time to get account information»; «Trading Account → REST API → Get balance» — «Update time of account information», и пример ответа той же секции несёт его на часы позже `uTime` строки валюты. Наблюдением на demo не подтверждено. |
 | `totalEq` | string (decimal) | Total equity аккаунта. |
 | `adjEq` | string (decimal) | Adjusted / effective equity. |
 | `availEq` | string (decimal) | Account-level available equity. |
@@ -49,7 +49,7 @@
 | OKX field | Тип (raw) | Назначение |
 |---|---|---|
 | `ccy` | string | Валюта (например, `USDT`). |
-| `uTime` | string (epoch millis) | Время обновления currency snapshot. |
+| `uTime` | string (epoch millis) | Время последнего изменения остатка этой валюты: у счёта без движения средств стоит на месте. Офдок: «Get balance» — «Update time of currency balance information»; лог изменений 2021-04-16 — «balance update time of a certain currency». |
 | `eq` | string (decimal) | Equity по валюте. |
 | `cashBal` | string (decimal) | Cash balance по валюте. |
 | `availBal` | string (decimal) | Available balance по валюте. |

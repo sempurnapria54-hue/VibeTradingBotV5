@@ -23,6 +23,7 @@ import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.util.Constants;
 import java.math.BigDecimal;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -165,8 +166,8 @@ public class RefreshBalanceExecutor implements CommandExecutor {
             return null;
         }
         return container.getBalances().stream()
-                .filter(balance -> instrument.getExternalSettlementCurrency()
-                        .equals(balance.getExternalCurrency()))
+                .filter(balance -> Objects.equals(instrument.getExternalSettlementCurrency(),
+                        balance.getExternalCurrency()))
                 .findFirst()
                 .orElse(null);
     }

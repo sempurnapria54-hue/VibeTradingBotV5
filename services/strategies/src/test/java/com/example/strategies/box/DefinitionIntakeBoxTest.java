@@ -123,20 +123,29 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
         assertThat(rows.count(OUTBOX_TABLE)).isZero();
     }
 
+    /**
+     * Ожидание сравнивает два ответа друг с другом, а не с пиньнутым
+     * текстом: контрактно значимо, что тело чужой счёт от несуществующего
+     * не отличает (docs/architecture/contracts.md §«Контекст тенанта в
+     * вызове»). Несуществующий счёт — вторым вызовом того же кейса, чтобы
+     * оба ответа снимались с одного состояния поверхности.
+     */
     @Test
-    @DisplayName("B1.5 — Счёт чужого тенанта отвергается тем же кодом, но другой причиной")
-    void b1_5_anAccountOfAnotherTenantIsRejectedByTheSameCodeForAnotherReason() {
+    @DisplayName("B1.5 — Счёт чужого тенанта отвергается тем же исходом, что несуществующий")
+    void b1_5_anAccountOfAnotherTenantIsRejectedLikeAnAbsentOne() {
         peerResolvesEverything();
         peer.answers(PEER_PAIR_CHECKS, Feed.pairCheck(Boolean.TRUE, Boolean.FALSE, Boolean.TRUE));
+        Answer foreign = post(STRATEGIES, TENANT, Bodies.reference());
+        peer.answers(PEER_PAIR_CHECKS, Feed.pairCheck(Boolean.FALSE, Boolean.FALSE, Boolean.TRUE));
 
-        Answer answer = post(STRATEGIES, TENANT, Bodies.reference());
+        Answer absent = post(STRATEGIES, TENANT, Bodies.reference());
 
-        assertThat(answer.status()).isEqualTo(400);
-        assertThat(answer.errorCode()).isEqualTo(REJECTED);
-        assertThat(answer.errorMessage())
-                .as("код тот же, а текст причины иной — счёт принадлежит другому тенанту")
+        assertThat(foreign.status()).isEqualTo(400);
+        assertThat(foreign.errorCode()).isEqualTo(REJECTED);
+        assertThat(foreign.errorMessage())
                 .contains("STRATEGY_ACCOUNT_NOT_FOUND")
-                .contains("другому тенанту");
+                .as("тело не отвечает на вопрос о существовании чужой сущности")
+                .isEqualTo(absent.errorMessage());
         assertThat(rows.count(STRATEGIES_TABLE)).isZero();
     }
 

@@ -9,10 +9,8 @@ import com.example.strategy.engine.calc.PriceCalculator;
 import com.example.strategy.engine.calc.SizeCalculator;
 import com.example.strategy.engine.calc.StrategyActionCalculator;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;
-import com.example.tradingcore.config.EnvironmentProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -53,7 +51,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableAsync
 @EnableScheduling
 @SpringBootApplication
-@EnableConfigurationProperties(EnvironmentProperties.class)
 @Import({AccessDenialHandler.class, JwtDecoderAssemblyGuard.class, ActorProvider.class, JobExecutionGuard.class,
         ServiceClientConfig.class,
         StrategyConditionEvaluator.class, StrategyActionCalculator.class,

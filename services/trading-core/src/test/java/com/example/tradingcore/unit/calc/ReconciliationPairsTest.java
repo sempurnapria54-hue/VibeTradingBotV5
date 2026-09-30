@@ -12,6 +12,7 @@ import static com.example.tradingcore.unit.calc.CalcFixture.withFeeComponent;
 import static com.example.tradingcore.unit.calc.CalcFixture.withType;
 import static com.example.tradingcore.unit.calc.CalcFixture.workingTolerance;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.other.DealCashFlow;
@@ -215,19 +216,19 @@ class ReconciliationPairsTest {
     }
 
     @Test
-    @DisplayName("U4.13 — строка с пустой суммой вносит ноль: исход возвращается, а не отказывает")
-    void u4_13_anEmptyAmountIsReadAsZero() {
+    @DisplayName("U4.13 — строка с пустой суммой отказывает, а не читается нулём")
+    void u4_13_anEmptyAmountIsRefused() {
         Deal deal = enteredDeal(reconciledEpisode());
         List<DealCashFlow> flows = List.of(
                 flow(DealCashFlow.CashFlowCategory.REALIZED_PNL, "10"),
                 flow(DealCashFlow.CashFlowCategory.TRADE_FEE, "-1"),
                 flow(DealCashFlow.CashFlowCategory.REALIZED_PNL, ""));
 
-        assertThat(calculator.reconcile(context(deal, flows)))
-                .as("состояние недостижимо — колонка `amount` миграции V4 объявлена not null; "
-                        + "спека на нём ОТКАЗЫВАЕТ арифметикой, и ожидание взято по коду, "
-                        + "а расхождение предъявлено находкой F2 (Z10)")
-                .isEqualTo(Deal.ReconciliationStatus.MATCHED);
+        assertThatThrownBy(() -> calculator.reconcile(context(deal, flows)))
+                .as("состояние недостижимо — колонка `amount` базовой миграции V1 объявлена not null; "
+                        + "спека на нём ОТКАЗЫВАЕТ арифметикой, и код теперь отказывает тем же: "
+                        + "прочтённая нулём строка дала бы «сошлась» по неполным данным (Z10)")
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

@@ -7,7 +7,7 @@
     "graphComplete": "граф сделки предъявлен контекстом прохода целиком; значение берётся из дома-спеки docs/spec/deal-context-load.json, величина graphComplete — форма здесь не переписывается. Охрана СИММЕТРИЧНА охране результата (docs/spec/deal-result.json), терминала сделки (docs/spec/deal-lifecycle.json) и терминала транша (docs/spec/deal-tranche-lifecycle.json): второе слагаемое ценового результата — сумма по ЗАГРУЖЕННЫМ эпизодам, и на усечённой загрузке она выходит нулём молча, то есть счётчик мерил бы ИТОГ, а не ценовой результат — ровно на той тропе, ради которой предикат заморозки и стои́т на непустоте записанного числа",
     "fundingCost": "накопленное финансирование сделки — сумма Position.externalFundingCost по её эпизодам; знак нормализован, издержка положительна. Берётся из записи закрытия эпизода, а не из строк разбивки движений: FUNDING-строки разбивки сверяют то же число и в ценовой результат не входят. Приходит той же записью, что и net эпизода, поэтому своей ветви доступности не имеет: пусто ровно тогда, когда пуст итог",
     "dealTerminal": "терминал, которым закрылась сделка: CLOSED — штатный, EMERGENCY_CLOSED — аварийный; ERROR терминалом не является — сделка идёт дальше аварийной тропой",
-    "exchangeStatusBefore": "ExchangeAccount.safetyRung до применения исхода сделки; мягкая ступень — HOLD, сворачивание — TRADE_BLOCKED, прочие значения ступенью не являются",
+    "objectStatusBefore": "статус объекта блокировки до применения исхода сделки; объект здесь всегда счёт, и статус — ExchangeAccount.safetyRung; мягкая ступень — HOLD, сворачивание — TRADE_BLOCKED, прочие значения ступенью не являются",
     "consecutiveLossCountBefore": "ExchangeAccount.consecutiveLossCount до применения исхода сделки",
     "globalConsecutiveLossLimit": "globalConsecutiveLossLimit — сколько подряд убыточных сделок останавливает торговлю; умолчания нет"
   },
@@ -65,7 +65,7 @@
     {
       "name": "holdStandingBefore",
       "note": "Ступень стояла до исхода сделки — мягкая либо жёсткая, безразлично по какой причине поднятая.",
-      "expr": "in(exchangeStatusBefore, 'HOLD', 'TRADE_BLOCKED')"
+      "expr": "in(objectStatusBefore, 'HOLD', 'TRADE_BLOCKED')"
     },
     {
       "name": "holdStandingAfter",
@@ -81,7 +81,7 @@
         "resultProfit": -12.5,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 0,
         "globalConsecutiveLossLimit": 3
       },
@@ -99,7 +99,7 @@
         "resultProfit": -4.0,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -117,7 +117,7 @@
         "resultProfit": 0.01,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -135,7 +135,7 @@
         "resultProfit": 55.0,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "HOLD",
+        "objectStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 3,
         "globalConsecutiveLossLimit": 3
       },
@@ -154,7 +154,7 @@
         "resultProfit": -1.0,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "HOLD",
+        "objectStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 3,
         "globalConsecutiveLossLimit": 3
       },
@@ -172,7 +172,7 @@
         "resultProfit": -30.0,
         "fundingCost": 0,
         "dealTerminal": "EMERGENCY_CLOSED",
-        "exchangeStatusBefore": "HOLD",
+        "objectStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 1,
         "globalConsecutiveLossLimit": 3
       },
@@ -191,7 +191,7 @@
         "resultProfit": null,
         "fundingCost": null,
         "dealTerminal": "EMERGENCY_CLOSED",
-        "exchangeStatusBefore": "TRADE_BLOCKED",
+        "objectStatusBefore": "TRADE_BLOCKED",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -213,7 +213,7 @@
         "resultProfit": -5.0,
         "fundingCost": 0,
         "dealTerminal": "ERROR",
-        "exchangeStatusBefore": "HOLD",
+        "objectStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -233,7 +233,7 @@
         "resultProfit": 0,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "HOLD",
+        "objectStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -253,7 +253,7 @@
         "resultProfit": null,
         "fundingCost": null,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -273,7 +273,7 @@
         "resultProfit": null,
         "fundingCost": null,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "HOLD",
+        "objectStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 3,
         "globalConsecutiveLossLimit": 3
       },
@@ -291,7 +291,7 @@
         "resultProfit": -10,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "HOLD",
+        "objectStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 5,
         "globalConsecutiveLossLimit": null
       },
@@ -309,7 +309,7 @@
         "resultProfit": -0.5,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 0,
         "globalConsecutiveLossLimit": 1
       },
@@ -326,7 +326,7 @@
         "resultProfit": 2.0,
         "fundingCost": -29.7,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -346,7 +346,7 @@
         "resultProfit": -5.0,
         "fundingCost": 30.0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "HOLD",
+        "objectStatusBefore": "HOLD",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -366,7 +366,7 @@
         "resultProfit": -10.0,
         "fundingCost": 10.0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -387,7 +387,7 @@
         "resultProfit": -12.5,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 0,
         "globalConsecutiveLossLimit": 3
       },
@@ -403,7 +403,7 @@
         "resultProfit": -12.5,
         "fundingCost": 0,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 0,
         "globalConsecutiveLossLimit": 3
       },
@@ -420,7 +420,7 @@
         "resultProfit": -30.0,
         "fundingCost": 0,
         "dealTerminal": "EMERGENCY_CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -441,7 +441,7 @@
         "resultProfit": 5,
         "fundingCost": -12,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },
@@ -455,13 +455,13 @@
       }
     },
     {
-      "case": "тот же расклад на полном графе: carry-издержка съела ценовую прибыль, серия растёт и достигает предела",
+      "case": "тот же расклад на полном графе: carry-доход маскирует ценовой убыток при положительном итоге, серия растёт и достигает предела",
       "state": {
         "graphComplete": true,
         "resultProfit": 5,
         "fundingCost": -12,
         "dealTerminal": "CLOSED",
-        "exchangeStatusBefore": "ACTIVE",
+        "objectStatusBefore": "ACTIVE",
         "consecutiveLossCountBefore": 2,
         "globalConsecutiveLossLimit": 3
       },

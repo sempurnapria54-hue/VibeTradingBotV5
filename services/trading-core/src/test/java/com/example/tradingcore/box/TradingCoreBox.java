@@ -135,8 +135,8 @@ abstract class TradingCoreBox {
     /** Класс отказа «негодный вход вызова» единого error-DTO. */
     protected static final String INVALID_REQUEST = "INVALID_REQUEST";
 
-    /** Класс отказа «сосед по ярусу недоступен» единого error-DTO. */
-    protected static final String PEER_SERVICE_UNAVAILABLE = "PEER_SERVICE_UNAVAILABLE";
+    /** Класс отказа «сосед недоступен» единого error-DTO — слово, общее с периметром и `strategies`. */
+    protected static final String PEER_UNAVAILABLE = "PEER_UNAVAILABLE";
 
     /** Класс события, которым приезжает копия определения. */
     protected static final String STRATEGY_ACTIVATED = "STRATEGY_ACTIVATED";

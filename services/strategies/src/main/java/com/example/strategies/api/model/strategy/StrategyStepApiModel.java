@@ -19,8 +19,9 @@ public class StrategyStepApiModel {
     private String stepType;
 
     @Valid
-    @NotNull
-    @Schema(description = "Общее условие применимости пакета действий", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Общее условие применимости пакета действий; несёт хотя бы одно правило — "
+            + "непустоту проверяет валидатор с кодом STRATEGY_CONDITION_EMPTY, а не аннотация",
+            requiredMode = Schema.RequiredMode.REQUIRED)
     private StrategyConditionApiModel condition;
 
     @Valid

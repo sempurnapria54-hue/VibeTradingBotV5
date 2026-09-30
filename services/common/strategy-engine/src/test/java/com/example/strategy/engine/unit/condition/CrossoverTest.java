@@ -23,7 +23,6 @@ import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -40,6 +39,9 @@ import org.junit.jupiter.api.Test;
  * {@code ema_fast = 9}, {@code ema_slow = 10}; правило `CROSSOVER`, левый
  * операнд {@code ema_fast}, правый {@code ema_slow}, оператор
  * `CROSSED_ABOVE`.
+ *
+ * <p><b>Ценовой операнд своего прошлого не имеет</b> — его задаёт
+ * индикатор-пара (`U5.11`, `U5.13`-`U5.15`).
  *
  * <p><b>Границы у половин времени РАЗНЫЕ, и это предмет группы:</b>
  * прошлое сравнивается включающей границей (касание с последующим уходом
@@ -140,31 +142,51 @@ class CrossoverTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Дом
-     * объявляет любой источник допустимым на любой стороне
-     * (docs/models/domain/aggregate/Strategy.md §Условия), то есть форма
-     * «цена пересекла среднюю» грамматикой выразима и создание её
-     * пропускает. Предыдущей цены контекст не несёт ни одним полем, и
-     * пересечение с участием ценового операнда ложно при ЛЮБОМ входе.
-     * Красный прогон и есть предъявление находки `F-3`
-     * (`.claude/work/backlog.md` §«Кроссовер с ценовым операндом ложен
-     * всегда: предыдущей цены в контексте нет»).
+     * Цена пересекла среднюю снизу вверх: у цены своего прошлого нет, и его
+     * задаёт индикатор-пара — цена закрытия свечи, на которой посчитано
+     * предыдущее значение средней, приезжает раскладкой предыдущих цен по
+     * ключу средней (docs/components/StrategyConditionEvaluator.md
+     * §«Вторая половина времени»). Прежде предыдущей цены контекст не нёс
+     * ни одним полем, и пересечение с ценой было ложно при любом входе —
+     * находка `F-3` закрыта.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U5.11 — цена слева пересекла среднюю снизу вверх: истина (дом), код ложен при любом прошлом")
-    void u5_11_aPriceOperandCanNeverCross() {
-        StrategyCondition condition = crossover(price(StrategyPriceSource.LAST_PRICE), indicator(SLOW_KEY, null),
-                StrategyConditionOperator.CROSSED_ABOVE);
-        ConditionEvaluationContext context = base()
-                .price(new BigDecimal("100"))
-                .latestIndicators(indicators(SLOW_KEY, ema("90")))
-                .previousIndicators(indicators(SLOW_KEY, ema("110")))
-                .build();
-
-        assertThat(evaluator.evaluate(condition, context))
+    @DisplayName("U5.11 — цена слева: прошлое 105 ≤ 110, настоящее 100 > 90 — истина")
+    void u5_11_aPriceOperandCrossesAgainstThePastOfItsIndicatorPair() {
+        assertThat(evaluator.evaluate(priceCrossover(), priceContext("105")))
                 .as("цена была под средней и ушла над ней — пересечение состоялось")
                 .isTrue();
+    }
+
+    /** Пара к U5.11: цена была над средней и прежде — различает их ровно прошлая цена. */
+    @Test
+    @DisplayName("U5.13 — цена слева, прошлое 115 > 110 (уже была выше): ложь")
+    void u5_13_aPriceAlreadyAboveItsPairIsNotACrossing() {
+        assertThat(evaluator.evaluate(priceCrossover(), priceContext("115"))).isFalse();
+    }
+
+    /**
+     * Прошлое цены берётся по ключу ПАРЫ: у пересечения цены с константой
+     * пары-индикатора нет, и прошлого у цены нет, даже когда раскладка
+     * предыдущих цен собрана.
+     */
+    @Test
+    @DisplayName("U5.14 — цена против константы 95, раскладка предыдущих цен собрана: ложь — пары-индикатора нет")
+    void u5_14_aPriceAgainstAConstantHasNoPast() {
+        StrategyCondition condition = crossover(price(StrategyPriceSource.LAST_PRICE), number("95"),
+                StrategyConditionOperator.CROSSED_ABOVE);
+
+        assertThat(evaluator.evaluate(condition, priceContext("90"))).isFalse();
+    }
+
+    /** Цена справа: пара ищется с любой стороны правила — зеркальная форма U5.11. */
+    @Test
+    @DisplayName("U5.15 — цена справа, средняя слева ушла под цену: CROSSED_BELOW — истина")
+    void u5_15_aPriceOnTheRightFindsItsPairOnTheLeft() {
+        StrategyCondition condition = crossover(indicator(SLOW_KEY, null), price(StrategyPriceSource.LAST_PRICE),
+                StrategyConditionOperator.CROSSED_BELOW);
+
+        assertThat(evaluator.evaluate(condition, priceContext("105"))).isTrue();
     }
 
     /**
@@ -190,6 +212,24 @@ class CrossoverTest {
     private StrategyCondition crossover(StrategyConditionOperand left, StrategyConditionOperand right,
                                         StrategyConditionOperator operator) {
         return condition(rule(StrategyConditionRuleType.CROSSOVER, operator, left, right));
+    }
+
+    private StrategyCondition priceCrossover() {
+        return crossover(price(StrategyPriceSource.LAST_PRICE), indicator(SLOW_KEY, null),
+                StrategyConditionOperator.CROSSED_ABOVE);
+    }
+
+    /**
+     * Цена момента {@code 100}; средняя: последнее {@code 90}, предыдущее
+     * {@code 110}; предыдущая цена — названная, по ключу средней.
+     */
+    private ConditionEvaluationContext priceContext(String previousPrice) {
+        return base()
+                .price(new BigDecimal("100"))
+                .latestIndicators(indicators(SLOW_KEY, ema("90")))
+                .previousIndicators(indicators(SLOW_KEY, ema("110")))
+                .previousPrices(Map.of(SLOW_KEY, new BigDecimal(previousPrice)))
+                .build();
     }
 
     private ConditionEvaluationContext context(String currentFast, String previousFast) {

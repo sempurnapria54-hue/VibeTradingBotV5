@@ -38,9 +38,16 @@ import com.example.tradingbot.domain.model.aggregate.strategy.StrategyMarketData
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStep;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperator;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRule;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionSourceType;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.trade.indicator.EmaValue;
+import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
@@ -48,6 +55,8 @@ import com.example.tradingcore.domain.fsm.StepSelection;
 import com.example.tradingcore.domain.fsm.StrategyStepSelector;
 import com.example.tradingcore.domain.market.MarketFeatures;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +84,11 @@ import org.junit.jupiter.api.Test;
  * они закрывают пробел {@code G1} документа: третья ось дискриминатора
  * ветви, разрешимость уровня защиты сделки, до сих пор не была предъявлена
  * ни одной стороной.
+ *
+ * <p><b>Клетки {@code U24.17} и {@code U24.18} — прошлое цены в покрытии.</b>
+ * Пересечение цены с индикатором читает раскладку предыдущих цен по ключу
+ * индикатора-пары; гейт, её не меривший, пропускал бы такой шаг к оценке,
+ * где тот ложен из-за половины, которой не было.
  */
 class StepFreshnessGateTest {
 
@@ -290,7 +304,69 @@ class StepFreshnessGateTest {
         assertThat(selection.getStep().getId()).isEqualTo(2L);
     }
 
+    @Test
+    @DisplayName("U24.17 — пересечение цены с индикатором, прошлого цены нет: покрытия нет, гейт применяется")
+    void u24_17_aPriceCrossoverWithoutThePastPriceIsNotCovered() {
+        StrategyStep first = dataStep(priceCrossover(INDICATOR_KEY),
+                expiredSetting(MarketDataExpiredAction.WAIT, MarketDataExpiredAction.GRACEFUL_CLOSE));
+
+        StepSelection selection = selectTranche(contextOf(first, priceCrossoverFeatures(Map.of())));
+
+        assertThat(selection.getEscalation()).isEqualTo(MarketDataExpiredAction.GRACEFUL_CLOSE);
+    }
+
+    @Test
+    @DisplayName("U24.18 — тот же шаг, прошлое цены по ключу индикатора-пары есть: гейт не применяется")
+    void u24_18_aPriceCrossoverWithThePastPriceIsCovered() {
+        StrategyStep first = dataStep(priceCrossover(INDICATOR_KEY),
+                expiredSetting(MarketDataExpiredAction.WAIT, MarketDataExpiredAction.GRACEFUL_CLOSE));
+
+        StepSelection selection = selectTranche(contextOf(first,
+                priceCrossoverFeatures(Map.of(INDICATOR_KEY, new BigDecimal("99")))));
+
+        assertThat(selection.hasEscalation()).isFalse();
+        assertThat(selection.getStep().getId()).isEqualTo(1L);
+    }
+
     // --- сборка ------------------------------------------------------------
+
+    /** Условие «цена пересекла индикатор снизу вверх»: прошлое цены ключуется индикатором-парой. */
+    private StrategyCondition priceCrossover(String indicatorKey) {
+        StrategyConditionOperand price = new StrategyConditionOperand();
+        price.setSourceType(StrategyConditionSourceType.PRICE);
+        StrategyConditionOperand indicator = new StrategyConditionOperand();
+        indicator.setSourceType(StrategyConditionSourceType.INDICATOR);
+        indicator.setIndicatorKey(indicatorKey);
+        StrategyConditionRule rule = new StrategyConditionRule();
+        rule.setRuleType(StrategyConditionRuleType.CROSSOVER);
+        rule.setOperator(StrategyConditionOperator.CROSSED_ABOVE);
+        rule.setLeftOperand(price);
+        rule.setRightOperand(indicator);
+        return new StrategyCondition(new ArrayList<>(List.of(rule)));
+    }
+
+    /**
+     * Фичи, накрывающие пересечение цены с индикатором всем, кроме прошлого
+     * цены: цена момента, последнее и предыдущее значения индикатора есть, а
+     * раскладка предыдущих цен — названная входом.
+     */
+    private MarketFeatures priceCrossoverFeatures(Map<String, BigDecimal> previousPrices) {
+        MarketPriceData prices = new MarketPriceData();
+        prices.setExternalLastPrice(new BigDecimal("101"));
+        return MarketFeatures.builder()
+                .latestIndicators(Map.of(INDICATOR_KEY, ema("100")))
+                .previousIndicators(Map.of(INDICATOR_KEY, ema("100")))
+                .previousPrices(previousPrices)
+                .structures(Map.of())
+                .marketPriceData(prices)
+                .build();
+    }
+
+    private EmaValue ema(String value) {
+        EmaValue ema = new EmaValue();
+        ema.setEma(new BigDecimal(value));
+        return ema;
+    }
 
     private StepSelection selectTranche(DealContext context) {
         return selector.selectTrancheStep(context, context.getDeal().getTranches().getFirst());

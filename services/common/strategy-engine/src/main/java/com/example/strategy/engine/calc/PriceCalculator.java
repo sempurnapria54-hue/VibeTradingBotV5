@@ -45,8 +45,9 @@ import org.springframework.stereotype.Service;
  * <p><b>Якорь уровня — один на все уровни</b> (стоп любого способа, тейк,
  * активация трейлинга, безубыток), и ветвится он по наличию живого
  * эпизода, а не по роли действия: пока эпизода нет, факта себестоимости не
- * существует. Перечень потребителей якоря закрыт
- * (docs/spec/stop-distance.json, величина {@code entryAnchor}).
+ * существует. Форма якоря — docs/spec/stop-distance.json, величина
+ * {@code entryAnchor}; перечень его потребителей закрыт —
+ * docs/components/PriceCalculator.md §«Якорь уровня — один на все уровни».
  */
 @Service
 public class PriceCalculator {
@@ -193,7 +194,7 @@ public class PriceCalculator {
         InstrumentExternalRules rules = context.getInstrumentExternalRules();
         BigDecimal feeRate = isNull(rules) ? null : rules.takerFeeRate();
         if (isNull(feeRate)) {
-            throw error(FEE_RATE_UNAVAILABLE,
+            throw unobserved(FEE_RATE_UNAVAILABLE,
                     "Taker fee rate is not resolved: breakeven level is a function of it");
         }
         return feeRate;
@@ -251,7 +252,7 @@ public class PriceCalculator {
     private BigDecimal structureStop(StopLossSettings settings, boolean isLong, CalculationContext context) {
         MarketStructure structure = context.findMarketStructureByKey(settings.getStructureKey());
         if (isNull(structure)) {
-            throw error(MISSING_STRUCTURE, "Market structure not found for key " + settings.getStructureKey());
+            throw unobserved(MISSING_STRUCTURE, "Market structure not found for key " + settings.getStructureKey());
         }
         BigDecimal base = isLong
                 ? structureLevel(structure, MarketPriceLevel.Type.SWING_LOW, MarketPriceLevel.Type.RANGE_LOW)
@@ -267,7 +268,7 @@ public class PriceCalculator {
             level = structure.findLevel(fallback);
         }
         if (isNull(level) || isNull(level.getPrice())) {
-            throw error(MISSING_STRUCTURE, "Structure level not found: " + primary + "/" + fallback);
+            throw unobserved(MISSING_STRUCTURE, "Structure level not found: " + primary + "/" + fallback);
         }
         return level.getPrice();
     }
@@ -277,7 +278,7 @@ public class PriceCalculator {
         if (value instanceof AtrValue atr && nonNull(atr.getAtr())) {
             return atr.getAtr();
         }
-        throw error(MISSING_ATR, "ATR not available for key " + settings.getIndicatorKey());
+        throw unobserved(MISSING_ATR, "ATR not available for key " + settings.getIndicatorKey());
     }
 
     /** Применяет дистанцию к базе: защитный уровень — против прибыли, целевой — по прибыли. */
@@ -291,7 +292,7 @@ public class PriceCalculator {
         if (nonNull(priceData) && nonNull(priceData.getExternalLastPrice())) {
             return priceData.getExternalLastPrice();
         }
-        throw error(NO_REFERENCE_PRICE, "No market reference price available");
+        throw unobserved(NO_REFERENCE_PRICE, "No market reference price available");
     }
 
     /**
@@ -310,7 +311,7 @@ public class PriceCalculator {
         if (nonNull(position) && isTrue(position.hasLiveRisk())) {
             BigDecimal observed = position.getExternalAverageEntryPrice();
             if (isNull(observed)) {
-                throw error(ENTRY_ANCHOR_UNAVAILABLE,
+                throw unobserved(ENTRY_ANCHOR_UNAVAILABLE,
                         "Live episode has no observed average entry price: level anchor is empty");
             }
             return observed;
@@ -333,10 +334,9 @@ public class PriceCalculator {
     }
 
     /**
-     * База размещения ЗАЯВКИ, объявленной от цены входа, — не уровень
-     * защиты, и потому это не якорь уровня: перечень потребителей якоря
-     * закрыт (docs/spec/stop-distance.json). Здесь берётся факт, если он
-     * есть, иначе плановая цена.
+     * База размещения ЗАЯВКИ, объявленной от цены входа, — не якорь
+     * уровня. Порядок резолва и чем он расходится с якорем —
+     * docs/components/PriceCalculator.md §«База размещения от цены входа».
      */
     private BigDecimal entryReference(CalculationContext context) {
         Position position = context.getActivePosition();
@@ -360,7 +360,7 @@ public class PriceCalculator {
         }
         MarketStructure structure = context.findMarketStructureByKey(placement.getStructureKey());
         if (isNull(structure)) {
-            throw error(MISSING_STRUCTURE, "Market structure not found for key " + placement.getStructureKey());
+            throw unobserved(MISSING_STRUCTURE, "Market structure not found for key " + placement.getStructureKey());
         }
         return structureLevel(structure, toLevelType(baseType), toLevelType(baseType));
     }
@@ -375,7 +375,7 @@ public class PriceCalculator {
     private BigDecimal marketPriceBySource(StrategyPricePlacement placement, CalculationContext context) {
         MarketPriceData priceData = context.getMarketPriceData();
         if (isNull(priceData)) {
-            throw error(NO_REFERENCE_PRICE, "Market price snapshot is not available");
+            throw unobserved(NO_REFERENCE_PRICE, "Market price snapshot is not available");
         }
         BigDecimal resolved = switch (placement.getPriceSource()) {
             case BEST_BID_PRICE -> priceData.getExternalBidPrice();
@@ -386,11 +386,18 @@ public class PriceCalculator {
                     "Price source is not carried by the market price snapshot: " + placement.getPriceSource());
         };
         if (isNull(resolved)) {
-            throw error(NO_REFERENCE_PRICE, "Market price source unavailable: " + placement.getPriceSource());
+            throw unobserved(NO_REFERENCE_PRICE, "Market price source unavailable: " + placement.getPriceSource());
         }
         return resolved;
     }
 
+    /**
+     * Уровень структуры, который называет база размещения. Ветвь цены
+     * входа и рыночной цены недостижима по построению — обе базы
+     * резолвятся раньше, — и потому она не контролируемый отказ со своим
+     * кодом, а неожиданное исключение: код отказа несёт тип ошибки, и
+     * недостижимая ветвь приписала бы коду чужой повод.
+     */
     private MarketPriceLevel.Type toLevelType(StrategyPriceBaseType baseType) {
         return switch (baseType) {
             case RANGE_LOW -> MarketPriceLevel.Type.RANGE_LOW;
@@ -399,7 +406,7 @@ public class PriceCalculator {
             case SWING_HIGH -> MarketPriceLevel.Type.SWING_HIGH;
             case SUPPORT -> MarketPriceLevel.Type.SUPPORT;
             case RESISTANCE -> MarketPriceLevel.Type.RESISTANCE;
-            case ENTRY_PRICE, MARKET_PRICE -> throw error(MISSING_STRUCTURE,
+            case ENTRY_PRICE, MARKET_PRICE -> throw new IllegalStateException(
                     "Base type is not a structure level: " + baseType);
         };
     }
@@ -455,7 +462,19 @@ public class PriceCalculator {
         return price;
     }
 
+    /** Постоянный отказ: невыразимое объявление либо наблюдённая, но вырожденная величина. */
     private CalculationException error(String code, String message) {
         return new CalculationException(CalculationError.permanent(code, message));
+    }
+
+    /**
+     * Временный отказ: недостающая величина — наблюдение рынка либо площадки,
+     * которое производит чужой писатель своим тактом, и следующий проход
+     * может его застать. Тип — функция кода: какие коды временны́ и почему,
+     * держит docs/components/models/CalculationError.md §«Тип выводится из
+     * повода».
+     */
+    private CalculationException unobserved(String code, String message) {
+        return new CalculationException(CalculationError.temporary(code, message));
     }
 }

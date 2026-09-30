@@ -9,7 +9,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.strategy.engine.condition.StrategyConditionEvaluator;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
@@ -24,6 +26,7 @@ import com.example.tradingcore.domain.fsm.TrancheCascadeResult;
 import com.example.tradingcore.domain.fsm.TrancheEdge;
 import com.example.tradingcore.domain.fsm.deal.DealActiveHandler;
 import com.example.tradingcore.domain.safety.HoldSignal;
+import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,17 +48,45 @@ final class DealActiveHarness {
 
     private final TrancheCascade cascade = mock(TrancheCascade.class);
 
-    private final StrategyStepSelector stepSelector = mock(StrategyStepSelector.class);
-
     private final SystemActionExecutor systemActionExecutor = mock(SystemActionExecutor.class);
 
-    private final DealActiveHandler handler =
-            new DealActiveHandler(cascade, stepSelector, new DealTerminalGate(), systemActionExecutor);
+    private final StrategyStepSelector stepSelector;
+
+    private final AccountInstrumentStateDataService pairStateDataService;
+
+    private final DealActiveHandler handler;
 
     DealActiveHarness() {
-        when(cascade.run(any())).thenReturn(silentCascade());
+        this(mock(StrategyStepSelector.class), mock(AccountInstrumentStateDataService.class));
         when(stepSelector.selectDealStep(any())).thenReturn(StepSelection.none());
+    }
+
+    private DealActiveHarness(StrategyStepSelector stepSelector,
+                              AccountInstrumentStateDataService pairStateDataService) {
+        this.stepSelector = stepSelector;
+        this.pairStateDataService = pairStateDataService;
+        this.handler = new DealActiveHandler(cascade, stepSelector, new DealTerminalGate(), systemActionExecutor);
+        when(cascade.run(any())).thenReturn(silentCascade());
         when(systemActionExecutor.next(any(), any(), any())).thenReturn(Optional.empty());
+    }
+
+    /**
+     * Обработчик с НАСТОЯЩИМ отбором шага, чья граница строки пары отдаёт
+     * названную строку. Отбор — единственный коллаборатор обработчика, у
+     * которого вообще есть тропа к ступени пары (гейт повтора); других
+     * носителей ступени у прохода активной сделки нет. Интерпретатор
+     * условий подменён: предмет — ступень, а не истинность условия.
+     */
+    static DealActiveHarness withPairState(AccountInstrumentState pairState) {
+        AccountInstrumentStateDataService boundary = mock(AccountInstrumentStateDataService.class);
+        when(boundary.getRequiredByPair(any(), any())).thenReturn(pairState);
+        return new DealActiveHarness(
+                new StrategyStepSelector(mock(StrategyConditionEvaluator.class), boundary), boundary);
+    }
+
+    /** Граница строки пары — под отрицательные ожидания «не читается». */
+    AccountInstrumentStateDataService pairStateBoundary() {
+        return pairStateDataService;
     }
 
     /** Свод, который отдаёт каскад. */

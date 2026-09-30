@@ -8,10 +8,12 @@ import com.example.marketdata.mapping.CandleMapper;
 import com.example.marketdata.persistence.model.CandleEntity;
 import com.example.marketdata.persistence.repository.CandleRepository;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -102,6 +104,18 @@ public class CandleDataService {
                 .stream()
                 .map(mapper::persistenceToDomain)
                 .collect(toList());
+    }
+
+    /**
+     * Закрытие свечи, на которой посчитано значение идентичности индикатора
+     * у инструмента; пусто — такой свечи в ряду нет.
+     *
+     * @param openTimestamp открытие бара свечи — метка значения индикатора
+     */
+    @Transactional(readOnly = true)
+    public Optional<BigDecimal> findCloseOfIndicatorCandle(Long instrumentId, Long indicatorConfigId,
+                                                          Long openTimestamp) {
+        return repository.findCloseOfIndicatorCandle(instrumentId, indicatorConfigId, openTimestamp);
     }
 
     @Transactional(readOnly = true)

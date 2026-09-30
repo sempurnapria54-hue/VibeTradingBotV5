@@ -1,6 +1,7 @@
 package com.example.marketdata.api.model;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
@@ -30,6 +31,10 @@ public class MarketFeatureBundleApiResponse {
 
     @Schema(description = "Предыдущие значения тех же идентичностей — вторая половина сравнений")
     private Map<String, IndicatorValueApiResponse> previousIndicators;
+
+    @Schema(description = "Цены прошлой половины сравнения по авторскому имени индикатора — закрытие свечи, "
+            + "на которой посчитано его предыдущее значение; отдаются, только если цену спрашивают")
+    private Map<String, BigDecimal> previousPrices;
 
     @Schema(description = "Последние свежие структуры рынка по авторскому имени операнда")
     private Map<String, MarketStructureApiResponse> structures;

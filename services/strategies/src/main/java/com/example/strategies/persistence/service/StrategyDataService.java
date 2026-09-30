@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static java.util.stream.Collectors.toList;
 
+import com.example.strategies.exception.StrategyNotFoundException;
 import com.example.strategies.mapping.StrategyMapper;
 import com.example.strategies.persistence.model.StrategyActionEntity;
 import com.example.strategies.persistence.model.StrategyDetailEntity;
@@ -94,13 +95,20 @@ public class StrategyDataService {
     }
 
     /**
-     * Строка определения по идентичности; нет — негодный вход вызова:
-     * идентичность пришла снаружи.
+     * Строка определения по идентичности; нет — ненайденность определения.
+     *
+     * <p><b>Отказ — классом своего артефакта, а не платформенным.</b> Текст
+     * исключения платформенного класса наружу не идёт даже тогда, когда его
+     * бросил наш код (docs/rules/error-handling-policy.md §«Пояснение отказа
+     * пишет наша сторона, а не платформа»), и прежний
+     * {@code IllegalArgumentException} уходил бы вызывающему без реджект-кода.
+     * Тропа — переход статуса, и отказ у неё тот же, что у поиска определения
+     * в контексте тенанта: один класс на обе точки.
      */
     @Transactional(readOnly = true)
     public StrategyEntity getRequiredEntityByInternalId(String internalId) {
         return repository.findByInternalId(internalId)
-                .orElseThrow(() -> new IllegalArgumentException("Strategy not found: " + internalId));
+                .orElseThrow(() -> new StrategyNotFoundException(internalId));
     }
 
     /**

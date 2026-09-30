@@ -12,6 +12,7 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,14 +25,15 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Базовая сборка:</b> транш с коллекциями заявок и отдельных
  * условных заявок; у защит проставлены причины закрытия и типы условия; у
- * reduce-only ног — статус и причина налива.
+ * reduce-only ног — статус и причина налива; у отдельных защит, где клетка
+ * их сравнивает, — момент срабатывания на площадке и ключ строки.
  *
- * <p><b>Две клетки группы не прогоняются, и это не пропуск.</b> `U5.9`
- * (двусторонняя пара) и `U5.10` (пустой тип условия) ожидания не имеют:
- * дом перевода типа сработавшей защиты в причину выхода молчит, а
- * отображение и названное ограничение живут только в javadoc реализации
- * (находка `D-4`, звено `Z3`). Ожидание, взятое из реализации, ожиданием
- * не является.
+ * <p><b>Ожидания всех клеток группы — из дома</b>
+ * (docs/lifecycles/DealTranche.md §«Инициатор выхода транша читается по
+ * его фактам»): перевод типа условия, порядок носителей, двусторонняя пара
+ * (`U5.9`), пустой тип (`U5.10`) и выбор последней сработавшей среди
+ * нескольких отдельных (`U5.11`-`U5.13`). Звено `Z3` остаётся исполнителем,
+ * а не источником ожидания.
  */
 class TrancheExitInitiatorTest {
 
@@ -110,11 +112,87 @@ class TrancheExitInitiatorTest {
                 .isEqualTo(DealTranche.CloseReason.STOP_LOSS);
     }
 
+    /** Какая нога пары исполнилась, тип условия не говорит — ответ родовой. */
+    @Test
+    @DisplayName("U5.9 — сработавшая отдельная защита с типом двусторонней пары")
+    void u5_9_aTriggeredPairNamesStrategyExit() {
+        assertThat(withTriggeredStandalone(AlgoOrder.ConditionType.OCO_FULL).exitInitiatedReason())
+                .isEqualTo(DealTranche.CloseReason.STRATEGY_EXIT);
+    }
+
+    /**
+     * Защита без типа не называется инициатором и чтения не обрывает: ответ
+     * даёт следующий носитель — здесь налитая собственная reduce-only нога.
+     */
+    @Test
+    @DisplayName("U5.10 — у отдельной защиты тип условия пуст")
+    void u5_10_anUntypedTriggeredProtectionIsSkipped() {
+        AlgoOrder untyped = triggeredStandalone(1L, null, null);
+        DealTranche subject = trancheOf(trancheWithExposure("10"),
+                List.of(filledReduceOnly()), List.of(untyped));
+
+        assertThat(subject.exitInitiatedReason()).isEqualTo(DealTranche.CloseReason.STRATEGY_EXIT);
+    }
+
+    /**
+     * Частичный тейк сработал раньше, стоп — позже и добрал остаток: ответ
+     * даёт стоп в ОБОИХ порядках коллекции — выбирает модель, а не порядок,
+     * в котором сборщик графа разложил строки.
+     */
+    @Test
+    @DisplayName("U5.11 — две сработавшие отдельные защиты, моменты срабатывания различны")
+    void u5_11_theLastTriggeredAnswersWhateverTheCollectionOrder() {
+        AlgoOrder earlierTake = triggeredStandalone(2L, AlgoOrder.ConditionType.PARTIAL_TAKE_PROFIT,
+                Instant.parse("2026-09-19T10:00:00Z"));
+        AlgoOrder laterStop = triggeredStandalone(1L, AlgoOrder.ConditionType.STOP_LOSS,
+                Instant.parse("2026-09-19T10:05:00Z"));
+
+        DealTranche earlierFirst = trancheOf(trancheWithExposure("10"), List.of(),
+                List.of(earlierTake, laterStop));
+        DealTranche laterFirst = trancheOf(trancheWithExposure("10"), List.of(),
+                List.of(laterStop, earlierTake));
+
+        assertThat(earlierFirst.exitInitiatedReason()).isEqualTo(DealTranche.CloseReason.STOP_LOSS);
+        assertThat(laterFirst.exitInitiatedReason()).isEqualTo(DealTranche.CloseReason.STOP_LOSS);
+    }
+
+    /** Защита без наблюдённого момента уступает защите с моментом, даже заведённая позже. */
+    @Test
+    @DisplayName("U5.12 — у одной из двух сработавших защит момент срабатывания не наблюдён")
+    void u5_12_anObservedMomentOutranksAnAbsentOne() {
+        AlgoOrder observedTake = triggeredStandalone(1L, AlgoOrder.ConditionType.TAKE_PROFIT,
+                Instant.parse("2026-09-19T10:00:00Z"));
+        AlgoOrder unobservedStop = triggeredStandalone(2L, AlgoOrder.ConditionType.STOP_LOSS, null);
+        DealTranche subject = trancheOf(trancheWithExposure("10"), List.of(),
+                List.of(unobservedStop, observedTake));
+
+        assertThat(subject.exitInitiatedReason()).isEqualTo(DealTranche.CloseReason.TAKE_PROFIT);
+    }
+
+    /** Без моментов у обеих отвечает заведённая позже — больший ключ строки. */
+    @Test
+    @DisplayName("U5.13 — у обеих сработавших защит момент срабатывания не наблюдён")
+    void u5_13_withoutMomentsTheLaterCreatedAnswers() {
+        AlgoOrder olderStop = triggeredStandalone(1L, AlgoOrder.ConditionType.STOP_LOSS, null);
+        AlgoOrder newerTake = triggeredStandalone(2L, AlgoOrder.ConditionType.TAKE_PROFIT, null);
+        DealTranche subject = trancheOf(trancheWithExposure("10"), List.of(),
+                List.of(olderStop, newerTake));
+
+        assertThat(subject.exitInitiatedReason()).isEqualTo(DealTranche.CloseReason.TAKE_PROFIT);
+    }
+
     private static DealTranche withTriggeredStandalone(AlgoOrder.ConditionType conditionType) {
-        AlgoOrder protection = standaloneStop(1L, AlgoOrder.Status.COMPLETED, "10", "90");
+        AlgoOrder protection = triggeredStandalone(1L, conditionType, null);
+        return trancheOf(trancheWithExposure("10"), List.of(), List.of(protection));
+    }
+
+    private static AlgoOrder triggeredStandalone(Long id, AlgoOrder.ConditionType conditionType,
+                                                 Instant triggeredAt) {
+        AlgoOrder protection = standaloneStop(id, AlgoOrder.Status.COMPLETED, "10", "90");
         protection.setConditionType(conditionType);
         protection.setCloseReason(AlgoOrder.CloseReason.TRIGGERED);
-        return trancheOf(trancheWithExposure("10"), List.of(), List.of(protection));
+        protection.setExternalTriggerTime(triggeredAt);
+        return protection;
     }
 
     private static AttachedAlgoOrder triggeredAttached() {

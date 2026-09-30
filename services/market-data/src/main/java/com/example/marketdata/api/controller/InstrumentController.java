@@ -11,14 +11,13 @@ import com.example.marketdata.persistence.service.CandleDataService;
 import com.example.marketdata.persistence.service.CandleGroupDataService;
 import com.example.marketdata.persistence.service.InstrumentDataService;
 import com.example.marketdata.persistence.service.InstrumentExternalRulesDataService;
-import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.marketdata.util.Constants;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
@@ -44,12 +43,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class InstrumentController {
 
-    /** Статусы, при которых инструмент считается действующим листингом. */
-    private static final Set<Instrument.Status> LISTED_STATUSES = Set.of(
-            Instrument.Status.SYNC,
-            Instrument.Status.CANDLES_LOADING,
-            Instrument.Status.ACTIVE);
-
     private final InstrumentDataService instrumentDataService;
     private final InstrumentExternalRulesDataService rulesDataService;
     private final CandleGroupDataService candleGroupDataService;
@@ -59,9 +52,15 @@ public class InstrumentController {
     /**
      * Действующий листинг окном за курсором.
      *
+     * <p><b>Действующий листинг — статусы, на которых ведётся навес
+     * правил</b>, и носитель перечня у него общий с обходом правил тика синка
+     * (docs/lifecycles/Instrument.md §«Листинг наружу — статусы, на которых
+     * ведётся навес правил»). Это не популяция прохода срезов: у той граница
+     * проведена по торгам, а не по онбордингу.
+     *
      * <p><b>Безлимитного чтения листинга нет:</b> его потолок — величина
-     * площадки, а не наша, и растёт её решением. Весь листинг читается
-     * обходом окон, пока окно не окажется короче предела.
+     * площадки, а не наша, и растёт её решением. Действующий листинг
+     * читается обходом окон, пока окно не окажется короче предела.
      */
     @Operation(summary = "Действующий листинг каталога окном")
     @ApiResponses({
@@ -71,7 +70,8 @@ public class InstrumentController {
     @GetMapping
     public List<InstrumentApiResponse> getInstruments(@Valid @ParameterObject InstrumentListingApiQuery window) {
         return apiMapper.domainToApiInstruments(
-                instrumentDataService.findListedWindow(LISTED_STATUSES, window.getAfter(), window.getLimit()));
+                instrumentDataService.findListedWindow(Constants.InstrumentCatalog.RULES_MAINTAINED_STATUSES,
+                        window.getAfter(), window.getLimit()));
     }
 
     @Operation(summary = "Инструмент каталога")

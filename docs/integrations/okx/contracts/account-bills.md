@@ -5,18 +5,15 @@
 Каков контракт операций по bill-записям аккаунта (7d, 3m, deep-архив с
 2021).
 
-## Внешний источник правды
+## Источник правды вне репозитория
 
-Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
-раздел «Trading Account → REST API», секции «Get bills details (last
-7 days)», «Get bills details (last 3 months)», «Apply bills details
-(since 2021)», «Get bills details (since 2021)», «Get bill types»).
-При расхождении с офдоком побеждает офдок; синхронизация —
-перевыкачка + дифф при каждом заходе интегратора по источнику и по
-задаче «актуализируй» (`.claude/processes/api-docs-completion.md`,
-канал чтения — `.claude/skills/integration-okx.md`). Последняя
-сверка: 2026-06-11 (bills-archive поле-уровнево,
-deep-архив дистиллирован).
+Официальный док OKX (`https://www.okx.com/docs-v5/en/`, раздел «Trading
+Account → REST API», секции «Get bills details (last 7 days)», «Get
+bills details (last 3 months)», «Apply bills details (since 2021)», «Get
+bills details (since 2021)», «Get bill types»). Процедура сверки и
+приоритет офдока — `.claude/rules/external-source-sync.md`. Последняя
+сверка: 2026-06-11 (bills-archive поле-уровнево, deep-архив
+дистиллирован).
 
 ## Endpoints
 

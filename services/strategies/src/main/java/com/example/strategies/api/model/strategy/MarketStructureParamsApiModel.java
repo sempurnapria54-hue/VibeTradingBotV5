@@ -40,15 +40,24 @@ public class MarketStructureParamsApiModel {
     private BigDecimal maxRangeWidthPercents;
 
     @PositiveOrZero
-    @Schema(description = "Буфер подтверждения пробоя, % от ширины диапазона")
+    @Schema(description = "Буфер подтверждения пробоя, % от цены пробиваемого уровня: порог вверх — "
+            + "уровень · (1 + буфер/100), вниз — уровень · (1 − буфер/100)")
     private BigDecimal breakoutBufferPercents;
 
     @PositiveOrZero
     @Schema(description = "Число баров подтверждения пробоя")
     private Integer breakoutConfirmationBars;
 
-    @Positive
-    @Schema(description = "Глубина поиска свингов, баров")
+    /**
+     * Глубина поиска свингов.
+     *
+     * <p>Положительность держит не аннотация, а
+     * {@code StrategyDefinitionValidator} кодом
+     * {@code STRATEGY_STRUCTURE_SWING_LOOKBACK_NOT_POSITIVE} — по тому же
+     * доводу, что у {@code lookbackBars}: с аннотацией именованный код был
+     * бы недостижим.
+     */
+    @Schema(description = "Глубина поиска свингов, баров (> 0)")
     private Integer swingLookbackBars;
 
     @PositiveOrZero

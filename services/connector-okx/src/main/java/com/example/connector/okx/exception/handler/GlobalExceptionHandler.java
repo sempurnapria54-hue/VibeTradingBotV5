@@ -62,6 +62,15 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * вторым форматом ({@code docs/rules/error-handling-policy.md}
  * §«Внешняя поверхность»).
  *
+ * <p><b>Пояснение отказа пишет наша сторона, а не платформа</b>
+ * ({@code docs/rules/error-handling-policy.md}). Ветви собственных классов
+ * артефакта отдают их текст; ветви платформенных классов —
+ * {@link IllegalArgumentException}, {@link RestClientException},
+ * {@link VaultException} — отдают постоянный текст ветви, а текст
+ * исключения уводят в лог: по классу обработчик автора текста не
+ * различает, а платформенный текст несёт полные имена классов, адреса и
+ * строки разбора.
+ *
  * <p><b>Конкретные HTTP-коды провизорны</b> — этот набор объявлен
  * хвостом пользователя ({@code .claude/rules/codestyle.md} §«Обработка
  * ошибок»): выравнивание кодов по всей платформе идёт одним ходом, а не
@@ -131,10 +140,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      * ветки транспортный сбой уходил бы наружу голым {@code 500} без
      * поля причины — то есть мимо единого error-DTO, который ядро и
      * читает, чтобы выбрать реакцию.
+     *
+     * <p>Текст клиента наружу не идёт — он несёт адрес запроса площадке;
+     * в лог сбой пишет читатель источника, называя эндпоинт.
      */
     @ExceptionHandler(RestClientException.class)
     public ResponseEntity<ErrorApiResponse> onTransportFailure(RestClientException failure) {
-        return response(HttpStatus.BAD_GATEWAY, ExchangeFailureClass.EXCHANGE_UNREACHABLE.name(), failure.getMessage());
+        return response(HttpStatus.BAD_GATEWAY, ExchangeFailureClass.EXCHANGE_UNREACHABLE.name(),
+                "Площадка не ответила");
     }
 
     /**
@@ -148,10 +161,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      *
      * <p>Кэш ключей делает эту ветку редкой: недоступность хранилища
      * останавливает торговлю не мгновенно, а по истечении срока кэша.
+     *
+     * <p>Текст клиента хранилища наружу не идёт — он несёт адрес секрета
+     * и ответ хранилища; в лог он идёт целиком.
      */
     @ExceptionHandler(VaultException.class)
     public ResponseEntity<ErrorApiResponse> onSecretStoreUnavailable(VaultException failure) {
-        return response(HttpStatus.SERVICE_UNAVAILABLE, ExchangeFailureClass.SECRET_STORE_UNAVAILABLE.name(), failure.getMessage());
+        log.warn("Secret store unavailable on the connector surface", failure);
+        return response(HttpStatus.SERVICE_UNAVAILABLE, ExchangeFailureClass.SECRET_STORE_UNAVAILABLE.name(),
+                "Хранилище секретов не ответило");
     }
 
     /**
@@ -163,10 +181,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      * сеть разбора шлюза, а испорченное содержимое хранилища — резолвер
      * ключей в «ключей нет»: оба — классы границы, и ядро выбирает по ним
      * реакцию, а не считает отказ своим дефектом.
+     *
+     * <p><b>Пояснение — постоянный текст ветви.</b> Класс платформенный:
+     * тот же {@link IllegalArgumentException} бросает разбор перечня и
+     * кладёт в текст полное имя доменного класса. Текст исключения идёт в
+     * лог.
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorApiResponse> onIllegalArgument(IllegalArgumentException failure) {
-        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", failure.getMessage());
+        log.warn("Invalid request on the connector surface: {}", failure.getMessage());
+        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Негодный вход запроса");
     }
 
     /**

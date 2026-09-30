@@ -19,6 +19,7 @@ import com.example.marketdata.domain.service.MarketPriceDataService;
 import com.example.marketdata.domain.service.MarketStructureService;
 import com.example.marketdata.domain.service.phase.MarketPhaseResolver;
 import com.example.marketdata.exception.ExchangeReadException;
+import com.example.marketdata.persistence.service.CandleDataService;
 import com.example.marketdata.persistence.service.IndicatorDataService;
 import com.example.marketdata.persistence.service.MarketStructureDataService;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;
@@ -63,13 +64,15 @@ class MarketFeatureReadTest {
     private final IndicatorDataService indicatorDataService = mock(IndicatorDataService.class);
     private final MarketStructureDataService structureDataService = mock(MarketStructureDataService.class);
     private final MarketPriceDataService priceDataService = mock(MarketPriceDataService.class);
+    private final CandleDataService candleDataService = mock(CandleDataService.class);
     private final MarketDataExpirationChecker checker = new MarketDataExpirationChecker();
 
     private final MarketFeatureService featureService = new MarketFeatureService(
             new IndicatorService(indicatorDataService, checker),
             new MarketStructureService(structureDataService, checker),
             priceDataService,
-            new MarketPhaseService(new MarketPhaseResolver(new StrategyConditionEvaluator())));
+            new MarketPhaseService(new MarketPhaseResolver(new StrategyConditionEvaluator())),
+            candleDataService);
 
     /**
      * Предыдущее значение приезжает вместе с последним.
@@ -211,6 +214,152 @@ class MarketFeatureReadTest {
 
         assertThat(bundle.getMarketPriceData()).isNull();
         assertThat(bundle.getMarketPhase().getType()).isEqualTo(MarketPhase.Type.UNKNOWN);
+    }
+
+    /**
+     * Прошлое цены — закрытие свечи предыдущего значения, по ключу привязки.
+     *
+     * <p>Свеча ищется по открытию бара, которым помечено предыдущее значение,
+     * и по идентичности привязки: её таймфрейм выбирает ряд. Ключ — авторское
+     * имя индикатора, тот же, по которому оценщик читает прошлое цены у
+     * пересечения с ценой.
+     */
+    @Test
+    void previousPriceIsTheCloseOfThePreviousValueCandle() {
+        IndicatorValue previous = givenLatestAndPrevious();
+        givenPrices("6");
+        when(candleDataService.findCloseOfIndicatorCandle(INSTRUMENT_ID, CONFIG_ID, millisOf(previous)))
+                .thenReturn(Optional.of(new BigDecimal("3")));
+
+        MarketFeatureBundle bundle = featureService.readFeatures(instrument(), bindingsAskingPrice());
+
+        assertThat(bundle.getPreviousPrices()).containsOnlyKeys(KEY);
+        assertThat(bundle.getPreviousPrices().get(KEY)).isEqualByComparingTo("3");
+    }
+
+    /**
+     * Цену не спрашивают — прошлого цены не читают: без цены момента
+     * пересечение с ценой ложно при любом прошлом.
+     */
+    @Test
+    void previousPriceIsNotReadWhenThePriceIsNotAsked() {
+        givenLatestAndPrevious();
+
+        MarketFeatureBundle bundle = featureService.readFeatures(instrument(), bindingsOnly(Duration.ofHours(1)));
+
+        assertThat(bundle.getPreviousPrices()).isEmpty();
+        verify(candleDataService, never()).findCloseOfIndicatorCandle(anyLong(), anyLong(), anyLong());
+    }
+
+    /**
+     * История короче двух значений — предыдущего нет, и ключа прошлого цены
+     * нет: значение не выдумывается, свеча не читается.
+     */
+    @Test
+    void noPreviousValueMeansNoPreviousPrice() {
+        givenAtrAgedMinutes(1);
+        givenPrices("6");
+
+        MarketFeatureBundle bundle = featureService.readFeatures(instrument(), bindingsAskingPrice());
+
+        assertThat(bundle.getPreviousPrices()).isEmpty();
+        verify(candleDataService, never()).findCloseOfIndicatorCandle(anyLong(), anyLong(), anyLong());
+    }
+
+    /** Свечи предыдущего значения в ряду нет — ключа нет, а не нуль. */
+    @Test
+    void anAbsentCandleLeavesNoKey() {
+        givenLatestAndPrevious();
+        givenPrices("6");
+        when(candleDataService.findCloseOfIndicatorCandle(anyLong(), anyLong(), anyLong()))
+                .thenReturn(Optional.empty());
+
+        MarketFeatureBundle bundle = featureService.readFeatures(instrument(), bindingsAskingPrice());
+
+        assertThat(bundle.getPreviousIndicators()).containsKey(KEY);
+        assertThat(bundle.getPreviousPrices()).isEmpty();
+    }
+
+    /**
+     * Прошлое цены доходит и до контекста классификации фазы.
+     *
+     * <p>Клауза «цена пересекла ATR снизу вверх»: сейчас цена {@code 6} выше
+     * последнего значения {@code 5}, прежде закрытие {@code 3} было не выше
+     * предыдущего {@code 4}. С прошлым цены клауза истинна и фаза
+     * классифицирована; без свечи то же чтение даёт {@code UNKNOWN} — иначе
+     * проба прошла бы и на контексте, в который раскладку не передали.
+     */
+    @Test
+    void phaseClassificationReadsThePreviousPrice() {
+        IndicatorValue previous = givenLatestAndPrevious();
+        givenPrices("6");
+        when(candleDataService.findCloseOfIndicatorCandle(INSTRUMENT_ID, CONFIG_ID, millisOf(previous)))
+                .thenReturn(Optional.of(new BigDecimal("3")));
+
+        assertThat(featureService.readFeatures(instrument(), priceCrossoverRequest()).getMarketPhase().getType())
+                .isEqualTo(MarketPhase.Type.BULL_TREND);
+
+        when(candleDataService.findCloseOfIndicatorCandle(anyLong(), anyLong(), anyLong()))
+                .thenReturn(Optional.empty());
+
+        assertThat(featureService.readFeatures(instrument(), priceCrossoverRequest()).getMarketPhase().getType())
+                .isEqualTo(MarketPhase.Type.UNKNOWN);
+    }
+
+    /** Последнее значение {@code 5} и предыдущее {@code 4}; возвращает предыдущее. */
+    private IndicatorValue givenLatestAndPrevious() {
+        IndicatorValue latest = atrAgedMinutes(1, "5");
+        IndicatorValue previous = atrAgedMinutes(2, "4");
+        when(indicatorDataService.findLatest(INSTRUMENT_ID, CONFIG_ID)).thenReturn(Optional.of(latest));
+        when(indicatorDataService.findLatestTwo(INSTRUMENT_ID, CONFIG_ID)).thenReturn(List.of(latest, previous));
+        return previous;
+    }
+
+    private void givenPrices(String lastPrice) {
+        MarketPriceData prices = new MarketPriceData();
+        prices.setExternalLastPrice(new BigDecimal(lastPrice));
+        when(priceDataService.getMarketPriceData(anyLong(), anyString())).thenReturn(prices);
+    }
+
+    private static Long millisOf(IndicatorValue value) {
+        return value.getCandleTimestamp().toInstant().toEpochMilli();
+    }
+
+    private FeatureReadRequest bindingsAskingPrice() {
+        return FeatureReadRequest.builder()
+                .indicatorBindings(List.of(new FeatureBinding(KEY, CONFIG_ID, Duration.ofHours(1))))
+                .structureBindings(List.of())
+                .priceRequired(true)
+                .build();
+    }
+
+    /** Клауза «цена пересекла индикатор привязки снизу вверх». */
+    private FeatureReadRequest priceCrossoverRequest() {
+        StrategyConditionOperand left = new StrategyConditionOperand();
+        left.setSourceType(StrategyConditionSourceType.PRICE);
+
+        StrategyConditionOperand right = new StrategyConditionOperand();
+        right.setSourceType(StrategyConditionSourceType.INDICATOR);
+        right.setIndicatorKey(KEY);
+
+        StrategyConditionRule rule = new StrategyConditionRule();
+        rule.setRuleType(StrategyConditionRuleType.CROSSOVER);
+        rule.setOperator(StrategyConditionOperator.CROSSED_ABOVE);
+        rule.setLeftOperand(left);
+        rule.setRightOperand(right);
+
+        StrategyCondition condition = new StrategyCondition();
+        condition.setRules(List.of(rule));
+
+        StrategyMarketPhaseRule phaseRule = new StrategyMarketPhaseRule();
+        phaseRule.setType(MarketPhase.Type.BULL_TREND);
+        phaseRule.setCondition(condition);
+
+        return FeatureReadRequest.builder()
+                .phaseRules(List.of(phaseRule))
+                .indicatorBindings(List.of(new FeatureBinding(KEY, CONFIG_ID, Duration.ofHours(1))))
+                .structureBindings(List.of())
+                .build();
     }
 
     private void givenAtrAgedMinutes(int minutes) {

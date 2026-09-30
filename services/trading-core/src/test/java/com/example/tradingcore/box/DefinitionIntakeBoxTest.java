@@ -154,7 +154,13 @@ class DefinitionIntakeBoxTest extends SharedTradingCoreBox {
         barrier();
 
         assertThat(rows.count("strategies")).isZero();
-        assertThat(AppLog.since(mark)).contains("Strategy fact without envelope headers is skipped offset=");
+        // Неполный конверт идёт тропой отравленной записи: строка несёт
+        // тему, партицию и смещение, первопричина — следом.
+        assertThat(AppLog.since(mark)).contains("Strategy fact is poison and is skipped topic=" + strategyTopic()
+                + " partition=");
+        assertThat(AppLog.since(mark)).contains("Strategy fact without envelope headers eventId=null");
+        assertThat(AppLog.since(mark)).contains("Strategy fact without envelope headers eventId=ev-headerless"
+                + " eventType=null");
         // Обработка следующих записей продолжается: барьер её и предъявляет.
         assertThat(rows.count("inbox_events")).isEqualTo(1L);
     }

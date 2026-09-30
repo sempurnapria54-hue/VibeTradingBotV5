@@ -10,6 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
@@ -75,7 +76,7 @@ class CloseReasonSeniorityTest {
 
     @ParameterizedTest
     @EnumSource(value = DealTranche.CloseReason.class, names = "UNKNOWN", mode = EnumSource.Mode.EXCLUDE)
-    @DisplayName("U8.7 — каждое из семи значений перечня старшинства порознь")
+    @DisplayName("U8.7 — каждое из шести значений перечня старшинства порознь")
     void u8_7_theRankedSetMapsOneToOne(DealTranche.CloseReason reason) {
         assertThat(dealOf(reason).closeReasonBySeniority()).isEqualTo(Deal.CloseReason.valueOf(reason.name()));
     }
@@ -102,10 +103,32 @@ class CloseReasonSeniorityTest {
 
     @ParameterizedTest
     @EnumSource(value = Deal.CloseReason.class, names = "EMERGENCY_CLOSE", mode = EnumSource.Mode.EXCLUDE)
-    @DisplayName("U8.11 — каждое из семи наследуемых значений порознь")
+    @DisplayName("U8.11 — каждое из шести наследуемых значений порознь")
     void u8_11_theInheritedSetMapsOneToOne(Deal.CloseReason reason) {
         assertThat(dealClosedBy(reason).inheritedTrancheCloseReason())
                 .isEqualTo(DealTranche.CloseReason.valueOf(reason.name()));
+    }
+
+    /**
+     * Соседние пары порядка пинят его целиком: строгое старшинство каждой
+     * пары по транзитивности задаёт весь порядок, и перестановка любых двух
+     * рангов роняет хотя бы одну пару. Обе раскладки пары — порядок
+     * закрытия старшинства не даёт.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "EXTERNAL_CLOSE, RISK_CONTROL",
+            "RISK_CONTROL, STOP_LOSS",
+            "STOP_LOSS, STRATEGY_EXIT",
+            "STRATEGY_EXIT, TAKE_PROFIT",
+            "TAKE_PROFIT, ENTRY_CONDITION_EXPIRED"
+    })
+    @DisplayName("U8.12 — каждая соседняя пара объявленного порядка старшинства")
+    void u8_12_eachAdjacentPairRanksAsDeclared(DealTranche.CloseReason senior, DealTranche.CloseReason junior) {
+        Deal.CloseReason expected = Deal.CloseReason.valueOf(senior.name());
+
+        assertThat(dealOf(senior, junior).closeReasonBySeniority()).isEqualTo(expected);
+        assertThat(dealOf(junior, senior).closeReasonBySeniority()).isEqualTo(expected);
     }
 
     private static Deal dealOf(DealTranche.CloseReason... reasons) {

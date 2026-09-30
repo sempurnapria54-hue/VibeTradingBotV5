@@ -28,9 +28,11 @@ import org.junit.jupiter.api.Test;
  * реджект — docs/rules/strategy-validation.md §«Что проверяется на
  * создании»).
  *
- * <p><b>Экземпция названа ОДНОМУ типу, а не классу «нештатные».</b> Шаг
- * страховки под неё не попадает, и неизвестный тип — тоже: сверка идёт
- * с именем типа выхода.
+ * <p><b>Экземпция названа ОДНОМУ типу на ОДНОМ уровне, а не классу
+ * «нештатные».</b> Шаг страховки под неё не попадает, неизвестный тип —
+ * тоже: сверка идёт с именем типа выхода. Шаг выхода ТРАНША под неё не
+ * попадает тоже: ребром работает только шаг сделки, а шаг транша делает
+ * лишь то, что объявляет его пакет.
  *
  * <p><b>Опустошённый пакет уносит КЛЮЧИ своих действий</b>, поэтому
  * клетка называет и битые ссылки, которые после этого появляются: набор
@@ -98,12 +100,16 @@ class StepPackageTest {
     }
 
     @Test
-    @DisplayName("U15.6 — шаг выхода с пустым пакетом на ТРАНШЕ: экземпция читается по типу шага")
-    void u15_6_theExemptionIsReadFromTheStepTypeNotTheLevel() {
+    @DisplayName("U15.6 — шаг выхода с пустым пакетом на ТРАНШЕ: экземпция — свойство уровня сделки")
+    void u15_6_theExemptionBelongsToTheDealLevelOnly() {
         CreateStrategyApiRequest request = reference();
         stepsByStatus(tranche(bull(request))).put("PROTECTION_SWITCHED", List.of(bareStep("EXIT")));
 
-        assertThat(violations(request)).isEmpty();
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("details[0].tranches[bull_main].stepsByStatus[PROTECTION_SWITCHED][0].actions "
+                        + EMPTY_PACKAGE);
     }
 
     @Test

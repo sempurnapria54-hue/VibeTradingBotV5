@@ -54,8 +54,5 @@ public enum StrategyConditionRuleType {
     CROSSOVER,
 
     /** Объёмный фильтр пройден (объём — вспомогательный фильтр, см. IND-Q1). */
-    VOLUME_FILTER_PASSED,
-
-    /** Свеча таймфрейма закрыта (поле timeframe) — защита от look-ahead. */
-    CANDLE_CLOSED
+    VOLUME_FILTER_PASSED
 }

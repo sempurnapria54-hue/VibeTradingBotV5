@@ -16,7 +16,7 @@
 | `askSz` | string (decimal) | да | Объём на лучшем ask — **вводится шагом 7**: операнд измерителя ёмкости `Order.bookDepthAtPlacement`. |
 | `bidSz` | string (decimal) | да | Объём на лучшем bid. Там же. |
 | `ts` | string (epoch millis) | да | Время тикера. |
-| `vol24h` | string (decimal) | да | Объём за сутки в базовой валюте — **вводится сбором срезов**: переход среза тикера кладёт его в `MarketTicker.volume` (`docs/models/domain/other/MarketTicker.md`); переход runtime-цены его не читает. |
+| `vol24h` | string (decimal) | да | Объём за сутки: у деривативов — числом контрактов, у спота — в базовой валюте (офдок) — **вводится сбором срезов**: переход среза тикера кладёт его в `MarketTicker.volume` (`docs/models/domain/other/MarketTicker.md`); переход runtime-цены его не читает. |
 
 Таблица выровнена под **худой coded DTO** (`TickerOkxResponse.java`:
 `instType`/`instId`/`last`/`askPx`/`bidPx`/`ts`; сопровождение сделки добавляет
@@ -24,21 +24,22 @@
 зеркало биржи нет.
 
 Числа OKX приходят строками; обязательные числовые строки парсятся
-в `BigDecimal`. `MID_PRICE` источником не передаётся — вычисляется
-доменно как `(bidPx + askPx) / 2` (см.
-`docs/models/mapping/MarketPriceData.md`).
+в `BigDecimal`. `MID_PRICE` источником не передаётся — это величина
+runtime-модели цены (`docs/components/models/MarketPriceData.md`
+§«Середина спреда»); переход её не маппит
+(`docs/models/mapping/MarketPriceData.md`).
 
 ## Поля, которые НЕ входят в DTO
 
-OKX `market/ticker` отдаёт больше полей, чем содержит coded DTO:
+OKX `market/ticker` — и элемент `market/tickers`, состав у них один
+(`docs/integrations/okx/contracts/market-price-data.md`) — отдаёт больше
+полей, чем содержит coded DTO:
 `lastSz`, `open24h`, `high24h`/`low24h`, `volCcy24h`,
 `sodUtc0`/`sodUtc8` (24h-агрегаты и SOD-метрики). Доменно не
 используются и в DTO не заведены. **`askSz`/`bidSz` из этого перечня
 выведены шагом 7, `vol24h` — сбором срезов** — они переехали в таблицу
 используемых.
 
-`markPx`/`idxPx` ранее значились в таблице полей DTO — в coded DTO их
-**нет** (перенесены сюда при doc-sync). Возвращает ли `market/ticker`
-их вообще — **требует офдок-сверки** (`integrator`): mark/index price
-отдаются отдельными эндпоинтами (`public/mark-price`,
-`market/index-tickers`). До сверки как факт ticker'а не утверждается.
+`markPx`/`idxPx` тикер не несёт вовсе — ни единичный, ни агрегатный
+(офдок, сверка 2026-09-30): mark/index price отдаются отдельными
+эндпоинтами (`public/mark-price`, `market/index-tickers`).

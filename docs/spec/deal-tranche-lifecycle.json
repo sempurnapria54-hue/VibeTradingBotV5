@@ -60,6 +60,312 @@
       "expr": "trancheEdgeDeclared && !riskCreatingUnderCollapse && (!reopenEdge || reopenPermitted) && (to != 'CLOSED' || terminalContract)"
     }
   ],
+  "populations": [
+    {
+      "axis": "рёбра статусной машины транша — у каждого названа допустимость",
+      "note": "Перечень выводится из ПЕРЕЧНЯ СТАТУСОВ дока-дома полным произведением без петель, а не из матрицы переходов: матрица — это то, что кто-то написал, и она молчит о ребре, которого в ней нет. Объявленные рёбра покрыты примерами, прочие объявлены недостижимыми и предъявляют контрпример с названной причиной исключения. Форма та же, что у рёбер сделки (docs/spec/deal-lifecycle.json).",
+      "rule": [
+        "trancheTransitionAllowed"
+      ],
+      "derive": {
+        "command": "bash tools/derive/tranche-status-edges.sh",
+        "from": [
+          "docs/lifecycles/DealTranche.md"
+        ]
+      },
+      "keys": [
+        "from",
+        "to"
+      ],
+      "where": "in(from, 'PRECHECK', 'ENTRY_SUBMITTED', 'ENTRY_FINALIZED', 'PROTECTION_SWITCHED', 'MANAGING', 'EXIT_PENDING', 'CLOSED') && in(to, 'PRECHECK', 'ENTRY_SUBMITTED', 'ENTRY_FINALIZED', 'PROTECTION_SWITCHED', 'MANAGING', 'EXIT_PENDING', 'CLOSED') && from != to",
+      "excludes": "два класса примеров, у которых ребра статусной машины транша нет вовсе: пробы с чужим статусом (ERROR и EMERGENCY_CLOSED — статусы сделки, у транша их нет, и предмет пробы в том, что ребра не существует) и строки без смены статуса. Примеры предикатов состояния операндов ребра не несут и в популяции не участвуют по построению ключей. Ни один из классов не содержит достижимого ребра транша, поэтому фальсифицирующее состояние фильтром не выводится.",
+      "members": [
+        {
+          "member": [
+            "PRECHECK",
+            "ENTRY_SUBMITTED"
+          ]
+        },
+        {
+          "member": [
+            "PRECHECK",
+            "ENTRY_FINALIZED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "PRECHECK",
+            "PROTECTION_SWITCHED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "PRECHECK",
+            "MANAGING"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "PRECHECK",
+            "EXIT_PENDING"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "PRECHECK",
+            "CLOSED"
+          ]
+        },
+        {
+          "member": [
+            "ENTRY_SUBMITTED",
+            "PRECHECK"
+          ],
+          "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "ENTRY_SUBMITTED",
+            "ENTRY_FINALIZED"
+          ]
+        },
+        {
+          "member": [
+            "ENTRY_SUBMITTED",
+            "PROTECTION_SWITCHED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "ENTRY_SUBMITTED",
+            "MANAGING"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "ENTRY_SUBMITTED",
+            "EXIT_PENDING"
+          ]
+        },
+        {
+          "member": [
+            "ENTRY_SUBMITTED",
+            "CLOSED"
+          ]
+        },
+        {
+          "member": [
+            "ENTRY_FINALIZED",
+            "PRECHECK"
+          ],
+          "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "ENTRY_FINALIZED",
+            "ENTRY_SUBMITTED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "ENTRY_FINALIZED",
+            "PROTECTION_SWITCHED"
+          ]
+        },
+        {
+          "member": [
+            "ENTRY_FINALIZED",
+            "MANAGING"
+          ]
+        },
+        {
+          "member": [
+            "ENTRY_FINALIZED",
+            "EXIT_PENDING"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "ENTRY_FINALIZED",
+            "CLOSED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "PROTECTION_SWITCHED",
+            "PRECHECK"
+          ],
+          "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "PROTECTION_SWITCHED",
+            "ENTRY_SUBMITTED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "PROTECTION_SWITCHED",
+            "ENTRY_FINALIZED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "PROTECTION_SWITCHED",
+            "MANAGING"
+          ]
+        },
+        {
+          "member": [
+            "PROTECTION_SWITCHED",
+            "EXIT_PENDING"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "PROTECTION_SWITCHED",
+            "CLOSED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "MANAGING",
+            "PRECHECK"
+          ],
+          "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "MANAGING",
+            "ENTRY_SUBMITTED"
+          ]
+        },
+        {
+          "member": [
+            "MANAGING",
+            "ENTRY_FINALIZED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "MANAGING",
+            "PROTECTION_SWITCHED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "MANAGING",
+            "EXIT_PENDING"
+          ]
+        },
+        {
+          "member": [
+            "MANAGING",
+            "CLOSED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "PRECHECK"
+          ],
+          "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "ENTRY_SUBMITTED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "ENTRY_FINALIZED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "PROTECTION_SWITCHED"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "MANAGING"
+          ],
+          "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик"
+        },
+        {
+          "member": [
+            "EXIT_PENDING",
+            "CLOSED"
+          ]
+        },
+        {
+          "member": [
+            "CLOSED",
+            "PRECHECK"
+          ],
+          "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "ENTRY_SUBMITTED"
+          ],
+          "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "ENTRY_FINALIZED"
+          ],
+          "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "PROTECTION_SWITCHED"
+          ],
+          "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "MANAGING"
+          ],
+          "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)"
+        },
+        {
+          "member": [
+            "CLOSED",
+            "EXIT_PENDING"
+          ],
+          "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)"
+        }
+      ]
+    }
+  ],
   "examples": [
     {
       "case": "штатная тропа: предвходовая проверка ведёт к отправке входа",
@@ -477,6 +783,7 @@
     },
     {
       "case": "прыжка через сопровождение из отправленного входа в подтверждённый выход нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
       "state": {
         "graphComplete": true,
         "from": "ENTRY_SUBMITTED",
@@ -489,7 +796,8 @@
         }
       },
       "expect": {
-        "trancheEdgeDeclared": false
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
       }
     },
     {
@@ -659,6 +967,524 @@
       "expect": {
         "trancheRiskBearing": false,
         "terminalContract": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "подтверждённый фактами вход ведёт отправленный транш в подтверждённый",
+      "state": {
+        "graphComplete": true,
+        "from": "ENTRY_SUBMITTED",
+        "to": "ENTRY_FINALIZED",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "positionReducingOnly": false,
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
+      },
+      "expect": {
+        "trancheEdgeDeclared": true,
+        "trancheTransitionAllowed": true
+      }
+    },
+    {
+      "case": "выход транша доступен и из отправленного входа — живую входную заявку он снимает сам",
+      "state": {
+        "graphComplete": true,
+        "from": "ENTRY_SUBMITTED",
+        "to": "EXIT_PENDING",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "positionReducingOnly": false,
+            "status": "PENDING",
+            "accumulatedFillSize": 0
+          }
+        ],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
+      },
+      "expect": {
+        "trancheEdgeDeclared": true,
+        "trancheTransitionAllowed": true
+      }
+    },
+    {
+      "case": "отправленный и не налившийся вход, снятый площадкой, закрывает транш прямо из отправки",
+      "state": {
+        "graphComplete": true,
+        "from": "ENTRY_SUBMITTED",
+        "to": "CLOSED",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "positionReducingOnly": false,
+            "status": "CANCELED",
+            "accumulatedFillSize": 0
+          }
+        ],
+        "protections": [],
+        "deal": {
+          "status": "ACTIVE"
+        }
+      },
+      "expect": {
+        "trancheEdgeDeclared": true,
+        "trancheRiskBearing": false,
+        "trancheTransitionAllowed": true
+      }
+    },
+    {
+      "case": "подтверждённая основная защита переключает транш из подтверждённого входа",
+      "state": {
+        "graphComplete": true,
+        "from": "ENTRY_FINALIZED",
+        "to": "PROTECTION_SWITCHED",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "positionReducingOnly": false,
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
+        "protections": [
+          {
+            "id": "sl",
+            "carrier": "ATTACHED",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 3,
+            "parentFillSize": 3
+          },
+          {
+            "id": "main",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 3
+          }
+        ],
+        "deal": {
+          "status": "ACTIVE"
+        }
+      },
+      "expect": {
+        "trancheEdgeDeclared": true,
+        "trancheTransitionAllowed": true
+      }
+    },
+    {
+      "case": "после переключения защиты транш уходит в сопровождение",
+      "state": {
+        "graphComplete": true,
+        "from": "PROTECTION_SWITCHED",
+        "to": "MANAGING",
+        "reopenAllowed": false,
+        "orders": [
+          {
+            "type": "ENTRY",
+            "positionReducingOnly": false,
+            "status": "COMPLETED",
+            "accumulatedFillSize": 3
+          }
+        ],
+        "protections": [
+          {
+            "id": "sl",
+            "carrier": "ATTACHED",
+            "kind": "STOP",
+            "status": "CANCELED",
+            "size": 3,
+            "parentFillSize": 3
+          },
+          {
+            "id": "main",
+            "carrier": "STANDALONE",
+            "kind": "STOP",
+            "status": "ACTIVE",
+            "size": 3
+          }
+        ],
+        "deal": {
+          "status": "ACTIVE"
+        }
+      },
+      "expect": {
+        "trancheEdgeDeclared": true,
+        "trancheTransitionAllowed": true
+      }
+    },
+    {
+      "case": "ребра PRECHECK → ENTRY_FINALIZED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "PRECHECK",
+        "to": "ENTRY_FINALIZED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра PRECHECK → PROTECTION_SWITCHED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "PRECHECK",
+        "to": "PROTECTION_SWITCHED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра PRECHECK → MANAGING у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "PRECHECK",
+        "to": "MANAGING"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра PRECHECK → EXIT_PENDING у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "PRECHECK",
+        "to": "EXIT_PENDING"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра ENTRY_SUBMITTED → PRECHECK у транша нет",
+      "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "ENTRY_SUBMITTED",
+        "to": "PRECHECK"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра ENTRY_SUBMITTED → PROTECTION_SWITCHED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "ENTRY_SUBMITTED",
+        "to": "PROTECTION_SWITCHED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра ENTRY_FINALIZED → PRECHECK у транша нет",
+      "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "ENTRY_FINALIZED",
+        "to": "PRECHECK"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра ENTRY_FINALIZED → ENTRY_SUBMITTED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "ENTRY_FINALIZED",
+        "to": "ENTRY_SUBMITTED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра ENTRY_FINALIZED → EXIT_PENDING у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "ENTRY_FINALIZED",
+        "to": "EXIT_PENDING"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра ENTRY_FINALIZED → CLOSED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "ENTRY_FINALIZED",
+        "to": "CLOSED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра PROTECTION_SWITCHED → PRECHECK у транша нет",
+      "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "PROTECTION_SWITCHED",
+        "to": "PRECHECK"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра PROTECTION_SWITCHED → ENTRY_SUBMITTED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "PROTECTION_SWITCHED",
+        "to": "ENTRY_SUBMITTED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра PROTECTION_SWITCHED → ENTRY_FINALIZED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "PROTECTION_SWITCHED",
+        "to": "ENTRY_FINALIZED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра PROTECTION_SWITCHED → EXIT_PENDING у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "PROTECTION_SWITCHED",
+        "to": "EXIT_PENDING"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра PROTECTION_SWITCHED → CLOSED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "PROTECTION_SWITCHED",
+        "to": "CLOSED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра MANAGING → PRECHECK у транша нет",
+      "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "MANAGING",
+        "to": "PRECHECK"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра MANAGING → ENTRY_FINALIZED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "MANAGING",
+        "to": "ENTRY_FINALIZED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра MANAGING → PROTECTION_SWITCHED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "MANAGING",
+        "to": "PROTECTION_SWITCHED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра MANAGING → CLOSED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "MANAGING",
+        "to": "CLOSED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра EXIT_PENDING → PRECHECK у транша нет",
+      "unreachable": "возврата в предвходовую проверку нет: транш проходит её один раз при материализации, а повторный вход идёт ребром переоткрытия (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "PRECHECK"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра EXIT_PENDING → ENTRY_SUBMITTED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "ENTRY_SUBMITTED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра EXIT_PENDING → ENTRY_FINALIZED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "ENTRY_FINALIZED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра EXIT_PENDING → PROTECTION_SWITCHED у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "PROTECTION_SWITCHED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра EXIT_PENDING → MANAGING у транша нет",
+      "unreachable": "ребра нет в матрице переходов транша (docs/lifecycles/DealTranche.md): такого перехода не затребует ни один обработчик",
+      "state": {
+        "from": "EXIT_PENDING",
+        "to": "MANAGING"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра CLOSED → PRECHECK у транша нет",
+      "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "CLOSED",
+        "to": "PRECHECK"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра CLOSED → ENTRY_SUBMITTED у транша нет",
+      "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "CLOSED",
+        "to": "ENTRY_SUBMITTED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра CLOSED → ENTRY_FINALIZED у транша нет",
+      "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "CLOSED",
+        "to": "ENTRY_FINALIZED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра CLOSED → PROTECTION_SWITCHED у транша нет",
+      "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "CLOSED",
+        "to": "PROTECTION_SWITCHED"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра CLOSED → MANAGING у транша нет",
+      "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "CLOSED",
+        "to": "MANAGING"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
+        "trancheTransitionAllowed": false
+      }
+    },
+    {
+      "case": "ребра CLOSED → EXIT_PENDING у транша нет",
+      "unreachable": "терминал транша обработчика не имеет: затребовать ребро из терминала некому (docs/lifecycles/DealTranche.md)",
+      "state": {
+        "from": "CLOSED",
+        "to": "EXIT_PENDING"
+      },
+      "expect": {
+        "trancheEdgeDeclared": false,
         "trancheTransitionAllowed": false
       }
     }

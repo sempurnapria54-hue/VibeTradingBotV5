@@ -1,6 +1,8 @@
 package com.example.strategies;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -45,6 +47,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class SurfaceErrorContractTest {
 
     private static final String TENANT = "tn-0001";
+
+    /** Полное имя доменного класса — то, что платформа кладёт в текст разбора перечня. */
+    private static final String PLATFORM_CLASS = "com.example.tradingbot.domain.model.aggregate.strategy.Strategy";
+
+    private static final String PLATFORM_TEXT = "No enum constant " + PLATFORM_CLASS + ".Status.BOGUS";
 
     private final StrategyDataService strategyDataService = mock(StrategyDataService.class);
 
@@ -102,6 +109,27 @@ class SurfaceErrorContractTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").exists())
                 .andExpect(jsonPath("$.occurredAt").exists());
+    }
+
+    /**
+     * Негодный вход, распознанный прикладным кодом, отвечает постоянным
+     * текстом ветви: класс исключения платформенный, и его текст несёт
+     * внутреннюю форму — здесь полное имя доменного класса, как у разбора
+     * значения вне перечня (docs/rules/error-handling-policy.md §«Пояснение
+     * отказа пишет наша сторона, а не платформа»).
+     */
+    @Test
+    @DisplayName("Негодный вход отвечает текстом нашей стороны, а не текстом платформенного исключения")
+    void anInvalidInputAnswersWithOurOwnExplanation() throws Exception {
+        when(strategyDataService.findByInternalIdWithTree(anyString()))
+                .thenThrow(new IllegalArgumentException(PLATFORM_TEXT));
+
+        mockMvc.perform(get("/api/v1/strategies/st-0001")
+                        .header(Constants.Header.TENANT, TENANT))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message").value(not(containsString(PLATFORM_CLASS))))
+                .andExpect(jsonPath("$.message").isNotEmpty());
     }
 
     /**

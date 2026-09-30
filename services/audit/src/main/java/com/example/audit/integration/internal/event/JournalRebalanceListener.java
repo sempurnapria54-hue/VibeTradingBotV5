@@ -39,6 +39,20 @@ import org.springframework.stereotype.Component;
  *       <b>разрыв не пишется</b>.</li>
  * </ul>
  *
+ * <p><b>Наименьшего доступного брокер не отдал — сравнения нет</b>, и это не
+ * четвёртый исход, а его невозможность
+ * (docs/rules/durable-consumer-reception.md §«Наименьшего доступного брокер
+ * не отдал — сравнения нет, и это не ещё один исход, а его невозможность»):
+ * проверка переносится на второй момент обнаружения, а граница двигается
+ * только там, где двинул бы её и без наименьшего доступного.
+ * <ul>
+ *   <li>смещение группы есть — ожидание садится на него, момент наблюдения
+ *       не двигается, разрыв объявит доставка;</li>
+ *   <li>смещения нет — наблюдение начинается заново, как в третьем исходе,
+ *       а ожидание посадит первая доставка: позиции назначение не знает
+ *       вовсе.</li>
+ * </ul>
+ *
  * <p><b>Строки состояния пары может ещё не быть</b> — её заводит тик, а не
  * этот класс: тогда запись не находит цели и не делает ничего. Окно
  * ограничено одним тактом тика.
@@ -68,18 +82,21 @@ public class JournalRebalanceListener implements ConsumerAwareRebalanceListener 
      * <p>Ожидание — та позиция, с которой чтение действительно начнётся:
      * зафиксированное смещение, а при его отсутствии либо отставании —
      * наименьшее доступное, потому что позиция чтения группы «с начала
-     * темы».
+     * темы». Без наименьшего доступного сравнивать не с чем, и ожидание
+     * садится на зафиксированное смещение как есть: вышедшее за пределы
+     * смещение позиция чтения переставит вперёд, и разрыв объявит первая же
+     * доставка.
      */
     private void compare(TopicPartition partition, OffsetAndMetadata committedOffset,
                          Long earliestOffset, OffsetDateTime moment) {
-        if (isNull(earliestOffset)) {
-            log.warn("Наименьшее доступное смещение партиции не отдано брокером partition={}", partition);
+        if (isNull(committedOffset)) {
+            restartObservation(partition, earliestOffset, moment);
             return;
         }
-        if (isNull(committedOffset)) {
-            log.info("Смещения группы по партиции не осталось: наблюдение начинается заново partition={}", partition);
-            receptionService.restartObservation(partition.topic(), moment);
-            offsetTracker.expect(partition, earliestOffset);
+        if (isNull(earliestOffset)) {
+            log.warn("Наименьшее доступное смещение партиции не отдано брокером: сравнение переносится на доставку "
+                    + "partition={} committed={}", partition, committedOffset.offset());
+            offsetTracker.expect(partition, committedOffset.offset());
             return;
         }
         if (committedOffset.offset() < earliestOffset) {
@@ -90,5 +107,23 @@ public class JournalRebalanceListener implements ConsumerAwareRebalanceListener 
             return;
         }
         offsetTracker.expect(partition, committedOffset.offset());
+    }
+
+    /**
+     * Смещения группы нет: наблюдение начинается заново моментом назначения.
+     *
+     * <p>Ожидание садится на наименьшее доступное — с него чтение и
+     * начнётся. Не отдал его брокер — ожидания нет, и посадит его первая
+     * доставка; наименьшее доступное этому исходу не нужно.
+     */
+    private void restartObservation(TopicPartition partition, Long earliestOffset, OffsetDateTime moment) {
+        log.info("Смещения группы по партиции не осталось: наблюдение начинается заново partition={}", partition);
+        receptionService.restartObservation(partition.topic(), moment);
+        if (isNull(earliestOffset)) {
+            log.warn("Наименьшее доступное смещение партиции не отдано брокером: ожидание посадит первая доставка "
+                    + "partition={}", partition);
+            return;
+        }
+        offsetTracker.expect(partition, earliestOffset);
     }
 }

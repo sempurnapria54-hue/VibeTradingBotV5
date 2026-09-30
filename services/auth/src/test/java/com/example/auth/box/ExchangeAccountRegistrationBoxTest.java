@@ -120,11 +120,11 @@ class ExchangeAccountRegistrationBoxTest extends SharedAuthBox {
      * Значение контура вне перечня: {@code Contour.valueOf} бросает в теле
      * метода контроллера, до всякого обращения к сервису.
      *
-     * <p><b>Половина клетки о ТЕКСТЕ платформенного исключения не
-     * проверяется, и это названо:</b> запрета на имя доменного класса в
-     * теле отказа не несёт ни один дом вне тропы отказа доступа и `500`
-     * (находка {@code F-6} документа). Ослаблять ассерт под текущее
-     * поведение здесь нечего — ожидания не существует.
+     * <p><b>Половина клетки о ТЕКСТЕ платформенного исключения:</b> тело не
+     * несёт ни имени перечня, ни его пакета, ни фразы разбора перечня
+     * (docs/rules/error-handling-policy.md §«Пояснение отказа пишет наша
+     * сторона, а не платформа»; находка {@code F-6} закрыта этим домом).
+     * Пояснение при этом есть: запрет снимает чужой текст, а не само поле.
      */
     @Test
     @DisplayName("B2.6 — значение контура вне перечня отвергается")
@@ -138,6 +138,9 @@ class ExchangeAccountRegistrationBoxTest extends SharedAuthBox {
 
         assertThat(answer.status()).isEqualTo(400);
         assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(String.valueOf(answer.asObject().get("message"))).isNotBlank();
+        assertThat(answer.body()).doesNotContain("Contour", "com.example", "exchange_account",
+                "No enum constant");
         assertThat(rows.count("exchange_accounts")).isEqualTo(accountsBefore);
         assertThat(secrets.accountNames(AuthSubstrate.ENVIRONMENT)).hasSize(secretsBefore);
     }

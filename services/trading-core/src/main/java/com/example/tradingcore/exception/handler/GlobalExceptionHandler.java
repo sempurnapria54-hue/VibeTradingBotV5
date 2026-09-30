@@ -46,20 +46,34 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      * идентичность. Все они — негодный ВХОД вызова, и отвечать на них
      * пятисотым значило бы сказать «чини сервер» тому, кто чинить обязан
      * запрос.
+     *
+     * <p><b>Пояснение — постоянный текст ветви, а не текст исключения</b>
+     * (docs/rules/error-handling-policy.md §«Пояснение отказа пишет наша
+     * сторона, а не платформа»). Класс платформенный: его бросает и наш код,
+     * и разбор перечня каркасом, кладущий в текст полное имя доменного
+     * класса, — по классу автора текста обработчик не различает. Текст
+     * исключения уходит в лог: там он нужен тому, кто разбирает отказ.
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorApiResponse> onIllegalArgument(IllegalArgumentException failure) {
-        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", failure.getMessage());
+        log.info("Request is refused as invalid input: {}", failure.getMessage());
+        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Негодный вход вызова");
     }
 
     /**
      * Сосед по ярусу недоступен: наша сторона исправна, и повтор имеет
      * смысл позже (docs/rules/runtime-error-classification.md §«Отказ
      * соседа по ярусу»).
+     *
+     * <p><b>Слово класса — общее с прочими поверхностями</b>
+     * (docs/rules/error-handling-policy.md §«Класс отказа — значение поля
+     * {@code code}, и перечень его закрыт»): периметр пересылает ответ
+     * владельца как есть, и второе слово у одного класса доехало бы до
+     * браузера рядом с первым.
      */
     @ExceptionHandler(PeerServiceUnavailableException.class)
     public ResponseEntity<ErrorApiResponse> onPeerUnavailable(PeerServiceUnavailableException failure) {
-        return response(HttpStatus.SERVICE_UNAVAILABLE, "PEER_SERVICE_UNAVAILABLE", failure.getMessage());
+        return response(HttpStatus.SERVICE_UNAVAILABLE, "PEER_UNAVAILABLE", failure.getMessage());
     }
 
     /**

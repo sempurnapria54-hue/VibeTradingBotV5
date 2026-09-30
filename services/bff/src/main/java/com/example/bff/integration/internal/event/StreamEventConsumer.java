@@ -1,6 +1,7 @@
 package com.example.bff.integration.internal.event;
 
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.bff.api.model.StreamRecordApiModel;
@@ -23,7 +24,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,7 +58,8 @@ import org.springframework.stereotype.Component;
  * умеем. То же с неразбираемым содержимым: поток — не решение, и
  * потерянная запись стоит одной строки лога, а остановленный поток —
  * всей картины. Тот же исход у момента происшествия, который не
- * разбирается.
+ * разбирается; ОТСУТСТВУЮЩИЙ же момент раздачу не гейтит — запись уходит
+ * без него.
  *
  * <p><b>Слушатель заводится только на настроенной тропе</b>
  * ({@link StreamConsumptionCondition}): пустой адрес брокера либо пустой
@@ -93,8 +94,9 @@ public class StreamEventConsumer {
                     record.topic(), record.offset());
             return;
         }
-        OffsetDateTime occurredAt = occurredAt(record);
-        if (isNull(occurredAt)) {
+        String moment = header(record, Constants.EventHeaders.OCCURRED_AT);
+        OffsetDateTime occurredAt = isNull(moment) ? null : occurredAt(record, moment);
+        if (nonNull(moment) && isNull(occurredAt)) {
             return;
         }
         Object content = contentOf(eventType, record.value());
@@ -154,19 +156,23 @@ public class StreamEventConsumer {
     }
 
     /**
-     * Момент происшествия; заголовка нет — момент раздачи. Заголовок, который
-     * не разбирается, — порча конверта, а не отсутствие значения: запись
-     * пропускается, как и неразобранное тело, и раздачу не останавливает.
+     * Момент происшествия из ПРЕДЪЯВЛЕННОГО заголовка.
+     *
+     * <p><b>Заголовка нет — сюда не приходят:</b> запись уходит без момента,
+     * и пустое поле значит «момент не добыт». Момент раздачи на его место не
+     * подставляется — по потоку подставленный от настоящего не отличить, а
+     * клиент строит от момента нижнюю границу дочитывания после разрыва
+     * (docs/architecture/contracts.md, раздел «Живые данные в браузер»).
+     *
+     * <p>Заголовок, который есть и не разбирается (включая пустую строку), —
+     * порча конверта, а не отсутствие значения: запись пропускается, как и
+     * неразобранное тело, и раздачу не останавливает.
      *
      * @return момент записи; пусто — заголовок не разобрался
      */
-    private OffsetDateTime occurredAt(ConsumerRecord<String, String> record) {
-        String occurredAt = header(record, Constants.EventHeaders.OCCURRED_AT);
-        if (isBlank(occurredAt)) {
-            return OffsetDateTime.now(ZoneOffset.UTC);
-        }
+    private OffsetDateTime occurredAt(ConsumerRecord<String, String> record, String moment) {
         try {
-            return OffsetDateTime.parse(occurredAt);
+            return OffsetDateTime.parse(moment);
         } catch (DateTimeParseException failure) {
             log.error("An event with an unreadable occurrence moment is skipped topic={} offset={}",
                     record.topic(), record.offset(), failure);

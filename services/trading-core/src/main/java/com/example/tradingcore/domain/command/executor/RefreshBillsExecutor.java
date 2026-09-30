@@ -1,5 +1,6 @@
 package com.example.tradingcore.domain.command.executor;
 
+import static com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient.indexInstrumentId;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
@@ -306,11 +307,11 @@ public class RefreshBillsExecutor implements CommandExecutor {
             flow.setRateStatus(DealCashFlow.RateStatus.NOT_REQUIRED);
             return;
         }
-        String indexInstrumentId = flow.getCcy() + "-" + settleCurrency;
-        if (isTrue(applyIndexRate(flow, indexInstrumentId, TimeFrame.ONE_SECOND))) {
+        String rateCandleInstrument = indexInstrumentId(flow.getCcy(), settleCurrency);
+        if (isTrue(applyIndexRate(flow, rateCandleInstrument, TimeFrame.ONE_SECOND))) {
             return;
         }
-        if (isTrue(applyIndexRate(flow, indexInstrumentId, TimeFrame.ONE_MINUTE))) {
+        if (isTrue(applyIndexRate(flow, rateCandleInstrument, TimeFrame.ONE_MINUTE))) {
             return;
         }
         flow.setRateStatus(DealCashFlow.RateStatus.RATE_UNAVAILABLE);
@@ -340,9 +341,13 @@ public class RefreshBillsExecutor implements CommandExecutor {
      * ступень не применяется. Проверка накрытия обязательна: источник
      * отдаёт ближайшую доступную, и без неё курс мог бы приехать с бара,
      * закончившегося до операции.
+     *
+     * <p>Имя индекса строит граница с коннектором
+     * ({@link ExchangeOperationsClient#indexInstrumentId}), а не этот
+     * исполнитель: склейка валют есть номенклатура площадки.
      */
-    private Boolean applyIndexRate(DealCashFlow flow, String indexInstrumentId, TimeFrame timeFrame) {
-        Candle candle = exchangeOperationsClient.getIndexCandleAt(indexInstrumentId, timeFrame,
+    private Boolean applyIndexRate(DealCashFlow flow, String rateCandleInstrument, TimeFrame timeFrame) {
+        Candle candle = exchangeOperationsClient.getIndexCandleAt(rateCandleInstrument, timeFrame,
                 flow.getExternalCreatedAt());
         if (isNull(candle) || isNull(candle.getOpenTimestamp()) || isNull(candle.getClose())) {
             return false;
@@ -353,7 +358,7 @@ public class RefreshBillsExecutor implements CommandExecutor {
         }
         flow.setAppliedRate(candle.getClose());
         flow.setRateStatus(DealCashFlow.RateStatus.APPLIED);
-        flow.setAppliedRateCandleInstrument(indexInstrumentId);
+        flow.setAppliedRateCandleInstrument(rateCandleInstrument);
         flow.setAppliedRateCandleTimeframe(timeFrame);
         flow.setAppliedRateCandleOpenTime(
                 OffsetDateTime.ofInstant(Instant.ofEpochMilli(candle.getOpenTimestamp()), ZoneOffset.UTC));

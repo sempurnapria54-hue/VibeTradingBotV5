@@ -65,20 +65,45 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.UNAUTHORIZED.getReasonPhrase());
     }
 
-    /** Отказы резолва контекста несут свой статус и свой код. */
+    /**
+     * Отказы резолва контекста несут свой статус и свой код.
+     *
+     * <p>Пояснение — причина, которую наш бросающий задал явно: в
+     * сервлетном стеке класс бросает только наш код, а реактивные его
+     * наследники каркаса сюда не доезжают
+     * (docs/rules/error-handling-policy.md §«Пояснение отказа пишет наша
+     * сторона, а не платформа»).
+     */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorApiResponse> onResponseStatus(ResponseStatusException failure) {
         return response(HttpStatus.valueOf(failure.getStatusCode().value()),
                 "PERIMETER_REQUEST_REJECTED", failure.getReason());
     }
 
-    /** Негодный вход вызова: неизвестный глагол, неразобранное значение. */
+    /**
+     * Негодный вход вызова: неразобранное значение, негодный адрес
+     * пересылки, служебный разделитель в поле билета.
+     *
+     * <p><b>Пояснение — постоянный текст ветви, а не текст исключения.</b>
+     * Класс платформенный: тот же класс бросает и каркас, и по классу
+     * автора текста не различить, а текст платформы несёт внутреннюю форму —
+     * отказ разбора адреса пересылки, например, положил бы в него адрес
+     * владельца
+     * (docs/rules/error-handling-policy.md §«Пояснение отказа пишет наша
+     * сторона, а не платформа»). Текст исключения уходит в лог.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorApiResponse> onIllegalArgument(IllegalArgumentException failure) {
-        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", failure.getMessage());
+        log.info("An invalid request input is rejected reason={}", failure.getMessage());
+        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Негодный вход вызова");
     }
 
-    /** Владелец недоступен: ответа нет, и выдавать это за свой отказ нечестно. */
+    /**
+     * Владелец недоступен: ответа нет, и выдавать это за свой отказ нечестно.
+     *
+     * <p>Класс — свой, и текст его пишет наш бросающий; отказ транспорта
+     * едет в нём причиной, а не приклеивается к тексту.
+     */
     @ExceptionHandler(PeerServiceUnavailableException.class)
     public ResponseEntity<ErrorApiResponse> onPeerUnavailable(PeerServiceUnavailableException failure) {
         return response(HttpStatus.SERVICE_UNAVAILABLE, "PEER_UNAVAILABLE", failure.getMessage());

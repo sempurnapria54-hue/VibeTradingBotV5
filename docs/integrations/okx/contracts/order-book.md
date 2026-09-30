@@ -4,15 +4,12 @@
 
 Каков контракт операций чтения стакана.
 
-## Внешний источник правды
+## Источник правды вне репозитория
 
-Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
-раздел «Order Book Trading → Market Data», секции «GET / Order
-book», «GET / Full order book»). При расхождении с офдоком побеждает
-офдок; синхронизация — перевыкачка + дифф при каждом заходе
-интегратора по источнику и по задаче «актуализируй»
-(`.claude/processes/api-docs-completion.md`, канал чтения —
-`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
+Официальный док OKX (`https://www.okx.com/docs-v5/en/`, раздел «Order
+Book Trading → Market Data», секции «GET / Order book», «GET / Full
+order book»). Процедура сверки и приоритет офдока —
+`.claude/rules/external-source-sync.md`. Последняя сверка: 2026-06-11
 (поле-уровневая дистилляция).
 
 ## Статус использования

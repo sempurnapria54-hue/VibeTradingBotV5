@@ -4,13 +4,11 @@
 
 Какие лимиты у WebSocket-соединений источника.
 
-## Внешний источник правды
+## Источник правды вне репозитория
 
-Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
-раздел «Overview → WebSocket»). При расхождении с офдоком побеждает
-офдок; синхронизация — перевыкачка + дифф при каждом заходе
-интегратора (`.claude/processes/api-docs-completion.md`, канал —
-`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11.
+Официальный док OKX (`https://www.okx.com/docs-v5/en/`, раздел «Overview
+→ WebSocket»). Процедура сверки и приоритет офдока —
+`.claude/rules/external-source-sync.md`. Последняя сверка: 2026-06-11.
 
 ## Лимиты
 

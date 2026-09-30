@@ -1,5 +1,6 @@
 package com.example.tradingcore.unit.risk;
 
+import static com.example.tradingcore.unit.risk.RiskFixture.BALANCE_FRESHNESS;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingAppetite;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingPairState;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingRules;
@@ -11,6 +12,7 @@ import com.example.strategy.engine.calc.CalculatedStrategyAction;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
+import com.example.tradingcore.config.DealContextProperties;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult;
@@ -19,11 +21,12 @@ import com.example.tradingcore.domain.command.risk.RiskValidator;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.InstrumentExternalRulesDataService;
 import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Валидатор со своими тремя границами хранилища
+ * Валидатор со своими тремя границами хранилища и конфигурацией прохода
  * (`.claude/tests/cases/trading-core-risk.md` §«Чем достаются выходы»).
  *
  * <p><b>Подменяется ровно то, у чего есть ввод-вывод:</b> справочные
@@ -47,13 +50,25 @@ final class RiskHarness {
     private final TenantRiskAppetiteDataService appetiteDataService =
             mock(TenantRiskAppetiteDataService.class);
 
+    private final DealContextProperties properties = new DealContextProperties();
+
     private final RiskValidator validator =
-            new RiskValidator(rulesDataService, pairStateDataService, appetiteDataService);
+            new RiskValidator(rulesDataService, pairStateDataService, appetiteDataService, properties);
 
     RiskHarness() {
         givenRules(workingRules());
         givenPairState(workingPairState());
         givenAppetite(workingAppetite());
+        givenBalanceFreshness(BALANCE_FRESHNESS);
+    }
+
+    /**
+     * Толерантность прохода к возрасту снимка средств — конфигурация, а не
+     * граница хранилища: по ней преконтроль решает, мерить ли проверки
+     * средств счёта. Пусто — толерантность не объявлена.
+     */
+    void givenBalanceFreshness(Duration freshness) {
+        properties.setBalanceFreshness(freshness);
     }
 
     /** Справочные правила инструмента, которые отдаёт граница; пусто — не материализованы. */

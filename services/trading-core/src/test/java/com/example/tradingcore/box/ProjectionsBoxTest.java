@@ -92,7 +92,7 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
     @Test
     @DisplayName("B10.2 — половины тика независимы")
     void theTwoHalvesOfTheTickDoNotDependOnEachOther() {
-        auth.refusesAnything(503, Feed.peerFailure("PEER_SERVICE_UNAVAILABLE"));
+        auth.refusesAnything(503, Feed.peerFailure(PEER_UNAVAILABLE));
         marketData.answers(PEER_INSTRUMENTS, Feed.array(Feed.instrument(INSTRUMENT, EXTERNAL_INSTRUMENT)));
         answerRules(INSTRUMENT, EXTERNAL_INSTRUMENT);
         Integer mark = AppLog.mark();
@@ -171,9 +171,9 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
                 Feed.instrument(THIRD_INSTRUMENT, THIRD_EXTERNAL_INSTRUMENT)));
         answerRules(INSTRUMENT, EXTERNAL_INSTRUMENT);
         marketData.answers(PEER_INSTRUMENTS + "/" + SECOND_INSTRUMENT + RULES, 503,
-                Feed.peerFailure("PEER_SERVICE_UNAVAILABLE"));
+                Feed.peerFailure(PEER_UNAVAILABLE));
         marketData.answers(PEER_INSTRUMENTS + "/" + THIRD_INSTRUMENT + RULES, 503,
-                Feed.peerFailure("PEER_SERVICE_UNAVAILABLE"));
+                Feed.peerFailure(PEER_UNAVAILABLE));
 
         tick(Tick.REGISTRY_PROJECTIONS);
 
@@ -245,7 +245,7 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
     @DisplayName("B10.7 — отказ одной пары стоит одну пару")
     void aRefusalOnOnePairCostsExactlyThatPair() {
         provision(List.of(ACCOUNT, SECOND_ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
-        connector.answers(feeRatePath(ACCOUNT), 503, Feed.peerFailure("PEER_SERVICE_UNAVAILABLE"));
+        connector.answers(feeRatePath(ACCOUNT), 503, Feed.peerFailure(PEER_UNAVAILABLE));
         connector.answers(feeRatePath(SECOND_ACCOUNT), Feed.array(feeRate("B")));
         Integer mark = AppLog.mark();
 
@@ -300,7 +300,7 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
     @DisplayName("B10.10 — недоступность владельца данных приём определения не роняет")
     void anUnavailableDataOwnerDoesNotBreakTheDefinitionReception() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
-        marketData.refusesAnything(503, Feed.peerFailure("PEER_SERVICE_UNAVAILABLE"));
+        marketData.refusesAnything(503, Feed.peerFailure(PEER_UNAVAILABLE));
         Strategy definition = Definitions.withComputations("S2", ACCOUNT, INSTRUMENT);
 
         activate(definition);

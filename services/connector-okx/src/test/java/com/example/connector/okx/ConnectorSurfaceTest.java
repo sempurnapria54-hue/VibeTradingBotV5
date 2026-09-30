@@ -22,6 +22,7 @@ import com.example.connector.okx.gateway.ExchangeGateway;
 import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.vault.VaultException;
 import org.springframework.web.client.ResourceAccessException;
@@ -170,6 +172,41 @@ class ConnectorSurfaceTest {
     }
 
     /**
+     * Текст исключения платформенного класса наружу не идёт — ни на негодном
+     * входе, ни на транспортном сбое, ни на недоступном хранилище
+     * ({@code docs/rules/error-handling-policy.md}, пассаж «Пояснение отказа
+     * пишет наша сторона, а не платформа»).
+     *
+     * <p>Тексты бросков собраны так, как их пишет платформа: разбор перечня
+     * кладёт полное имя доменного класса, клиент — адрес запроса. Класс
+     * отказа при этом остаётся тем же, что и прежде.
+     */
+    @Test
+    void platformExceptionTextDoesNotTravelOut() throws Exception {
+        String enumParse = "No enum constant com.example.tradingbot.domain.model.core.algo_order."
+                + "AlgoOrder.ConditionType.SIDEWAYS";
+        String transport = "I/O error on GET request for \"https://www.okx.com/api/v5/public/time\"";
+        String store = "Status 503 Service Unavailable [secret/data/dev/exchange-accounts/acc-1]";
+        when(gateway.getPositions(ACCOUNT)).thenThrow(new IllegalArgumentException(enumParse));
+        when(gateway.getServerTime()).thenThrow(new ResourceAccessException(transport));
+        when(gateway.getPositions(OTHER_ACCOUNT)).thenThrow(new VaultException(store));
+
+        String invalid = body(mockMvc.perform(get("/api/v1/accounts/{account}/positions", ACCOUNT))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST")));
+        String unreachable = body(mockMvc.perform(get("/api/v1/market/time"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.code").value("EXCHANGE_UNREACHABLE")));
+        String unavailable = body(mockMvc.perform(get("/api/v1/accounts/{account}/positions", OTHER_ACCOUNT))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("SECRET_STORE_UNAVAILABLE")));
+
+        assertThat(invalid).doesNotContain("com.example", "No enum constant", "ConditionType");
+        assertThat(unreachable).doesNotContain("okx.com", "I/O error");
+        assertThat(unavailable).doesNotContain("secret/data", "Status 503");
+    }
+
+    /**
      * Причина проблемного статуса переезжает ОТДЕЛЬНЫМ полем.
      *
      * <p>Ядро ставит её причиной закрытия сущности; окажись она только в
@@ -184,6 +221,10 @@ class ConnectorSurfaceTest {
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.code").value("EXTERNAL_STATUS"))
                 .andExpect(jsonPath("$.reason").value("UNKNOWN_EXTERNAL_STATUS"));
+    }
+
+    private static String body(ResultActions result) throws Exception {
+        return result.andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
     /** Веб-слой поверхности: контроллеры, единая точка ошибок и подменённый шлюз. */

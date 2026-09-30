@@ -18,7 +18,8 @@
     "tranche.exposure": "экспозиция транша, которому принадлежит действие (выход либо набор ступеней); резолв — docs/spec/protection-coverage.json. Нетто-размер позиции операндом этой спеки не значится: на сетке он относится к нескольким траншам сразу, и любая величина размера, взятая от него, покрывала бы чужую экспозицию",
     "exit.fraction": "объявленная доля выхода; область определения — (0, 1]: нулевая доля действием не объявляется и до расчёта не доходит — она отвергается создáнием стратегии как непозитивная доля объявления (docs/rules/strategy-validation.md, реджект STRATEGY_ACTION_FRACTION_NOT_POSITIVE)",
     "ladder.previousStepsTotal": "сумма размеров уже поставленных ступеней набора",
-    "ladder.declaredStepSize": "размер ступени по объявленной доле"
+    "ladder.declaredStepSize": "размер ступени по объявленной доле",
+    "ladder.isLastStep": "ступень — последняя в наборе своего шага, то есть получает остаток (селектор «последней» — docs/rules/live-risk-protection.md); шаг не предъявлен (восстановленная сделка) — ложь: остатка ступень не берёт"
   },
 
   "values": [
@@ -101,8 +102,8 @@
     },
     {
       "name": "ladderStepRejected",
-      "note": "Ступень меньше минимального размера — явный отказ шага, а не тихий пропуск.",
-      "expr": "ladder.declaredStepSize < instrument.minSize"
+      "note": "Ступень меньше минимального размера — явный отказ шага, а не тихий пропуск. Меряются ОБЕ величины: объявленная доля и, у последней ступени, доставшийся ей остаток — отказ, когда ниже минимума любая. Одной объявленной мало: экспозиция транша могла уменьшиться после постановки предыдущих ступеней, и остаток последней оказывается ниже минимума при размещаемой доле, а ступень ниже минимального торгового размера невыразима, какой бы из двух величин она ни получилась. Обратное направление держит первая половина: набор, чья объявленная доля неразмещаема, невыразим целиком, сколько бы ни досталось последней ступени.",
+      "expr": "ladder.declaredStepSize < instrument.minSize || (ladder.isLastStep && lastLadderStepSize < instrument.minSize)"
     }
   ],
 
@@ -556,7 +557,8 @@
         },
         "ladder": {
           "previousStepsTotal": 75,
-          "declaredStepSize": 25
+          "declaredStepSize": 25,
+          "isLastStep": true
         },
         "entryAnchor": 3000,
         "stopPrice": 2910,
@@ -589,7 +591,8 @@
         },
         "ladder": {
           "previousStepsTotal": 75,
-          "declaredStepSize": 25
+          "declaredStepSize": 25,
+          "isLastStep": true
         },
         "entryAnchor": 3000,
         "stopPrice": 2910,
@@ -622,7 +625,8 @@
         },
         "ladder": {
           "previousStepsTotal": 9,
-          "declaredStepSize": 3
+          "declaredStepSize": 3,
+          "isLastStep": false
         },
         "entryAnchor": 3000,
         "stopPrice": 2910,
@@ -630,6 +634,75 @@
       },
       "expect": {
         "ladderStepRejected": true
+      }
+    },
+    {
+      "case": "экспозиция транша уменьшилась после постановки трёх ступеней по 25: доля последней размещаема, а доставшийся ей остаток ниже минимума — отказ шага",
+      "note": "Состояние достижимо: три ступени поставлены при экспозиции 100, затем частичный выход увёл её до 78. Объявленная доля последней ступени от нынешней экспозиции — 19 контрактов, выше минимума; остаток — 3, ниже. Форма, мерившая одну объявленную долю, отказа здесь не давала.",
+      "state": {
+        "direction": "LONG",
+        "base": 10000,
+        "instrument": {
+          "contractValue": 0.1,
+          "lotSize": 1,
+          "minSize": 5
+        },
+        "entry": {
+          "riskPerActionPercent": 1,
+          "allocationPercents": 100
+        },
+        "exit": {
+          "fraction": 1
+        },
+        "tranche": {
+          "exposure": 78
+        },
+        "ladder": {
+          "previousStepsTotal": 75,
+          "declaredStepSize": 19,
+          "isLastStep": true
+        },
+        "entryAnchor": 3000,
+        "stopPrice": 2910,
+        "feeRate": 0.0005
+      },
+      "expect": {
+        "lastLadderStepSize": 3,
+        "ladderStepRejected": true
+      }
+    },
+    {
+      "case": "не последняя ступень остатка не берёт: её размер — объявленная доля, и малый остаток экспозиции над поставленными отказа не даёт",
+      "note": "Пара к примеру выше: те же операнды остатка на ступени, которая последней не является. Три ступени по 20 % из пяти поставлены при экспозиции 100, частичный выход увёл её до 62; четвёртая ступень получает объявленную долю 12. Форма, мерившая остаток у всякой ступени, отказывала бы здесь по разности 62 - 60 = 2.",
+      "state": {
+        "direction": "LONG",
+        "base": 10000,
+        "instrument": {
+          "contractValue": 0.1,
+          "lotSize": 1,
+          "minSize": 5
+        },
+        "entry": {
+          "riskPerActionPercent": 1,
+          "allocationPercents": 100
+        },
+        "exit": {
+          "fraction": 1
+        },
+        "tranche": {
+          "exposure": 62
+        },
+        "ladder": {
+          "previousStepsTotal": 60,
+          "declaredStepSize": 12,
+          "isLastStep": false
+        },
+        "entryAnchor": 3000,
+        "stopPrice": 2910,
+        "feeRate": 0.0005
+      },
+      "expect": {
+        "ladderStepRejected": false
       }
     },
     {

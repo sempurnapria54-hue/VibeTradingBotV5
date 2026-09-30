@@ -19,6 +19,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperator;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import java.math.BigDecimal;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -89,9 +90,11 @@ class VolumeFilterTest {
     }
 
     /**
-     * У цены прошлого в контексте нет ни одним полем — та же половина, что
-     * у `U5.11`: фильтр на ценовом операнде ложен при ЛЮБОМ прошлом
-     * (находка `F-3`).
+     * У цены своего прошлого нет — его задаёт индикатор-пара, а у фильтра
+     * пары нет: операнд один. Фильтр на ценовом операнде ложен при ЛЮБОМ
+     * прошлом, даже когда раскладка предыдущих цен собрана
+     * (docs/components/StrategyConditionEvaluator.md §«Вторая половина
+     * времени»); контракт авторинга такой формы не допускает.
      */
     @Test
     @DisplayName("U6.6 — левый операнд — цена: ложь при любом прошлом")
@@ -122,14 +125,16 @@ class VolumeFilterTest {
     }
 
     /**
-     * Контекст, у которого цена момента объявлена, а «прошлая цена»
-     * выразима только раскладкой индикаторов: полем контекста её нет.
+     * Контекст, у которого цена момента объявлена и раскладка предыдущих цен
+     * СОБРАНА по ключу соседнего индикатора: ложь фильтра тогда не следствие
+     * пустой раскладки, а отсутствия пары.
      */
     private ConditionEvaluationContext priceContext(String current, String pastNeighbour) {
         return base()
                 .price(new BigDecimal(current))
                 .latestIndicators(indicators(OBV_KEY, obv(current)))
                 .previousIndicators(indicators(OBV_KEY, obv(pastNeighbour)))
+                .previousPrices(Map.of(OBV_KEY, new BigDecimal(pastNeighbour)))
                 .build();
     }
 }

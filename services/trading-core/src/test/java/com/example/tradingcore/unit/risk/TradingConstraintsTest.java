@@ -8,8 +8,12 @@ import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.pairState;
 import static com.example.tradingcore.unit.risk.RiskFixture.priceBuilder;
+import static com.example.tradingcore.unit.risk.RiskFixture.protection;
 import static com.example.tradingcore.unit.risk.RiskFixture.protectionAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.rules;
+import static com.example.tradingcore.unit.risk.RiskFixture.takeProfitAction;
+import static com.example.tradingcore.unit.risk.RiskFixture.tranche;
+import static com.example.tradingcore.unit.risk.RiskFixture.transferAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.withPrice;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingContext;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingPairState;
@@ -18,10 +22,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategy.engine.calc.CalculatedStrategyAction;
 import com.example.strategy.engine.calc.PriceMode;
+import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +43,11 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Базовая сборка</b> — U1.1: размер 10 контрактов при минимуме 1,
  * шаге 1 и лимитах, которых он не достаёт; плечо пары не назначено.
+ *
+ * <p><b>Торгуемость запирает набор риска, а не защиту</b> (клетки
+ * U2.19-U2.23; дом — docs/rules/risk-validator-scope.md): область
+ * проверки — блок-сет ступени, и защитное действие, уровня своего транша
+ * не ослабляющее, на неторгуемом инструменте проходит.
  */
 class TradingConstraintsTest {
 
@@ -220,6 +231,63 @@ class TradingConstraintsTest {
                 .containsExactly(RiskCheckCode.INSTRUMENT_NOT_LIVE,
                         RiskCheckCode.MARGIN_MODE_NOT_ISOLATED,
                         RiskCheckCode.SIZE_BELOW_MIN);
+    }
+
+    @Test
+    @DisplayName("U2.19 — инструмент не торгуется, первая защита над непокрытым траншем: отказа нет")
+    void u2_19_theFirstProtectionOverAnUncoveredTranchePassesOnANonTradeableInstrument() {
+        harness.givenRules(suspendedRules());
+
+        assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), workingContext(),
+                tranche(List.of(), List.of())))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U2.20 — инструмент не торгуется, перенос стопа ближе к цене, чем защита транша: отказа нет")
+    void u2_20_aTighteningTransferPassesOnANonTradeableInstrument() {
+        harness.givenRules(suspendedRules());
+
+        assertThat(codes(harness.validate(transferAction("2950"), workingContext(), protectedTranche())))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("U2.21 — инструмент не торгуется, постановка уровня фиксации прибыли: отказа нет")
+    void u2_21_aTakeProfitPlacementPassesOnANonTradeableInstrument() {
+        harness.givenRules(suspendedRules());
+
+        assertThat(codes(harness.validate(takeProfitAction(), workingContext(), protectedTranche()))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U2.22 — инструмент не торгуется, перенос стопа дальше от цены, чем защита транша: отказ")
+    void u2_22_aLooseningTransferIsRejectedOnANonTradeableInstrument() {
+        harness.givenRules(suspendedRules());
+
+        assertThat(codes(harness.validate(transferAction("2850"), workingContext(), protectedTranche())))
+                .containsExactly(RiskCheckCode.INSTRUMENT_NOT_LIVE);
+    }
+
+    /** Транша у действия нет: ослабляет ли уровень защиту, спросить не у кого. */
+    @Test
+    @DisplayName("U2.23 — инструмент не торгуется, защита с уровнем, транш не назван: отказ")
+    void u2_23_aProtectiveActWithoutItsTrancheIsRejectedOnANonTradeableInstrument() {
+        harness.givenRules(suspendedRules());
+
+        assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), workingContext())))
+                .containsExactly(RiskCheckCode.INSTRUMENT_NOT_LIVE);
+    }
+
+    /** Правила рабочего инструмента, у которого торги приостановлены. */
+    private static InstrumentExternalRules suspendedRules() {
+        InstrumentExternalRules suspended = workingRules();
+        suspended.setStatus(InstrumentExternalRules.Status.SUSPEND);
+        return suspended;
+    }
+
+    /** Транш с одной живой отдельной защитой на уровне базовой сборки. */
+    private static DealTranche protectedTranche() {
+        return tranche(List.of(), List.of(protection(STOP.toPlainString())));
     }
 
     /** Вход базовой сборки с названным режимом рассчитанной цены. */

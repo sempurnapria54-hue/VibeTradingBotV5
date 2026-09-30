@@ -74,6 +74,9 @@ public class ExchangeOperationsClient {
 
     private static final String ACCOUNT_PATH = "/api/v1/accounts/{accountInternalId}";
 
+    /** Разделитель валют в имени индекса пары котировки — номенклатура площадки коннектора. */
+    private static final String INDEX_PAIR_SEPARATOR = "-";
+
     private static final ParameterizedTypeReference<List<Order>> ORDER_LIST =
             new ParameterizedTypeReference<>() { };
     private static final ParameterizedTypeReference<List<AlgoOrder>> ALGO_ORDER_LIST =
@@ -424,6 +427,26 @@ public class ExchangeOperationsClient {
     }
 
     /**
+     * Имя индекса пары котировки в номенклатуре площадки коннектора: валюта
+     * и котируемая валюта через разделитель площадки.
+     *
+     * <p><b>Имя строит граница, а не домен</b>
+     * (docs/components/RefreshBillsExecutor.md §«Лестница огрубления
+     * разрешения»): склейка есть словарь площадки, и доменный слой
+     * источникового литерала не знает (.claude/rules/codestyle.md §«Слои
+     * (зоны ответственности)»). Домен передаёт пару валют и получает имя,
+     * которое записывает координатой свечи курса.
+     *
+     * <p><b>Конвенция одной площадки — то же названное ограничение, что и
+     * один коннектор</b> (шапка класса): вторая площадка вводит выбор
+     * коннектора по коду площадки счёта, и номенклатура имени выбирается
+     * вместе с ним, а не остаётся общей.
+     */
+    public static String indexInstrumentId(String currency, String quoteCurrency) {
+        return currency + INDEX_PAIR_SEPARATOR + quoteCurrency;
+    }
+
+    /**
      * Время площадки — публичная операция, которую зовёт ядро.
      *
      * <p><b>Счёта не несёт</b> (ключи ей не нужны), а нужна там, где обе
@@ -487,8 +510,11 @@ public class ExchangeOperationsClient {
         ExchangeFailureClass failureClass = isNull(body)
                 ? null
                 : EnumUtils.getEnum(ExchangeFailureClass.class, body.getCode());
+        // Без тела пояснение наше, а не фраза статуса транспорта: текст
+        // уезжает наружу отказом соседа (docs/rules/error-handling-policy.md
+        // §«Пояснение отказа пишет наша сторона, а не платформа»).
         String detail = "[" + operation + "] "
-                + (isNull(body) ? failure.getStatusText() : body.getMessage());
+                + (isNull(body) ? "no error body, status " + failure.getStatusCode().value() : body.getMessage());
         if (isNull(failureClass)) {
             return unclassified(detail, failure);
         }

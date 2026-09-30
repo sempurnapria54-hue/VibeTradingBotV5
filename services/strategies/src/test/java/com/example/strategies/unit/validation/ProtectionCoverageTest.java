@@ -221,7 +221,7 @@ class ProtectionCoverageTest {
     @DisplayName("U13.13 — тот же дефект на шаге уровня СДЕЛКИ: область инварианта — транш")
     void u13_13_theCoverageInvariantIsTrancheScoped() {
         CreateStrategyApiRequest dealLevel = reference();
-        dealStepsByStatus(bull(dealLevel)).put("EXIT_PENDING", List.of(bareCancelStep("deal_cancel")));
+        dealStepsByStatus(bull(dealLevel)).get("ACTIVE").add(bareCancelStep("deal_cancel"));
 
         CreateStrategyApiRequest trancheLevel = reference();
         stepsByStatus(tranche(bull(trancheLevel))).put("PROTECTION_SWITCHED",

@@ -2632,6 +2632,26 @@
       "expect": {
         "actStopKeepsProtection": false
       }
+    },
+    {
+      "case": "перечень траншей пуст: «все покрыты» и «приписанное в пределах» истинны вакуумно, «есть нарушение», «несёт риск» и «уровень не резолвится» ложны, суммы нулевые, уровня на позицию нет — пусто, а не ноль",
+      "note": "Сделки без траншей домен не производит: пустой перечень есть недогрузка графа, и отсекает его охрана полноты (docs/spec/deal-context-load.json, tranchesPresent), а не агрегаты этой спеки.",
+      "state": {
+        "deal": {
+          "direction": "LONG",
+          "status": "ACTIVE"
+        },
+        "tranches": []
+      },
+      "expect": {
+        "allTranchesCovered": true,
+        "attributionNonNegative": true,
+        "anyTrancheViolated": false,
+        "dealRiskBearing": false,
+        "dealStopUnresolved": false,
+        "dealExposure": 0,
+        "stopCurrentLive": null
+      }
     }
   ]
 }

@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.platform.security.ActorProvider;
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
+import com.example.strategies.exception.StrategyNotFoundException;
 import com.example.strategies.integration.internal.api.TradingCoreReadClient;
 import com.example.strategies.integration.internal.api.model.PairCheckCoreResponse;
 import com.example.strategies.mapping.StrategyApiMapper;
@@ -120,12 +121,13 @@ public class StrategyLifecycleService {
     /**
      * Определение тенанта; чужое читается как ненайденное — иначе
      * поверхность отвечала бы на вопрос о существовании чужой сущности.
+     * Отказ тот же, что у точки чтения: ненайденному переходить не из
+     * чего, и отказ перехода здесь недостижим.
      */
     private Strategy requireOwnDefinition(String internalId, String tenantInternalId) {
         return strategyDataService.findByInternalId(internalId)
                 .filter(found -> Objects.equals(tenantInternalId, found.getTenantId()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Strategy not found: " + internalId));
+                .orElseThrow(() -> new StrategyNotFoundException(internalId));
     }
 
     /**

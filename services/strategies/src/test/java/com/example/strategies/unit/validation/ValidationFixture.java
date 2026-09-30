@@ -67,6 +67,9 @@ final class ValidationFixture {
     /** Предел множителя катастрофического потолка базовой пары. */
     static final String BASE_CATASTROPHIC = "100";
 
+    /** Срок свежести подложенной настройки рыночных данных — любой разбираемый. */
+    private static final String NEW_SETTING_EXPIRATION = "PT1H";
+
     /** Порядок деталей эталона: индекс — тип фазы. */
     private static final List<String> PHASES = List.of("BULL_TREND", "BEAR_TREND", "RANGE", "UNKNOWN");
 
@@ -381,9 +384,16 @@ final class ValidationFixture {
         return tranche;
     }
 
+    /**
+     * Новый шаг несёт непустое условие: без него всякий подложенный шаг
+     * получал бы отказ пустого условия поверх предмета своего кейса. Правило
+     * взято без контракта операндов — {@code POSITION_OPENED} ни одной
+     * проверки создания не задевает.
+     */
     static StrategyStepApiModel newStep(String stepType, StrategyActionApiModel... actions) {
         StrategyStepApiModel step = new StrategyStepApiModel();
         step.setStepType(stepType);
+        replaceRules(step, newRule("POSITION_OPENED"));
         step.setActions(new ArrayList<>(Arrays.asList(actions)));
         return step;
     }
@@ -414,23 +424,30 @@ final class ValidationFixture {
         return action;
     }
 
-    /** Настройка индикатора с объявленным назначением — кейс правит её ось. */
+    /**
+     * Настройка индикатора с объявленными назначением и сроком свежести —
+     * кейс правит её ось. Срок обязателен у каждого объявления рыночных
+     * данных, и без него всякая подложенная настройка получала бы отказ
+     * поверх предмета своего кейса.
+     */
     static StrategyIndicatorSettingApiModel newIndicator(String key, String indicatorType,
                                                          IndicatorParamsApiModel params) {
         StrategyIndicatorSettingApiModel setting = new StrategyIndicatorSettingApiModel();
         setting.setKey(key);
         setting.setIndicatorType(indicatorType);
         setting.setDestiny("ENTRY_CONDITION");
+        setting.setExpirationDuration(NEW_SETTING_EXPIRATION);
         setting.setParams(params);
         return setting;
     }
 
-    /** Настройка структуры рынка с объявленными таймфреймом и назначением. */
+    /** Настройка структуры рынка с объявленными таймфреймом, назначением и сроком свежести. */
     static StrategyMarketStructureSettingApiModel newStructure(String key) {
         StrategyMarketStructureSettingApiModel setting = new StrategyMarketStructureSettingApiModel();
         setting.setKey(key);
         setting.setTimeframe("ONE_HOUR");
         setting.setDestiny("MARKET_PHASE");
+        setting.setExpirationDuration(NEW_SETTING_EXPIRATION);
         return setting;
     }
 

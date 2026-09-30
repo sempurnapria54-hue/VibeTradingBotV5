@@ -124,6 +124,21 @@ class ReactionUnderLiveRiskTest {
                 .isEqualTo(RiskBlockAction.Type.SKIP_ACTION);
     }
 
+    @Test
+    @DisplayName("U22.10 — инструмент не торгуется при живом риске: пропуск действия, не авария")
+    void u22_10_aNonTradeableInstrumentUnderLiveRiskSkipsTheAction() {
+        // При живом риске неторгуемость отвергает только ослабление защиты,
+        // и прежняя защита остаётся живой. Увод в аварийный контур снимал
+        // бы по рынку риск, который под контролем, на инструменте, который
+        // не торгуется (docs/processes/risk-evaluation.md §«Карв-аут
+        // исчерпанного бюджета сделки»).
+        RiskBlockAction action = resolve(blockedVerdict(RiskCheckCode.INSTRUMENT_NOT_LIVE));
+
+        assertThat(action.getType()).isEqualTo(RiskBlockAction.Type.SKIP_ACTION);
+        assertThat(action.getRiskCode()).isEqualTo(RiskCheckCode.INSTRUMENT_NOT_LIVE);
+        assertThat(action.getCloseReason()).isNull();
+    }
+
     /** Реакция карты на названный вердикт при живом риске по стадии. */
     private RiskBlockAction resolve(RiskValidationResult verdict) {
         return resolver.resolve(context(emptyDeal()), LIVE_RISK_STAGE, verdict);

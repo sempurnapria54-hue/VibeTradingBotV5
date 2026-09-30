@@ -17,6 +17,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.tranche;
 import static com.example.tradingcore.unit.risk.RiskFixture.weakeningAction;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.strategy.engine.calc.CalculatedStrategyAction;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
@@ -152,6 +153,26 @@ class CatastrophicNotionalCeilingTest {
         assertThat(codes(harness.validate(weakeningAction(), dealContext)))
                 .as("15000 + 3000 = 18000 ровно в потолок; вторая нога добавила бы ещё 15000")
                 .isEmpty();
+    }
+
+    /**
+     * Нотинал акта прайсится ЕГО плановой ценой, а не средней живого
+     * эпизода (docs/rules/risk-policy.md, правило катастрофического
+     * потолка): средняя прайсит только налитые контракты. Пара «ровно / на
+     * волос ниже» различает формы — по средней сумма была бы 6000 и прошла
+     * бы обе границы.
+     */
+    @Test
+    @DisplayName("U15.11 — добор выше средней живого эпизода: нотинал акта по его плановой цене")
+    void u15_11_anAddAboveTheEpisodeAverageIsPricedAtItsOwnPlannedPrice() {
+        CalculatedStrategyAction addAbove = entryAction("10", new BigDecimal("3300"), STOP.toPlainString());
+
+        assertThat(codes(harness.validate(addAbove, liveContext("6.3"))))
+                .as("3000 эпизода + 3300 акта = 6300 ровно в потолок 1000 × 6.3")
+                .isEmpty();
+        assertThat(codes(harness.validate(addAbove, liveContext("6.299"))))
+                .as("потолок на волос ниже перебирается нотиналом акта по его цене")
+                .containsExactly(RiskCheckCode.DEAL_NOTIONAL_EXCEEDED);
     }
 
     /** Живая нога без заявленного риска: предмет группы — нотинал, а не риск. */

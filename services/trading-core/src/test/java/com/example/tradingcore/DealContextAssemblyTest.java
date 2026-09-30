@@ -33,6 +33,7 @@ import com.example.tradingcore.persistence.service.OrderDataService;
 import com.example.tradingcore.persistence.service.PositionDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -65,6 +66,8 @@ class DealContextAssemblyTest {
     private static final Long DETAIL_ID = 11L;
     private static final Integer FLOW_LIMIT = 2;
     private static final OffsetDateTime MOMENT = OffsetDateTime.parse("2026-09-06T10:00:00Z");
+    private static final Instant EARLIER_TRIGGER = Instant.parse("2026-09-06T09:00:00Z");
+    private static final Instant LATER_TRIGGER = Instant.parse("2026-09-06T09:30:00Z");
 
     private final ExchangeAccountDataService exchangeAccountDataService = mock(ExchangeAccountDataService.class);
     private final InstrumentDataService instrumentDataService = mock(InstrumentDataService.class);
@@ -267,6 +270,31 @@ class DealContextAssemblyTest {
     }
 
     /**
+     * Порядок отдельных защит, в котором их отдаёт чтение сделки, раскладка
+     * по траншу сохраняет, и собранный транш называет причиной выхода
+     * последнюю сработавшую защиту — её выбирает модель по моменту
+     * срабатывания (docs/lifecycles/DealTranche.md §«Инициатор выхода
+     * транша читается по его фактам»). Стоп сработал позже тейка, и транш
+     * обязан назвать стоп.
+     */
+    @Test
+    void loadedOrderOfProtectionsSurvivesLayoutAndNamesTheLastTriggered() {
+        DealTranche tranche = filledTranche();
+        when(dealTrancheDataService.findByDealId(DEAL_ID)).thenReturn(List.of(tranche));
+        when(orderDataService.findByDealId(DEAL_ID)).thenReturn(List.of(leg(1L, tranche.getId())));
+        when(algoOrderDataService.findByDealId(DEAL_ID)).thenReturn(List.of(
+                triggeredProtection(8L, tranche.getId(), AlgoOrder.ConditionType.STOP_LOSS, LATER_TRIGGER),
+                triggeredProtection(5L, tranche.getId(), AlgoOrder.ConditionType.PARTIAL_TAKE_PROFIT,
+                        EARLIER_TRIGGER)));
+        when(positionDataService.findEpisodes(DEAL_ID)).thenReturn(List.of(new Position()));
+
+        service.build(fetchedDeal());
+
+        assertThat(tranche.getAlgoOrders()).extracting(AlgoOrder::getId).containsExactly(8L, 5L);
+        assertThat(tranche.exitInitiatedReason()).isEqualTo(DealTranche.CloseReason.STOP_LOSS);
+    }
+
+    /**
      * Терминальный транш из графа не вычёркивается: по ногам ВСЕЙ сделки
      * считаются числа риска и экспозиция, а фильтр «нетерминальные»
      * опустошал бы обе коллекции ровно в точке расчёта.
@@ -350,6 +378,16 @@ class DealContextAssemblyTest {
         algoOrder.setId(id);
         algoOrder.setDealId(DEAL_ID);
         algoOrder.setDealTrancheId(trancheId);
+        return algoOrder;
+    }
+
+    /** Отдельная защита транша, сработавшая на площадке в названный момент. */
+    private AlgoOrder triggeredProtection(Long id, Long trancheId, AlgoOrder.ConditionType conditionType,
+                                          Instant triggeredAt) {
+        AlgoOrder algoOrder = algoLeg(id, trancheId);
+        algoOrder.setConditionType(conditionType);
+        algoOrder.setCloseReason(AlgoOrder.CloseReason.TRIGGERED);
+        algoOrder.setExternalTriggerTime(triggeredAt);
         return algoOrder;
     }
 

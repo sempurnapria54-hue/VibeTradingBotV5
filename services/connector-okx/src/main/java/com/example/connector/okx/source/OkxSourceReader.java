@@ -500,7 +500,33 @@ public class OkxSourceReader {
             log.error("OKX empty balance [account-balance] ccy={}", settleCurrency);
             throw new ExchangeIntegrationException("OKX empty balance [account-balance] ccy=" + settleCurrency);
         }
-        return balanceContainerMapper.integrationToSnapshot(response.getData().getFirst());
+        BalanceOkxResponse account = response.getData().getFirst();
+        verifySettleCurrencyRow(account, settleCurrency);
+        return balanceContainerMapper.integrationToSnapshot(account);
+    }
+
+    /**
+     * Строка расчётной валюты обязательна — структурная валидация до
+     * маппинга (docs/models/mapping/Balance.md §«Validation (структурная, до
+     * маппинга)»): отсутствие строки — контролируемый отказ границы, а не
+     * снимок без неё.
+     *
+     * <p><b>Класс — нарушение инварианта ответа, а не ошибка API.</b> Площадка
+     * ответила успехом, и тот же ответ придёт на повтор; снимок без строки
+     * расчётной валюты не несёт ни остатка, ни капитала, по которым ядро
+     * считает размер и преконтроль
+     * (docs/rules/controlled-exchange-exceptions.md: недостача обязательного
+     * поля). Пустой {@code data} остаётся своей ветвью выше — там ответа о
+     * счёте нет вовсе.
+     */
+    private void verifySettleCurrencyRow(BalanceOkxResponse account, String settleCurrency) {
+        Boolean present = nonNull(account) && emptyIfNull(account.getDetails()).stream()
+                .anyMatch(detail -> nonNull(detail) && Objects.equals(settleCurrency, detail.getCcy()));
+        if (isFalse(present)) {
+            log.error("OKX balance without settle currency row [account-balance] ccy={}", settleCurrency);
+            throw new ExternalInvariantViolationException(
+                    "account-balance: в ответе нет строки расчётной валюты ccy=" + settleCurrency);
+        }
     }
 
     /**

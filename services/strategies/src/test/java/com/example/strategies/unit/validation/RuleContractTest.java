@@ -35,6 +35,12 @@ import org.junit.jupiter.api.Test;
  */
 class RuleContractTest {
 
+    /** Реджект пересечения с ценой без индикатора-пары. */
+    private static final String CROSSOVER_UNPAIRED = "STRATEGY_CROSSOVER_PRICE_WITHOUT_INDICATOR";
+
+    /** Реджект объёмного фильтра на неиндикаторном операнде. */
+    private static final String VOLUME_NOT_INDICATOR = "STRATEGY_VOLUME_FILTER_OPERAND_NOT_INDICATOR";
+
     @Test
     @DisplayName("U28.1 — базовая сборка: правила несут операторы и операнды своего типа")
     void u28_1_theReferenceRulesSatisfyTheirContracts() {
@@ -68,22 +74,24 @@ class RuleContractTest {
         assertThat(violationsOfRule(rule)).isEmpty();
     }
 
+    /**
+     * Тип закрытия свечи снят из перечня вместе с исполнением: операнда
+     * закрытия свечи контекст оценки не несёт
+     * (docs/rules/strategy-condition-contract.md §«Тип без операнда не
+     * объявляется»). Прежнее имя отвергает создание разбором перечня — той
+     * же ветвью, что всякое неизвестное (группа {@code U29}), а не
+     * контрактом типа.
+     */
     @Test
-    @DisplayName("U28.5 — закрытие свечи без таймфрейма")
-    void u28_5_aCandleClosedRuleRequiresItsTimeframe() {
-        assertThat(violationsOfRule(newRule("CANDLE_CLOSED")))
-                .singleElement()
-                .asString()
-                .contains("timeframe is required for CANDLE_CLOSED");
-    }
-
-    @Test
-    @DisplayName("U28.6 — закрытие свечи с таймфреймом: нарушений нет")
-    void u28_6_aDeclaredTimeframeSatisfiesTheCandleContract() {
+    @DisplayName("U28.5 — снятый тип закрытия свечи: имя вне перечня, контракт не считается")
+    void u28_5_theRetiredCandleClosedNameIsAnUnknownRuleType() {
         StrategyConditionRuleApiModel rule = newRule("CANDLE_CLOSED");
         rule.setTimeframe("FIVE_MINUTES");
 
-        assertThat(violationsOfRule(rule)).isEmpty();
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".ruleType: unknown value CANDLE_CLOSED");
     }
 
     @Test
@@ -344,6 +352,69 @@ class RuleContractTest {
     }
 
     @Test
+    @DisplayName("U28.29 — пересечение цены с константой: прошлого у цены нет — отказ пары")
+    void u28_29_aPriceCrossingAConstantIsRefused() {
+        assertThat(violationsOfRule(crossover(priceOperand(), constantOperand("NUMBER", "100"))))
+                .singleElement()
+                .asString()
+                .contains(CROSSOVER_UNPAIRED);
+    }
+
+    @Test
+    @DisplayName("U28.30 — пересечение цены с ценой: отказ один на правило, а не на сторону")
+    void u28_30_aPriceCrossingAPriceIsRefusedOnce() {
+        assertThat(violationsOfRule(crossover(priceOperand(), priceOperand())))
+                .singleElement()
+                .asString()
+                .contains(CROSSOVER_UNPAIRED);
+    }
+
+    @Test
+    @DisplayName("U28.31 — цена справа, константа слева: сторона цены на исход не влияет")
+    void u28_31_thePriceSideDoesNotMatter() {
+        assertThat(violationsOfRule(crossover(constantOperand("NUMBER", "100"), priceOperand())))
+                .singleElement()
+                .asString()
+                .contains(CROSSOVER_UNPAIRED);
+    }
+
+    @Test
+    @DisplayName("U28.32 — пересечение цены с индикатором: прошлое цены задаёт пара — нарушений нет")
+    void u28_32_aPriceCrossingAnIndicatorIsLegal() {
+        assertThat(violationsOfRule(crossover(priceOperand(), indicatorOperand("ema_fast_15m")))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U28.33 — объёмный фильтр на индикаторе: нарушений нет")
+    void u28_33_aVolumeFilterOnAnIndicatorIsLegal() {
+        StrategyConditionRuleApiModel rule = newRule("VOLUME_FILTER_PASSED");
+        rule.setLeftOperand(indicatorOperand("ema_fast_15m"));
+
+        assertThat(violationsOfRule(rule)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U28.34 — объёмный фильтр на цене: прошлого у левого операнда нет — отказ")
+    void u28_34_aVolumeFilterOnThePriceIsRefused() {
+        StrategyConditionRuleApiModel rule = newRule("VOLUME_FILTER_PASSED");
+        rule.setLeftOperand(priceOperand());
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".leftOperand " + VOLUME_NOT_INDICATOR);
+    }
+
+    @Test
+    @DisplayName("U28.35 — объёмный фильтр без операнда: то же состояние и тот же код")
+    void u28_35_aVolumeFilterWithoutItsOperandIsRefused() {
+        assertThat(violationsOfRule(newRule("VOLUME_FILTER_PASSED")))
+                .singleElement()
+                .asString()
+                .contains(VOLUME_NOT_INDICATOR);
+    }
+
+    @Test
     @DisplayName("U28.24 — тип правила, которого контракт не описывает: он инкрементален")
     void u28_24_anUndescribedRuleTypeCarriesNoContract() {
         assertThat(violationsOfRule(newRule("TREND_CHANGED"))).isEmpty();
@@ -363,6 +434,16 @@ class RuleContractTest {
         CreateStrategyApiRequest request = reference();
         replaceRules(entryStep(bull(request)), rule);
         return violations(request);
+    }
+
+    /** Пересечение вверх с названными операндами — оператор годен, предмет клетки в операндах. */
+    private StrategyConditionRuleApiModel crossover(StrategyConditionOperandApiModel left,
+                                                    StrategyConditionOperandApiModel right) {
+        StrategyConditionRuleApiModel rule = newRule("CROSSOVER");
+        rule.setOperator("CROSSED_ABOVE");
+        rule.setLeftOperand(left);
+        rule.setRightOperand(right);
+        return rule;
     }
 
     private StrategyConditionOperandApiModel structureOperand() {

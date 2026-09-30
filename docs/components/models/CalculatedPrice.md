@@ -17,7 +17,7 @@
 | `priceMode` | `PriceMode` | Режим цены. |
 | `basePrice` | `BigDecimal` | База, от которой считали. |
 | `rawPrice` | `BigDecimal` | Цена до округления. |
-| `roundedPrice` | `BigDecimal` | Цена после округления по шагу цены. |
+| `roundedPrice` | `BigDecimal` | Цена после округления по шагу цены; у рыночного ориентира не округляется и равна базе (`docs/components/PriceCalculator.md`). |
 | `sendPriceToExchange` | `Boolean` | Нужно ли отправлять цену на биржу. |
 | `stopLossPrice` | `ResolvedStopLossPrice` | Компонент стопа, если действие его создаёт или замещает. |
 | `takeProfitPrice` | `ResolvedTakeProfitPrice` | Компонент тейка. |

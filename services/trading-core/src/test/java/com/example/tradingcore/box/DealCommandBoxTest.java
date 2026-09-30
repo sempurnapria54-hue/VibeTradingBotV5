@@ -278,7 +278,7 @@ class DealCommandBoxTest extends SharedLiveDealBox {
     @DisplayName("B3.9 — отказ соседа по ярусу сделку в ошибку не уводит")
     void theTierPeerFailureDoesNotMoveTheDealToError() {
         openCommandDeal(workingDefinition());
-        marketData.answers(featuresPath(INSTRUMENT), 503, Feed.peerFailure("PEER_SERVICE_UNAVAILABLE"));
+        marketData.answers(featuresPath(INSTRUMENT), 503, Feed.peerFailure(PEER_UNAVAILABLE));
         PeerStub.all().forEach(PeerStub::forgetRequests);
 
         tick(Tick.DEAL_ORCHESTRATOR);

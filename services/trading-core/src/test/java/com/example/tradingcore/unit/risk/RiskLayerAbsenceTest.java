@@ -18,6 +18,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingcore.config.DealContextProperties;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
 import com.example.tradingcore.domain.command.risk.RiskBlockAction;
@@ -88,7 +89,8 @@ class RiskLayerAbsenceTest {
     void u29_2_theValidatorHasNoCommandCreatingCollaborator() {
         assertThat(collaboratorTypes(RiskValidator.class))
                 .containsExactlyInAnyOrder(InstrumentExternalRulesDataService.class,
-                        AccountInstrumentStateDataService.class, TenantRiskAppetiteDataService.class);
+                        AccountInstrumentStateDataService.class, TenantRiskAppetiteDataService.class,
+                        DealContextProperties.class);
     }
 
     @Test
@@ -104,7 +106,7 @@ class RiskLayerAbsenceTest {
     }
 
     @Test
-    @DisplayName("U29.4 — проверки свежести снимка средств у преконтроля нет ни одной")
+    @DisplayName("U29.4 — отказа по свежести снимка средств преконтроль не производит")
     void u29_4_theValidatorNeverProducesTheStaleBalanceCode() {
         assertThat(executableBodyOf("domain/command/risk/RiskValidator.java"))
                 .doesNotContain("BALANCE_NOT_FRESH");

@@ -94,7 +94,11 @@
 (`docs/architecture/data-ownership.md`):
 
 - база `auth`, таблица `tenants` — реестровая часть:
-  `internal_id` — `NOT NULL`, `UNIQUE`; `name` — `NOT NULL`; `status` —
+  `internal_id` — `NOT NULL`, `UNIQUE`; `name` — `NOT NULL`, `varchar(255)`:
+  исключение строковой конвенции по ширине, назначенной не этим носителем
+  (`docs/rules/persistence-representation.md`) — при отсутствии
+  `preferred_username` имя заводится из claim `sub`, чью длину OIDC
+  ограничивает 255 ASCII-символами; `status` —
   `NOT NULL`, строкой (`.claude/rules/codestyle.md` §«Слои моделей и
   enum'ы»);
 - база `trading_core`, таблица `tenant_risk_appetites` — числа

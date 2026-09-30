@@ -8,12 +8,15 @@ import static com.example.tradingcore.unit.fsm.FsmFixture.exposed;
 import static com.example.tradingcore.unit.fsm.FsmFixture.filledEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.livePosition;
+import static com.example.tradingcore.unit.fsm.FsmFixture.pairState;
 import static com.example.tradingcore.unit.fsm.FsmFixture.tranche;
 import static java.util.Objects.nonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.domain.command.DealContext;
@@ -35,13 +38,16 @@ import org.junit.jupiter.api.Test;
  * живой эпизод один; чужого живого риска нет; каскад подменён и молчит;
  * исполнитель системных действий подменён и отдаёт пустоту.
  *
- * <p><b>Кейсы {@code U7.8} и {@code U7.9} не прогоняются</b> — дом
- * называет обработчика исполнителем двух проверок, которых он не делает
- * (находка {@code F-3}): торгуемость инструмента он не читает вовсе, а
- * жёсткую ступень энфорсит петля до него. Ожидания у них нет, и кода они
- * не получили.
+ * <p><b>Кейсы {@code U7.8} и {@code U7.9} пинят, что двух операндов
+ * обработчик не читает</b> — дом развёл их по исполнителям (находка
+ * {@code F-3} закрыта правкой дома): торгуемость читает преконтроль
+ * действия, жёсткую ступень энфорсит петля до обработчика. Ожидание обоих
+ * — исход базовой сборки.
  */
 class DealActiveInputChecksTest {
+
+    /** Сырой статус площадки у инструмента, чьи торги приостановлены. */
+    private static final String SUSPENDED_EXCHANGE_STATE = "suspend";
 
     private final DealActiveHarness harness = new DealActiveHarness();
 
@@ -161,6 +167,49 @@ class DealActiveInputChecksTest {
         assertThat(transition.getHoldSignal()).isNull();
         assertThat(transition.hasCommands()).isFalse();
         assertThat(transition.movesStatus()).isFalse();
+    }
+
+    /**
+     * Торгуемость читает преконтроль действия, а не проход сопровождения
+     * (docs/components/DealActiveHandler.md §«Жёсткая ступень и
+     * торгуемость инструмента входными проверками прохода не являются»).
+     * Границы справочных правил у обработчика нет вовсе; единственный
+     * носитель биржевого состояния инструмента в его входе — сырой статус
+     * площадки на инструменте контекста, и он ставится неторгуемым.
+     */
+    @Test
+    @DisplayName("U7.8 — инструмент сделки не торгуется: исход базовой сборки, торгуемость проход не читает")
+    void u7_8_aNonTradeableInstrumentLeavesTheInputChecksPassed() {
+        DealContext context = baseContext();
+        context.getInstrument().setExternalStatus(SUSPENDED_EXCHANGE_STATE);
+
+        DealTransition transition = harness.handle(context);
+
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.getHoldSignal()).isNull();
+    }
+
+    /**
+     * Жёсткую ступень пары энфорсит шаг петли ДО обработчика
+     * (docs/components/DealOrchestratorJob.md §«Цикл прохода»). Отбор шага
+     * здесь настоящий — он единственный коллаборатор с тропой к строке пары
+     * (гейт повтора отказавшей надобности), — и строка пары несёт жёсткую
+     * ступень. Отказавших строк у базовой сборки нет, поэтому законному
+     * читателю спрашивать нечего, и граница строки пары не читается вовсе.
+     */
+    @Test
+    @DisplayName("U7.9 — на паре «счёт, инструмент» жёсткая ступень: исход базовой сборки, ступень обработчик не читает")
+    void u7_9_aHardRungOnThePairLeavesTheInputChecksPassed() {
+        DealActiveHarness underHardRung =
+                DealActiveHarness.withPairState(pairState(Instrument.SafetyRung.TRADE_BLOCKED));
+
+        DealTransition transition = underHardRung.handle(baseContext());
+
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.getHoldSignal()).isNull();
+        verifyNoInteractions(underHardRung.pairStateBoundary());
     }
 
     /**

@@ -84,9 +84,6 @@ final class TradingCoreSubstrate {
     /** Код площадки штатного прогона. */
     static final String EXCHANGE_CODE = "OKX";
 
-    /** Имя окружения штатного прогона. */
-    static final String ENVIRONMENT = "dev";
-
     /**
      * Образ брокера: та же версия, что у клиента в дереве зависимостей
      * ({@code kafka-clients}). Совпадение сверяет проба
@@ -244,7 +241,6 @@ final class TradingCoreSubstrate {
         values.put("spring.security.oauth2.client.registration.platform-services.client-id", "trading-core");
         values.put("spring.security.oauth2.client.registration.platform-services.client-secret",
                 "trading-core-secret");
-        values.put("platform.environment.name", ENVIRONMENT);
         values.put("neighbours.connector.exchange-code", EXCHANGE_CODE);
         values.put("neighbours.connector.base-url", PeerStub.connector().baseUrl());
         values.put("neighbours.auth.base-url", PeerStub.auth().baseUrl());

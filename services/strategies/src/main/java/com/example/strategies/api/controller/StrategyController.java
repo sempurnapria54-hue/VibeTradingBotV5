@@ -7,6 +7,7 @@ import com.example.strategies.config.SurfaceProperties;
 import com.example.strategies.domain.service.StrategyCreationService;
 import com.example.strategies.domain.service.StrategyLifecycleService;
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
+import com.example.strategies.exception.StrategyNotFoundException;
 import com.example.strategies.mapping.StrategyApiMapper;
 import com.example.strategies.persistence.service.StrategyDataService;
 import com.example.strategies.util.Constants;
@@ -30,7 +31,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Поверхность владельца определений: создание, чтение, смена статуса.
@@ -102,8 +102,7 @@ public class StrategyController {
         return strategyDataService.findByInternalIdWithTree(internalId)
                 .filter(found -> Objects.equals(tenantInternalId, found.getTenantId()))
                 .map(mapper::domainToApi)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Strategy not found: " + internalId));
+                .orElseThrow(() -> new StrategyNotFoundException(internalId));
     }
 
     /**

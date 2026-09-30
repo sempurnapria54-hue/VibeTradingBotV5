@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.api.model.strategy.StrategyAlgoOrderActionApiModel;
 import com.example.strategies.api.model.strategy.StrategyConditionOperandApiModel;
+import com.example.strategies.api.model.strategy.StrategyConditionRuleApiModel;
 import com.example.strategies.api.model.strategy.StrategyPricePlacementApiModel;
 import com.example.strategies.api.model.strategy.StrategyStepApiModel;
 import java.util.List;
@@ -107,7 +108,13 @@ class EnumDomainTest {
         CreateStrategyApiRequest request = reference();
         indicator(request, "atr_15m").getParams().setTimeframe("TEN_MINUTES");
         structure(request, "phase_structure_1h").setTimeframe("TEN_MINUTES");
-        rules(entryStep(bull(request))).get(4).setTimeframe("TEN_MINUTES");
+        List<StrategyConditionRuleApiModel> entryRules = rules(entryStep(bull(request)));
+        // Тип без контракта: таймфрейм правила сверяется перечнем при любом типе.
+        StrategyConditionRuleApiModel timeframed = new StrategyConditionRuleApiModel();
+        timeframed.setLevel(entryRules.size() + 1);
+        timeframed.setRuleType("TREND_CHANGED");
+        timeframed.setTimeframe("TEN_MINUTES");
+        entryRules.add(timeframed);
 
         assertThat(matching(violations(request), "timeframe: " + UNKNOWN + " TEN_MINUTES")).hasSize(3);
     }

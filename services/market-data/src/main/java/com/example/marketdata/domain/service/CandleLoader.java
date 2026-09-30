@@ -20,9 +20,10 @@ import org.springframework.stereotype.Component;
 /**
  * Ведёт одну {@link CandleGroup} по жизненному циклу загрузки свечей
  * (docs/lifecycles/CandleGroup.md): BACKFILL (выкачка истории в глубину
- * до заказанного горизонта либо пустого ответа) → SYNC (докачка хвоста) →
- * CHECK (проверка целостности по count) → REPAIR (докачка дыр бинарным
- * поиском) → ACTIVE. Идемпотентность держит {@link CandleDataService}
+ * до заказанного горизонта либо пустого ответа) → CHECK (проверка
+ * целостности по count) → REPAIR (докачка дыр бинарным поиском) → ACTIVE;
+ * из ACTIVE — SYNC (докачка хвоста вместе с проверкой) → ACTIVE либо
+ * REPAIR. Идемпотентность держит {@link CandleDataService}
  * (естественный ключ группы и открытия бара).
  *
  * <p><b>Горизонт бэкфилла берётся у ГРУППЫ, а не у инструмента:</b>
@@ -42,6 +43,20 @@ import org.springframework.stereotype.Component;
  * проход, упавший на чтении у площадки, группу не пишет и бюджета не
  * расходует: неустранимую дыру от временного отказа отличает ответ
  * площадки, а не его отсутствие.
+ *
+ * <p><b>Проход, продвинувший ряд к плотности, бюджет возвращает.</b>
+ * Предел попыток отличает неустранимую дыру, а не широкую: хвост,
+ * отросший за долгий бэкфилл шире нескольких страниц, латается починкой
+ * постранично, и без возврата бюджета исчерпал бы его на заведомо
+ * устранимой дыре (docs/lifecycles/CandleGroup.md §«Докачка дыр
+ * (`REPAIR`)»). Прогресс меряется недостачей до плотности, а не числом
+ * вставленных свечей: бары ниже нижней границы ряда её не сокращают.
+ *
+ * <p><b>Докачка хвоста проверяет целостность тем же шагом.</b> Отдельный
+ * шаг {@code CHECK} после {@code SYNC} держал бы готовую группу вне
+ * {@code ACTIVE} на пересчёте готовности каждого тика с новым баром, и
+ * инструмент терял бы готовность на штатной догонке
+ * (docs/lifecycles/Instrument.md §«Координация»).
  */
 @Slf4j
 @Component
@@ -91,19 +106,28 @@ public class CandleLoader {
                 properties.getPageSize());
         persist(group, page);
         reconcile(group);
-        group.setStatus(CandleGroup.Status.CHECK);
+        settleIntegrity(group);
         candleGroupDataService.save(group);
     }
 
     private void check(CandleGroup group) {
         reconcile(group);
+        settleIntegrity(group);
+        candleGroupDataService.save(group);
+    }
+
+    /**
+     * Проверка целостности по count: плотный ряд — {@code ACTIVE} с
+     * обнулённым бюджетом докачки, дефицит — {@code REPAIR}. Границы и
+     * {@code count} к этому моменту сведены с рядом в базе.
+     */
+    private void settleIntegrity(CandleGroup group) {
         if (group.isDense()) {
             group.resetRepairAttempts();
             group.setStatus(CandleGroup.Status.ACTIVE);
-        } else {
-            group.setStatus(CandleGroup.Status.REPAIR);
+            return;
         }
-        candleGroupDataService.save(group);
+        group.setStatus(CandleGroup.Status.REPAIR);
     }
 
     private void repair(CandleGroup group) {
@@ -123,10 +147,14 @@ public class CandleLoader {
         }
         Instrument instrument = instrumentDataService.getRequiredById(group.getInstrumentId());
         long step = group.getTimeframe().getDurationMillis();
+        long deficitBefore = deficit(group);
         List<Candle> page = readClient.getHistoryCandles(instrument.getExternalId(), group.getTimeframe(),
                 window.toMillis() + step, properties.getPageSize());
         persist(group, page);
         reconcile(group);
+        if (deficit(group) < deficitBefore) {
+            group.resetRepairAttempts();
+        }
         group.setStatus(CandleGroup.Status.CHECK);
         candleGroupDataService.save(group);
     }
@@ -174,6 +202,15 @@ public class CandleLoader {
             }
         }
         return new HoleWindow(lo, hi);
+    }
+
+    /**
+     * Недостача ряда до плотности на фактических границах: ожидаемое по
+     * density-инварианту минус поддерживаемый {@code count}.
+     */
+    private long deficit(CandleGroup group) {
+        long actual = isNull(group.getCount()) ? 0L : group.getCount();
+        return group.expectedCount() - actual;
     }
 
     private void persist(CandleGroup group, List<Candle> candles) {

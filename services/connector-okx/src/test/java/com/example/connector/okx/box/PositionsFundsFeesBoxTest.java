@@ -148,6 +148,34 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
         assertThat(exchange.single(OkxConstants.ACCOUNT_BALANCE_PATH).getUrl()).contains("ccy=USDT");
     }
 
+    /**
+     * Ожидание взято из дома: строка расчётной валюты у баланса обязательна,
+     * и её отсутствие — контролируемый отказ границы
+     * ({@code docs/models/mapping/Balance.md} §«Validation (структурная, до
+     * маппинга)»); класс — нарушение инварианта контракта: недостача
+     * обязательного поля ({@code docs/rules/controlled-exchange-exceptions.md}).
+     * Вариант на каждую форму недостачи: строка только чужой валюты, пустой
+     * перечень строк, перечня нет вовсе.
+     */
+    @Test
+    @DisplayName("B5.10 — ответ баланса без строки расчётной валюты нарушает инвариант")
+    void b5_10_aBalanceWithoutTheSettleCurrencyRowViolatesTheInvariant() {
+        List<String> violations = List.of(
+                balanceAnswer(",\"details\":[{\"ccy\":\"BTC\",\"eq\":\"1\",\"availBal\":\"1\",\"frozenBal\":\"0\"}]"),
+                balanceAnswer(",\"details\":[]"),
+                balanceAnswer(""));
+        for (String violation : violations) {
+            exchange.reset();
+            exchange.answers(OkxConstants.ACCOUNT_BALANCE_PATH, Okx.ok(violation));
+
+            Answer answer = get(account("/balance?settleCurrency=USDT"));
+
+            assertThat(answer.carriesErrorDto()).as(violation).isTrue();
+            assertThat(answer.errorCode()).as(violation).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+            assertThat(String.valueOf(answer.asObject().get("message"))).as(violation).contains("USDT");
+        }
+    }
+
     @Test
     @DisplayName("B5.6 — движения средств обходятся пагинацией назад до пустой страницы")
     void b5_6_billsAreWalkedBackwardsUntilAnEmptyPage() {
@@ -235,6 +263,12 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
             assertThat(answer.carriesErrorDto()).as(violation).isTrue();
             assertThat(answer.errorCode()).as(violation).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
         }
+    }
+
+    /** Ответ баланса со счётными полями и названным хвостом строк валют. */
+    private static String balanceAnswer(String details) {
+        return "{\"uTime\":\"1758240000000\",\"totalEq\":\"1000\",\"adjEq\":\"990\",\"availEq\":\"900\""
+                + details + "}";
     }
 
     private static String feeAnswer(String ts, String group) {

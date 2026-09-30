@@ -12,6 +12,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.trade.indicator.EmaValue;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.indicator.ObvValue;
+import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingcore.domain.market.MarketFeatures;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -90,6 +91,28 @@ class MarketFeatureCoverageTest {
         assertThat(features.covers(compare())).isTrue();
     }
 
+    /**
+     * Пересечение цены с индикатором читает и прошлое цены — по ключу
+     * индикатора-пары. Его нет — шаг не покрыт, хотя цена момента и обе
+     * половины индикатора на месте; есть — покрыт.
+     */
+    @Test
+    void aPriceCrossoverNeedsThePastPriceUnderTheIndicatorPairKey() {
+        MarketPriceData prices = new MarketPriceData();
+        prices.setExternalLastPrice(new BigDecimal("11"));
+        MarketFeatures.MarketFeaturesBuilder withoutPastPrice = MarketFeatures.builder()
+                .latestIndicators(Map.of(SLOW, ema("10")))
+                .previousIndicators(Map.of(SLOW, ema("10")))
+                .structures(Map.of())
+                .marketPriceData(prices);
+
+        assertThat(withoutPastPrice.build().covers(priceCrossover())).isFalse();
+        assertThat(withoutPastPrice.previousPrices(Map.of(FAST, new BigDecimal("9"))).build()
+                .covers(priceCrossover())).isFalse();
+        assertThat(withoutPastPrice.previousPrices(Map.of(SLOW, new BigDecimal("9"))).build()
+                .covers(priceCrossover())).isTrue();
+    }
+
     private static MarketFeatures features(Map<String, IndicatorValue> latest,
                                            Map<String, IndicatorValue> previous) {
         return MarketFeatures.builder()
@@ -102,6 +125,13 @@ class MarketFeatureCoverageTest {
     private static StrategyCondition crossover() {
         return condition(rule(StrategyConditionRuleType.CROSSOVER, StrategyConditionOperator.CROSSED_ABOVE,
                 indicator(FAST), indicator(SLOW)));
+    }
+
+    private static StrategyCondition priceCrossover() {
+        StrategyConditionOperand price = new StrategyConditionOperand();
+        price.setSourceType(StrategyConditionSourceType.PRICE);
+        return condition(rule(StrategyConditionRuleType.CROSSOVER, StrategyConditionOperator.CROSSED_ABOVE,
+                price, indicator(SLOW)));
     }
 
     private static StrategyCondition volumeFilter() {

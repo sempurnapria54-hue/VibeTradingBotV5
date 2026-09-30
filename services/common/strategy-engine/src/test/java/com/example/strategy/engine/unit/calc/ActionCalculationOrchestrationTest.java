@@ -1,12 +1,16 @@
 package com.example.strategy.engine.unit.calc;
 
+import static com.example.strategy.engine.unit.calc.CalcFixture.TICK_SIZE;
 import static com.example.strategy.engine.unit.calc.CalcFixture.algoAction;
 import static com.example.strategy.engine.unit.calc.CalcFixture.attachedStop;
 import static com.example.strategy.engine.unit.calc.CalcFixture.base;
 import static com.example.strategy.engine.unit.calc.CalcFixture.detail;
 import static com.example.strategy.engine.unit.calc.CalcFixture.entryAction;
+import static com.example.strategy.engine.unit.calc.CalcFixture.liveEpisode;
 import static com.example.strategy.engine.unit.calc.CalcFixture.marketPlacement;
 import static com.example.strategy.engine.unit.calc.CalcFixture.rules;
+import static com.example.strategy.engine.unit.calc.CalcFixture.stopAction;
+import static com.example.strategy.engine.unit.calc.CalcFixture.stopSettings;
 import static com.example.strategy.engine.unit.calc.CalcFixture.tranche;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,13 +25,16 @@ import com.example.strategy.engine.calc.SizeCalculator;
 import com.example.strategy.engine.calc.StrategyActionCalculationResult;
 import com.example.strategy.engine.calc.StrategyActionCalculator;
 import com.example.strategy.engine.exception.CalculationException;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StopLossCalculationType;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
+import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAlgoOrderAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrderAction;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,7 +49,7 @@ import org.junit.jupiter.api.Test;
  * группы — порядок и обёртка, а не числа. Подменяются при этом
  * <b>коллабораторы</b> — подклассами-заглушками, а не доменные модели
  * (.claude/rules/codestyle.md §«Тесты доменных моделей»); там, где
- * предмет клетки — сам исход расчёта (`U12.1`, `U12.10`), работают
+ * предмет клетки — сам исход расчёта (`U12.1`, `U12.10`, `U12.11`), работают
  * настоящие половины.
  *
  * <p><b>Сменяет прежнюю пробу предмета целиком.</b> Класс
@@ -207,26 +214,53 @@ class ActionCalculationOrchestrationTest {
     }
 
     /**
-     * Тип ошибки — ПОСТОЯННАЯ у всех троп без исключения: временной
-     * ошибки расчёта не производит ни одна. Читатель по типу ветвится и
-     * заводит повтор, который недостижим, — находка `F-3`
-     * (`.claude/work/backlog.md` §«Временная ошибка расчёта писателя не
-     * имеет, а ядро по ней ветвится»).
+     * Недостаёт объявления либо контекст неполон — отказ ПОСТОЯННЫЙ:
+     * повтор без правки стратегии дал бы тот же отказ
+     * (docs/components/models/CalculationError.md §«Тип выводится из
+     * повода»). Пара к `U12.11`: различает их ровно повод.
      */
     @Test
-    @DisplayName("U12.10 — любой контролируемый отказ слоя: тип PERMANENT, повтор запрещён")
-    void u12_10_everyControlledRefusalOfTheLayerIsPermanent() {
+    @DisplayName("U12.10 — отказ по невыразимому объявлению: тип PERMANENT, повтор запрещён")
+    void u12_10_aRefusalOnAnInexpressibleDeclarationIsPermanent() {
         StrategyActionCalculator calculator = realCalculator();
-        List<CalculationContext> refusing = List.of(
-                missingRiskBaseContext(),
-                noReferencePriceContext(),
-                missingStopSettingsContext());
+        Map<String, CalculationContext> refusing = Map.of(
+                "MISSING_RISK_BASE", missingRiskBaseContext(),
+                "MISSING_STOP_LOSS_SETTINGS", missingStopSettingsContext());
 
-        assertThat(refusing).allSatisfy(context -> {
+        refusing.forEach((code, context) -> {
             StrategyActionCalculationResult result = calculator.calculate(context);
-            assertThat(result.isSuccess()).as("контекст обязан отказать").isFalse();
-            assertThat(result.getError().getType()).isEqualTo(CalculationErrorType.PERMANENT);
-            assertThat(result.getError().getRetryable()).isFalse();
+            assertThat(result.isSuccess()).as("контекст %s обязан отказать", code).isFalse();
+            assertThat(result.getError().getCode()).isEqualTo(code);
+            assertThat(result.getError().getType()).as(code).isEqualTo(CalculationErrorType.PERMANENT);
+            assertThat(result.getError().getRetryable()).as(code).isFalse();
+        });
+    }
+
+    /**
+     * Недостаёт НАБЛЮДЕНИЯ — цены, значения индикатора, структуры, средней
+     * цены входа эпизода, ставки комиссии: отказ ВРЕМЕННЫЙ и повторяемый,
+     * потому что следующий проход может наблюдение застать. Проверяются
+     * обе половины расчёта — ставку комиссии производит и половина размера
+     * (docs/components/models/CalculationError.md §«Тип выводится из
+     * повода»).
+     */
+    @Test
+    @DisplayName("U12.11 — отказ по ненаблюдённой величине: тип TEMPORARY, повтор разрешён — у обеих половин")
+    void u12_11_aRefusalOnAnUnobservedValueIsTemporary() {
+        StrategyActionCalculator calculator = realCalculator();
+        Map<String, CalculationContext> refusing = Map.of(
+                "NO_REFERENCE_PRICE", noReferencePriceContext(),
+                "ENTRY_ANCHOR_UNAVAILABLE", unobservedAverageContext(),
+                "MISSING_ATR", stopContext(StopLossCalculationType.ATR_PERCENT),
+                "MISSING_STRUCTURE", stopContext(StopLossCalculationType.MARKET_STRUCTURE_BUFFER_PERCENT),
+                "FEE_RATE_UNAVAILABLE", unresolvedFeeRateContext());
+
+        refusing.forEach((code, context) -> {
+            StrategyActionCalculationResult result = calculator.calculate(context);
+            assertThat(result.isSuccess()).as("контекст %s обязан отказать", code).isFalse();
+            assertThat(result.getError().getCode()).isEqualTo(code);
+            assertThat(result.getError().getType()).as(code).isEqualTo(CalculationErrorType.TEMPORARY);
+            assertThat(result.getError().getRetryable()).as(code).isTrue();
         });
     }
 
@@ -272,6 +306,36 @@ class ActionCalculationOrchestrationTest {
         return base(action)
                 .dealTranche(tranche("10"))
                 .strategyDetail(detail("1", List.of(action)))
+                .build();
+    }
+
+    /** Живой эпизод есть, а средняя цена входа не наблюдена — якорь уровня пуст. */
+    private CalculationContext unobservedAverageContext() {
+        StrategyAction action = stopAction("1");
+        return base(action)
+                .activePosition(liveEpisode(null))
+                .dealTranche(tranche("10"))
+                .strategyDetail(detail("1", List.of(action)))
+                .build();
+    }
+
+    /** Стоп названного способа; ни значения волатильности, ни структуры в контексте нет. */
+    private CalculationContext stopContext(StopLossCalculationType calculationType) {
+        StrategyAlgoOrderAction action = algoAction(2L, AlgoOrder.ConditionType.STOP_LOSS);
+        action.setStopLossSettings(stopSettings(calculationType, "20"));
+        return base(action)
+                .dealTranche(tranche("10"))
+                .strategyDetail(detail("1", List.of((StrategyAction) action)))
+                .build();
+    }
+
+    /** Базовая сборка входа, у правил инструмента ставка комиссии не резолвится — отказывает размер. */
+    private CalculationContext unresolvedFeeRateContext() {
+        StrategyOrderAction action = attachedEntry();
+        return base(action)
+                .instrumentExternalRules(rules(TICK_SIZE, null, "1", "0.1", "0.1"))
+                .riskBase(new BigDecimal("10000"))
+                .strategyDetail(detail("1", List.of((StrategyAction) action)))
                 .build();
     }
 

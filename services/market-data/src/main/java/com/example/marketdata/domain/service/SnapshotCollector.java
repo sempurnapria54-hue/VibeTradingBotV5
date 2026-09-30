@@ -29,9 +29,13 @@ import org.apache.commons.collections4.MapUtils;
 import org.springframework.stereotype.Service;
 
 /**
- * Один проход сбора невосполнимых срезов по действующему листингу — всему
- * каталогу площадки, кроме снятого с торгов
- * (docs/processes/snapshot-collection.md).
+ * Один проход сбора невосполнимых срезов по всему листингу — всему каталогу
+ * площадки, кроме снятого с торгов (docs/processes/snapshot-collection.md).
+ *
+ * <p><b>Весь листинг, а не действующий.</b> Действующий листинг — отбор
+ * поверхности каталога по статусам, на которых ведётся навес правил
+ * (docs/lifecycles/Instrument.md); популяция прохода проведена по торгам, а
+ * не по онбордингу, и потому шире.
  *
  * <p><b>Единица работы — проход, а не инструмент.</b> Срез имеет смысл
  * как состояние рынка на момент, и пять инструментов, снятых с разбросом
@@ -83,7 +87,7 @@ public class SnapshotCollector {
     private final SnapshotCollectionProperties properties;
     private final ConnectorProperties connectorProperties;
 
-    /** Снимает срез по всему действующему листингу за один проход. */
+    /** Снимает срез по всему листингу за один проход. */
     public void collectPass() {
         List<Instrument> listed = instrumentDataService.findCatalogExceptWithin(
                 connectorProperties.getExchangeCode(), WITHDRAWN_STATUSES, properties.getPassLimit());

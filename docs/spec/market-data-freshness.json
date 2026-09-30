@@ -10,6 +10,8 @@
     "expirationDuration": "срок свежести, который приносит СПРАШИВАЮЩАЯ настройка: толерантность принадлежит читателю, а не строке результата",
     "now": "текущий момент",
     "inputs": "входы фазы: свои точки отсчёта и сроки владельцев",
+    "inputs[].referencePoint": "точка отсчёта входа фазы — момент данных самого входа, уже резолвленный по его виду. ПОЛЕ СТРОКИ, а не величина referencePoint этой спеки: внутри агрегата по inputs[] имя строки перекрывает одноимённую величину, и ветка по kind к строке не применяется",
+    "inputs[].expirationDuration": "срок свежести, который приносит настройка владельца входа; поле строки, внутри агрегата перекрывает одноимённый операнд спрашивающей настройки",
     "expiredSetting": "РАЗВЕДЁННАЯ ПАРА реакций шага на устаревание: protectedPositionAction и unprotectedPositionAction. Здесь операнд означает РЕЗОЛЬВЕННОЕ значение пары — какая из двух ветвей выбрана; выбор делает величина protectionBranch",
     "actionKind": "род действия: DATA_DEPENDENT, REFRESH, CANCEL, CLOSE, SAFETY",
     "protectedPositionAction": "реакция шага, когда живой риск транша покрыт либо его нет вовсе (StrategyMarketDataExpiredSetting)",
@@ -39,7 +41,7 @@
     },
     {
       "name": "phaseExpiredAt",
-      "note": "У фазы своего срока нет: она устаревает вместе с самым ранним из своих входов.",
+      "note": "У фазы своего срока нет: она устаревает вместе с самым ранним из своих входов. referencePoint и expirationDuration в выражении агрегата — поля строки входа (inputs[].referencePoint, inputs[].expirationDuration), а не величина и операнд этой спеки: у каждого входа своя точка отсчёта и свой срок владельца.",
       "op": "min",
       "over": "inputs[]",
       "of": "referencePoint + expirationDuration"
@@ -468,6 +470,29 @@
         "branchCovered": true,
         "protectionBranch": "PROTECTED",
         "expiredSettingResolved": "WAIT"
+      }
+    },
+    {
+      "case": "у фазы нет ни одного входа: самого раннего срока нет — это отсутствие данных, а не бессрочная свежесть",
+      "state": {
+        "kind": "PHASE",
+        "windowEndAt": null,
+        "candleTimestamp": null,
+        "confirmedAt": null,
+        "expirationDuration": null,
+        "now": 1250,
+        "expiredSetting": "BLOCK_STEP",
+        "actionKind": "DATA_DEPENDENT",
+        "inputs": []
+      },
+      "expect": {
+        "phaseExpiredAt": null,
+        "expiredAt": null,
+        "dataPresent": false,
+        "isFresh": false,
+        "freshnessState": "MISSING",
+        "reaction": "BLOCK_STEP",
+        "actionBlocked": true
       }
     }
   ],

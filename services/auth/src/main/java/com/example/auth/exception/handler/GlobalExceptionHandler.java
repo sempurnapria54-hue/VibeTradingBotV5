@@ -52,10 +52,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return response(HttpStatus.UNPROCESSABLE_CONTENT, "CONTOUR_NOT_ADMITTED", failure.getMessage());
     }
 
-    /** Неизвестный тенант, неразобранное значение перечня и прочий негодный вход. */
+    /**
+     * Неизвестный тенант, неразобранное значение перечня и прочий негодный вход.
+     *
+     * <p><b>Пояснение — постоянный текст ветви, а не текст исключения</b>
+     * (docs/rules/error-handling-policy.md §«Пояснение отказа пишет наша
+     * сторона, а не платформа»). Класс платформенный, и по нему автор текста
+     * не различается: тот же класс бросает и наш сервис («тенант не найден»),
+     * и разбор перечня, кладущий в текст полное имя доменного класса. Текст
+     * исключения уходит в лог — причина отказа не теряется, но и во внешний
+     * контракт не попадает.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorApiResponse> onIllegalArgument(IllegalArgumentException failure) {
-        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", failure.getMessage());
+        log.info("Invalid request refused: {}", failure.getMessage());
+        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Запрос содержит недопустимое значение");
     }
 
     /**

@@ -346,7 +346,7 @@ public class SizeCalculator {
     private BigDecimal requireFeeRate(InstrumentExternalRules rules) {
         BigDecimal feeRate = rules.takerFeeRate();
         if (isNull(feeRate)) {
-            throw error(FEE_RATE_UNAVAILABLE, "Taker fee rate is not resolved: both legs of the cost are unknown");
+            throw unobserved(FEE_RATE_UNAVAILABLE, "Taker fee rate is not resolved: both legs of the cost are unknown");
         }
         return feeRate;
     }
@@ -375,7 +375,18 @@ public class SizeCalculator {
         return value.divide(step, 0, RoundingMode.DOWN).multiply(step);
     }
 
+    /** Постоянный отказ: невыразимое объявление, неполный контекст либо вырожденная величина. */
     private CalculationException error(String code, String message) {
         return new CalculationException(CalculationError.permanent(code, message));
+    }
+
+    /**
+     * Временный отказ: ставка комиссии — наблюдение площадки, которое
+     * синхронизирует чужой такт, и следующий проход может её застать.
+     * Признак — docs/components/models/CalculationError.md §«Тип выводится
+     * из повода».
+     */
+    private CalculationException unobserved(String code, String message) {
+        return new CalculationException(CalculationError.temporary(code, message));
     }
 }

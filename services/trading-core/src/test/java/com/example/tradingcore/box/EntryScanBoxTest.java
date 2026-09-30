@@ -315,7 +315,7 @@ class EntryScanBoxTest extends SharedTradingCoreBox {
         // Отказ стои́т на инструменте ПЕРВОГО счёта; второй счёт держит
         // определение на соседнем инструменте и его читает исправно.
         marketData.answers(featuresPath(INSTRUMENT), 503,
-                Feed.peerFailure(PEER_SERVICE_UNAVAILABLE));
+                Feed.peerFailure(PEER_UNAVAILABLE));
         featuresOf(SECOND_INSTRUMENT, MarketPhase.Type.BULL_TREND);
         exchangeMoment();
         activate(entryDefinition(DEFINITION, INSTRUMENT, MarketPhase.Type.BULL_TREND));

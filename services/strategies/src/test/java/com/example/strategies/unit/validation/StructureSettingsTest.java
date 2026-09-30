@@ -125,6 +125,25 @@ class StructureSettingsTest {
                 .contains(".expirationDuration: invalid ISO-8601 duration два часа");
     }
 
+    /**
+     * Срок свежести структуры обязателен тем же правилом, что у индикатора
+     * (docs/rules/strategy-validation.md §«Что проверяется на создании»): без
+     * него структура в запрос рыночных данных не входит, и условие на ней
+     * ложно всегда.
+     */
+    @Test
+    @DisplayName("U25.18 — срок годности настройки структуры опущен: обязательность своим кодом")
+    void u25_18_anAbsentStructureDurationIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).setExpirationDuration(null);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("strategy.marketStructureSettings[0].expirationDuration "
+                        + "STRATEGY_MARKET_DATA_EXPIRATION_NOT_DECLARED");
+    }
+
     @Test
     @DisplayName("U25.9 — окно расчёта структуры опущено: нарушение обязательности, диапазона нет")
     void u25_9_anUndeclaredLookbackWindowIsRejected() {
@@ -177,6 +196,49 @@ class StructureSettingsTest {
     void u25_13_anAbsentParamsBlockIsNotCheckedForTheWindow() {
         CreateStrategyApiRequest request = reference();
         structure(request, REFERENCE_KEY).setParams(null);
+
+        assertThat(violations(request)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U25.14 — глубина поиска свингов нулевая: нарушение диапазона своим кодом")
+    void u25_14_aZeroSwingLookbackIsRejectedByItsOwnCode() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).getParams().setSwingLookbackBars(0);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".params.swingLookbackBars STRATEGY_STRUCTURE_SWING_LOOKBACK_NOT_POSITIVE")
+                .contains("получено 0");
+    }
+
+    @Test
+    @DisplayName("U25.15 — глубина поиска свингов отрицательная: то же нарушение диапазона")
+    void u25_15_aNegativeSwingLookbackIsRejectedToo() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).getParams().setSwingLookbackBars(-3);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".params.swingLookbackBars STRATEGY_STRUCTURE_SWING_LOOKBACK_NOT_POSITIVE");
+    }
+
+    @Test
+    @DisplayName("U25.16 — глубина поиска свингов опущена: обязательности у неё нет")
+    void u25_16_anAbsentSwingLookbackIsNotRejected() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).getParams().setSwingLookbackBars(null);
+
+        assertThat(violations(request)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U25.17 — глубина поиска свингов в один бар: нижняя граница диапазона включена")
+    void u25_17_aOneBarSwingLookbackPasses() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).getParams().setSwingLookbackBars(1);
 
         assertThat(violations(request)).isEmpty();
     }

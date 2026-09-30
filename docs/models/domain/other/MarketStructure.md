@@ -219,7 +219,13 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
   `window_end_at`; `confirmed_at` и четыре колонки пробоя
   (`breakout_broken_level_type`, `breakout_direction`,
   `breakout_level_price`, `breakout_confirmed_at`) обнуляемы — пробоя у
-  окна может не быть вовсе (§«MarketBreakoutEvent (раздел)»). Ключ
+  окна может не быть вовсе (§«MarketBreakoutEvent (раздел)»). Типы:
+  суррогатный `id` — `bigserial`; `instrument_id` и
+  `market_structure_config_id` — `bigint`; `type`,
+  `breakout_broken_level_type` и `breakout_direction` — `varchar(64)`, все
+  три строкой значения перечня; `breakout_level_price`
+  — `numeric(36, 18)`; четыре момента (`window_start_at`, `window_end_at`,
+  `confirmed_at`, `breakout_confirmed_at`) — `timestamptz`. Ключ
   уникальности `uk_market_structure_identity`
   `(instrument_id, market_structure_config_id, window_end_at)`; индекс
   чтения `ix_market_structure_latest` по тем же операндам с `window_end_at
@@ -227,7 +233,10 @@ strategy-layer для `StrategyPriceBaseType` / `StrategyPricePlacement`
 - **`market_price_levels`** — уровни, **реляционно, а не JSONB**: в
   отличие от уровней биржевой книги, на них ведут решения потребителя, и
   у каждого своя пара моментов. Обязательны `market_structure_id`, `type`
-  и `price`; `detected_at` и `confirmed_at` обнуляемы. Ключа уникальности
+  и `price`; `detected_at` и `confirmed_at` обнуляемы. Типы: суррогатный
+  `id` — `bigserial`, `market_structure_id` — `bigint`, `type` —
+  `varchar(64)` строкой значения перечня, `price` — `numeric(36, 18)`,
+  оба момента — `timestamptz`. Ключа уникальности
   нет: у одного каркаса законно несколько уровней одного типа с разной
   ценой. Ссылка на каркас — `on delete cascade`: уровень вне своего
   окна смысла не имеет. Индекс — `ix_market_price_level_structure`

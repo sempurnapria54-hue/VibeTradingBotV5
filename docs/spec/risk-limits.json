@@ -28,14 +28,22 @@
     "dealCollapsing": "сделка в окне сворачивания НА ТРОПЕ ПРЕКОНТРОЛЯ — её статус EXIT_PENDING. Ошибочное состояние в операнд не входит: risk-creating акт при deal.status = ERROR до преконтроля не доходит ни одной тропой (FSM траншей там не прогоняется, а на safety-, аварийных и восстановительных тропах преконтроль не вызывается), и обе половины окна закрыты разным — дом разведения docs/rules/exit-teardown-order.md. Операнд приходит контекстом прохода: преконтроль его не выводит",
     "actRiskCreating": "проверяемый акт создаёт риск: отправка входной заявки, добор объёма, замещение с увеличением. Определение — docs/rules/risk-policy.md",
     "actRisk": "риск акта: плановый риск ноги для risk-creating, 0 для risk-weakening; резолв — docs/spec/order-sizing.json, значение entryRiskAtStop",
-    "actNotional": "нотинал акта: плановый размер ноги × стоимость контракта × плановая цена входа для risk-creating, 0 для risk-weakening — новых контрактов такое действие не создаёт; резолв — CalculatedSize и CalculatedPrice проверяемого действия",
+    "actNotional": "нотинал акта: плановый размер ноги × стоимость контракта × плановая цена входа для risk-creating, 0 для risk-weakening — новых контрактов такое действие не создаёт; резолв — CalculatedSize и CalculatedPrice проверяемого действия. Цена — плановая цена САМОГО акта и при живом эпизоде тоже: якорь эпизода (entryAnchor, его средняя цена) прайсит только налитые контракты — своим слагаемым livePositionNotional, — а контракты акта по ней налиться не могут. Одно значение читают оба потребителя — катастрофический потолок (withinDealNotional) и маржа акта (actRequiredMargin)",
+    "unreflectedLegsNotional": "нотинал живых входных ног сделки, которых снимок средств счёта не отражает: площадка их не подтвердила либо подтвердила позже момента снимка; плановый размер × стоимость контракта × плановая цена входа. Нога, подтверждённая до момента снимка, в свободном остатке уже учтена",
+    "pair.leverage": "рабочее плечо пары «счёт, инструмент» — AccountInstrumentState.leverage; пусто у акта, создающего риск, отвергается раньше кодом LEVERAGE_NOT_CONFIGURED (docs/rules/trading-constraints.md)",
+    "balanceSnapshotFresh": "снимок средств счёта есть и обновлён площадкой позже рубежа «сейчас минус толерантность прохода» — тот же предикат и та же толерантность, по которым обработчик предвходовой проверки заказывает добычу (docs/components/TranchePrecheckHandler.md). Ложь — проверки средств счёта не меряются (docs/components/RiskValidator.md)",
+    "settle.cashBalance": "денежный остаток строки расчётной валюты инструмента в снимке средств — Balance.externalCashBalance",
+    "settle.equity": "капитал строки расчётной валюты инструмента в снимке средств — Balance.externalEquity",
+    "settle.availableBalance": "свободный остаток строки расчётной валюты инструмента в снимке средств — Balance.externalAvailableBalance",
     "riskBaseBefore": "ExchangeAccount.riskBase до применения исхода сделки",
     "freeBalanceAtFinalization": "свободный остаток расчётной валюты на момент финализации сделки; пусто — строки расчётной валюты в снимке нет",
     "balanceSnapshotAfterTerminal": "снимок BalanceContainer сделан не раньше терминала сделки; false — снимок устарел относительно исхода",
     "riskBaseObservationCandidate": "доступный остаток строки расчётной валюты в приземляемом снимке средств — операнд первого наблюдения базы; пусто — строки расчётной валюты в снимке нет",
     "exchangeRiskBase": "ExchangeAccount.riskBase на момент проверки — живая база счёта, следующая за свободным остатком в обе стороны (величина riskBaseAfter ниже). Делитель первого действия сделки, у которого снимка ещё нет; пуст ⇒ BALANCE_INVALID (docs/components/RiskValidator.md)",
     "instrumentSafetyRungStanding": "инструмент действия стоит в safety-ступени с блок-сетом — Instrument.safetyRung = ENTRY_BLOCKED либо TRADE_BLOCKED (docs/rules/instrument-hold.md §Enforcement). Рабочее состояние и онбординговые статусы значения не дают",
-    "actInSafetyBlockSet": "класс проверяемого акта входит в блок-сет safety-ступени: risk-creating, risk-increasing либо risk-weakening (ослабление защиты). Защитное действие ослабляет защиту, только когда его уровень отступает от защиты своего транша — величина actStopKeepsProtection (docs/spec/protection-coverage.json) ложна; подтяжка стопа, перевод в безубыток и первая защита над непокрытым траншем в блок-сет не входят, трейлинг и действие без названного транша — входят. Снятие риска и reduce-only-выход в блок-сет не входят — сделки доживают под своей защитой (docs/rules/instrument-hold.md)"
+    "actInSafetyBlockSet": "класс проверяемого акта входит в блок-сет safety-ступени: risk-creating, risk-increasing либо risk-weakening (ослабление защиты). Защитное действие ослабляет защиту, только когда его уровень отступает от защиты своего транша — величина actStopKeepsProtection (docs/spec/protection-coverage.json) ложна; подтяжка стопа, перевод в безубыток и первая защита над непокрытым траншем в блок-сет не входят, трейлинг и действие без названного транша — входят. Снятие риска и reduce-only-выход в блок-сет не входят — сделки доживают под своей защитой (docs/rules/instrument-hold.md)",
+    "instrumentLive": "инструмент торгуется — справочные правила инструмента несут статус LIVE (docs/models/domain/other/InstrumentExternalRules.md); прочие статусы (приостановка, предоткрытие, экспирация, тестовый, ненормализованный) — ложь",
+    "blockingCode": "блокирующий код вердикта преконтроля, предъявленного карте реакции при живом риске транша, — значение перечня RiskCheckCode (docs/components/models/RiskCheckResult.md). Операнд покодовый: многокодовый вердикт карта свёртывает конъюнкцией членства (docs/components/RiskBlockResolver.md), и свёртка здесь не переписывается"
   },
   "values": [
     {
@@ -63,7 +71,7 @@
     },
     {
       "name": "stopPriceAfterAct",
-      "note": "Уровень защиты, действующий ПОСЛЕ применения проверяемого акта: устанавливаемый актом, а если акт уровня не касается — действующий сегодня. Величина РЕЗОЛВИТ операнд stopPrice, на котором стои́т закрытая форма риска подключённого дома (docs/spec/risk-at-stop.json) — собственной копии формы потребитель не заводит. Имя РАЗВЕДЕНО с операндом намеренно: stopPrice — общевходное имя (уровень, который оценивают), и объявить его величиной значило бы завести ему дом, которого у входного имени быть не должно — соседние спеки начали бы получать «подмену дома гостевым состоянием». Ветка risk-weakening обязана мерить одновременный потолок «при той защите, которую действие устанавливает»: преконтроль зовётся ДО создания команды, среди ЖИВЫХ защит проверяемой нет по построению, и потолок по действующему уровню мерил бы защиту, которую действие как раз заменяет. Счётный эффект: после рядового адверсного проскока входа постановка основной защиты бессрочно блокировалась. ПУСТОТА обоих операндов означает, что после акта защиты не остаётся вовсе — риск позиции ничем не ограничен, и потолок отказывает вычислением, а не считается по снятому уровню (снятие защиты живого риска без замены запрещено — docs/rules/live-risk-protection.md).",
+      "note": "Уровень защиты, действующий ПОСЛЕ применения проверяемого акта: устанавливаемый актом, а если акт уровня не касается — действующий сегодня. Величина РЕЗОЛВИТ операнд stopPrice, на котором стои́т закрытая форма риска подключённого дома (docs/spec/risk-at-stop.json) — собственной копии формы потребитель не заводит. Имя РАЗВЕДЕНО с операндом намеренно: stopPrice — общевходное имя (уровень, который оценивают), и объявить его величиной значило бы завести ему дом, которого у входного имени быть не должно — соседние спеки начали бы получать «подмену дома гостевым состоянием». Ветка risk-weakening обязана мерить одновременный потолок «при той защите, которую действие устанавливает»: преконтроль зовётся ДО создания команды, среди ЖИВЫХ защит проверяемой нет по построению, и потолок по действующему уровню мерил бы защиту, которую действие как раз заменяет. Счётный эффект: после рядового адверсного проскока входа постановка основной защиты бессрочно блокировалась. ПУСТОТА обоих операндов означает, что акт уровня не ставит, а действующий уровень на всю позицию не резолвится — риск позиции ничем не ограничен, и потолок отказывает вычислением, а не считается по подставленному уровню. Акт, снимающий защиту, сюда не попадает: до команды снимаемая защита ещё действует и входит в liveStopPrice, так что потолок считается по доактному уровню — консервативно, пока рядом остаётся другая защита; снятие единственной защиты транша ловит покрытие после снятия (docs/spec/protection-coverage.json, величина coverageAfterRemoval).",
       "expr": "coalesce(?actStopPrice, liveStopPrice)"
     },
     {
@@ -150,6 +158,31 @@
       "expr": "instrumentSafetyRungStanding && actInSafetyBlockSet"
     },
     {
+      "name": "instrumentNotLiveBlocksAction",
+      "note": "Проверка торгуемости инструмента отвергает акт кодом INSTRUMENT_NOT_LIVE на тех же классах, что блок-сет safety-ступени: создание и наращивание риска и ослабление защиты. Защита, уровня своего транша не ослабляющая, и фиксация прибыли под проверку не подпадают — неторгуемость запрещает принимать риск, а не сопровождать принятый. Дом области — docs/rules/risk-validator-scope.md; различитель класса — операнд actInSafetyBlockSet, его дом — docs/rules/instrument-hold.md.",
+      "expr": "!instrumentLive && actInSafetyBlockSet"
+    },
+    {
+      "name": "actRequiredMargin",
+      "note": "Маржа, которую потребует риск-создающий акт: нотинал акта вместе с нотиналом ног, которых снимок средств не отражает, делённый на рабочее плечо пары, плюс комиссия открытия по ставке как издержке. Без слагаемого неотражённых ног уровни сетки, входящие проходами подряд внутри толерантности свежести, делили бы один свободный остаток. Действие, риска не создающее, маржи не занимает. Дом проверки — docs/components/RiskValidator.md.",
+      "expr": "if(actRiskCreating, (actNotional + unreflectedLegsNotional) / pair.leverage + (actNotional + unreflectedLegsNotional) * feeRate, 0)"
+    },
+    {
+      "name": "balanceNotEnoughBlocksAction",
+      "note": "Свободного остатка расчётной валюты не хватает на маржу акта — отказ BALANCE_NOT_ENOUGH, реакция — карв-аут (docs/processes/risk-evaluation.md). Равенство проходит. Несвежий снимок проверку не меряет — названное ограничение дома docs/components/RiskValidator.md: отказ по несвежести увёл бы сделку при живом риске в аварийный контур.",
+      "expr": "balanceSnapshotFresh && actRiskCreating && actRequiredMargin > settle.availableBalance"
+    },
+    {
+      "name": "borrowOrDebtDetected",
+      "note": "Обязательство в расчётной валюте — отрицательный денежный остаток либо капитал её строки в свежем снимке: отказ BORROW_OR_DEBT_DETECTED на всяком проверяемом действии. Ноль обязательством не является. Дом правила — docs/rules/trading-constraints.md; признак выразим лишь частью — явных полей обязательств площадки снимок не несёт (docs/components/RiskValidator.md).",
+      "expr": "balanceSnapshotFresh && (settle.cashBalance < 0 || settle.equity < 0)"
+    },
+    {
+      "name": "liveRiskBlockReaction",
+      "note": "Род реакции карты на отказ преконтроля при живом риске транша, покодово: код из перечня карв-аута — SKIP_ACTION (действие не исполняется, сделка остаётся в статусе и доживает под своей защитой), всякий иной — MOVE_DEAL_TO_ERROR. Отказ по неполноте графа уводит в ERROR на любой стадии и в перечне не стоит. Дом членства — таблица карв-аута docs/processes/risk-evaluation.md; эта величина — её исполнимая форма, и популяция ниже выводит своих членов из той таблицы и из перечня кодов, так что расхождение формы с таблицей роняет прогон.",
+      "expr": "if(in(blockingCode, 'SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET', 'RISK_PER_DEAL_CUMULATIVE_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED', 'DEAL_NOTIONAL_EXCEEDED', 'STOP_DISTANCE_BELOW_FLOOR', 'STOP_LOSS_INVALID_SIDE', 'STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION', 'STOP_LOSS_BEYOND_MARK_PRICE', 'PROTECTION_COVERAGE_REDUCED', 'LOSS_LIMIT_NOT_CONFIGURED', 'RISK_APPETITE_NOT_CONFIGURED', 'LEVERAGE_NOT_CONFIGURED', 'BALANCE_NOT_ENOUGH', 'RISK_CREATING_UNDER_COLLAPSE', 'INSTRUMENT_NOT_LIVE', 'INSTRUMENT_SAFETY_HOLD'), 'SKIP_ACTION', 'MOVE_DEAL_TO_ERROR')"
+    },
+    {
       "name": "actWithinPerAction",
       "expr": "actRisk <= limits.riskPerActionPercent / 100 * base"
     },
@@ -169,6 +202,263 @@
       "name": "withinDealNotional",
       "note": "Слагаемое проверяемого акта обязательно: без него первый вход сравнивал бы с потолком ноль и проходил любым размером — потолок, заведённый против шокового хода, был бы инертен ровно там, где решается размер. Незаданное число риск-аппетита — множитель стратегии или максимальный риск на сделку — отказывает вычислением, а не пропускает действие.",
       "expr": "dealNotional + actNotional <= catastrophicLossCeiling"
+    }
+  ],
+  "populations": [
+    {
+      "axis": "значение RiskCheckCode × реакция карты при живом риске транша",
+      "note": "Перечень выводится из ПЕРЕЧНЯ КОДОВ и из таблицы карв-аута дома членства, а не из кодов, встреченных в примерах: перечень встреченного молчит ровно о том коде, которого в нём нет. Второй ключ — сама величина правила, поэтому кортеж примера есть исход формулы, а объявленный член — исход таблицы: расхождение формы с таблицей даёт непокрытый член и член вне перечня сразу. Коды, которых не производит ни одна проверка преконтроля, объявлены недостижимыми и предъявляют контрпример: реакция карты на них определена, а тропы, предъявляющей их карте, нет.",
+      "rule": [
+        "liveRiskBlockReaction"
+      ],
+      "derive": {
+        "command": "bash tools/derive/risk-check-code-reaction.sh",
+        "from": [
+          "services/trading-core/src/main/java/com/example/tradingcore/domain/command/risk/RiskCheckResult.java",
+          "docs/processes/risk-evaluation.md",
+          "services/common/strategy-engine/src/main/java/com/example/strategy/engine/calc/util/CalculationErrorCodes.java"
+        ]
+      },
+      "keys": [
+        "blockingCode",
+        "liveRiskBlockReaction"
+      ],
+      "members": [
+        {
+          "member": [
+            "RISK_PER_ACTION_EXCEEDED",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "RISK_PER_DEAL_CUMULATIVE_EXCEEDED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "DEAL_NOTIONAL_EXCEEDED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "STOP_DISTANCE_BELOW_FLOOR",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "INSTRUMENT_SETTLE_CURRENCY_MISSING",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "RISK_CREATING_UNDER_COLLAPSE",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "INSTRUMENT_SAFETY_HOLD",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "EXCHANGE_MAX_LEVERAGE_EXCEEDED",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "LEVERAGE_NOT_CONFIGURED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "MARGIN_MODE_NOT_ISOLATED",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "BORROW_OR_DEBT_DETECTED",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "BALANCE_NOT_ENOUGH",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "BALANCE_NOT_FRESH",
+            "MOVE_DEAL_TO_ERROR"
+          ],
+          "unreachable": "несвежий снимок средств преконтролю не предъявляется — обработчик добывает свежий снимок до вызова (docs/processes/risk-evaluation.md), и ни одна проверка преконтроля код не производит (docs/components/RiskValidator.md)"
+        },
+        {
+          "member": [
+            "BALANCE_INVALID",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "SIZE_BELOW_MIN",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "SIZE_LOT_STEP_INVALID",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "SIZE_ABOVE_LIMIT",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "STOP_LOSS_INVALID_SIDE",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "TAKE_PROFIT_INVALID_SIDE",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "STOP_LOSS_BEYOND_MARK_PRICE",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "RISK_CREATING_ENTRY_WITHOUT_STOP",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "PARTIAL_EXIT_NOT_REDUCE_ONLY",
+            "MOVE_DEAL_TO_ERROR"
+          ],
+          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
+        },
+        {
+          "member": [
+            "PARTIAL_EXIT_INCREASES_POSITION",
+            "MOVE_DEAL_TO_ERROR"
+          ],
+          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
+        },
+        {
+          "member": [
+            "DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN",
+            "MOVE_DEAL_TO_ERROR"
+          ],
+          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
+        },
+        {
+          "member": [
+            "MULTIPLE_POSITIONS_DETECTED",
+            "MOVE_DEAL_TO_ERROR"
+          ],
+          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
+        },
+        {
+          "member": [
+            "POSITION_STATE_UNKNOWN",
+            "MOVE_DEAL_TO_ERROR"
+          ],
+          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
+        },
+        {
+          "member": [
+            "INSTRUMENT_NOT_LIVE",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "INSTRUMENT_RULES_MISSING",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "CALCULATED_ACTION_INVALID",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "PROTECTION_COVERAGE_REDUCED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "FEE_RATE_UNAVAILABLE",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        },
+        {
+          "member": [
+            "RISK_APPETITE_NOT_CONFIGURED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "LOSS_LIMIT_NOT_CONFIGURED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "DEAL_GRAPH_INCOMPLETE",
+            "MOVE_DEAL_TO_ERROR"
+          ]
+        }
+      ]
     }
   ],
   "examples": [
@@ -1340,7 +1630,7 @@
     },
     {
       "case": "ослабление защиты считается всеми четырьмя потолками: три проходят, катастрофическое отвергает — нотинал живого эпизода вырос проскоком входа выше одобренного преконтролем",
-      "note": "Состояние достижимо ходом эталонной тропы: вход при доле аллокации 100 сайзится в 33 контракта (тесный стоп — связывает аллокация, docs/spec/order-sizing.json), его плановый риск 19.79505 укладывается в поактный бюджет 100, плановый нотинал 33 x 0.1 x 3000 = 9900 проходит катастрофический потолок 9900 равенством. Филл идёт по 3020 — проскок поднимает нотинал живого эпизода до 9966, и следующее действие, даже нулевое по риску и нотиналу, катастрофическим неравенством отвергается.",
+      "note": "Конфигурация примера граничная: доля аллокации 100 при множителе 99 и глобальном потолке 1 % оставляет нулевой запас нотинала и создания при этих числах не проходит (docs/spec/strategy-reference.json, величина notionalHeadroomSatisfied). До рантайма такое состояние доходит тропой потолка, изменённого системой после приёма стратегии: стратегия принята, пока глобальный потолок тенанта держал запас (например 1.05 %), затем держатель снизил его до 1 %. Эталонная доля 95 на тех же числах до этого состояния проскоком не доходит: 31 контракт дают нотинал 9300, и превысить потолок 9900 можно лишь проскоком свыше 6 %. Механика неравенства: вход сайзится в 33 контракта (тесный стоп — связывает аллокация, docs/spec/order-sizing.json), его плановый риск 19.79505 укладывается в поактный бюджет 100, плановый нотинал 33 x 0.1 x 3000 = 9900 проходит катастрофический потолок 9900 равенством. Филл идёт по 3020 — проскок поднимает нотинал живого эпизода до 9966, и следующее действие, даже нулевое по риску и нотиналу, катастрофическим неравенством отвергается.",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -1898,8 +2188,8 @@
       }
     },
     {
-      "case": "акт снимает защиту и своей не ставит: уровня после акта нет, и одновременный потолок ОТКАЗЫВАЕТ вычислением, а не считается по снятому",
-      "note": "Третья ветвь операнда, и она не «действующий уровень»: считать потолок по защите, которую действие уничтожает, — зеркало того самого дефекта, ради которого операнд заведён. Снятие защиты живого риска без замены запрещено правилом покрытия (docs/rules/live-risk-protection.md); отказ здесь — второй рубеж на случай, когда акт до покрытия не дошёл.",
+      "case": "акт уровня не ставит, а действующего уровня на всю позицию нет: уровня после акта нет, и одновременный потолок ОТКАЗЫВАЕТ вычислением, а не считается по подставленному",
+      "note": "Третья ветвь операнда: пустота, а не «действующий уровень». Действующего уровня нет, когда хоть один транш с экспозицией своего уровня не несёт (docs/spec/protection-coverage.json, величина stopCurrentLive); подставить уровень соседа либо нуль было бы разрешающей ошибкой. Акт, снимающий защиту, этой ветви не даёт: снимаемая защита до команды ещё действует и входит в liveStopPrice — это вторая ветвь, и снятие единственной защиты транша ловит покрытие после снятия (docs/spec/protection-coverage.json, величина coverageAfterRemoval).",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": false,
@@ -2107,6 +2397,562 @@
       },
       "expect": {
         "safetyRungBlocksAction": false
+      }
+    },
+    {
+      "case": "вход по неторгуемому инструменту отвергается проверкой торгуемости",
+      "state": {
+        "instrumentLive": false,
+        "actInSafetyBlockSet": true
+      },
+      "expect": {
+        "instrumentNotLiveBlocksAction": true
+      },
+      "note": "Неторгуемость запрещает принимать новый риск: вход, добор и замещение с увеличением — в классах проверки."
+    },
+    {
+      "case": "первая защита над непокрытым траншем неторгуемого инструмента проверкой торгуемости не запирается",
+      "state": {
+        "instrumentLive": false,
+        "actInSafetyBlockSet": false
+      },
+      "expect": {
+        "instrumentNotLiveBlocksAction": false
+      },
+      "note": "Защита, уровня своего транша не ослабляющая, вне классов проверки: принятый риск доживает под своей защитой, и гейт входа её не снимает. Отказ площадки на постановке разбирает граница коннектора (docs/rules/risk-validator-scope.md)."
+    },
+    {
+      "case": "вход по торгуемому инструменту проверкой торгуемости не отвергается",
+      "state": {
+        "instrumentLive": true,
+        "actInSafetyBlockSet": true
+      },
+      "expect": {
+        "instrumentNotLiveBlocksAction": false
+      },
+      "note": "Проверка режет только по неторгуемости: класс акта без неё отказа не даёт."
+    },
+    {
+      "case": "свободного остатка хватает на маржу и комиссию акта — отказа нет",
+      "state": {
+        "actRiskCreating": true,
+        "actNotional": 3000,
+        "unreflectedLegsNotional": 0,
+        "pair": {
+          "leverage": 10
+        },
+        "feeRate": 0.0005,
+        "balanceSnapshotFresh": true,
+        "settle": {
+          "availableBalance": 1000
+        }
+      },
+      "expect": {
+        "actRequiredMargin": 301.5,
+        "balanceNotEnoughBlocksAction": false
+      },
+      "note": "Нотинал 3000 при плече 10: маржа 300 плюс комиссия 0.0005 × 3000."
+    },
+    {
+      "case": "свободного остатка не хватает на маржу и комиссию акта — отказ BALANCE_NOT_ENOUGH",
+      "state": {
+        "actRiskCreating": true,
+        "actNotional": 3000,
+        "unreflectedLegsNotional": 0,
+        "pair": {
+          "leverage": 10
+        },
+        "feeRate": 0.0005,
+        "balanceSnapshotFresh": true,
+        "settle": {
+          "availableBalance": 301
+        }
+      },
+      "expect": {
+        "actRequiredMargin": 301.5,
+        "balanceNotEnoughBlocksAction": true
+      }
+    },
+    {
+      "case": "свободный остаток равен требованию — граница включена, отказа нет",
+      "state": {
+        "actRiskCreating": true,
+        "actNotional": 3000,
+        "unreflectedLegsNotional": 0,
+        "pair": {
+          "leverage": 10
+        },
+        "feeRate": 0.0005,
+        "balanceSnapshotFresh": true,
+        "settle": {
+          "availableBalance": 301.5
+        }
+      },
+      "expect": {
+        "actRequiredMargin": 301.5,
+        "balanceNotEnoughBlocksAction": false
+      }
+    },
+    {
+      "case": "нога, которой снимок не отражает, прибавляется к требованию — отказ",
+      "state": {
+        "actRiskCreating": true,
+        "actNotional": 3000,
+        "unreflectedLegsNotional": 3000,
+        "pair": {
+          "leverage": 10
+        },
+        "feeRate": 0.0005,
+        "balanceSnapshotFresh": true,
+        "settle": {
+          "availableBalance": 600
+        }
+      },
+      "expect": {
+        "actRequiredMargin": 603,
+        "balanceNotEnoughBlocksAction": true
+      },
+      "note": "Без слагаемого неотражённой ноги требование было бы 301.5, и акт прошёл бы по остатку, который нога уже заняла."
+    },
+    {
+      "case": "снимок несвеж — проверка не меряется, отказа нет",
+      "state": {
+        "actRiskCreating": true,
+        "actNotional": 3000,
+        "unreflectedLegsNotional": 0,
+        "pair": {
+          "leverage": 10
+        },
+        "feeRate": 0.0005,
+        "balanceSnapshotFresh": false,
+        "settle": {
+          "availableBalance": 1
+        }
+      },
+      "expect": {
+        "actRequiredMargin": 301.5,
+        "balanceNotEnoughBlocksAction": false
+      },
+      "note": "Названное ограничение дома: отказ по несвежести увёл бы сделку при живом риске в аварийный контур."
+    },
+    {
+      "case": "действие риска не создаёт — маржи не занимает, отказа нет",
+      "state": {
+        "actRiskCreating": false,
+        "actNotional": 0,
+        "unreflectedLegsNotional": 3000,
+        "pair": {
+          "leverage": 10
+        },
+        "feeRate": 0.0005,
+        "balanceSnapshotFresh": true,
+        "settle": {
+          "availableBalance": 1
+        }
+      },
+      "expect": {
+        "actRequiredMargin": 0,
+        "balanceNotEnoughBlocksAction": false
+      }
+    },
+    {
+      "case": "отрицательный денежный остаток расчётной валюты — обязательство",
+      "state": {
+        "balanceSnapshotFresh": true,
+        "settle": {
+          "cashBalance": -5,
+          "equity": 1000
+        }
+      },
+      "expect": {
+        "borrowOrDebtDetected": true
+      }
+    },
+    {
+      "case": "отрицательный капитал расчётной валюты — обязательство",
+      "state": {
+        "balanceSnapshotFresh": true,
+        "settle": {
+          "cashBalance": 10,
+          "equity": -1
+        }
+      },
+      "expect": {
+        "borrowOrDebtDetected": true
+      }
+    },
+    {
+      "case": "нулевые остаток и капитал обязательством не являются",
+      "state": {
+        "balanceSnapshotFresh": true,
+        "settle": {
+          "cashBalance": 0,
+          "equity": 0
+        }
+      },
+      "expect": {
+        "borrowOrDebtDetected": false
+      }
+    },
+    {
+      "case": "снимок несвеж — признак не меряется",
+      "state": {
+        "balanceSnapshotFresh": false,
+        "settle": {
+          "cashBalance": -5,
+          "equity": -5
+        }
+      },
+      "expect": {
+        "borrowOrDebtDetected": false
+      }
+    },
+    {
+      "case": "отказ RISK_PER_ACTION_EXCEEDED при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "RISK_PER_ACTION_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ RISK_PER_DEAL_CUMULATIVE_EXCEEDED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "RISK_PER_DEAL_CUMULATIVE_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ DEAL_NOTIONAL_EXCEEDED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "DEAL_NOTIONAL_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ STOP_DISTANCE_BELOW_FLOOR при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "STOP_DISTANCE_BELOW_FLOOR"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ INSTRUMENT_SETTLE_CURRENCY_MISSING при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "INSTRUMENT_SETTLE_CURRENCY_MISSING"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ RISK_CREATING_UNDER_COLLAPSE при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "RISK_CREATING_UNDER_COLLAPSE"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ INSTRUMENT_SAFETY_HOLD при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "INSTRUMENT_SAFETY_HOLD"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ EXCHANGE_MAX_LEVERAGE_EXCEEDED при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "EXCHANGE_MAX_LEVERAGE_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ LEVERAGE_NOT_CONFIGURED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "LEVERAGE_NOT_CONFIGURED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ MARGIN_MODE_NOT_ISOLATED при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "MARGIN_MODE_NOT_ISOLATED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ BORROW_OR_DEBT_DETECTED при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "BORROW_OR_DEBT_DETECTED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ BALANCE_NOT_ENOUGH при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "BALANCE_NOT_ENOUGH"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ BALANCE_NOT_FRESH при живом риске транша — ребро сделки в ERROR",
+      "unreachable": "несвежий снимок средств преконтролю не предъявляется — обработчик добывает свежий снимок до вызова (docs/processes/risk-evaluation.md), и ни одна проверка преконтроля код не производит (docs/components/RiskValidator.md)",
+      "state": {
+        "blockingCode": "BALANCE_NOT_FRESH"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ BALANCE_INVALID при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "BALANCE_INVALID"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ SIZE_BELOW_MIN при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "SIZE_BELOW_MIN"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ SIZE_LOT_STEP_INVALID при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "SIZE_LOT_STEP_INVALID"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ SIZE_ABOVE_LIMIT при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "SIZE_ABOVE_LIMIT"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ STOP_LOSS_INVALID_SIDE при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "STOP_LOSS_INVALID_SIDE"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ TAKE_PROFIT_INVALID_SIDE при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "TAKE_PROFIT_INVALID_SIDE"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ STOP_LOSS_BEYOND_MARK_PRICE при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "STOP_LOSS_BEYOND_MARK_PRICE"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ RISK_CREATING_ENTRY_WITHOUT_STOP при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "RISK_CREATING_ENTRY_WITHOUT_STOP"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ PARTIAL_EXIT_NOT_REDUCE_ONLY при живом риске транша — ребро сделки в ERROR",
+      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
+      "state": {
+        "blockingCode": "PARTIAL_EXIT_NOT_REDUCE_ONLY"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ PARTIAL_EXIT_INCREASES_POSITION при живом риске транша — ребро сделки в ERROR",
+      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
+      "state": {
+        "blockingCode": "PARTIAL_EXIT_INCREASES_POSITION"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN при живом риске транша — ребро сделки в ERROR",
+      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
+      "state": {
+        "blockingCode": "DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ MULTIPLE_POSITIONS_DETECTED при живом риске транша — ребро сделки в ERROR",
+      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
+      "state": {
+        "blockingCode": "MULTIPLE_POSITIONS_DETECTED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ POSITION_STATE_UNKNOWN при живом риске транша — ребро сделки в ERROR",
+      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
+      "state": {
+        "blockingCode": "POSITION_STATE_UNKNOWN"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ INSTRUMENT_NOT_LIVE при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "INSTRUMENT_NOT_LIVE"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ INSTRUMENT_RULES_MISSING при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "INSTRUMENT_RULES_MISSING"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ CALCULATED_ACTION_INVALID при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "CALCULATED_ACTION_INVALID"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ PROTECTION_COVERAGE_REDUCED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "PROTECTION_COVERAGE_REDUCED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ FEE_RATE_UNAVAILABLE при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "FEE_RATE_UNAVAILABLE"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "отказ RISK_APPETITE_NOT_CONFIGURED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "RISK_APPETITE_NOT_CONFIGURED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ LOSS_LIMIT_NOT_CONFIGURED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "LOSS_LIMIT_NOT_CONFIGURED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ DEAL_GRAPH_INCOMPLETE при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "DEAL_GRAPH_INCOMPLETE"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
       }
     }
   ]

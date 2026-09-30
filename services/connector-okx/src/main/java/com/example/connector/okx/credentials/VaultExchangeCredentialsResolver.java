@@ -71,12 +71,16 @@ public class VaultExchangeCredentialsResolver implements ExchangeCredentialsReso
      * недостижимой площадки, и ядро повторяло бы вызов площадки там, где
      * молчит хранилище (docs/components/IntegrationService.md §«Классы
      * отказа на границе — дом здесь»).
+     *
+     * <p>Текст транспортного отказа к пояснению не приклеивается: его пишет
+     * клиент, и он несёт адрес хранилища. Первопричина едет причиной
+     * исключения (docs/rules/error-handling-policy.md).
      */
     private VaultResponse read(String path) {
         try {
             return vaultTemplate.read(path);
         } catch (RestClientException e) {
-            throw new VaultException("Хранилище секретов не ответило: " + e.getMessage(), e);
+            throw new VaultException("Хранилище секретов не ответило", e);
         }
     }
 

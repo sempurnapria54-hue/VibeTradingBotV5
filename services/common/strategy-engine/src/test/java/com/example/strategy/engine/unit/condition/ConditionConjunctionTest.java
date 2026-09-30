@@ -13,6 +13,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRule;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import java.util.ArrayList;
 import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,11 +29,12 @@ import org.junit.jupiter.api.Test;
  * нет, фактов сделки нет; условие — одно правило `MARKET_PHASE_IS` с
  * константой `BULL_TREND`, фаза прохода `BULL_TREND` (правило истинно).
  *
- * <p><b>Три формы пустого условия (`U1.6`-`U1.8`) и правило с пустым типом
- * (`U1.9`) здесь не прогоняются:</b> «пустое условие истинно» живёт только
- * в javadoc, а что обязан ответить интерпретатор на невалидном правиле, не
- * называет ни один носитель — §«Кейсы, не прогоняемые сегодня» того же
- * документа.
+ * <p><b>Три формы пустого условия (`U1.6`-`U1.8`) истинны</b> — дом
+ * семантики docs/components/StrategyConditionEvaluator.md §«Пустое условие
+ * истинно»; авторской формой пустое условие не бывает
+ * (docs/rules/strategy-condition-contract.md §«Условие непусто»). <b>Правило с пустым типом (`U1.9`) здесь не
+ * прогоняется:</b> что обязан ответить интерпретатор на нём, не называет ни
+ * один носитель — §«Кейсы, не прогоняемые сегодня» того же документа.
  */
 class ConditionConjunctionTest {
 
@@ -98,6 +100,33 @@ class ConditionConjunctionTest {
         assertThat(evaluator.evaluate(condition(truthy, falsy), bullTrend()))
                 .as("обратный порядок — тот же исход")
                 .isFalse();
+    }
+
+    /**
+     * Условия нет вовсе — и контекста тоже: истина нейтрального элемента
+     * конъюнкции, и ни один операнд не читается, поэтому и падения нет.
+     */
+    @Test
+    @DisplayName("U1.6 — условие пусто (null), контекст тоже null: истина, падения нет")
+    void u1_6_anAbsentConditionIsTrueWithoutReadingTheContext() {
+        assertThat(evaluator.evaluate(null, null)).isTrue();
+    }
+
+    /** Перечень правил пуст — та же ветвь. */
+    @Test
+    @DisplayName("U1.7 — условие есть, перечень правил пуст: истина")
+    void u1_7_anEmptyRuleListIsTrue() {
+        StrategyCondition condition = new StrategyCondition();
+        condition.setRules(new ArrayList<>());
+
+        assertThat(evaluator.evaluate(condition, bullTrend())).isTrue();
+    }
+
+    /** Перечень правил пустой ссылкой — третья форма той же ветви. */
+    @Test
+    @DisplayName("U1.8 — условие есть, перечень правил null: истина")
+    void u1_8_anAbsentRuleListIsTrue() {
+        assertThat(evaluator.evaluate(new StrategyCondition(), bullTrend())).isTrue();
     }
 
     /**

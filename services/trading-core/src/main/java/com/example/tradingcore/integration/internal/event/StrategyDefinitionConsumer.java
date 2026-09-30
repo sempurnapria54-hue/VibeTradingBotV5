@@ -39,6 +39,15 @@ import org.springframework.stereotype.Component;
  * inbox — той же транзакцией, что и следствие
  * (docs/rules/idempotency-via-unique.md).
  *
+ * <p><b>Конверт без идентичности события либо без класса — отравленная
+ * запись</b> ({@link PoisonStrategyFactException}): повтор её не исправит
+ * ни при каком состоянии базы ядра, и она уходит той же тропой, что всякая
+ * отравленная, — обработчик отказа ({@link StrategyFactErrorHandler})
+ * пропускает её сразу, со строкой журнала, несущей тему, партицию, смещение
+ * и первопричину (docs/architecture/contracts.md §«Как конверт лежит на
+ * проводе — поимённо»; перечень отравленных —
+ * docs/architecture/data-ownership.md §«Копии чужих данных»).
+ *
  * <p><b>Неизвестный класс события пропускается, а не роняет проход:</b>
  * производитель вправе завести новый класс раньше, чем появится его
  * читатель, и падение на неизвестном имени остановило бы обработку тех
@@ -62,8 +71,8 @@ public class StrategyDefinitionConsumer {
         String eventId = header(record, HEADER_EVENT_ID);
         String eventTypeName = header(record, HEADER_EVENT_TYPE);
         if (isNull(eventId) || isNull(eventTypeName)) {
-            log.error("Strategy fact without envelope headers is skipped offset={}", record.offset());
-            return;
+            throw new PoisonStrategyFactException("Strategy fact without envelope headers eventId=" + eventId
+                    + " eventType=" + eventTypeName);
         }
         if (isFalse(EnumUtils.isValidEnum(StrategyEventType.class, eventTypeName))) {
             log.info("Strategy fact of an unknown class is skipped eventType={}", eventTypeName);

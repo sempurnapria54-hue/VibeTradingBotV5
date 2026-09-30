@@ -4,19 +4,16 @@
 
 Каков контракт операций по algo-ордеру.
 
-## Внешний источник правды
+## Источник правды вне репозитория
 
-Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
-раздел «Order Book Trading → Algo Trading», секции «POST / Place
-algo order», «POST / Cancel algo order», «POST / Amend algo order»,
-«GET / Algo order details», «GET / Algo order list», «GET / Algo
-order history»; changelog — `https://www.okx.com/docs-v5/log_en/`).
-При расхождении с офдоком побеждает офдок; синхронизация —
-перевыкачка + дифф при каждом заходе интегратора по источнику и по
-задаче «актуализируй» (`.claude/processes/api-docs-completion.md`,
-канал чтения — `.claude/skills/integration-okx.md`). Последняя
-сверка: 2026-06-11 (cancel/amend/query поле-уровнево,
-симметрия advance-семейства).
+Официальный док OKX (`https://www.okx.com/docs-v5/en/`, раздел «Order
+Book Trading → Algo Trading», секции «POST / Place algo order», «POST /
+Cancel algo order», «POST / Amend algo order», «GET / Algo order
+details», «GET / Algo order list», «GET / Algo order history»; changelog
+— `https://www.okx.com/docs-v5/log_en/`). Процедура сверки и приоритет
+офдока — `.claude/rules/external-source-sync.md`. Последняя сверка:
+2026-06-11 (cancel/amend/query поле-уровнево, симметрия
+advance-семейства).
 
 **Рантайм-расхождение (2026-06-20, провенанс `рантайм`):**
 `cancel-advance-algos` отсутствует в офдоке (delisted 2025-04-24), но

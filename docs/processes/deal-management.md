@@ -61,7 +61,7 @@ DealTrancheStateMachine / handler транша
        SystemActionExecutor (REFRESH_DEAL_CONTEXT_ACTION / FINALIZE_DEAL_ENTRY_ACTION /
        FINALIZE_DEAL_EXIT_ACTION / FINALIZE_DEAL_ERROR_ACTION) -> звенья-команды;
        перечень типов — место истины docs/models/domain/other/DealActionState.md, здесь он пересобирается из него; состав звена выводится из
-       Deal.status (docs/components/SystemActionExecutor.md). Статусные рёбра,
+       durable-фактов сделки (docs/components/SystemActionExecutor.md). Статусные рёбра,
        являющиеся исходом системного действия, пишет звено, а не handler
        (docs/processes/fsm-execution-layering.md)
 

@@ -168,11 +168,9 @@ class CandleLoadingBoxTest extends SharedMarketDataBox {
         tick(Tick.CANDLES);
 
         assertThat(connector.count(ConnectorStub.CANDLES)).isEqualTo(1);
-        assertThat(status()).isEqualTo("CHECK");
         assertThat(rows.count("candles")).isEqualTo(Long.valueOf(PAGE_SIZE + 2));
-
-        tick(Tick.CANDLES);
-
+        // Проверка целостности идёт тем же шагом, что и докачка хвоста:
+        // плотный ряд возвращается в ACTIVE тем же тиком, а не следующим.
         assertThat(status()).isEqualTo("ACTIVE");
     }
 
@@ -182,9 +180,9 @@ class CandleLoadingBoxTest extends SharedMarketDataBox {
         String instrument = provisionInstruments(INSTRUMENT).getFirst();
         requireCandles(instrument, HOUR, 300L);
         requireCandles(instrument, "ONE_DAY", 300L);
+        // Вторая группа остаётся заведённой: дозагрузка глубины у неё
+        // впереди, и готовность инструмента она снимает по-настоящему.
         rows.put("update candle_groups set status = 'ACTIVE' where timeframe = ?", HOUR);
-        rows.put("update candle_groups set status = 'SYNC' where timeframe = 'ONE_DAY'");
-        connector.answers(ConnectorStub.CANDLES, Feed.empty());
 
         tick(Tick.CANDLES);
 
@@ -280,6 +278,34 @@ class CandleLoadingBoxTest extends SharedMarketDataBox {
         Long newest = ((Number) rows.all("candle_groups").getFirst()
                 .get("actual_last_utc_millis")).longValue();
         assertThat(System.currentTimeMillis() - newest).isGreaterThanOrEqualTo(HOUR_MILLIS);
+    }
+
+    @Test
+    @DisplayName("B3.17 — готовый инструмент не теряет ACTIVE на штатной догонке хвоста")
+    void b3_17_aReadyInstrumentKeepsActiveThroughARoutineTailSync() {
+        loadDenseSeries();
+        tick(Tick.CANDLES);
+        assertThat(instrumentStatus()).isEqualTo("ACTIVE");
+        connector.forgetRequests();
+        // Первый тик: сверх верхней границы ряда закрылись два бара.
+        connector.answers(ConnectorStub.CANDLES, page(301, 3));
+
+        tick(Tick.CANDLES);
+
+        assertThat(connector.count(ConnectorStub.CANDLES)).isEqualTo(1);
+        assertThat(rows.count("candles")).isEqualTo(Long.valueOf(PAGE_SIZE + 2));
+        assertThat(instrumentStatus()).isEqualTo("ACTIVE");
+        assertThat(status()).isEqualTo("ACTIVE");
+
+        // Второй тик подряд: хвост отрос снова, и догонка снова штатная.
+        connector.answers(ConnectorStub.CANDLES, page(299, 3));
+
+        tick(Tick.CANDLES);
+
+        assertThat(connector.count(ConnectorStub.CANDLES)).isEqualTo(2);
+        assertThat(rows.count("candles")).isEqualTo(Long.valueOf(PAGE_SIZE + 4));
+        assertThat(instrumentStatus()).isEqualTo("ACTIVE");
+        assertThat(status()).isEqualTo("ACTIVE");
     }
 
     /** Ряд из одной плотной страницы, доведённый до проверки целостности. */

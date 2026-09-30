@@ -10,14 +10,20 @@ import org.junit.jupiter.api.Test;
  * Группа {@code B3} документа кейсов: определение целиком
  * (.claude/tests/cases/strategies.md).
  *
- * <p><b>У ненайденности нет ни реджект-кода, ни дома, и ожидание держится
- * ФОРМОЙ тела и неразличимостью двух причин</b> (находка F-6 того же
- * документа). Поэтому клетки {@code B3.2} и {@code B3.3} сравнивают два
- * ответа друг с другом, а не с пиньнутым кодом: контрактно значимо
- * именно то, что клиент не может отличить «нет такого» от «есть, но
- * чужое».
+ * <p><b>Ненайденность опознаётся парой «класс отказа плюс реджект-код
+ * {@code STRATEGY_NOT_FOUND}», а неразличимость двух причин — сравнением
+ * двух ответов друг с другом</b> (docs/architecture/contracts.md
+ * §«Контекст тенанта в вызове»): контрактно значимо, что клиент не может
+ * отличить «нет такого» от «есть, но чужое», и число ответа
+ * различителем не служит.
  */
 class DefinitionReadBoxTest extends SharedStrategiesBox {
+
+    /** Класс отказа, которым отвечают все броски поверхности владельца. */
+    private static final String REJECTED = "STRATEGY_REQUEST_REJECTED";
+
+    /** Реджект-код ненайденности определения, названного путём. */
+    private static final String NOT_FOUND = "STRATEGY_NOT_FOUND";
 
     @Test
     @DisplayName("B3.1 — Определение отдаётся вместе с деревом")
@@ -53,12 +59,18 @@ class DefinitionReadBoxTest extends SharedStrategiesBox {
         String internalId = given(TENANT);
 
         Answer foreign = get(STRATEGIES + "/" + internalId, SECOND_TENANT);
-        Answer absent = get(STRATEGIES + "/st-absent-0001", SECOND_TENANT);
+        Answer absent = get(STRATEGIES + "/" + internalId + "-absent", SECOND_TENANT);
 
         assertThat(foreign.carriesErrorDto()).isTrue();
+        assertThat(foreign.errorCode()).isEqualTo(REJECTED);
+        assertThat(foreign.errorMessage()).contains(NOT_FOUND);
         assertThat(foreign.status())
                 .as("поверхность не отвечает на вопрос о существовании чужой сущности")
                 .isEqualTo(absent.status());
+        assertThat(foreign.errorCode()).isEqualTo(absent.errorCode());
+        assertThat(foreign.errorMessage())
+                .as("текст отказа двух причин не различает — отличается только названная идентичность")
+                .isEqualTo(absent.errorMessage().replace(internalId + "-absent", internalId));
         assertThat(rows.countWhere(STRATEGIES_TABLE, "internal_id", internalId))
                 .as("чтение чужого определения его не трогает")
                 .isEqualTo(1L);
@@ -74,10 +86,10 @@ class DefinitionReadBoxTest extends SharedStrategiesBox {
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode())
                 .as("класс отказа тот же, что у всякого броска поверхности")
-                .isEqualTo("STRATEGY_REQUEST_REJECTED");
+                .isEqualTo(REJECTED);
         assertThat(answer.errorMessage())
-                .as("реджект-кода у этого исхода нет вовсе (F-6)")
-                .doesNotContain("STRATEGY_")
+                .as("исход опознаётся реджект-кодом ненайденности в пояснении")
+                .contains(NOT_FOUND)
                 .contains("st-absent-0002");
     }
 }

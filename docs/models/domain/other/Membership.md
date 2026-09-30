@@ -46,7 +46,14 @@
 
 ## Персистентность
 
-- **Таблица** — `memberships` у базы `auth`.
+- **Таблица** — `memberships` у базы `auth`; суррогатный ключ `id` —
+  `bigserial`.
+- **Колонки:** `internal_id` — `varchar(64)`, `user_id` — `varchar(255)`,
+  `tenant_id` — `varchar(64)`, `role` — `varchar(64)`, строкой значения
+  перечня.
+- **`user_id` — исключение строковой конвенции** по длине чужого контракта
+  (`docs/rules/persistence-representation.md`): это claim `sub` провайдера
+  идентичности, и OIDC объявляет его не длиннее 255 ASCII-символов.
 - **Обязательны** `internal_id`, `user_id`, `tenant_id`, `role`.
 - **Ключи уникальности** — `uk_membership_internal_id` (`internal_id`) и
   `uk_membership_user_tenant` (`user_id`, `tenant_id`): у пользователя в
@@ -63,7 +70,10 @@
   `OWNER`» ограничением схемы не выражается — его держит исполнитель
   заведения тенанта, создающий тенанта и его членство одной транзакцией.
   Тенанта без владельца не бывает: отвечать за потерю было бы некому.
-- **Audit-поля** — базовые шесть (`docs/models/domain/other/Auditable.md`).
+- **Audit-поля** — базовые шесть (`docs/models/domain/other/Auditable.md`);
+  `created_at` обязателен. Биржевые `external_created_at` и
+  `external_modified_at` остаются пустыми всегда: членство заводит наша
+  поверхность, события источника у него нет.
 
 ## Связи
 

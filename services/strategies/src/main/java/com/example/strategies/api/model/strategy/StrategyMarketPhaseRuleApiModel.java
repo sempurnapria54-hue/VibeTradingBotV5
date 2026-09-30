@@ -3,7 +3,6 @@ package com.example.strategies.api.model.strategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,8 +21,8 @@ public class StrategyMarketPhaseRuleApiModel {
     private String type;
 
     @Valid
-    @NotNull
-    @Schema(description = "Условие клаузы (контекст классификации фазы)",
+    @Schema(description = "Условие клаузы (контекст классификации фазы); несёт хотя бы одно правило — "
+            + "непустоту проверяет валидатор с кодом STRATEGY_CONDITION_EMPTY, а не аннотация",
             requiredMode = Schema.RequiredMode.REQUIRED)
     private StrategyConditionApiModel condition;
 }

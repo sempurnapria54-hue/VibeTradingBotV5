@@ -14,8 +14,6 @@ import com.example.tradingcore.domain.fsm.DealTrancheHandler;
 import com.example.tradingcore.domain.fsm.TrancheActionDisposition;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
 import com.example.tradingcore.domain.fsm.TrancheWorkPass;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -203,7 +201,6 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
             log.warn("Balance freshness tolerance is not declared, snapshot read as stale");
             return true;
         }
-        OffsetDateTime threshold = OffsetDateTime.now(ZoneOffset.UTC).minus(properties.getBalanceFreshness());
-        return isFalse(dealContext.getBalanceContainer().isFresherThan(threshold));
+        return isFalse(dealContext.balanceFresh(properties.getBalanceFreshness()));
     }
 }

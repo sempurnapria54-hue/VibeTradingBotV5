@@ -69,7 +69,9 @@ final class ConnectorStub {
     private final WireMockServer server;
 
     private ConnectorStub() {
-        this.server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        this.server = new WireMockServer(WireMockConfiguration.options()
+                .dynamicPort()
+                .extensions(new HistoryWindow()));
         this.server.start();
     }
 
@@ -150,6 +152,24 @@ final class ConnectorStub {
                         .withStatus(status)
                         .withHeader("Content-Type", "application/json")
                         .withBody(body)));
+    }
+
+    /**
+     * История площадки как РЯД, а не заготовка: запрос истории получает
+     * окно этого ряда по своему курсору и лимиту ({@link HistoryWindow}).
+     * Им подаются кейсы, где курсор запроса выводит предмет, а не кейс.
+     *
+     * @param firstOpenTimestamp открытие первого бара ряда
+     * @param stepMillis         длительность бара
+     * @param count              число баров ряда
+     */
+    void servesHistory(Long firstOpenTimestamp, Long stepMillis, Integer count) {
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(HISTORY_CANDLES))
+                .willReturn(WireMock.aResponse()
+                        .withTransformers(HistoryWindow.NAME)
+                        .withTransformerParameter(HistoryWindow.FIRST_OPEN, String.valueOf(firstOpenTimestamp))
+                        .withTransformerParameter(HistoryWindow.STEP, String.valueOf(stepMillis))
+                        .withTransformerParameter(HistoryWindow.COUNT, String.valueOf(count))));
     }
 
     /**

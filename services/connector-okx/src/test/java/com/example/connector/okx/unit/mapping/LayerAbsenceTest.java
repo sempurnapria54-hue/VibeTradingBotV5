@@ -7,13 +7,10 @@ import com.example.connector.okx.mapping.DealCashFlowMapper;
 import com.example.connector.okx.mapping.OrderMapper;
 import com.example.connector.okx.mapping.PositionMapper;
 import com.example.connector.okx.mapping.TradeFeeRateMapper;
-import com.example.connector.okx.resolve.OkxCredentialsRejectionResolver;
 import com.example.tradingbot.domain.exchange.ExchangeAck;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -215,18 +212,6 @@ class LayerAbsenceTest {
                 .containsPattern("default -> throw new ExternalStatusException");
         assertThat(bodies.get("OkxAlgoOrderExternalStatusResolver.java"))
                 .containsPattern("default -> throw new ExternalStatusException");
-    }
-
-    /** «Прочий отказ источника» выражается двумя ложными ответами, а не своим предикатом. */
-    @Test
-    @DisplayName("U32.14 — третьего вопроса резолвер класса отказа не задаёт")
-    void u32_14_theRejectionResolverAsksTwoQuestions() {
-        assertThat(Arrays.stream(OkxCredentialsRejectionResolver.class.getDeclaredMethods())
-                .filter(method -> Modifier.isPublic(method.getModifiers()))
-                .map(Method::getName)
-                .sorted()
-                .toList())
-                .containsExactly("isCredentialsRejected", "isOwnRequestDefect");
     }
 
     /** Непустоту, принадлежность и число элементов мерит читатель источника. */

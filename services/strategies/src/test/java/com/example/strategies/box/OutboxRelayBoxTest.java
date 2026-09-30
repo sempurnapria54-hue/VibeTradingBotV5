@@ -65,7 +65,8 @@ class OutboxRelayBoxTest extends SharedStrategiesBox {
                 .as("в теме ровно одна запись — та, что лежала строкой")
                 .hasSize(1);
         assertThat(rows.count(OUTBOX_TABLE))
-                .as("строк реле не удаляет: накопление гасит чистка опубликованных, а не оно")
+                .as("строк реле не удаляет: опубликованная хранится без предела — принятый рост, "
+                        + "docs/components/OutboxRelayJob.md")
                 .isEqualTo(1L);
         assertThat(event(ACTIVATED).get(PUBLISHED_AT)).isNotNull();
         assertThat(statusOf(internalId, TENANT))

@@ -47,10 +47,12 @@
 Хранится в БД (entity `CandleEntity`, таблица `candles`),
 наследует audit-поля. Ограничения схемы:
 
-- `id` — identity (autoincrement).
-- Уникальность: `(candle_group_id, open_timestamp)`
-  (uk_candle_group_id_open_timestamp) — идемпотентность загрузки и
-  основа проверки целостности по count.
+- Первичный ключ — пара `(candle_group_id, open_timestamp)` (`pk_candle`);
+  суррогатного `id` нет: таблица — гипертаблица по `open_timestamp`, и
+  колонка разбиения входит во всякий уникальный индекс (дом требования —
+  `docs/rules/persistence-representation.md`, раздел о ключе
+  гипертаблицы). Ключ держит идемпотентность загрузки и основу проверки
+  целостности по count.
 - `candle_group_id`, `open_timestamp`, `open`, `high`, `low`,
   `close` — `NOT NULL`; `volume` — nullable.
 - `open`/`high`/`low`/`close`/`volume` — `precision = PRICE_PRECISION`,

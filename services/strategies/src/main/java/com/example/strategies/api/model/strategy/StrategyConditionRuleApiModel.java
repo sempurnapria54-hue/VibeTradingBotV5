@@ -32,7 +32,8 @@ public class StrategyConditionRuleApiModel {
     @Schema(description = "Простое процентное поле плоских правил (PROFIT_PERCENTS_REACHED и т. п.)")
     private BigDecimal percents;
 
-    @Schema(description = "Таймфрейм плоских правил про серию свечей (CANDLE_CLOSED), имя TimeFrame")
+    @Schema(description = "Таймфрейм плоских правил про серию свечей, имя TimeFrame; сверяется с перечнем, "
+            + "но сегодня его не читает ни один тип правила — у сравнивающих правил таймфрейм несёт операнд")
     private String timeframe;
 
     @Schema(description = "Оператор сравнивающего правила (EQ/GT/CROSSED_ABOVE/...)")

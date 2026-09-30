@@ -78,18 +78,45 @@ public class StrategyCondition {
      * мерить наравне с последней (docs/rules/market-data-freshness.md).
      *
      * <p><b>Прошлое читают пересечение — обоими операндами — и объёмный
-     * фильтр — левым;</b> прочие правила его не спрашивают. Цена предыдущей
-     * половины не имеет вовсе и сюда не входит: её пустоту оценщик читает
-     * ложью сам. Перечень — зеркало оценки
-     * (docs/components/StrategyConditionEvaluator.md) и живёт у грамматики
-     * рядом с {@link #indicatorKeys()}, а не у каждого читателя: новый тип
-     * правила, читающий прошлое, пополняет его той же правкой, что заводит
-     * его оценку.
+     * фильтр — левым;</b> прочие правила его не спрашивают. Прошлое ЦЕНЫ
+     * сюда не входит: своего ключа у цены нет, его задаёт индикатор-пара, и
+     * перечень у него свой ({@link #pastPriceKeys()}). Перечень — зеркало
+     * оценки (docs/components/StrategyConditionEvaluator.md) и живёт у
+     * грамматики рядом с {@link #indicatorKeys()}, а не у каждого читателя:
+     * новый тип правила, читающий прошлое, пополняет его той же правкой, что
+     * заводит его оценку. Совпадение перечня с чтениями оценщика сверяет
+     * проба {@code PastReadDeclarationTest} у {@code strategy-engine}.
      */
     public Set<String> pastIndicatorKeys() {
         return keysOf(emptyIfNull(rules).stream()
                         .filter(Objects::nonNull)
                         .flatMap(this::pastOperands),
+                StrategyConditionSourceType.INDICATOR, StrategyConditionOperand::getIndicatorKey);
+    }
+
+    /**
+     * Авторские имена индикаторов-ПАР, по чьему ключу оценка условия читает
+     * ПРЕДЫДУЩУЮ ЦЕНУ, — ценовая половина прошлого, которую гейт покрытия
+     * обязан мерить наравне с индикаторной (docs/rules/market-data-freshness.md).
+     *
+     * <p><b>Ключ — индикатор-пара, а не цена.</b> У цены своего таймфрейма
+     * нет, и её прошлое — закрытие свечи, на которой посчитано предыдущее
+     * значение индикатора по другую сторону пересечения; раскладка
+     * предыдущих цен ключуется его именем
+     * (docs/components/StrategyConditionEvaluator.md §«Вторая половина
+     * времени»). Читает её только пересечение, у которого одна сторона —
+     * цена, а другая — индикатор: у пары-не-индикатора прошлого цены нет, и
+     * операнд недоступен без чтения раскладки. Объёмный фильтр прошлое цены
+     * не читает — у цены он его не спрашивает вовсе.
+     *
+     * <p>Та же дисциплина, что у {@link #pastIndicatorKeys()}: перечень —
+     * зеркало оценки и живёт у грамматики; совпадение с чтениями оценщика
+     * сверяет та же проба {@code PastReadDeclarationTest}.
+     */
+    public Set<String> pastPriceKeys() {
+        return keysOf(emptyIfNull(rules).stream()
+                        .filter(Objects::nonNull)
+                        .flatMap(this::pricePairOperands),
                 StrategyConditionSourceType.INDICATOR, StrategyConditionOperand::getIndicatorKey);
     }
 
@@ -143,6 +170,24 @@ public class StrategyCondition {
             return Stream.of(rule.getLeftOperand());
         }
         return Stream.empty();
+    }
+
+    /**
+     * Операнды-пары ценовых сторон пересечения: по их ключу оценка читает
+     * прошлое цены; пусто — правило его не читает. Пара, не являющаяся
+     * индикатором, отсеивается отбором по типу источника.
+     */
+    private Stream<StrategyConditionOperand> pricePairOperands(StrategyConditionRule rule) {
+        if (isFalse(Objects.equals(StrategyConditionRuleType.CROSSOVER, rule.getRuleType()))) {
+            return Stream.empty();
+        }
+        return Stream.of(pairOfPrice(rule.getLeftOperand(), rule.getRightOperand()),
+                pairOfPrice(rule.getRightOperand(), rule.getLeftOperand()));
+    }
+
+    /** Пара операнда, если сам операнд — цена; иначе пусто. */
+    private StrategyConditionOperand pairOfPrice(StrategyConditionOperand operand, StrategyConditionOperand pair) {
+        return isTrue(isPriceOperand(operand)) ? pair : null;
     }
 
     private Boolean namesSource(StrategyConditionSourceType sourceType) {

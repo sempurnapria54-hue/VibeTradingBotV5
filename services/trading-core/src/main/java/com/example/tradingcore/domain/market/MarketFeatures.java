@@ -39,6 +39,15 @@ public class MarketFeatures {
     /** Предыдущие значения тех же идентичностей — вторая половина сравнений. */
     Map<String, IndicatorValue> previousIndicators;
 
+    /**
+     * Цены прошлой половины сравнения по авторскому имени индикатора-пары:
+     * закрытие свечи, на которой посчитано его предыдущее значение. Ключа
+     * нет — прошлого цены у этой пары нет, и пересечение с ценой ложно
+     * (docs/components/StrategyConditionEvaluator.md §«Вторая половина
+     * времени»).
+     */
+    Map<String, BigDecimal> previousPrices;
+
     /** Последние свежие структуры рынка по авторскому имени операнда. */
     Map<String, MarketStructure> structures;
 
@@ -55,7 +64,8 @@ public class MarketFeatures {
 
     /**
      * Рыночная половина контекста оценки условий — значения, их
-     * предыдущие значения, структуры, цена и фаза момента.
+     * предыдущие значения, структуры, цена момента и её прошлое по ключам
+     * индикаторов-пар, фаза момента.
      *
      * <p><b>Собирается здесь, потому что читателей у неё двое:</b> проход
      * сделки достраивает её фактами сделки, отбор входа берёт как есть —
@@ -71,6 +81,7 @@ public class MarketFeatures {
         return ConditionEvaluationContext.builder()
                 .latestIndicators(emptyIfNull(latestIndicators))
                 .previousIndicators(emptyIfNull(previousIndicators))
+                .previousPrices(emptyIfNull(previousPrices))
                 .structures(emptyIfNull(structures))
                 .price(lastPrice())
                 .marketPhase(phaseType());
@@ -85,6 +96,7 @@ public class MarketFeatures {
         return ConditionEvaluationContext.builder()
                 .latestIndicators(Map.of())
                 .previousIndicators(Map.of())
+                .previousPrices(Map.of())
                 .structures(Map.of());
     }
 
@@ -112,9 +124,13 @@ public class MarketFeatures {
      * меривший одни последние, пропускал такой шаг к оценке, и тот
      * оказывался ложным из-за половины, которой не было: «условие не
      * выполнено» становилось неотличимо от «операнда не было»
-     * (docs/rules/market-data-freshness.md). Какие правила читают прошлое,
-     * отвечает грамматика условия ({@link StrategyCondition#pastIndicatorKeys()}),
-     * а не гейт: перечень у читателя повторял бы знание оценщика.
+     * (docs/rules/market-data-freshness.md). Прошлое цены — та же половина:
+     * пересечение цены с индикатором читает раскладку предыдущих цен по
+     * ключу индикатора-пары, и без неё оно ложно по той же причине. Какие
+     * правила читают прошлое и по каким ключам, отвечает грамматика условия
+     * ({@link StrategyCondition#pastIndicatorKeys()},
+     * {@link StrategyCondition#pastPriceKeys()}), а не гейт: перечень у
+     * читателя повторял бы знание оценщика.
      */
     public Boolean covers(StrategyCondition condition) {
         if (isNull(condition)) {
@@ -128,6 +144,7 @@ public class MarketFeatures {
         }
         return emptyIfNull(latestIndicators).keySet().containsAll(condition.indicatorKeys())
                 && emptyIfNull(previousIndicators).keySet().containsAll(condition.pastIndicatorKeys())
+                && emptyIfNull(previousPrices).keySet().containsAll(condition.pastPriceKeys())
                 && emptyIfNull(structures).keySet().containsAll(condition.structureKeys());
     }
 }

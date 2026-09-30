@@ -2,7 +2,6 @@ package com.example.strategies.api.model.strategy;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,8 +12,9 @@ import lombok.Setter;
 public class StrategyConditionApiModel {
 
     @Valid
-    @NotEmpty
-    @Schema(description = "Правила условия; проверяются по level ASC, истинны должны быть все",
+    @Schema(description = "Правила условия; проверяются по level ASC, истинны должны быть все. "
+            + "Перечень непуст — непустоту проверяет валидатор с кодом STRATEGY_CONDITION_EMPTY, "
+            + "а не аннотация: код с аннотацией был бы недостижим",
             requiredMode = Schema.RequiredMode.REQUIRED)
     private List<StrategyConditionRuleApiModel> rules;
 }

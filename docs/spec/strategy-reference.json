@@ -36,7 +36,7 @@
       "name": "allDetailsWithinPhaseMatrix",
       "note": "Все детали стратегии укладываются в матрицу допустимости. Клейм счётный, поэтому и объявлен величиной: перечень пар без прогона против эталона был бы абзацем.",
       "op": "all",
-      "over": "details",
+      "over": "strategy.details[]",
       "of": "phaseEntryPolicyAllowed"
     },
     {
@@ -92,6 +92,42 @@
       "op": "count",
       "over": "strategy.details[].stepsByStatus{}[]",
       "where": "!dealLevelStepTypeAllowed"
+    },
+    {
+      "name": "dealLevelStepsCount",
+      "note": "Шаги уровня сделки под всеми статусами — операнд dealLevelStepsWithoutSelection.",
+      "op": "count",
+      "over": "strategy.details[].stepsByStatus{}[]"
+    },
+    {
+      "name": "dealLevelStepsUnderActive",
+      "note": "Шаги уровня сделки под активной сделкой — единственным статусом, где их отбирают (docs/components/DealActiveHandler.md; координированный выход их не отбирает — docs/components/DealExitPendingHandler.md). Ключа карты форма не читает, поэтому статус назван путём.",
+      "op": "count",
+      "over": "strategy.details[].stepsByStatus.ACTIVE[]"
+    },
+    {
+      "name": "dealLevelStepsWithoutSelection",
+      "note": "Шаги уровня сделки под статусом без отбора: они не исполнятся никогда, при любом рынке. Реджект создания — STRATEGY_STEP_STATUS_WITHOUT_SELECTION (docs/rules/strategy-validation.md). Ключ вне перечня статусов сделки валидатор отвергает разбором перечня, а не этим кодом; форма их не различает и считает всякий ключ, кроме активного.",
+      "expr": "dealLevelStepsCount - dealLevelStepsUnderActive"
+    },
+    {
+      "name": "trancheStepsWithoutSelection",
+      "note": "Шаги транша под терминальным статусом: под ним шаги не отбирает ни один обработчик транша (разделы «Шаги статуса» компонент-доков обработчиков транша), под прочими статусами отбор есть. Реджект создания — STRATEGY_STEP_STATUS_WITHOUT_SELECTION (docs/rules/strategy-validation.md).",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus.CLOSED[]"
+    },
+    {
+      "name": "stepDeclaresActions",
+      "note": "Пакет действий одного шага непуст; опущенное поле и пустой перечень — одно состояние (ложь).",
+      "op": "exists",
+      "over": "actions"
+    },
+    {
+      "name": "trancheBareExitSteps",
+      "note": "Шаги выхода ТРАНША без единого действия. Пустой пакет законен только у шага выхода уровня СДЕЛКИ — он работает ребром в координированный выход; шаг транша делает лишь то, что объявляет его пакет, и пустой пакет не делает ничего. Реджект создания — STRATEGY_STEP_ACTIONS_EMPTY (docs/rules/strategy-validation.md).",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[]",
+      "where": "?stepType == 'EXIT' && !stepDeclaresActions"
     },
     {
       "name": "usesLegacyActionLevel",
@@ -403,6 +439,39 @@
       "name": "detailsCount",
       "op": "count",
       "over": "strategy.details[]"
+    },
+    {
+      "name": "bullTrendDetailsCount",
+      "note": "Сколько деталей стратегии объявлено на фазу BULL_TREND. Четыре счёта по типам фазы — операнды detailPerPhaseExact; общего счёта с параметром фазы у формы нет, поэтому тип назван в имени.",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "?marketPhaseType == 'BULL_TREND'"
+    },
+    {
+      "name": "bearTrendDetailsCount",
+      "note": "Сколько деталей стратегии объявлено на фазу BEAR_TREND — операнд detailPerPhaseExact.",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "?marketPhaseType == 'BEAR_TREND'"
+    },
+    {
+      "name": "rangeDetailsCount",
+      "note": "Сколько деталей стратегии объявлено на фазу RANGE — операнд detailPerPhaseExact.",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "?marketPhaseType == 'RANGE'"
+    },
+    {
+      "name": "unknownDetailsCount",
+      "note": "Сколько деталей стратегии объявлено на фазу UNKNOWN — операнд detailPerPhaseExact.",
+      "op": "count",
+      "over": "strategy.details[]",
+      "where": "?marketPhaseType == 'UNKNOWN'"
+    },
+    {
+      "name": "detailPerPhaseExact",
+      "note": "Ровно одна деталь на каждый тип рыночной фазы (дом правила — docs/rules/strategy-validation.md, перечень фаз — docs/models/domain/other/MarketPhase.md). Две стороны нарушения разведены: фаза без детали даёт счёт 0 — неторгуемая фаза объявляется явной деталью, а не отсутствием; две детали на одну фазу дают счёт 2 — какая из них действует, выбрать нечем. Значение фазы вне перечня здесь не мерится: его отвергает разбор перечня, отдельным нарушением.",
+      "expr": "bullTrendDetailsCount == 1 && bearTrendDetailsCount == 1 && rangeDetailsCount == 1 && unknownDetailsCount == 1"
     }
   ],
   "examples": [
@@ -413,7 +482,12 @@
       },
       "expect": {
         "detailsCount": 4,
-        "tradableDetailsCount": 2
+        "tradableDetailsCount": 2,
+        "bullTrendDetailsCount": 1,
+        "bearTrendDetailsCount": 1,
+        "rangeDetailsCount": 1,
+        "unknownDetailsCount": 1,
+        "detailPerPhaseExact": true
       }
     },
     {
@@ -453,6 +527,111 @@
       },
       "expect": {
         "dealLevelStepsOutOfScope": 0
+      }
+    },
+    {
+      "case": "шаги эталона стоят только под статусами с отбором, и пустого пакета у шагов транша нет",
+      "stateFrom": {
+        "strategy": "services/strategies/src/test/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "dealLevelStepsCount": 2,
+        "dealLevelStepsUnderActive": 2,
+        "dealLevelStepsWithoutSelection": 0,
+        "trancheStepsWithoutSelection": 0,
+        "trancheBareExitSteps": 0
+      }
+    },
+    {
+      "case": "шаги под статусами без отбора и шаг выхода транша без действий; шаг выхода сделки без действий законен и в счёт не идёт, шаг выхода транша с действием — тоже",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "stepsByStatus": {
+                "ACTIVE": [
+                  {
+                    "stepType": "EXIT"
+                  }
+                ],
+                "EXIT_PENDING": [
+                  {
+                    "stepType": "FAIL_SAFE",
+                    "actions": [
+                      {
+                        "actionKind": "POSITION",
+                        "actionType": "EXIT_ACTION"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "tranches": [
+                {
+                  "key": "t1",
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "EXIT",
+                        "actions": [
+                          {
+                            "actionKind": "POSITION",
+                            "actionType": "EXIT_ACTION"
+                          }
+                        ]
+                      },
+                      {
+                        "stepType": "EXIT"
+                      }
+                    ],
+                    "CLOSED": [
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "POSITION",
+                            "actionType": "EXIT_ACTION"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "dealLevelStepsCount": 2,
+        "dealLevelStepsUnderActive": 1,
+        "dealLevelStepsWithoutSelection": 1,
+        "trancheStepsWithoutSelection": 1,
+        "trancheBareExitSteps": 1
+      }
+    },
+    {
+      "case": "пакет шага с объявленным действием непуст",
+      "state": {
+        "stepType": "EXIT",
+        "actions": [
+          {
+            "actionKind": "POSITION",
+            "actionType": "EXIT_ACTION"
+          }
+        ]
+      },
+      "expect": {
+        "stepDeclaresActions": true
+      }
+    },
+    {
+      "case": "пакет шага без поля действий пуст",
+      "state": {
+        "stepType": "EXIT"
+      },
+      "expect": {
+        "stepDeclaresActions": false
       }
     },
     {
@@ -1334,6 +1513,11 @@
                           }
                         ]
                       }
+                    ],
+                    "CLOSED": [
+                      {
+                        "stepType": "EXIT"
+                      }
                     ]
                   }
                 }
@@ -1352,6 +1536,9 @@
         "tradableDetailsWithTranches": 0,
         "tranchesWithSingleEntry": 0,
         "dealLevelStepsOutOfScope": 1,
+        "dealLevelStepsWithoutSelection": 1,
+        "trancheStepsWithoutSelection": 1,
+        "trancheBareExitSteps": 1,
         "usesLegacyActionLevel": 1,
         "actionsWithUnknownType": 1,
         "entryActionsWithoutAttachedProtection": 1,
@@ -1990,24 +2177,26 @@
     {
       "case": "все детали укладываются в матрицу: две торгуемые, две отказные",
       "state": {
-        "details": [
-          {
-            "marketPhaseType": "BULL_TREND",
-            "phaseEntryPolicy": "FOLLOW_PHASE"
-          },
-          {
-            "marketPhaseType": "BEAR_TREND",
-            "phaseEntryPolicy": "FOLLOW_PHASE"
-          },
-          {
-            "marketPhaseType": "RANGE",
-            "phaseEntryPolicy": "NO_TRADE"
-          },
-          {
-            "marketPhaseType": "UNKNOWN",
-            "phaseEntryPolicy": "NO_TRADE"
-          }
-        ]
+        "strategy": {
+          "details": [
+            {
+              "marketPhaseType": "BULL_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "BEAR_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "RANGE",
+              "phaseEntryPolicy": "NO_TRADE"
+            },
+            {
+              "marketPhaseType": "UNKNOWN",
+              "phaseEntryPolicy": "NO_TRADE"
+            }
+          ]
+        }
       },
       "expect": {
         "allDetailsWithinPhaseMatrix": true
@@ -2016,20 +2205,22 @@
     {
       "case": "одна деталь вне матрицы — весь набор отвергается",
       "state": {
-        "details": [
-          {
-            "marketPhaseType": "BULL_TREND",
-            "phaseEntryPolicy": "FOLLOW_PHASE"
-          },
-          {
-            "marketPhaseType": "RANGE",
-            "phaseEntryPolicy": "CONTRARIAN"
-          },
-          {
-            "marketPhaseType": "UNKNOWN",
-            "phaseEntryPolicy": "NO_TRADE"
-          }
-        ]
+        "strategy": {
+          "details": [
+            {
+              "marketPhaseType": "BULL_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "RANGE",
+              "phaseEntryPolicy": "CONTRARIAN"
+            },
+            {
+              "marketPhaseType": "UNKNOWN",
+              "phaseEntryPolicy": "NO_TRADE"
+            }
+          ]
+        }
       },
       "expect": {
         "allDetailsWithinPhaseMatrix": false
@@ -2234,6 +2425,158 @@
       },
       "expect": {
         "conditionPriceSourceUnavailable": 0
+      }
+    },
+    {
+      "case": "деталь без траншей: признак переоткрытия у пустого перечня истинен вакуумно — пустоту ловит счёт траншей, а не он",
+      "note": "Пустой перечень траншей законен у неторгуемой детали и отвергается у торгуемой (docs/rules/strategy-validation.md).",
+      "state": {
+        "tranches": []
+      },
+      "expect": {
+        "trancheDeclaresReopen": true,
+        "detailTrancheCount": 0
+      }
+    },
+    {
+      "case": "торгуемая деталь без траншей в счёт деталей с траншами не входит: вакуумную истину признака переоткрытия гасит конъюнкт непустоты",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "marketPhaseType": "BULL_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "tranches": []
+            }
+          ]
+        }
+      },
+      "expect": {
+        "tradableDetailsCount": 1,
+        "tradableDetailsWithTranches": 0
+      }
+    },
+    {
+      "case": "набор без деталей матрицу не нарушает вакуумно: пустой набор отвергает правило «ровно одна деталь на каждый тип фазы», а не матрица",
+      "state": {
+        "strategy": {
+          "details": []
+        }
+      },
+      "expect": {
+        "allDetailsWithinPhaseMatrix": true
+      }
+    },
+    {
+      "case": "две детали на одну фазу при покрытых остальных: счёт бычьей фазы 2, правило «ровно одна» нарушено, хотя ни одна фаза не пуста",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "marketPhaseType": "BULL_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "BULL_TREND",
+              "phaseEntryPolicy": "CONTRARIAN"
+            },
+            {
+              "marketPhaseType": "BEAR_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "RANGE",
+              "phaseEntryPolicy": "NO_TRADE"
+            },
+            {
+              "marketPhaseType": "UNKNOWN",
+              "phaseEntryPolicy": "NO_TRADE"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "bullTrendDetailsCount": 2,
+        "bearTrendDetailsCount": 1,
+        "rangeDetailsCount": 1,
+        "unknownDetailsCount": 1,
+        "detailPerPhaseExact": false
+      }
+    },
+    {
+      "case": "четыре детали, но не на четыре фазы: дубль медвежьей фазы при пустом диапазоне — число деталей совпадает с числом фаз, и счёт деталей нарушения не видит",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "marketPhaseType": "BULL_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "BEAR_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "BEAR_TREND",
+              "phaseEntryPolicy": "NO_TRADE"
+            },
+            {
+              "marketPhaseType": "UNKNOWN",
+              "phaseEntryPolicy": "NO_TRADE"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "detailsCount": 4,
+        "bullTrendDetailsCount": 1,
+        "bearTrendDetailsCount": 2,
+        "rangeDetailsCount": 0,
+        "unknownDetailsCount": 1,
+        "detailPerPhaseExact": false
+      }
+    },
+    {
+      "case": "неторгуемая фаза без явной детали: отказ от торговли в неизвестной фазе объявляется деталью, а не отсутствием",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "marketPhaseType": "BULL_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "BEAR_TREND",
+              "phaseEntryPolicy": "FOLLOW_PHASE"
+            },
+            {
+              "marketPhaseType": "RANGE",
+              "phaseEntryPolicy": "NO_TRADE"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "bullTrendDetailsCount": 1,
+        "bearTrendDetailsCount": 1,
+        "rangeDetailsCount": 1,
+        "unknownDetailsCount": 0,
+        "detailPerPhaseExact": false
+      }
+    },
+    {
+      "case": "набор без деталей правило «ровно одна деталь на каждый тип фазы» нарушает на всех четырёх фазах сразу",
+      "state": {
+        "strategy": {
+          "details": []
+        }
+      },
+      "expect": {
+        "bullTrendDetailsCount": 0,
+        "bearTrendDetailsCount": 0,
+        "rangeDetailsCount": 0,
+        "unknownDetailsCount": 0,
+        "detailPerPhaseExact": false
       }
     }
   ],

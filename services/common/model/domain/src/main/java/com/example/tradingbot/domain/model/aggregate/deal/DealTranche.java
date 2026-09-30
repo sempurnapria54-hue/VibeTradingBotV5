@@ -14,6 +14,7 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -41,6 +42,18 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class DealTranche extends Auditable {
+
+    /**
+     * Порядок давности срабатывания отдельной защиты — наибольшим
+     * элементом выходит последняя сработавшая. Старше всего наблюдённый
+     * площадкой момент срабатывания; пустой момент уступает любому
+     * непустому. При равенстве — строка, заведённая позже (больший ключ);
+     * пустой ключ уступает любому.
+     */
+    private static final Comparator<AlgoOrder> BY_TRIGGER_RECENCY = Comparator
+            .<AlgoOrder, Instant>comparing(AlgoOrder::getExternalTriggerTime,
+                    Comparator.nullsFirst(Comparator.<Instant>naturalOrder()))
+            .thenComparing(AlgoOrder::getId, Comparator.nullsFirst(Comparator.<Long>naturalOrder()));
 
     /** Внутренний идентификатор в БД. */
     private Long id;
@@ -283,13 +296,24 @@ public class DealTranche extends Auditable {
         return ownExitFilled ? CloseReason.STRATEGY_EXIT : null;
     }
 
-    /** Причина по сработавшей защите транша — отдельной либо встроенной. */
+    /**
+     * Причина по сработавшей защите транша — отдельной либо встроенной.
+     *
+     * <p><b>Среди нескольких сработавших отдельных защит отвечает
+     * ПОСЛЕДНЯЯ сработавшая</b> — та, что добрала остаток транша
+     * (docs/lifecycles/DealTranche.md §«Инициатор выхода транша читается по
+     * его фактам»). Выбор делает модель по фактам защит
+     * ({@link #BY_TRIGGER_RECENCY}), а не порядок коллекции: иначе ответ
+     * зависел бы от того, в каком порядке сборщик графа разложил строки.
+     * Защита с пустым типом условия инициатором не называется и в выбор не
+     * входит.
+     */
     private CloseReason triggeredProtectionReason() {
         CloseReason standalone = emptyIfNull(algoOrders).stream()
                 .filter(algo -> AlgoOrder.CloseReason.TRIGGERED.equals(algo.getCloseReason()))
+                .filter(algo -> nonNull(algo.getConditionType()))
+                .max(BY_TRIGGER_RECENCY)
                 .map(algo -> reasonOf(algo.getConditionType()))
-                .filter(Objects::nonNull)
-                .findFirst()
                 .orElse(null);
         if (nonNull(standalone)) {
             return standalone;
@@ -622,9 +646,6 @@ public class DealTranche extends Auditable {
 
         /** Сработал стоп-лосс транша. */
         STOP_LOSS,
-
-        /** Сработал временной стоп. */
-        TIME_STOP,
 
         /** Штатный выход по стратегии. */
         STRATEGY_EXIT,

@@ -1,6 +1,7 @@
 package com.example.strategies.domain.service;
 
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.domain.validation.StrategyDefinitionValidator;
@@ -65,20 +66,23 @@ public class StrategyCreationService {
     }
 
     /**
-     * Ссылки определения разрешаются у соседа, и отказ адресует тот
-     * конъюнкт, который ложен: «не годится» без указания, что именно,
-     * автору ничего не говорит (docs/concept.md П3).
+     * Ссылки определения разрешаются у соседа, и отказ адресует ту
+     * ссылку, которая не разрешилась: «не годится» без указания, что
+     * именно, автору ничего не говорит (docs/concept.md П3).
+     *
+     * <p><b>Счёт чужого тенанта и несуществующий счёт — один отказ с одним
+     * текстом.</b> Различи их текст — поверхность отвечала бы на вопрос о
+     * существовании чужой сущности (docs/architecture/contracts.md
+     * §«Контекст тенанта в вызове»: правило действует и когда сущность
+     * называет ссылка в теле вызова).
      */
     private void validateReferences(CreateStrategyApiRequest request, String tenantInternalId) {
         PairCheckCoreResponse check = tradingCoreReadClient.checkPair(tenantInternalId,
                 request.getExchangeAccountInternalId(), request.getInstrumentInternalId());
         List<String> violations = new ArrayList<>();
-        if (isFalse(check.accountFound())) {
-            violations.add("exchangeAccountInternalId STRATEGY_ACCOUNT_NOT_FOUND: счёта с такой "
-                    + "идентичностью в реестре нет");
-        } else if (isFalse(check.accountBelongsToTenant())) {
-            violations.add("exchangeAccountInternalId STRATEGY_ACCOUNT_NOT_FOUND: счёт принадлежит "
-                    + "другому тенанту");
+        if (isFalse(isTrue(check.accountFound()) && isTrue(check.accountBelongsToTenant()))) {
+            violations.add("exchangeAccountInternalId STRATEGY_ACCOUNT_NOT_FOUND: счёт с такой "
+                    + "идентичностью в контексте тенанта не разрешается");
         }
         if (isFalse(check.instrumentFound())) {
             violations.add("instrumentInternalId STRATEGY_INSTRUMENT_NOT_FOUND: инструмента с такой "

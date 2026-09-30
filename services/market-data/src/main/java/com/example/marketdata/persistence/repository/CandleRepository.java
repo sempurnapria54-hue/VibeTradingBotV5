@@ -5,6 +5,7 @@ import com.example.marketdata.persistence.model.CandleId;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -71,6 +72,20 @@ public interface CandleRepository extends JpaRepository<CandleEntity, CandleId> 
                            @Param("externalModifiedAt") OffsetDateTime externalModifiedAt,
                            @Param("writtenAt") OffsetDateTime writtenAt,
                            @Param("writer") String writer);
+
+    /**
+     * Закрытие свечи, на которой посчитано значение идентичности индикатора:
+     * группа инструмента берётся по таймфрейму идентичности, свеча — по
+     * открытию бара (метка значения — открытие его свечи). Проекция одного
+     * поля: сущности свечи, группы и идентичности ради него не грузятся.
+     */
+    @Query("select c.close from CandleEntity c, CandleGroupEntity g, IndicatorConfigEntity ic "
+            + "where c.candleGroupId = g.id and g.instrumentId = :instrumentId "
+            + "and ic.id = :indicatorConfigId and g.timeframe = ic.timeframe "
+            + "and c.openTimestamp = :openTimestamp")
+    Optional<BigDecimal> findCloseOfIndicatorCandle(@Param("instrumentId") Long instrumentId,
+                                                    @Param("indicatorConfigId") Long indicatorConfigId,
+                                                    @Param("openTimestamp") Long openTimestamp);
 
     @Query("select min(c.openTimestamp) from CandleEntity c where c.candleGroupId = :groupId")
     Long findMinOpenTimestamp(@Param("groupId") Long groupId);

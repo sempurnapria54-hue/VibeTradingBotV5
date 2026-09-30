@@ -126,8 +126,10 @@ OBV; сейчас не заведён (каталог расширяем по п
   `indicator_type`. Все значения — `numeric(36, 18)` и **обнуляемы**: у
   строки заполнены только колонки своего типа, у прочих значения нет
   (`docs/rules/absent-value-semantics.md`).
-- **Обязательны** четыре колонки идентичности: `indicator_type`,
-  `instrument_id`, `indicator_config_id`, `candle_timestamp`.
+- **Обязательны** четыре колонки идентичности: `indicator_type`
+  (`varchar(32)`, строкой значения перечня), `instrument_id` и
+  `indicator_config_id` (`bigint`), `candle_timestamp` (`timestamptz`).
+  Суррогатный ключ `id` — `bigserial`.
 - **Ключ уникальности** — `uk_indicator_value_identity`
   `(instrument_id, indicator_config_id, candle_timestamp)`: тот же ключ,
   что объявляет §«Ключевание — идентичностью вычисления».

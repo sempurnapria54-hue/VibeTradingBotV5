@@ -140,7 +140,7 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
         // Класс отказа — недоступность соседа, а не «всё непредусмотренное»:
         // наша сторона исправна, и повтор имеет смысл позже.
         assertThat(answer.carriesErrorDto()).isTrue();
-        assertThat(answer.errorCode()).isEqualTo(PEER_SERVICE_UNAVAILABLE);
+        assertThat(answer.errorCode()).isEqualTo(PEER_UNAVAILABLE);
         assertThat(answer.status()).isEqualTo(503);
         // Ступень стои́т: снятие не применилось ни на байт.
         assertThat(rungOf(ACCOUNT)).isEqualTo("TRADE_BLOCKED");

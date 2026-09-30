@@ -13,8 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Грамматика условия: чьё ПРЕДЫДУЩЕЕ значение читает оценка — продолжение
- * группы `U17` документа `.claude/tests/cases/domain-model-predicates.md`
+ * Грамматика условия: чьё ПРЕДЫДУЩЕЕ значение читает оценка — индикатора
+ * (`U17.24`-`U17.29`) и цены (`U17.30`-`U17.35`); продолжение группы `U17` документа `.claude/tests/cases/domain-model-predicates.md`
  * (docs/rules/market-data-freshness.md, покрытие по обеим половинам
  * сравнения; docs/components/StrategyConditionEvaluator.md).
  *
@@ -59,7 +59,10 @@ class ConditionPastReadTest {
         assertThat(subject.indicatorKeys()).containsExactlyInAnyOrder(FAST, SLOW);
     }
 
-    /** Цена предыдущей половины не имеет: её пустоту оценщик читает ложью сам. */
+    /**
+     * У ценового операнда ключа прошлого индикатора нет: его прошлое ключует
+     * индикатор-пара, и в перечень прошлого цены оно уходит (U17.30).
+     */
     @Test
     @DisplayName("U17.27 — пересечение цены с индикатором")
     void u17_27_aPriceOperandHasNoPastKey() {
@@ -88,6 +91,78 @@ class ConditionPastReadTest {
         assertThat(condition(null, rule(null, indicator(FAST), indicator(SLOW))).pastIndicatorKeys()).isEmpty();
     }
 
+    /** Прошлое цены ключуется индикатором по другую сторону пересечения. */
+    @Test
+    @DisplayName("U17.30 — пересечение цены с индикатором: ключ прошлого цены")
+    void u17_30_aPriceCrossoverKeysThePastPriceByTheIndicatorPair() {
+        StrategyCondition subject = condition(
+                rule(StrategyConditionRuleType.CROSSOVER, price(), indicator(SLOW)));
+
+        assertThat(subject.pastPriceKeys()).containsExactly(SLOW);
+    }
+
+    /** Сторона цены в пересечении значения не имеет: ключ — индикатор по другую сторону. */
+    @Test
+    @DisplayName("U17.31 — пересечение индикатора с ценой справа")
+    void u17_31_thePriceOnTheRightKeysThePastPriceByTheLeftIndicator() {
+        StrategyCondition subject = condition(
+                rule(StrategyConditionRuleType.CROSSOVER, indicator(FAST), price()));
+
+        assertThat(subject.pastPriceKeys()).containsExactly(FAST);
+    }
+
+    /** Пересечение без цены прошлого цены не читает. */
+    @Test
+    @DisplayName("U17.32 — пересечение двух индикаторов")
+    void u17_32_aCrossoverWithoutPriceReadsNoPastPrice() {
+        StrategyCondition subject = condition(
+                rule(StrategyConditionRuleType.CROSSOVER, indicator(FAST), indicator(SLOW)));
+
+        assertThat(subject.pastPriceKeys()).isEmpty();
+    }
+
+    /**
+     * Пары-индикатора нет — ключа нет: у цены против константы и против цены
+     * прошлого нет вовсе, и оценщик читает его ложью без раскладки.
+     */
+    @Test
+    @DisplayName("U17.33 — пересечение цены с константой и цены с ценой")
+    void u17_33_aPriceCrossoverWithoutAnIndicatorPairHasNoKey() {
+        StrategyCondition subject = condition(
+                rule(StrategyConditionRuleType.CROSSOVER, price(), operand(StrategyConditionSourceType.CONSTANT, null)),
+                rule(StrategyConditionRuleType.CROSSOVER, price(), price()));
+
+        assertThat(subject.pastPriceKeys()).isEmpty();
+    }
+
+    /**
+     * Прошлое цены читает только пересечение: объёмный фильтр и сравнение с
+     * ценой его не спрашивают, хотя индикатор по другую сторону у них есть.
+     */
+    @Test
+    @DisplayName("U17.34 — объёмный фильтр и сравнение с ценой")
+    void u17_34_onlyTheCrossoverReadsThePastPrice() {
+        StrategyCondition subject = condition(
+                rule(StrategyConditionRuleType.VOLUME_FILTER_PASSED, price(), indicator(VOLUME)),
+                rule(StrategyConditionRuleType.PRICE_COMPARE, price(), indicator(SLOW)));
+
+        assertThat(subject.pastPriceKeys()).isEmpty();
+    }
+
+    /** Пустые правило, тип, пара и пробельное имя пары отказа разыменования не дают. */
+    @Test
+    @DisplayName("U17.35 — пустые правило, тип правила, пара цены и пробельное имя пары")
+    void u17_35_absentPartsGiveNoPastPriceKey() {
+        StrategyCondition subject = condition(
+                null,
+                rule(null, price(), indicator(SLOW)),
+                rule(StrategyConditionRuleType.CROSSOVER, price(), null),
+                rule(StrategyConditionRuleType.CROSSOVER, price(), indicator("  ")));
+
+        assertThat(subject.pastPriceKeys()).isEmpty();
+        assertThat(new StrategyCondition().pastPriceKeys()).isEmpty();
+    }
+
     private static StrategyCondition condition(StrategyConditionRule... rules) {
         return new StrategyCondition(new ArrayList<>(Arrays.asList(rules)));
     }
@@ -99,6 +174,10 @@ class ConditionPastReadTest {
         rule.setLeftOperand(left);
         rule.setRightOperand(right);
         return rule;
+    }
+
+    private static StrategyConditionOperand price() {
+        return operand(StrategyConditionSourceType.PRICE, null);
     }
 
     private static StrategyConditionOperand indicator(String key) {

@@ -154,13 +154,44 @@ class PhaseClassificationContextTest {
                 .contains(".timeframe: unknown value TEN_MINUTES");
     }
 
+    /**
+     * Клауза без условия — безусловная фаза: оценка читает пустое условие
+     * истиной, и фаза назначалась бы каждому инструменту на каждом проходе
+     * (docs/rules/strategy-condition-contract.md §«Условие непусто»). Обход
+     * правил при этом не начинается — отказ ровно один.
+     */
     @Test
-    @DisplayName("U26.10 — условие клаузы не объявлено: обход правил не начинается")
-    void u26_10_aClauseWithoutAConditionIsNotTraversed() {
+    @DisplayName("U26.10 — условие клаузы не объявлено: отказ пустого условия, обход правил не начинается")
+    void u26_10_aClauseWithoutAConditionIsRejectedAndNotTraversed() {
         CreateStrategyApiRequest request = reference();
         phaseRule(request, TREND_CLAUSE).setCondition(null);
 
-        assertThat(violations(request)).isEmpty();
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("marketPhaseSetting.phaseRules[" + TREND_CLAUSE + "].condition STRATEGY_CONDITION_EMPTY");
+    }
+
+    @Test
+    @DisplayName("U26.13 — пересечение цены с константой в клаузе: контракт пары считается и здесь")
+    void u26_13_theCrossoverPricePairIsCheckedInTheClauseContextToo() {
+        CreateStrategyApiRequest request = reference();
+        StrategyConditionRuleApiModel rule = phaseConditionRule(request, TREND_CLAUSE);
+        StrategyConditionOperandApiModel price = newOperand("PRICE");
+        price.setPriceSource("LAST_PRICE");
+        StrategyConditionOperandApiModel constant = newOperand("CONSTANT");
+        constant.setValueType("NUMBER");
+        constant.setValue("100");
+        rule.setRuleType("CROSSOVER");
+        rule.setOperator("CROSSED_ABOVE");
+        rule.setLeftOperand(price);
+        rule.setRightOperand(constant);
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("marketPhaseSetting.phaseRules[")
+                .contains("STRATEGY_CROSSOVER_PRICE_WITHOUT_INDICATOR");
     }
 
     @Test

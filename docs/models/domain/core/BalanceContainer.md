@@ -33,7 +33,7 @@
 |---|---|---|
 | `id` | `Long` | Внутренний идентификатор снимка. |
 | `exchangeAccountId` | `Long` | **Биржевой счёт**, которому принадлежит снимок (`docs/models/domain/core/ExchangeAccount.md`). |
-| `externalUpdatedAt` | `OffsetDateTime` | Время обновления снимка на стороне биржи. База проверки свежести. |
+| `externalUpdatedAt` | `OffsetDateTime` | Момент, на который биржа собрала сведения о счёте (`docs/models/mapping/Balance.md`). База проверки свежести. |
 | `externalTotalEquity` | `BigDecimal` | Общий капитал счёта. |
 | `externalAdjustedEquity` | `BigDecimal` | Скорректированный капитал. |
 | `externalAvailableEquity` | `BigDecimal` | Свободный капитал уровня счёта. **Базой риск-политики не является** — диагностическая величина. |
@@ -57,7 +57,7 @@
 | `id` | `Long` | Внутренний идентификатор. |
 | `balanceContainerId` | `Long` | Родительский контейнер. |
 | `externalCurrency` | `String` | Валюта. |
-| `externalUpdatedAt` | `OffsetDateTime` | Время обновления снимка валюты на бирже. |
+| `externalUpdatedAt` | `OffsetDateTime` | Время последнего изменения остатка валюты на бирже; свежесть его не читает. |
 | `externalEquity` | `BigDecimal` | Капитал по валюте. |
 | `externalCashBalance` | `BigDecimal` | Денежный остаток. |
 | `externalAvailableBalance` | `BigDecimal` | Доступный остаток. У строки **расчётной валюты инструмента** — операнд движения базы риска (в обе стороны) и её первого наблюдения; **самой базой не является** (`docs/rules/risk-policy.md`). Единица определена по построению — валютой строки. |

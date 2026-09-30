@@ -4,18 +4,14 @@
 
 Каков контракт операций по позиции.
 
-## Внешний источник правды
+## Источник правды вне репозитория
 
-Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
-разделы «Trading Account → REST API» — «Get positions», «Get
-positions history»; «Order Book Trading → Trade» — «POST / Close
-positions»). При расхождении с офдоком побеждает офдок;
-синхронизация — перевыкачка + дифф при каждом заходе интегратора по
-источнику и по задаче «актуализируй»
-(`.claude/processes/api-docs-completion.md`, канал чтения —
-`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
-(соответствие positions/close-position; positions-history
-поле-уровнево).
+Официальный док OKX (`https://www.okx.com/docs-v5/en/`, разделы «Trading
+Account → REST API» — «Get positions», «Get positions history»; «Order
+Book Trading → Trade» — «POST / Close positions»). Процедура сверки и
+приоритет офдока — `.claude/rules/external-source-sync.md`. Последняя
+сверка: 2026-06-11 (соответствие positions/close-position;
+positions-history поле-уровнево).
 
 **Рантайм-расхождение (2026-08-30, провенанс `рантайм`)** — одно, и оно
 несущее: офдок называет `posId` идентификатором позиции и переиспользования

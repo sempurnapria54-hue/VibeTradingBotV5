@@ -7,6 +7,7 @@ import static org.apache.commons.collections4.MapUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -25,6 +26,7 @@ import com.example.strategies.api.model.strategy.StopLossSettingsApiModel;
 import com.example.strategies.api.model.strategy.StrategyActionApiModel;
 import com.example.strategies.api.model.strategy.StrategyAlgoOrderActionApiModel;
 import com.example.strategies.api.model.strategy.StrategyAttachedProtectionSettingsApiModel;
+import com.example.strategies.api.model.strategy.StrategyConditionApiModel;
 import com.example.strategies.api.model.strategy.StrategyConditionOperandApiModel;
 import com.example.strategies.api.model.strategy.StrategyConditionRuleApiModel;
 import com.example.strategies.api.model.strategy.StrategyDetailApiModel;
@@ -122,7 +124,6 @@ public class StrategyDefinitionValidator {
             StrategyConditionRuleType.CROSSOVER.name(),
             StrategyConditionRuleType.RANGE_BREAKOUT_CONFIRMED.name(),
             StrategyConditionRuleType.VOLUME_FILTER_PASSED.name(),
-            StrategyConditionRuleType.CANDLE_CLOSED.name(),
             StrategyConditionRuleType.MARKET_STRUCTURE_IS.name());
 
     /**
@@ -163,6 +164,30 @@ public class StrategyDefinitionValidator {
                     StrategyPositionActionApiModel.class,
                     EnumSet.of(StrategyActionType.EXIT_ACTION));
 
+    /**
+     * Статусы транша, под которыми ядро ОТБИРАЕТ его шаги: у каждого свой
+     * обработчик (docs/components/Tranche*Handler.md, разделы «Шаги
+     * статуса»). Под терминальным {@code CLOSED} шаги не отбирает никто.
+     * Перечень объявлен положительно: статус, заведённый позже, отвергается,
+     * пока отбор под ним не назван.
+     */
+    private static final Set<String> TRANCHE_SELECTED_STATUSES = Set.of(
+            DealTranche.Status.PRECHECK.name(),
+            DealTranche.Status.ENTRY_SUBMITTED.name(),
+            DealTranche.Status.ENTRY_FINALIZED.name(),
+            DealTranche.Status.PROTECTION_SWITCHED.name(),
+            DealTranche.Status.MANAGING.name(),
+            DealTranche.Status.EXIT_PENDING.name());
+
+    /**
+     * Статус сделки, под которым отбираются шаги уровня сделки: только
+     * активная сделка (docs/components/DealActiveHandler.md). Координированный
+     * выход их не отбирает — такой шаг работает ребром из активной сделки, и
+     * двигать ему там нечего (docs/components/DealExitPendingHandler.md);
+     * терминальные статусы не отбирает никто.
+     */
+    private static final Set<String> DEAL_SELECTED_STATUSES = Set.of(Deal.Status.ACTIVE.name());
+
     /** Допустимые sourceType операндов в контексте классификации фазы (без MARKET_PHASE и runtime-сделки). */
     private static final Set<String> PHASE_ALLOWED_SOURCE_TYPES = Set.of(
             StrategyConditionSourceType.INDICATOR.name(),
@@ -172,6 +197,9 @@ public class StrategyDefinitionValidator {
             StrategyConditionSourceType.TIME.name());
 
     public void validateCreate(CreateStrategyApiRequest request, TenantRiskAppetite appetite) {
+        List<String> emptyMembers = new ArrayList<>();
+        collectEmptyMembers(request, emptyMembers);
+        rejectIfAny(emptyMembers);
         List<String> violations = new ArrayList<>();
         Map<String, IndicatorValue.Type> indicatorTypes = indicatorTypes(request.getIndicatorSettings());
         Set<String> structureKeys = structureSettingKeys(request.getMarketStructureSettings());
@@ -179,9 +207,120 @@ public class StrategyDefinitionValidator {
                 "strategy", indicatorTypes, violations);
         validateMarketPhaseSetting(request.getMarketPhaseSetting(), indicatorTypes, structureKeys, violations);
         validateDetails(request.getDetails(), appetite, indicatorTypes, structureKeys, violations);
+        rejectIfAny(violations);
+    }
+
+    private void rejectIfAny(List<String> violations) {
         if (isNotEmpty(violations)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.join("; ", violations));
         }
+    }
+
+    /**
+     * Член коллекции определения не пуст — у каждого перечня, который обход
+     * дерева читает поэлементно, и у значения карты шагов по статусу (дом
+     * правила — docs/rules/strategy-validation.md §«Что проверяется на
+     * создании»).
+     *
+     * <p>Пустое место узлом не является: у него нет ни одного поля, которое
+     * проверка могла бы прочесть, и дошедшее до проверок узла оно роняло
+     * обход разыменованием — автор получал отказ сервера вместо отказа
+     * создания. Bean Validation пустой член не отвергает: каскад по
+     * {@code @Valid} его пропускает, а аннотация на элементе отвечала бы без
+     * именованного кода (довод {@code validateFractionPositive}).
+     *
+     * <p><b>Отказ с пустым членом прочих нарушений не несёт, и это названная
+     * цена.</b> Обход начинается, когда все члены на месте: сделать каждую
+     * проверку терпимой к пустоте значило бы охранять ею два десятка мест,
+     * и пропущенная охрана возвращала бы тот же отказ сервера. Пустые члены
+     * при этом копятся между собой — автор получает их все одним ответом.
+     */
+    private void collectEmptyMembers(CreateStrategyApiRequest request, List<String> violations) {
+        rejectEmptyMembers(request.getIndicatorSettings(), "strategy.indicatorSettings", violations);
+        rejectEmptyMembers(request.getMarketStructureSettings(), "strategy.marketStructureSettings", violations);
+        if (nonNull(request.getMarketPhaseSetting())) {
+            List<StrategyMarketPhaseRuleApiModel> phaseRules = request.getMarketPhaseSetting().getPhaseRules();
+            rejectEmptyMembers(phaseRules, "marketPhaseSetting.phaseRules", violations);
+            for (int index = 0; index < emptyIfNull(phaseRules).size(); index++) {
+                StrategyMarketPhaseRuleApiModel rule = phaseRules.get(index);
+                if (isNull(rule)) {
+                    continue;
+                }
+                rejectEmptyRules(rule.getCondition(), "marketPhaseSetting.phaseRules[" + index + "].condition",
+                        violations);
+            }
+        }
+        List<StrategyDetailApiModel> details = request.getDetails();
+        rejectEmptyMembers(details, "details", violations);
+        for (int index = 0; index < emptyIfNull(details).size(); index++) {
+            StrategyDetailApiModel detail = details.get(index);
+            if (isNull(detail)) {
+                continue;
+            }
+            collectEmptyDetailMembers(detail, "details[" + index + "]", violations);
+        }
+    }
+
+    /** Члены детали: объявления траншей и шаги обоих уровней. */
+    private void collectEmptyDetailMembers(StrategyDetailApiModel detail, String path, List<String> violations) {
+        List<StrategyTrancheApiModel> tranches = detail.getTranches();
+        rejectEmptyMembers(tranches, path + ".tranches", violations);
+        for (int index = 0; index < emptyIfNull(tranches).size(); index++) {
+            StrategyTrancheApiModel tranche = tranches.get(index);
+            if (isNull(tranche)) {
+                continue;
+            }
+            collectEmptyStepMembers(tranche.getStepsByStatus(), path + ".tranches[" + index + "].stepsByStatus",
+                    violations);
+        }
+        collectEmptyStepMembers(detail.getStepsByStatus(), path + ".stepsByStatus", violations);
+    }
+
+    /** Значение карты шагов, шаг, правило его условия и действие его пакета. */
+    private void collectEmptyStepMembers(Map<String, List<StrategyStepApiModel>> stepsByStatus, String path,
+                                         List<String> violations) {
+        for (Map.Entry<String, List<StrategyStepApiModel>> entry : emptyIfNull(stepsByStatus).entrySet()) {
+            String statusPath = path + "[" + entry.getKey() + "]";
+            List<StrategyStepApiModel> steps = entry.getValue();
+            if (isNull(steps)) {
+                emptyMember(statusPath, violations);
+                continue;
+            }
+            rejectEmptyMembers(steps, statusPath, violations);
+            for (int index = 0; index < steps.size(); index++) {
+                StrategyStepApiModel step = steps.get(index);
+                if (isNull(step)) {
+                    continue;
+                }
+                String stepPath = statusPath + "[" + index + "]";
+                rejectEmptyRules(step.getCondition(), stepPath + ".condition", violations);
+                rejectEmptyMembers(step.getActions(), stepPath + ".actions", violations);
+            }
+        }
+    }
+
+    /** Правила условия; опущенное условие — предмет {@code validateConditionNotEmpty}. */
+    private void rejectEmptyRules(StrategyConditionApiModel condition, String path, List<String> violations) {
+        if (isNull(condition)) {
+            return;
+        }
+        rejectEmptyMembers(condition.getRules(), path + ".rules", violations);
+    }
+
+    private void rejectEmptyMembers(List<?> members, String path, List<String> violations) {
+        if (isNull(members)) {
+            return;
+        }
+        for (int index = 0; index < members.size(); index++) {
+            if (isNull(members.get(index))) {
+                emptyMember(path + "[" + index + "]", violations);
+            }
+        }
+    }
+
+    private void emptyMember(String path, List<String> violations) {
+        violations.add(path + " STRATEGY_COLLECTION_MEMBER_EMPTY: член коллекции определения пуст — "
+                + "пустое место узлом не является");
     }
 
     /**
@@ -208,9 +347,7 @@ public class StrategyDefinitionValidator {
             validateNotionalHeadroom(detail, path, appetite, violations);
             validateProtectionCoverage(detail, path, violations);
         }
-        if (isNotEmpty(violations)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.join("; ", violations));
-        }
+        rejectIfAny(violations);
     }
 
     /** Валидация целевого статуса PUT: известный enum, кроме CREATED (он системный). */
@@ -248,6 +385,7 @@ public class StrategyDefinitionValidator {
             StrategyMarketPhaseRuleApiModel rule = phaseRules.get(index);
             String path = "marketPhaseSetting.phaseRules[" + index + "]";
             validateEnum(MarketPhase.Type.class, rule.getType(), path + ".type", violations);
+            validateConditionNotEmpty(rule.getCondition(), path + ".condition", violations);
             if (isNull(rule.getCondition()) || isNull(rule.getCondition().getRules())) {
                 continue;
             }
@@ -818,7 +956,7 @@ public class StrategyDefinitionValidator {
         }
         validateEnum(IndicatorValue.Type.class, setting.getIndicatorType(), path + ".indicatorType", violations);
         validateEnum(Destiny.class, setting.getDestiny(), path + ".destiny", violations);
-        validateDuration(setting.getExpirationDuration(), path + ".expirationDuration", violations);
+        validateExpirationDeclared(setting.getExpirationDuration(), path + ".expirationDuration", violations);
         validateIndicatorParams(setting.getParams(), path + ".params", violations);
     }
 
@@ -867,8 +1005,8 @@ public class StrategyDefinitionValidator {
         }
         validateEnum(TimeFrame.class, setting.getTimeframe(), path + ".timeframe", violations);
         validateEnum(Destiny.class, setting.getDestiny(), path + ".destiny", violations);
-        validateDuration(setting.getExpirationDuration(), path + ".expirationDuration", violations);
-        validateStructureLookback(setting.getParams(), path + ".params.lookbackBars", violations);
+        validateExpirationDeclared(setting.getExpirationDuration(), path + ".expirationDuration", violations);
+        validateStructureLookback(setting.getParams(), path + ".params", violations);
         if (nonNull(setting.getEfficiencyRatioKey())) {
             validateIndicatorKeyOfType(setting.getEfficiencyRatioKey(), IndicatorValue.Type.EFFICIENCY_RATIO,
                     indicatorTypes, path + ".efficiencyRatioKey", violations);
@@ -894,20 +1032,33 @@ public class StrategyDefinitionValidator {
      * объявленного блока. Диапазон держит валидатор, а не аннотация
      * api-модели, по доводу {@code validateFractionPositive}: именованный
      * код с аннотацией был бы недостижим.
+     *
+     * <p><b>Глубина поиска свингов — та же форма диапазона, своим кодом.</b>
+     * Нулевая делает пивотом каждый бар, отрицательная отказывает чтению
+     * ряда у владельца рыночных данных; прежде её отсекала аннотация
+     * поверхности без именованного кода. Обязательность у неё не
+     * проверяется: пустая глубина — один из шести порогов, без которых
+     * резолвер отвечает неизвестной структурой, и сужать её одну значило бы
+     * развести пороги одного класса.
      */
     private void validateStructureLookback(MarketStructureParamsApiModel params, String path,
                                            List<String> violations) {
         if (isNull(params)) {
             return;
         }
+        Integer swingLookbackBars = params.getSwingLookbackBars();
+        if (nonNull(swingLookbackBars) && swingLookbackBars <= 0) {
+            violations.add(path + ".swingLookbackBars STRATEGY_STRUCTURE_SWING_LOOKBACK_NOT_POSITIVE: "
+                    + "глубина поиска свингов больше нуля баров, получено " + swingLookbackBars);
+        }
         Integer lookbackBars = params.getLookbackBars();
         if (isNull(lookbackBars)) {
-            violations.add(path + " STRATEGY_STRUCTURE_LOOKBACK_NOT_DECLARED: "
+            violations.add(path + ".lookbackBars STRATEGY_STRUCTURE_LOOKBACK_NOT_DECLARED: "
                     + "окно расчёта структуры объявляется явно, умолчания нет");
             return;
         }
         if (lookbackBars <= 0) {
-            violations.add(path + " STRATEGY_STRUCTURE_LOOKBACK_NOT_POSITIVE: "
+            violations.add(path + ".lookbackBars STRATEGY_STRUCTURE_LOOKBACK_NOT_POSITIVE: "
                     + "окно расчёта структуры больше нуля баров, получено " + lookbackBars);
         }
     }
@@ -935,6 +1086,10 @@ public class StrategyDefinitionValidator {
      * <p>Ключ действия уникален в пределах ВСЕЙ детали, поэтому набор
      * ключей собирается по обоим уровням: цель {@code targetActionKey}
      * резолвится через них же.
+     *
+     * <p>Уровни различаются двумя проверками: статусом, под которым шаги
+     * отбираются, и экземпцией пустого пакета — она есть только у шага
+     * выхода уровня сделки.
      */
     private void validateSteps(StrategyDetailApiModel detail, String path,
                                Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
@@ -947,9 +1102,12 @@ public class StrategyDefinitionValidator {
             }
             tranche.getStepsByStatus().forEach((status, steps) -> {
                 validateEnum(DealTranche.Status.class, status, tranchePath + ".stepsByStatus key", violations);
+                validateStatusSelectsSteps(DealTranche.Status.class, status, TRANCHE_SELECTED_STATUSES, steps,
+                        tranchePath, violations);
                 for (int index = 0; index < steps.size(); index++) {
                     String stepPath = tranchePath + ".stepsByStatus[" + status + "][" + index + "]";
                     validateTrancheActionPairs(steps.get(index), stepPath, violations);
+                    validateStepPackageNotEmpty(steps.get(index), Boolean.FALSE, stepPath, violations);
                     validateStep(steps.get(index), stepPath, indicatorTypes, structureKeys, actionKeys, violations);
                 }
             });
@@ -959,13 +1117,37 @@ public class StrategyDefinitionValidator {
         }
         detail.getStepsByStatus().forEach((status, steps) -> {
             validateEnum(Deal.Status.class, status, path + ".stepsByStatus key", violations);
+            validateStatusSelectsSteps(Deal.Status.class, status, DEAL_SELECTED_STATUSES, steps, path, violations);
             for (int index = 0; index < steps.size(); index++) {
                 String stepPath = path + ".stepsByStatus[" + status + "][" + index + "]";
                 validateDealLevelStepType(steps.get(index), stepPath, violations);
                 validateDealLevelActions(steps.get(index), stepPath, violations);
+                validateStepPackageNotEmpty(steps.get(index), Boolean.TRUE, stepPath, violations);
                 validateStep(steps.get(index), stepPath, indicatorTypes, structureKeys, actionKeys, violations);
             }
         });
+    }
+
+    /**
+     * Шаги объявлены только под статусом, где их ОТБИРАЮТ (дом правила —
+     * docs/rules/strategy-validation.md; отбор по статусам — разделы «Шаги
+     * статуса» компонент-доков обработчиков транша и сделки).
+     *
+     * <p>Шаг под статусом без отбора не исполнится никогда, при любом рынке,
+     * и принятый молча он обещал бы автору поведение, которого нет. Ключ вне
+     * перечня статусов здесь не повторяется — его отвергает разбор перечня;
+     * пустой перечень шагов не объявляет ничего и отказа не даёт.
+     */
+    private <E extends Enum<E>> void validateStatusSelectsSteps(Class<E> statusType, String status,
+                                                                Set<String> selectedStatuses,
+                                                                List<StrategyStepApiModel> steps, String path,
+                                                                List<String> violations) {
+        if (isEmpty(steps) || isFalse(EnumUtils.isValidEnum(statusType, status))
+                || selectedStatuses.contains(status)) {
+            return;
+        }
+        violations.add(path + ".stepsByStatus[" + status + "] STRATEGY_STEP_STATUS_WITHOUT_SELECTION: "
+                + "под статусом " + status + " шаги не отбираются — объявленные здесь не исполнятся никогда");
     }
 
     /**
@@ -1078,6 +1260,7 @@ public class StrategyDefinitionValidator {
                     step.getMarketDataExpiredSetting().getUnprotectedPositionAction(),
                     path + ".marketDataExpiredSetting.unprotectedPositionAction", violations);
         }
+        validateConditionNotEmpty(step.getCondition(), path + ".condition", violations);
         if (nonNull(step.getCondition()) && nonNull(step.getCondition().getRules())) {
             List<StrategyConditionRuleApiModel> rules = step.getCondition().getRules();
             for (int index = 0; index < rules.size(); index++) {
@@ -1085,7 +1268,6 @@ public class StrategyDefinitionValidator {
                         indicatorTypes, structureKeys, violations);
             }
         }
-        validateStepPackageNotEmpty(step, path, violations);
         if (nonNull(step.getActions())) {
             for (int index = 0; index < step.getActions().size(); index++) {
                 validateAction(step.getActions().get(index), path + ".actions[" + index + "]",
@@ -1095,27 +1277,55 @@ public class StrategyDefinitionValidator {
     }
 
     /**
-     * Пустой пакет действий законен ТОЛЬКО у шага {@code EXIT}: это вторая
-     * объявленная форма полного выхода — «шаг EXIT несёт только условие»
-     * (docs/rules/no-partial-close.md), и всю работу делает
-     * условие-переход в статус выхода. У прочих типов шаг без действий не
-     * делает ничего и остаётся допустимым вечно.
+     * Пустой пакет действий законен ТОЛЬКО у шага {@code EXIT} уровня
+     * СДЕЛКИ: это вторая объявленная форма полного выхода — «шаг EXIT несёт
+     * только условие» (docs/rules/no-partial-close.md), — и всю работу там
+     * делает ребро в координированный выход. Шаг транша ребром не работает:
+     * что он делает, задаёт его пакет, а не тип, — и шаг выхода транша без
+     * действий не делает ничего, как и шаг любого другого типа.
      *
      * <p>Прежде обязательность жила аннотацией {@code @NotEmpty}, то есть
      * код запрещал форму, которую корпус объявляет и на которую опирается
      * предусловие {@code netCloseAllowed}. Дом правила —
      * docs/rules/strategy-validation.md.
+     *
+     * @param bareExitAllowed шаг объявлен на уровне сделки — экземпция типа
+     *                        выхода действует только там
      */
-    private void validateStepPackageNotEmpty(StrategyStepApiModel step, String path,
+    private void validateStepPackageNotEmpty(StrategyStepApiModel step, Boolean bareExitAllowed, String path,
                                              List<String> violations) {
         if (isNotEmpty(step.getActions())) {
             return;
         }
-        if (StrategyStepType.EXIT.name().equals(step.getStepType())) {
+        if (isTrue(bareExitAllowed) && StrategyStepType.EXIT.name().equals(step.getStepType())) {
             return;
         }
         violations.add(path + ".actions STRATEGY_STEP_ACTIONS_EMPTY: пакет действий пуст, "
-                + "а пустой пакет законен только у шага EXIT");
+                + "а пустой пакет законен только у шага EXIT уровня сделки");
+    }
+
+    /**
+     * Условие шага и клаузы классификации фазы несёт хотя бы одно правило
+     * (дом правила — docs/rules/strategy-condition-contract.md §«Условие
+     * непусто»; код — docs/rules/strategy-validation.md).
+     *
+     * <p>Оценка читает пустое условие истиной — нейтральным элементом
+     * конъюнкции, — и молча пропущенное оно дало бы безусловный шаг либо
+     * безусловную фазу: у клаузы — фазу каждому инструменту на каждом
+     * проходе, за которой следующие клаузы не читаются вовсе. Опущенное
+     * условие и пустой перечень правил — одно состояние и один код.
+     *
+     * <p>Держит проверку валидатор, а не аннотация api-модели, по доводу
+     * {@code validateFractionPositive}: именованный код с аннотацией был бы
+     * недостижим.
+     */
+    private void validateConditionNotEmpty(StrategyConditionApiModel condition, String path,
+                                           List<String> violations) {
+        if (nonNull(condition) && isNotEmpty(condition.getRules())) {
+            return;
+        }
+        violations.add(path + " STRATEGY_CONDITION_EMPTY: условие несёт хотя бы одно правило, "
+                + "а пустое оценка читает истиной");
     }
 
     private void validateRule(StrategyConditionRuleApiModel rule, String path,
@@ -1162,11 +1372,6 @@ public class StrategyDefinitionValidator {
                     violations.add(path + ": percents is required for " + rule.getRuleType());
                 }
             }
-            case CANDLE_CLOSED -> {
-                if (isNull(rule.getTimeframe())) {
-                    violations.add(path + ": timeframe is required for CANDLE_CLOSED");
-                }
-            }
             case RANGE_BREAKOUT_CONFIRMED -> validateRangeBreakout(rule, path, violations);
             case MARKET_PHASE_IS -> validateMarketPhaseIs(rule, path, violations);
             case MARKET_STRUCTURE_IS -> validateMarketStructureIs(rule, path, violations);
@@ -1174,6 +1379,7 @@ public class StrategyDefinitionValidator {
                     StrategyConditionSourceType.INDICATOR, violations);
             case PRICE_COMPARE -> validateComparing(rule, path, StrategyConditionSourceType.PRICE, violations);
             case CROSSOVER -> validateCrossover(rule, path, violations);
+            case VOLUME_FILTER_PASSED -> validateVolumeFilter(rule, path, violations);
             default -> {
             }
         }
@@ -1234,10 +1440,12 @@ public class StrategyDefinitionValidator {
     }
 
     private Boolean hasOperandOfSource(StrategyConditionRuleApiModel rule, StrategyConditionSourceType source) {
-        return (nonNull(rule.getLeftOperand())
-                && Objects.equals(rule.getLeftOperand().getSourceType(), source.name()))
-                || (nonNull(rule.getRightOperand())
-                && Objects.equals(rule.getRightOperand().getSourceType(), source.name()));
+        return isTrue(ofSource(rule.getLeftOperand(), source)) || isTrue(ofSource(rule.getRightOperand(), source));
+    }
+
+    /** Операнд объявлен и его источник — названный. */
+    private Boolean ofSource(StrategyConditionOperandApiModel operand, StrategyConditionSourceType source) {
+        return nonNull(operand) && Objects.equals(operand.getSourceType(), source.name());
     }
 
     private void validateMarketPhaseIs(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
@@ -1294,6 +1502,49 @@ public class StrategyDefinitionValidator {
         if (isFalse(crossOperator)) {
             violations.add(path + ": CROSSOVER requires operator CROSSED_ABOVE or CROSSED_BELOW");
         }
+        validateCrossoverPricePair(rule, path, violations);
+    }
+
+    /**
+     * Пересечение с ценовым операндом пишется только в паре с индикаторным
+     * (docs/rules/strategy-condition-contract.md §«Прошлое цены задаёт
+     * индикатор-пара»; код — docs/rules/strategy-validation.md).
+     *
+     * <p>Пересечение сравнивает обе стороны и в прошлом, а своего прошлого у
+     * цены нет: им служит цена закрытия свечи, на которой посчитано
+     * предыдущее значение индикатора на ДРУГОЙ стороне. Цена против
+     * константы либо против цены прошлого не имеет вовсе, и оценка читает
+     * такое правило ложью всегда — пересечение не сработало бы никогда,
+     * молча.
+     */
+    private void validateCrossoverPricePair(StrategyConditionRuleApiModel rule, String path,
+                                            List<String> violations) {
+        Boolean leftUnpaired = isTrue(ofSource(rule.getLeftOperand(), StrategyConditionSourceType.PRICE))
+                && isFalse(ofSource(rule.getRightOperand(), StrategyConditionSourceType.INDICATOR));
+        Boolean rightUnpaired = isTrue(ofSource(rule.getRightOperand(), StrategyConditionSourceType.PRICE))
+                && isFalse(ofSource(rule.getLeftOperand(), StrategyConditionSourceType.INDICATOR));
+        if (isTrue(leftUnpaired) || isTrue(rightUnpaired)) {
+            violations.add(path + " STRATEGY_CROSSOVER_PRICE_WITHOUT_INDICATOR: пересечение с ценой пишется "
+                    + "только в паре с индикатором — прошлое цены задаёт индикатор на другой стороне");
+        }
+    }
+
+    /**
+     * Объёмный фильтр читает прошлое своего ЛЕВОГО операнда, и операнд этот
+     * — индикатор (docs/rules/strategy-condition-contract.md §«Прошлое цены
+     * задаёт индикатор-пара»; код — docs/rules/strategy-validation.md).
+     *
+     * <p>У цены своего прошлого нет, у константы прошлое равно настоящему, и
+     * рост, который фильтр мерит, у обеих не наблюдается никогда: фильтр
+     * на таком операнде ложен всегда, молча. Опущенный операнд — то же
+     * состояние и тот же код.
+     */
+    private void validateVolumeFilter(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
+        if (isTrue(ofSource(rule.getLeftOperand(), StrategyConditionSourceType.INDICATOR))) {
+            return;
+        }
+        violations.add(path + ".leftOperand STRATEGY_VOLUME_FILTER_OPERAND_NOT_INDICATOR: объёмный фильтр "
+                + "читает прошлое левого операнда, и прошлое есть только у индикатора");
     }
 
     private void validateOperand(StrategyConditionOperandApiModel operand, String path,
@@ -1769,10 +2020,29 @@ public class StrategyDefinitionValidator {
         }
     }
 
-    private void validateDuration(String value, String path, List<String> violations) {
-        if (isNull(value)) {
+    /**
+     * Срок свежести объявления рыночных данных ОБЪЯВЛЕН — у индикатора и у
+     * структуры; у классификации фазы своего срока нет вовсе
+     * (docs/models/domain/aggregate/Strategy.md).
+     *
+     * <p>Без срока ядро объявление в запрос рыночных данных не включает:
+     * операнд недоступен, предикат на нём консервативно ложен всегда, и
+     * стратегия молча не входит никогда. Подставлять срок за автора нечем —
+     * умолчания у поля нет. Пустая строка и пробелы — то же состояние и тот
+     * же код. Держит проверку валидатор, а не аннотация api-модели, по
+     * доводу {@code validateFractionPositive}: именованный код с аннотацией
+     * был бы недостижим. Дом правила — docs/rules/strategy-validation.md.
+     */
+    private void validateExpirationDeclared(String value, String path, List<String> violations) {
+        if (isBlank(value)) {
+            violations.add(path + " STRATEGY_MARKET_DATA_EXPIRATION_NOT_DECLARED: срок свежести объявления "
+                    + "рыночных данных объявляется явно, умолчания нет");
             return;
         }
+        validateDuration(value, path, violations);
+    }
+
+    private void validateDuration(String value, String path, List<String> violations) {
         try {
             Duration.parse(value);
         } catch (DateTimeParseException e) {

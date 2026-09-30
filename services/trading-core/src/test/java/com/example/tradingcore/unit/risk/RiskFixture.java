@@ -22,6 +22,8 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.Condition;
 import com.example.tradingbot.domain.model.core.algo_order.Trigger;
 import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
+import com.example.tradingbot.domain.model.core.balance.Balance;
+import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
@@ -34,6 +36,9 @@ import com.example.tradingcore.domain.command.risk.RiskCheckResult;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -59,7 +64,8 @@ import java.util.List;
  * единицу равен {@code (3000 − 2910) + 0.0005 × (3000 + 2910) = 92.955},
  * риск акта — {@code 92.955 × 10 × 0.1 = 92.955}, нотинал акта —
  * {@code 10 × 0.1 × 3000 = 3000}; поактный потолок
- * {@code 1 % × 10000 = 100} их накрывает.
+ * {@code 1 % × 10000 = 100} их накрывает. Маржа акта при плече 10 —
+ * {@code 3000 / 10 + 0.0005 × 3000 = 301.5}.
  */
 final class RiskFixture {
 
@@ -101,6 +107,12 @@ final class RiskFixture {
 
     /** Риск акта базовой сборки: {@code 92.955 × 10 × 0.1}. */
     static final BigDecimal ACT_RISK = new BigDecimal("92.955");
+
+    /** Толерантность прохода к возрасту снимка средств. */
+    static final Duration BALANCE_FRESHNESS = Duration.ofMinutes(5);
+
+    /** Расчётная валюта инструмента базовой сборки. */
+    static final String SETTLEMENT_CURRENCY = "USDT";
 
     private RiskFixture() {
     }
@@ -198,6 +210,37 @@ final class RiskFixture {
         instrument.setExternalId("ETH-USDT-SWAP");
         instrument.setExternalSettlementCurrency(settlementCurrency);
         return instrument;
+    }
+
+    /**
+     * Снимок средств счёта с одной строкой — расчётной валюты базовой
+     * сборки — и названными моментом у площадки и остатками; пусто —
+     * остаток не наблюдён.
+     */
+    static BalanceContainer balanceSnapshot(OffsetDateTime at, String cash, String equity, String available) {
+        return balanceSnapshot(at, SETTLEMENT_CURRENCY, cash, equity, available);
+    }
+
+    /** Снимок средств счёта с одной строкой названной валюты. */
+    static BalanceContainer balanceSnapshot(OffsetDateTime at, String currency, String cash, String equity,
+                                            String available) {
+        Balance row = new Balance();
+        row.setExternalCurrency(currency);
+        row.setExternalUpdatedAt(at);
+        row.setExternalCashBalance(decimal(cash));
+        row.setExternalEquity(decimal(equity));
+        row.setExternalAvailableBalance(decimal(available));
+        row.setExternalFrozenBalance(BigDecimal.ZERO);
+        BalanceContainer container = new BalanceContainer();
+        container.setExchangeAccountId(ACCOUNT_ID);
+        container.setExternalUpdatedAt(at);
+        container.setBalances(new ArrayList<>(List.of(row)));
+        return container;
+    }
+
+    /** Момент на названное число минут раньше текущего. */
+    static OffsetDateTime minutesAgo(Integer minutes) {
+        return OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(minutes);
     }
 
     /** Контекст базовой сборки поверх пустой сделки. */

@@ -173,7 +173,7 @@ class StrategyLifecycleTest {
 
         assertThatThrownBy(() -> service.applyStatus(STRATEGY, TENANT, Strategy.Status.ACTIVE))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("Strategy not found");
+                .hasMessageContaining("STRATEGY_NOT_FOUND");
     }
 
     private void givenDefinition(Strategy definition) {

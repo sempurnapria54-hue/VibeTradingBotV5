@@ -52,6 +52,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -80,6 +81,7 @@ import org.springframework.stereotype.Service;
  * статус, не пара. Позиция здесь не резолвится вовсе: сырого статуса у
  * неё нет ({@code docs/components/PositionStatusResolver.md}).
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OkxExchangeGateway implements ExchangeGateway {
@@ -367,13 +369,19 @@ public class OkxExchangeGateway implements ExchangeGateway {
      * классом «негодный вход», и ядро молча переводило строку в провал, не
      * поднимая ступени там, где площадка ответила не той формой
      * ({@code docs/rules/controlled-exchange-exceptions.md}).
+     *
+     * <p><b>Текст первопричины к пояснению не приклеивается.</b> Её класс
+     * платформенный, и текст пишет библиотека разбора — строку разбора,
+     * полное имя перечня; пояснение отказа наружу пишет наша сторона
+     * ({@code docs/rules/error-handling-policy.md}). Первопричина едет
+     * причиной исключения и уходит в лог здесь же, с эндпоинтом.
      */
     private <T> T parsed(String endpoint, Supplier<T> read) {
         try {
             return read.get();
         } catch (IllegalArgumentException | IndexOutOfBoundsException | DateTimeException e) {
-            throw new ExternalInvariantViolationException(
-                    "OKX response not parsed [" + endpoint + "]: " + e.getMessage(), e);
+            log.error("OKX response not parsed [{}]", endpoint, e);
+            throw new ExternalInvariantViolationException("OKX response not parsed [" + endpoint + "]", e);
         }
     }
 

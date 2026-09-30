@@ -9,10 +9,10 @@ import com.example.marketdata.config.InstrumentSyncProperties;
 import com.example.marketdata.domain.service.InstrumentCatalogService;
 import com.example.marketdata.exception.ExchangeAccessException;
 import com.example.marketdata.persistence.service.InstrumentDataService;
+import com.example.marketdata.util.Constants;
 import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -46,12 +46,6 @@ public class InstrumentSyncJob {
 
     /** Начало круга обхода: идентификаторы положительны. */
     private static final Long CURSOR_START = 0L;
-
-    /** Статусы, при которых инструмент участвует в обновлении правил. */
-    private static final Set<Instrument.Status> SYNCED_STATUSES = Set.of(
-            Instrument.Status.SYNC,
-            Instrument.Status.CANDLES_LOADING,
-            Instrument.Status.ACTIVE);
 
     private final InstrumentCatalogService catalogService;
     private final InstrumentDataService instrumentDataService;
@@ -112,11 +106,14 @@ public class InstrumentSyncJob {
      * <p>Курсор держится в памяти: при рестарте обход начинается сначала —
      * цена названа и она меньше, чем колонка состояния, которую читает
      * только этот тик.
+     *
+     * <p>Обходятся статусы, на которых ведётся навес правил; тем же перечнем
+     * ограничен листинг поверхности каталога, и носитель у них один.
      */
     private void syncRules() {
         List<Instrument> instruments = instrumentDataService.findListedAfter(
-                connectorProperties.getExchangeCode(), SYNCED_STATUSES, rulesCursor,
-                properties.getRulesBatchSize());
+                connectorProperties.getExchangeCode(), Constants.InstrumentCatalog.RULES_MAINTAINED_STATUSES,
+                rulesCursor, properties.getRulesBatchSize());
         if (isEmpty(instruments)) {
             rulesCursor = CURSOR_START;
             return;

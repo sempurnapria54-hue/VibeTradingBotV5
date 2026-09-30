@@ -21,13 +21,11 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionSourceType;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
-import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -84,44 +82,6 @@ class UnevaluableRuleTypeTest {
 
             assertThat(log.messages()).as("исполняемый тип следа не оставляет").isEmpty();
         }
-    }
-
-    /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Тип
-     * объявлен защитой от look-ahead, и создание требует у него таймфрейм
-     * (docs/models/domain/aggregate/Strategy.md §Условия). Код отвечает
-     * истиной при любом входе — таймфрейма он не читает, а операнда
-     * закрытия свечи в контексте нет вовсе: единственная защита от
-     * заглядывания вперёд не мерит ничего, и эталонное определение на неё
-     * опирается. Красный прогон и есть предъявление находки `F-5`
-     * (`.claude/work/backlog.md` §«Тип `CANDLE_CLOSED` константно истинен,
-     * а объявлен защитой от look-ahead»).
-     */
-    @Test
-    @Tag("debt")
-    @DisplayName("U12.3 — CANDLE_CLOSED с таймфреймом, свеча не закрыта: ложь (дом), код даёт истину")
-    void u12_3_theCandleClosedGuardMustReadTheCandle() {
-        StrategyConditionRule candleRule = rule(StrategyConditionRuleType.CANDLE_CLOSED);
-        candleRule.setTimeframe(TimeFrame.ONE_HOUR);
-
-        assertThat(evaluate(candleRule))
-                .as("защита от look-ahead обязана мерить закрытие объявленной свечи")
-                .isFalse();
-    }
-
-    /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе</b> — та же
-     * находка `F-5` со второй стороны: без таймфрейма мерить нечего тем
-     * более. Охрана второго рубежа: создание таймфрейм требует
-     * (docs/rules/strategy-validation.md).
-     */
-    @Test
-    @Tag("debt")
-    @DisplayName("U12.4 — CANDLE_CLOSED без таймфрейма: ложь (дом), код даёт истину")
-    void u12_4_theCandleClosedGuardWithoutATimeframeIsFalse() {
-        assertThat(evaluate(rule(StrategyConditionRuleType.CANDLE_CLOSED)))
-                .as("без объявленной свечи защита мерить не может ничего")
-                .isFalse();
     }
 
     /**

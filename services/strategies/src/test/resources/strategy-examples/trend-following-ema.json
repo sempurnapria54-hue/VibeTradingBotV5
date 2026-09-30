@@ -211,11 +211,6 @@
                         "valueType": "NUMBER",
                         "value": "50"
                       }
-                    },
-                    {
-                      "level": 5,
-                      "ruleType": "CANDLE_CLOSED",
-                      "timeframe": "FIVE_MINUTES"
                     }
                   ]
                 },
@@ -455,11 +450,6 @@
                         "valueType": "NUMBER",
                         "value": "50"
                       }
-                    },
-                    {
-                      "level": 5,
-                      "ruleType": "CANDLE_CLOSED",
-                      "timeframe": "FIVE_MINUTES"
                     }
                   ]
                 },

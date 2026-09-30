@@ -4,15 +4,14 @@
 
 Каков контракт операции получения баланса.
 
-## Внешний источник правды
+## Источник правды вне репозитория
 
-Дистиллят официального дока OKX (`https://www.okx.com/docs-v5/en/`,
-раздел «Trading Account → REST API», секция «Get balance»). При
-расхождении с офдоком побеждает офдок; синхронизация — перевыкачка +
-дифф при каждом заходе интегратора
-(`.claude/processes/api-docs-completion.md`, канал —
-`.claude/skills/integration-okx.md`). Последняя сверка: 2026-06-11
-(соответствие спеке подтверждено).
+Официальный док OKX (`https://www.okx.com/docs-v5/en/`, раздел «Trading
+Account → REST API», секция «Get balance»; семантика `uTime` счёта —
+также «Trading Account → WebSocket», секция «Account channel»). Процедура
+сверки и приоритет офдока — `.claude/rules/external-source-sync.md`.
+Последняя сверка: 2026-09-30 (семантика двух `uTime` ответа; наблюдением на
+demo не подтверждена).
 
 ## Endpoint
 
@@ -45,7 +44,7 @@
       "details": [
         {
           "ccy": "USDT",
-          "uTime": "1769253296789",
+          "uTime": "1769228737644",
           "eq": "1023.45",
           "cashBal": "1023.45",
           "availBal": "900.00",

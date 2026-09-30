@@ -34,10 +34,15 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Неразобранный тип индикатора уносит ключ из карты типов</b>, и
  * ссылки на него перестают резолвиться — вторая половина ожидания клетки.
+ *
+ * <p><b>Срок свежести обязателен</b> (docs/rules/strategy-validation.md
+ * §«Что проверяется на создании»): опущенный и пустой — одно состояние и
+ * один код, разбор длительности идёт только у объявленного.
  */
 class IndicatorSettingsTest {
 
     private static final String BELOW_MINIMUM = "is below derived minimum";
+    private static final String EXPIRATION_NOT_DECLARED = "STRATEGY_MARKET_DATA_EXPIRATION_NOT_DECLARED";
 
     @Test
     @DisplayName("U24.1 — базовая сборка: шесть настроек с уникальными ключами")
@@ -172,13 +177,33 @@ class IndicatorSettingsTest {
                 .contains(".expirationDuration: invalid ISO-8601 duration два часа");
     }
 
+    /**
+     * Без срока ядро объявление в запрос рыночных данных не включает, и
+     * предикат на нём ложен всегда — отказ создания, а не молчаливый пропуск.
+     * Разбор длительности при этом не идёт: второго нарушения нет.
+     */
     @Test
-    @DisplayName("U24.12 — срок годности опущен: разбор идёт только при непустоте")
-    void u24_12_anAbsentDurationIsNotParsed() {
+    @DisplayName("U24.12 — срок годности опущен: обязательность своим кодом, разбора нет")
+    void u24_12_anAbsentDurationIsRejected() {
         CreateStrategyApiRequest request = reference();
         indicator(request, "atr_15m").setExpirationDuration(null);
 
-        assertThat(violations(request)).isEmpty();
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("strategy.indicatorSettings[5].expirationDuration " + EXPIRATION_NOT_DECLARED);
+    }
+
+    @Test
+    @DisplayName("U24.15 — срок годности — пробелы: то же состояние и тот же код, что у опущенного")
+    void u24_15_aBlankDurationIsTheSameAsAnAbsentOne() {
+        CreateStrategyApiRequest request = reference();
+        indicator(request, "atr_15m").setExpirationDuration("  ");
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".expirationDuration " + EXPIRATION_NOT_DECLARED);
     }
 
     @Test

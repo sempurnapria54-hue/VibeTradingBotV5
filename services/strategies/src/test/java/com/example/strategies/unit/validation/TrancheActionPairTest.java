@@ -131,7 +131,7 @@ class TrancheActionPairTest {
         CreateStrategyApiRequest request = reference();
         StrategyPositionActionApiModel position = newPositionAction("deal_fail_safe");
         position.setActionType("CREATE_ACTION");
-        dealStepsByStatus(bull(request)).put("EXIT_PENDING", List.of(newStep("FAIL_SAFE", position)));
+        dealStepsByStatus(bull(request)).get("ACTIVE").add(newStep("FAIL_SAFE", position));
 
         assertThat(matching(violations(request), PAIR)).isEmpty();
     }
