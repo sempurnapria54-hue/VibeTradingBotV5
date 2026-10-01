@@ -17,7 +17,7 @@ import lombok.Setter;
  * назначения (защитные/закрывающие — не открывают позицию) и полем не
  * хранится. Для OCO_FULL: SL — из stopLossSettings, TP — из
  * triggerProfitPercents + triggerPriceType. См.
- * docs/models/domain/aggregate/Strategy.md (§StrategyAlgoOrderAction).
+ * docs/models/domain/aggregate/Strategy.md (§Действия).
  */
 @Getter
 @Setter

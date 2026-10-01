@@ -1,0 +1,880 @@
+{
+  "subject": "indicator-calculation",
+  "question": "Чему равно значение технического индикатора на баре и с какого бара оно сохраняется",
+  "home": "docs/models/domain/other/IndicatorValue.md",
+  "operands": {
+    "type": "тип индикатора — значение перечня IndicatorValue.Type",
+    "period": "период типа с одним окном (EMA, ATR, RSI, полосы, эффективность хода)",
+    "fastPeriod": "быстрый период MACD",
+    "slowPeriod": "медленный период MACD",
+    "signalPeriod": "период сигнальной линии MACD",
+    "kPeriod": "окно экстремумов стохастика",
+    "smoothPeriod": "окно сглаживания быстрой линии стохастика",
+    "dPeriod": "окно медленной линии стохастика",
+    "deviationMultiplier": "множитель отклонения полос",
+    "warmupOverride": "прогрев, объявленный параметрами идентичности; пусто — выводится по типу",
+    "barIndex": "номер бара в поданной истории, счёт с нуля от её начала",
+    "close": "цена закрытия бара, на котором считается значение",
+    "previousClose": "цена закрытия предыдущего бара; у первого бара истории её нет",
+    "high": "максимум бара",
+    "low": "минимум бара",
+    "volume": "объём бара; пусто — объём у свечи не проставлен",
+    "window": "окно, которым считается величина; строки по возрастанию времени, последняя — текущий бар",
+    "window[].value": "член сглаживаемого ряда: цена закрытия, истинный диапазон, прирост, быстрая линия стохастика — по тому, что сглаживается",
+    "window[].previousValue": "предыдущий член того же ряда — у эффективности хода цена закрытия предыдущего бара",
+    "window[].high": "максимум бара окна",
+    "window[].low": "минимум бара окна",
+    "previousSmoothed": "предыдущий член сглаженного ряда",
+    "input": "новый член входного ряда, который шаг рекурсии вносит в сглаженный",
+    "averageGain": "средний прирост цены закрытия — ряд rsiGain, сглаженный wilderNext",
+    "averageLoss": "средняя убыль цены закрытия — ряд rsiLoss, сглаженный wilderNext",
+    "fastEma": "EMA цены закрытия быстрого периода на баре",
+    "slowEma": "EMA цены закрытия медленного периода на баре",
+    "signalLine": "EMA линии MACD периода signalPeriod на баре",
+    "sigma": "корень из bollingerVariance. Корня раннер не вычисляет: пример подаёт его числом, и выбран он так, чтобы корень был точным",
+    "previousObv": "значение OBV на ближайшем предыдущем баре ряда, где оно определено; у первого считаемого бара прохода — затравка obvSeed",
+    "lastStoredObv": "последнее записанное значение OBV ряда идентичности, чей бар лежит в поданном окне; пусто — такого значения нет: идентичность считается впервые либо ряд прерван дольше окна"
+  },
+  "values": [
+    {
+      "name": "indicatorWindowSize",
+      "note": "Число членов окна.",
+      "op": "count",
+      "over": "window[]"
+    },
+    {
+      "name": "indicatorWindowSum",
+      "note": "Сумма членов окна.",
+      "op": "sum",
+      "over": "window[]",
+      "of": "value"
+    },
+    {
+      "name": "indicatorWindowAverage",
+      "note": "Простое среднее окна. Одна форма на четыре роли: затравка рекурсивного сглаживания (первое значение EMA и Уайлдера — среднее первых period членов входного ряда), средняя полоса, быстрая линия стохастика (среднее smoothPeriod сырых значений) и медленная (среднее dPeriod быстрых).",
+      "expr": "indicatorWindowSum / indicatorWindowSize"
+    },
+    {
+      "name": "emaAlpha",
+      "note": "Множитель экспоненциального сглаживания: 2 / (period + 1).",
+      "expr": "2 / (period + 1)"
+    },
+    {
+      "name": "emaNext",
+      "note": "Шаг EMA: предыдущий член плюс доля приращения. Рекурсия раннером по окну не разворачивается — спека держит один шаг, а затравку держит indicatorWindowAverage. Сглаживает цену закрытия у EMA и у двух линий MACD и линию MACD у сигнальной.",
+      "expr": "previousSmoothed + emaAlpha * (input - previousSmoothed)"
+    },
+    {
+      "name": "wilderNext",
+      "note": "Шаг сглаживания Уайлдера: (предыдущий · (period − 1) + новый) / period, то есть экспоненциальное сглаживание с множителем 1/period. Им, а не простым средним и не EMA, сглаживаются истинный диапазон ATR и средние прирост и убыль RSI: так оба индикатора определил их автор, и так их считают площадки и терминалы — значение с другим сглаживанием на той же истории было бы другим числом под тем же именем. Затравка — простое среднее первых period членов (indicatorWindowAverage).",
+      "expr": "(previousSmoothed * (period - 1) + input) / period"
+    },
+    {
+      "name": "trueRange",
+      "note": "Истинный диапазон бара: наибольшее из размаха бара и расстояний от предыдущего закрытия до максимума и до минимума — разрыв между барами входит в диапазон. У первого бара истории предыдущего закрытия нет, и его диапазон — размах.",
+      "expr": "if(isNull(?previousClose), high - low, max(high - low, max(abs(high - previousClose), abs(low - previousClose))))"
+    },
+    {
+      "name": "rsiGain",
+      "note": "Прирост цены закрытия к предыдущему бару; убыль даёт ноль.",
+      "expr": "max(close - previousClose, 0)"
+    },
+    {
+      "name": "rsiLoss",
+      "note": "Убыль цены закрытия к предыдущему бару, положительным числом; прирост даёт ноль.",
+      "expr": "max(previousClose - close, 0)"
+    },
+    {
+      "name": "rsiValue",
+      "note": "RSI = 100 − 100 / (1 + средний прирост / средняя убыль). Нулевая средняя убыль при положительном приросте — предел формулы, 100: в окне одни приросты. ВЫРОЖДЕННОЕ ОКНО — ни прироста, ни убыли, плоский ряд — отвечает 50, серединой шкалы: 100 читалось бы предельной перекупленностью на рынке, который не двигался, и запускало бы условия перекупленности. Принцип вырожденного окна — docs/models/domain/other/IndicatorValue.md.",
+      "expr": "if(averageLoss == 0, if(averageGain == 0, 50, 100), 100 - 100 / (1 + averageGain / averageLoss))"
+    },
+    {
+      "name": "macdLine",
+      "note": "Линия MACD: EMA быстрого периода минус EMA медленного, обе по цене закрытия. Линия определена с бара, где определена медленная EMA.",
+      "expr": "fastEma - slowEma"
+    },
+    {
+      "name": "macdHistogram",
+      "note": "Гистограмма: линия минус сигнальная — EMA линии периода signalPeriod.",
+      "expr": "macdLine - signalLine"
+    },
+    {
+      "name": "bollingerSquaredDeviationSum",
+      "note": "Сумма квадратов отклонений цен закрытия окна от средней полосы.",
+      "op": "sum",
+      "over": "window[]",
+      "of": "(value - indicatorWindowAverage) * (value - indicatorWindowAverage)"
+    },
+    {
+      "name": "bollingerVariance",
+      "note": "Дисперсия окна полос — ПОПУЛЯЦИОННАЯ: делитель — длина окна, а не на единицу меньше. Окно полос есть сам предмет измерения, а не выборка из большей совокупности, и так полосы определены их автором; выборочная форма расширяла бы полосы на множитель √(n/(n−1)) — у окна 20 на 2,6 % — и сдвигала бы положение цены и ширину против терминалов, на которые настраивается порог.",
+      "expr": "bollingerSquaredDeviationSum / indicatorWindowSize"
+    },
+    {
+      "name": "bollingerUpperBand",
+      "note": "Верхняя полоса: средняя плюс множитель отклонения, умноженный на корень дисперсии.",
+      "expr": "indicatorWindowAverage + deviationMultiplier * sigma"
+    },
+    {
+      "name": "bollingerLowerBand",
+      "note": "Нижняя полоса: средняя минус множитель отклонения, умноженный на корень дисперсии.",
+      "expr": "indicatorWindowAverage - deviationMultiplier * sigma"
+    },
+    {
+      "name": "bollingerBandwidth",
+      "note": "Ширина полос относительно средней. На плоском окне полосы сливаются, и ширина равна нулю без особого случая. Нулевой средней не бывает: цена закрытия торгуемого инструмента положительна, и исхода на таком окне спека не объявляет.",
+      "expr": "(bollingerUpperBand - bollingerLowerBand) / indicatorWindowAverage"
+    },
+    {
+      "name": "bollingerPercentB",
+      "note": "Положение цены закрытия между полосами: 0 — на нижней, 1 — на верхней. ВЫРОЖДЕННОЕ ОКНО — полосы слились (плоское окно либо нулевой множитель) — отвечает 0,5, серединой шкалы: цена стоит ровно на средней, и ни пробоя, ни касания границы нет. Принцип вырожденного окна — docs/models/domain/other/IndicatorValue.md.",
+      "expr": "if(bollingerUpperBand == bollingerLowerBand, 0.5, (close - bollingerLowerBand) / (bollingerUpperBand - bollingerLowerBand))"
+    },
+    {
+      "name": "stochasticHighest",
+      "note": "Наибольший максимум окна kPeriod.",
+      "op": "max",
+      "over": "window[]",
+      "of": "high"
+    },
+    {
+      "name": "stochasticLowest",
+      "note": "Наименьший минимум окна kPeriod.",
+      "op": "min",
+      "over": "window[]",
+      "of": "low"
+    },
+    {
+      "name": "stochasticRawK",
+      "note": "Сырое значение стохастика: положение цены закрытия в диапазоне окна, 0..100. Быстрая линия — простое среднее smoothPeriod сырых значений, медленная — простое среднее dPeriod быстрых (indicatorWindowAverage). ВЫРОЖДЕННОЕ ОКНО — нулевой диапазон, все бары окна на одной цене — отвечает 50, серединой шкалы: закрытие не ближе ни к максимуму, ни к минимуму. Плоский бар в неплоском окне вырожденным не является: экстремумы берутся по окну. Принцип вырожденного окна — docs/models/domain/other/IndicatorValue.md.",
+      "expr": "if(stochasticHighest == stochasticLowest, 50, 100 * (close - stochasticLowest) / (stochasticHighest - stochasticLowest))"
+    },
+    {
+      "name": "obvSeed",
+      "note": "Затравка OBV — значение, от которого проход продолжает сумму: последнее записанное значение ряда идентичности, и сумма идёт с бара после него. Записанного значения в поданном окне нет — ряд начинается нулём на первом баре окна, и на этом стыке уровень меняет базу. Сумма, начатая заново каждым проходом, склеивала бы ряд из отрезков разной базы: записанные значения не переписываются, и при сдвиге окна на бар разность соседних значений была бы знаковым объёмом нового бара минус знаковый объём бара, выпавшего из окна, — относительные формы операнда читали бы её движением. Операнд подаёт джоба расчёта (docs/components/IndicatorJob.md).",
+      "expr": "coalesce(?lastStoredObv, 0)"
+    },
+    {
+      "name": "obvNext",
+      "note": "Шаг OBV: объём бара прибавляется при росте цены закрытия, вычитается при падении, при равенстве значение не меняется. Сумма продолжается от затравки obvSeed, поэтому разность значения и предыдущего определённого есть знаковый объём его бара. У первого бара нового ряда предыдущего закрытия нет, и значения на нём нет. БАР С НЕПРОСТАВЛЕННЫМ ОБЪЁМОМ при изменившемся закрытии значения не имеет: объём не добыт, а нуль на его месте сделал бы бар неотличимым от бара без сделок (docs/rules/absent-value-semantics.md). Следующий бар продолжает сумму от предыдущего определённого значения, без вклада пропущенного: база уровня и так произвольна, а разность соседних определённых значений остаётся знаковым объёмом последнего из них. При равном закрытии объём в шаг не входит, и значение есть.",
+      "expr": "if(close == previousClose, previousObv, if(isNull(volume), null, if(close > previousClose, previousObv + volume, previousObv - volume)))"
+    },
+    {
+      "name": "efficiencySignedMoveSum",
+      "note": "Сумма побарных изменений цены закрытия окна со знаком — чистый ход от закрытия period баров назад до текущего.",
+      "op": "sum",
+      "over": "window[]",
+      "of": "value - previousValue"
+    },
+    {
+      "name": "efficiencyTotalMove",
+      "note": "Сумма модулей побарных изменений цены закрытия окна — пройденный путь.",
+      "op": "sum",
+      "over": "window[]",
+      "of": "abs(value - previousValue)"
+    },
+    {
+      "name": "efficiencyRatio",
+      "note": "Эффективность хода Кауфмана: модуль чистого хода, делённый на пройденный путь, 0..1. ВЫРОЖДЕННОЕ ОКНО — цена не двигалась, пути нет — отвечает 0: у меры тренда нулевая шкала и есть отсутствие направленного хода, середины у неё нет, а 1 объявляла бы трендом рынок, который стоит. Принцип вырожденного окна — docs/models/domain/other/IndicatorValue.md.",
+      "expr": "if(efficiencyTotalMove == 0, 0, abs(efficiencySignedMoveSum) / efficiencyTotalMove)"
+    },
+    {
+      "name": "derivedWarmup",
+      "note": "Прогрев по типу — номер первого сохраняемого бара. РЕКУРСИВНЫЕ ТИПЫ выводят его из одного требования: вес затравки в первом сохранённом значении падает примерно до e^−2 (около 13 %). Довод — значение одного бара не должно заметно зависеть от того, с какого бара начался проход: пересчёт окном, начатым позже, иначе даёт на той же свече другое число. У EMA множитель 2/(period+1), и остаток достигается на 2·period. У Уайлдера множитель 1/period — сглаживание вдвое медленнее, и тот же остаток требует 2·period шагов после затравки: 3·period (у кратности 2·period затравка держала бы около трети веса). MACD — медленная EMA до своего остатка (2·slowPeriod) плюс сигнальная, сглаживающая уже сошедшуюся линию (signalPeriod). ОКОННЫЕ И КУМУЛЯТИВНЫЕ ТИПЫ сходимости не ждут — окно точно с первого полного бара, — и их прогрев равен минимуму, с которым сверяется override объявления: период, сумма трёх окон стохастика, единица у OBV. Тип вне перечня прогрева не имеет.",
+      "expr": "if(type == 'EMA', 2 * period, if(in(type, 'ATR', 'RSI'), 3 * period, if(type == 'MACD', 2 * slowPeriod + signalPeriod, if(type == 'STOCHASTIC', kPeriod + smoothPeriod + dPeriod, if(in(type, 'BOLLINGER_BANDS', 'EFFICIENCY_RATIO'), period, if(type == 'OBV', 1, null))))))"
+    },
+    {
+      "name": "effectiveWarmup",
+      "note": "Действующий прогрев: объявленный override, а без него — выведенный по типу. Нулевой override законен: ряд тогда начинается с бара, на котором формула определена.",
+      "expr": "coalesce(?warmupOverride, derivedWarmup)"
+    },
+    {
+      "name": "indicatorValueStored",
+      "note": "Значение бара сохраняется, когда номер бара не меньше действующего прогрева; бар ровно на границе сохраняется. Бар, на котором формула ещё не определена (окно неполно, затравки нет), значения не имеет вовсе, какой бы прогрев ни был. Прогрев отсчитывается от НАЧАЛА РЯДА, а не окна: у ряда, начатого проходом, начало ряда и есть начало поданной истории, и номер бара — barIndex. ПРОДОЛЖЕННЫЙ РЯД кумулятивного типа (затравка obvSeed — записанное значение, lastStoredObv непусто) прогрев уже прошёл в проходе, записавшем затравку: записывается только значение за прогревом, а прогрев — параметр идентичности и между проходами ряда не меняется. Поэтому у продолженного ряда прогрев не отсекает ни одного бара, и сохраняется каждый бар после бара затравки, на котором значение определено; бар затравки и бары до него значения от прохода не получают — сумма начинается после затравки. Отсечь бары по номеру в окне значило бы провести сумму через бары без записи: следующий проход продолжает от более позднего значения, дыра не заполняется никогда, а относительные формы операнда читали бы через неё знаковый объём нескольких баров как шаг одного.",
+      "expr": "notNull(?lastStoredObv) || barIndex >= effectiveWarmup"
+    }
+  ],
+  "examples": [
+    {
+      "case": "простое среднее окна — сумма членов на их число",
+      "state": {
+        "window": [
+          {"value": 2},
+          {"value": 4},
+          {"value": 6},
+          {"value": 8}
+        ]
+      },
+      "expect": {
+        "indicatorWindowSize": 4,
+        "indicatorWindowSum": 20,
+        "indicatorWindowAverage": 5
+      }
+    },
+    {
+      "case": "затравка сглаживания ATR — простое среднее первых period истинных диапазонов",
+      "state": {
+        "window": [
+          {"value": 5},
+          {"value": 15},
+          {"value": 10}
+        ]
+      },
+      "expect": {
+        "indicatorWindowSize": 3,
+        "indicatorWindowSum": 30,
+        "indicatorWindowAverage": 10
+      }
+    },
+    {
+      "case": "один шаг при одном периоде: EMA и Уайлдер дают разные числа — выбор сглаживания не косметика",
+      "note": "Период 14, предыдущий 10, новый 24. EMA сдвигается на 2/15 приращения, Уайлдер — на 1/14.",
+      "state": {
+        "period": 14,
+        "previousSmoothed": 10,
+        "input": 24
+      },
+      "expect": {
+        "emaAlpha": 0.13333333333333333,
+        "emaNext": 11.866666666666667,
+        "wilderNext": 11
+      }
+    },
+    {
+      "case": "шаг EMA периода 9: множитель 0,2",
+      "state": {
+        "period": 9,
+        "previousSmoothed": 100,
+        "input": 110
+      },
+      "expect": {
+        "emaAlpha": 0.2,
+        "emaNext": 102,
+        "wilderNext": 101.11111111111111
+      }
+    },
+    {
+      "case": "шаг EMA периода 3: множитель ровно половина",
+      "state": {
+        "period": 3,
+        "previousSmoothed": 10,
+        "input": 14
+      },
+      "expect": {
+        "emaAlpha": 0.5,
+        "emaNext": 12,
+        "wilderNext": 11.333333333333334
+      }
+    },
+    {
+      "case": "первый бар истории: истинный диапазон равен размаху",
+      "state": {
+        "high": 105,
+        "low": 100,
+        "previousClose": null
+      },
+      "expect": {
+        "trueRange": 5
+      }
+    },
+    {
+      "case": "разрыв вверх: минимум выше предыдущего закрытия — диапазон шире размаха",
+      "state": {
+        "high": 105,
+        "low": 100,
+        "previousClose": 90
+      },
+      "expect": {
+        "trueRange": 15
+      }
+    },
+    {
+      "case": "разрыв вниз: максимум ниже предыдущего закрытия",
+      "state": {
+        "high": 105,
+        "low": 100,
+        "previousClose": 110
+      },
+      "expect": {
+        "trueRange": 10
+      }
+    },
+    {
+      "case": "предыдущее закрытие внутри бара: диапазон равен размаху",
+      "state": {
+        "high": 105,
+        "low": 100,
+        "previousClose": 102
+      },
+      "expect": {
+        "trueRange": 5
+      }
+    },
+    {
+      "case": "рост закрытия: прирост есть, убыли нет",
+      "state": {
+        "close": 105,
+        "previousClose": 100
+      },
+      "expect": {
+        "rsiGain": 5,
+        "rsiLoss": 0
+      }
+    },
+    {
+      "case": "падение закрытия: убыль положительным числом, прироста нет",
+      "state": {
+        "close": 97,
+        "previousClose": 100
+      },
+      "expect": {
+        "rsiGain": 0,
+        "rsiLoss": 3
+      }
+    },
+    {
+      "case": "RSI при приросте вдвое больше убыли",
+      "state": {
+        "averageGain": 2,
+        "averageLoss": 1
+      },
+      "expect": {
+        "rsiValue": 66.66666666666667
+      }
+    },
+    {
+      "case": "RSI при убыли втрое больше прироста",
+      "state": {
+        "averageGain": 1,
+        "averageLoss": 3
+      },
+      "expect": {
+        "rsiValue": 25
+      }
+    },
+    {
+      "case": "RSI в окне одних приростов — предел формулы, 100",
+      "state": {
+        "averageGain": 3,
+        "averageLoss": 0
+      },
+      "expect": {
+        "rsiValue": 100
+      }
+    },
+    {
+      "case": "RSI в окне одних убылей — 0",
+      "state": {
+        "averageGain": 0,
+        "averageLoss": 2
+      },
+      "expect": {
+        "rsiValue": 0
+      }
+    },
+    {
+      "case": "плоский ряд: ни прироста, ни убыли — RSI 50, а не предельная перекупленность",
+      "state": {
+        "averageGain": 0,
+        "averageLoss": 0
+      },
+      "expect": {
+        "rsiValue": 50
+      }
+    },
+    {
+      "case": "MACD: быстрая выше медленной, сигнальная ниже линии",
+      "state": {
+        "fastEma": 105,
+        "slowEma": 102,
+        "signalLine": 2
+      },
+      "expect": {
+        "macdLine": 3,
+        "macdHistogram": 1
+      }
+    },
+    {
+      "case": "MACD: быстрая ниже медленной",
+      "state": {
+        "fastEma": 98,
+        "slowEma": 100,
+        "signalLine": -1
+      },
+      "expect": {
+        "macdLine": -2,
+        "macdHistogram": -1
+      }
+    },
+    {
+      "case": "полосы на окне с точным корнем: отклонение популяционное — выборочное дало бы дисперсию 32/7",
+      "state": {
+        "deviationMultiplier": 2,
+        "sigma": 2,
+        "close": 9,
+        "window": [
+          {"value": 2},
+          {"value": 4},
+          {"value": 4},
+          {"value": 4},
+          {"value": 5},
+          {"value": 5},
+          {"value": 7},
+          {"value": 9}
+        ]
+      },
+      "expect": {
+        "indicatorWindowSize": 8,
+        "indicatorWindowAverage": 5,
+        "bollingerSquaredDeviationSum": 32,
+        "bollingerVariance": 4,
+        "bollingerUpperBand": 9,
+        "bollingerLowerBand": 1,
+        "bollingerBandwidth": 1.6,
+        "bollingerPercentB": 1
+      }
+    },
+    {
+      "case": "окно из двух цен при множителе 1: полосы ложатся ровно на эти цены",
+      "note": "Цены 3 и 1 отстоят от средней 2 на единицу: популяционное отклонение 1. Выборочное дало бы √2, и полосы вышли бы за обе цены.",
+      "state": {
+        "deviationMultiplier": 1,
+        "sigma": 1,
+        "close": 1,
+        "window": [
+          {"value": 3},
+          {"value": 1}
+        ]
+      },
+      "expect": {
+        "indicatorWindowSize": 2,
+        "indicatorWindowAverage": 2,
+        "bollingerSquaredDeviationSum": 2,
+        "bollingerVariance": 1,
+        "bollingerUpperBand": 3,
+        "bollingerLowerBand": 1,
+        "bollingerBandwidth": 1,
+        "bollingerPercentB": 0
+      }
+    },
+    {
+      "case": "плоское окно: полосы сливаются в среднюю, ширина ноль, положение цены — середина",
+      "state": {
+        "deviationMultiplier": 2,
+        "sigma": 0,
+        "close": 5,
+        "window": [
+          {"value": 5},
+          {"value": 5},
+          {"value": 5}
+        ]
+      },
+      "expect": {
+        "bollingerSquaredDeviationSum": 0,
+        "bollingerVariance": 0,
+        "bollingerUpperBand": 5,
+        "bollingerLowerBand": 5,
+        "bollingerBandwidth": 0,
+        "bollingerPercentB": 0.5
+      }
+    },
+    {
+      "case": "нулевой множитель на неплоском окне: полосы тоже сливаются, и положение цены — та же середина",
+      "state": {
+        "deviationMultiplier": 0,
+        "sigma": 2,
+        "close": 9,
+        "window": [
+          {"value": 2},
+          {"value": 4},
+          {"value": 4},
+          {"value": 4},
+          {"value": 5},
+          {"value": 5},
+          {"value": 7},
+          {"value": 9}
+        ]
+      },
+      "expect": {
+        "bollingerVariance": 4,
+        "bollingerUpperBand": 5,
+        "bollingerLowerBand": 5,
+        "bollingerBandwidth": 0,
+        "bollingerPercentB": 0.5
+      }
+    },
+    {
+      "case": "стохастик: закрытие на трёх четвертях диапазона окна",
+      "state": {
+        "close": 105,
+        "window": [
+          {"high": 110, "low": 95},
+          {"high": 105, "low": 90},
+          {"high": 108, "low": 100}
+        ]
+      },
+      "expect": {
+        "stochasticHighest": 110,
+        "stochasticLowest": 90,
+        "stochasticRawK": 75
+      }
+    },
+    {
+      "case": "стохастик: закрытие на четырёх пятых диапазона",
+      "state": {
+        "close": 48,
+        "window": [
+          {"high": 50, "low": 40},
+          {"high": 48, "low": 42}
+        ]
+      },
+      "expect": {
+        "stochasticHighest": 50,
+        "stochasticLowest": 40,
+        "stochasticRawK": 80
+      }
+    },
+    {
+      "case": "стохастик на плоском окне: нулевой диапазон — середина шкалы",
+      "state": {
+        "close": 10,
+        "window": [
+          {"high": 10, "low": 10},
+          {"high": 10, "low": 10}
+        ]
+      },
+      "expect": {
+        "stochasticHighest": 10,
+        "stochasticLowest": 10,
+        "stochasticRawK": 50
+      }
+    },
+    {
+      "case": "плоский бар в неплоском окне вырожденным не является",
+      "state": {
+        "close": 11,
+        "window": [
+          {"high": 10, "low": 10},
+          {"high": 12, "low": 8}
+        ]
+      },
+      "expect": {
+        "stochasticHighest": 12,
+        "stochasticLowest": 8,
+        "stochasticRawK": 75
+      }
+    },
+    {
+      "case": "OBV: рост закрытия прибавляет объём бара",
+      "state": {
+        "close": 105,
+        "previousClose": 100,
+        "volume": 50,
+        "previousObv": 1000
+      },
+      "expect": {
+        "obvNext": 1050
+      }
+    },
+    {
+      "case": "OBV: падение закрытия вычитает объём бара",
+      "state": {
+        "close": 95,
+        "previousClose": 100,
+        "volume": 50,
+        "previousObv": 1000
+      },
+      "expect": {
+        "obvNext": 950
+      }
+    },
+    {
+      "case": "OBV: равное закрытие значения не меняет",
+      "state": {
+        "close": 100,
+        "previousClose": 100,
+        "volume": 50,
+        "previousObv": 1000
+      },
+      "expect": {
+        "obvNext": 1000
+      }
+    },
+    {
+      "case": "OBV: бар с непроставленным объёмом при росте закрытия значения не имеет — нуль сделал бы его баром без сделок",
+      "state": {
+        "close": 105,
+        "previousClose": 100,
+        "volume": null,
+        "previousObv": 1000
+      },
+      "expect": {
+        "obvNext": null
+      }
+    },
+    {
+      "case": "OBV: при равном закрытии непроставленный объём значения не отнимает — в шаг он не входит",
+      "state": {
+        "close": 100,
+        "previousClose": 100,
+        "volume": null,
+        "previousObv": 1000
+      },
+      "expect": {
+        "obvNext": 1000
+      }
+    },
+    {
+      "case": "затравка OBV — последнее записанное значение ряда, а не нуль начала окна прохода",
+      "state": {
+        "lastStoredObv": 1000
+      },
+      "expect": {
+        "obvSeed": 1000
+      }
+    },
+    {
+      "case": "затравка OBV без записанного значения в окне — нуль: ряд начинается заново",
+      "state": {
+        "lastStoredObv": null
+      },
+      "expect": {
+        "obvSeed": 0
+      }
+    },
+    {
+      "case": "эффективность хода: монотонный рост — чистый ход равен пути",
+      "state": {
+        "window": [
+          {"value": 101, "previousValue": 100},
+          {"value": 102, "previousValue": 101},
+          {"value": 103, "previousValue": 102}
+        ]
+      },
+      "expect": {
+        "efficiencySignedMoveSum": 3,
+        "efficiencyTotalMove": 3,
+        "efficiencyRatio": 1
+      }
+    },
+    {
+      "case": "эффективность хода: монотонное падение — модуль в числителе, направление не влияет",
+      "state": {
+        "window": [
+          {"value": 99, "previousValue": 100},
+          {"value": 98, "previousValue": 99}
+        ]
+      },
+      "expect": {
+        "efficiencySignedMoveSum": -2,
+        "efficiencyTotalMove": 2,
+        "efficiencyRatio": 1
+      }
+    },
+    {
+      "case": "эффективность хода с откатом внутри окна",
+      "state": {
+        "window": [
+          {"value": 102, "previousValue": 100},
+          {"value": 101, "previousValue": 102},
+          {"value": 103, "previousValue": 101}
+        ]
+      },
+      "expect": {
+        "efficiencySignedMoveSum": 3,
+        "efficiencyTotalMove": 5,
+        "efficiencyRatio": 0.6
+      }
+    },
+    {
+      "case": "эффективность хода: возврат к исходной цене — ноль",
+      "state": {
+        "window": [
+          {"value": 102, "previousValue": 100},
+          {"value": 100, "previousValue": 102}
+        ]
+      },
+      "expect": {
+        "efficiencySignedMoveSum": 0,
+        "efficiencyTotalMove": 4,
+        "efficiencyRatio": 0
+      }
+    },
+    {
+      "case": "эффективность хода на плоском окне: пути нет — ноль, а не тренд",
+      "state": {
+        "window": [
+          {"value": 100, "previousValue": 100},
+          {"value": 100, "previousValue": 100}
+        ]
+      },
+      "expect": {
+        "efficiencySignedMoveSum": 0,
+        "efficiencyTotalMove": 0,
+        "efficiencyRatio": 0
+      }
+    },
+    {
+      "case": "прогрев EMA — два периода",
+      "state": {
+        "type": "EMA",
+        "period": 14
+      },
+      "expect": {
+        "derivedWarmup": 28,
+        "effectiveWarmup": 28
+      }
+    },
+    {
+      "case": "прогрев ATR — три периода: сглаживание Уайлдера вдвое медленнее EMA",
+      "state": {
+        "type": "ATR",
+        "period": 14
+      },
+      "expect": {
+        "derivedWarmup": 42,
+        "effectiveWarmup": 42
+      }
+    },
+    {
+      "case": "прогрев RSI — три периода",
+      "state": {
+        "type": "RSI",
+        "period": 10
+      },
+      "expect": {
+        "derivedWarmup": 30
+      }
+    },
+    {
+      "case": "прогрев MACD — два медленных периода плюс сигнальный",
+      "state": {
+        "type": "MACD",
+        "fastPeriod": 12,
+        "slowPeriod": 26,
+        "signalPeriod": 9
+      },
+      "expect": {
+        "derivedWarmup": 61
+      }
+    },
+    {
+      "case": "прогрев стохастика — сумма трёх окон",
+      "state": {
+        "type": "STOCHASTIC",
+        "kPeriod": 14,
+        "smoothPeriod": 3,
+        "dPeriod": 5
+      },
+      "expect": {
+        "derivedWarmup": 22
+      }
+    },
+    {
+      "case": "прогрев полос — период",
+      "state": {
+        "type": "BOLLINGER_BANDS",
+        "period": 20
+      },
+      "expect": {
+        "derivedWarmup": 20
+      }
+    },
+    {
+      "case": "прогрев эффективности хода — период",
+      "state": {
+        "type": "EFFICIENCY_RATIO",
+        "period": 10
+      },
+      "expect": {
+        "derivedWarmup": 10
+      }
+    },
+    {
+      "case": "прогрев OBV — единица: первому бару нечем определить знак объёма",
+      "state": {
+        "type": "OBV"
+      },
+      "expect": {
+        "derivedWarmup": 1
+      }
+    },
+    {
+      "case": "объявленный override старше выведенного, и бар до него не сохраняется",
+      "state": {
+        "type": "RSI",
+        "period": 14,
+        "warmupOverride": 50,
+        "barIndex": 49
+      },
+      "expect": {
+        "derivedWarmup": 42,
+        "effectiveWarmup": 50,
+        "indicatorValueStored": false
+      }
+    },
+    {
+      "case": "нулевой override законен и выведенным не подменяется",
+      "state": {
+        "type": "EMA",
+        "period": 14,
+        "warmupOverride": 0,
+        "barIndex": 5
+      },
+      "expect": {
+        "effectiveWarmup": 0,
+        "indicatorValueStored": true
+      }
+    },
+    {
+      "case": "бар перед границей прогрева не сохраняется",
+      "state": {
+        "type": "RSI",
+        "period": 14,
+        "barIndex": 41
+      },
+      "expect": {
+        "effectiveWarmup": 42,
+        "indicatorValueStored": false
+      }
+    },
+    {
+      "case": "бар ровно на границе прогрева сохраняется",
+      "state": {
+        "type": "RSI",
+        "period": 14,
+        "barIndex": 42
+      },
+      "expect": {
+        "indicatorValueStored": true
+      }
+    },
+    {
+      "case": "продолженный ряд OBV: бар окна с номером ниже прогрева сохраняется — ряд прогрев прошёл до затравки",
+      "state": {
+        "type": "OBV",
+        "warmupOverride": 10,
+        "barIndex": 3,
+        "lastStoredObv": 1000
+      },
+      "expect": {
+        "effectiveWarmup": 10,
+        "indicatorValueStored": true
+      }
+    },
+    {
+      "case": "ряд OBV, начатый проходом: бар с номером ниже прогрева не сохраняется — прогрев отсчитывается от начала окна",
+      "state": {
+        "type": "OBV",
+        "warmupOverride": 10,
+        "barIndex": 3,
+        "lastStoredObv": null
+      },
+      "expect": {
+        "effectiveWarmup": 10,
+        "indicatorValueStored": false
+      }
+    }
+  ]
+}

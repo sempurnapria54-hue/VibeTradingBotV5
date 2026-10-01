@@ -39,7 +39,7 @@ class PositionStatusResolveTest {
     @DisplayName("U9.1 — позиция добыта: статус живая, кандидат причины пуст")
     void u9_1_aFetchedPositionIsActiveWithoutACloseReason() {
         StatusResolveResult<Position.Status, Position.CloseReason> result =
-                resolver.resolve(fetchedPosition("1"));
+                resolver.resolve(fetchedPosition("1"), null);
 
         assertThat(result.getStatus()).isEqualTo(Position.Status.ACTIVE);
         assertThat(result.getCloseReason()).isNull();
@@ -48,7 +48,12 @@ class PositionStatusResolveTest {
     @Test
     @DisplayName("U9.2 — позиция не добыта: закрыта на бирже, и это нормальный факт")
     void u9_2_anUnfetchedPositionIsClosedByTheExchange() {
-        StatusResolveResult<Position.Status, Position.CloseReason> result = resolver.resolve(null);
+        // Пустой ответ закрытием становится только с корроборацией — записью
+        // закрытия эпизода (docs/spec/external-status-resolution.json,
+        // величина positionCloseCorroborated); без неё исход живой, и эту
+        // сторону держит PositionHarvestTest.
+        StatusResolveResult<Position.Status, Position.CloseReason> result =
+                resolver.resolve(null, Boolean.TRUE);
 
         assertThat(result.getStatus()).isEqualTo(Position.Status.CLOSED);
         assertThat(result.getCloseReason())
@@ -59,7 +64,7 @@ class PositionStatusResolveTest {
     @Test
     @DisplayName("U9.3 — позиция добыта с нулевым размером: статус живая")
     void u9_3_aZeroSizedFetchedPositionIsStillActive() {
-        assertThat(resolver.resolve(fetchedPosition("0")).getStatus())
+        assertThat(resolver.resolve(fetchedPosition("0"), null).getStatus())
                 .as("отсутствие живого риска — предикат доменной модели, а не исход резолва; "
                         + "налив позиции резолвер не читает (Z22)")
                 .isEqualTo(Position.Status.ACTIVE);
@@ -70,7 +75,7 @@ class PositionStatusResolveTest {
     void u9_4_theArgumentIsLeftUntouched() {
         Position fetched = fetchedPosition("1");
 
-        resolver.resolve(fetched);
+        resolver.resolve(fetched, null);
 
         assertThat(fetched.getStatus()).as("статус на модель не кладётся — применяет исполнитель").isNull();
         assertThat(fetched.getCloseReason()).isNull();
@@ -80,7 +85,8 @@ class PositionStatusResolveTest {
     @DisplayName("U9.5 — множество исходов ровно два: третьего значения резолвер не производит")
     void u9_5_thereAreExactlyTwoOutcomes() {
         List<StatusResolveResult<Position.Status, Position.CloseReason>> outcomes =
-                List.of(resolver.resolve(fetchedPosition("1")), resolver.resolve(null));
+                List.of(resolver.resolve(fetchedPosition("1"), null),
+                        resolver.resolve(null, Boolean.TRUE));
 
         assertThat(outcomes).extracting(StatusResolveResult::getStatus)
                 .containsExactly(Position.Status.ACTIVE, Position.Status.CLOSED);

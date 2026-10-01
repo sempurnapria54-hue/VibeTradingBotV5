@@ -13,6 +13,9 @@ import com.example.tradingcore.domain.command.RetryError;
 import com.example.tradingcore.domain.command.RuntimeErrorCode;
 import com.example.tradingcore.mapping.RuntimeJsonConverter;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -26,10 +29,14 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Кейсы — группы `U1`, `U2`, `U3`, а также `U11` (строка, записанная
  * прежней редакцией формы) и `U12` (отсутствие выходов), которые документ
- * ставит на любой из семи конвертеров
- * (.claude/tests/cases/jsonb-overlay-roundtrip.md).
+ * ставит на любой из семи конвертеров, и клетка `U13.1` — состав ключей
+ * строки, запиненный литералами (.claude/tests/cases/jsonb-overlay-roundtrip.md).
  */
 class RuntimeJsonConverterTest extends JsonbOverlayProbe {
+
+    /** Ключи уровня цены срабатывания, собранного всеми полями (`U13.1`). */
+    private static final List<String> TRIGGER_PRICE_KEYS =
+            List.of("type", "value", "externalType", "externalValue");
 
     private final RuntimeJsonConverter converter = new RuntimeJsonConverter(beanAssemblyMapper());
 
@@ -295,6 +302,20 @@ class RuntimeJsonConverterTest extends JsonbOverlayProbe {
                 .hasCauseInstanceOf(JsonProcessingException.class);
     }
 
+    @Test
+    @DisplayName("U11.7 — на строгом источнике лишний ключ своей строки отброшен, прочее тождественно")
+    void u11_7_onAStrictSourceAnUnknownKeyOfTheOwnRowIsDropped() {
+        ObjectMapper strict = beanAssemblyMapper()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        Condition condition = triggerCondition();
+        String withUnknown = converter.conditionToJson(condition)
+                .replaceFirst("\\{", "{\"algoClOrdId\":\"vtb1\",");
+
+        assertThat(new RuntimeJsonConverter(strict).jsonToCondition(withUnknown))
+                .as("U11.7: вход %s, источник строгий — терпимость запинена конвертером", withUnknown)
+                .usingRecursiveComparison().isEqualTo(condition);
+    }
+
     // --- U12: чего предмет не делает -------------------------------------
 
     @Test
@@ -335,6 +356,45 @@ class RuntimeJsonConverterTest extends JsonbOverlayProbe {
                 .isNotNull();
     }
 
+    // --- U13.1: состав ключей строки — литеральным перечнем -------------
+
+    @Test
+    @DisplayName("U13.1 — ветви условия и последняя ошибка: ключи на каждом уровне равны литеральному перечню")
+    void u13_1_everyRuntimeFormWritesExactlyTheLiteralKeysOnEveryLevel() {
+        String trigger = converter.conditionToJson(triggerConditionWithEveryField());
+        JsonNode triggerTree = readTree(trigger);
+        assertThat(keysOf(trigger))
+                .as("U13.1: условие триггерной ветки")
+                .containsExactlyInAnyOrder("type", "trigger");
+        assertThat(keysOf(triggerTree.get("trigger").toString()))
+                .as("U13.1: триггер")
+                .containsExactlyInAnyOrder("stopLoss", "takeProfit");
+        assertThat(keysOf(triggerTree.get("trigger").get("stopLoss").toString()))
+                .as("U13.1: цена стопа")
+                .containsExactlyInAnyOrderElementsOf(TRIGGER_PRICE_KEYS);
+        assertThat(keysOf(triggerTree.get("trigger").get("takeProfit").toString()))
+                .as("U13.1: цена тейка")
+                .containsExactlyInAnyOrderElementsOf(TRIGGER_PRICE_KEYS);
+
+        String trailing = converter.conditionToJson(trailingConditionWithEveryField());
+        JsonNode trailingTree = readTree(trailing);
+        assertThat(keysOf(trailing))
+                .as("U13.1: условие трейлинговой ветки")
+                .containsExactlyInAnyOrder("type", "trailing");
+        assertThat(keysOf(trailingTree.get("trailing").toString()))
+                .as("U13.1: трейлинг с наблюдённым уровнем")
+                .containsExactlyInAnyOrder("trailingPercents", "trailingStepValue", "activationPrice",
+                        "externalPrice");
+        assertThat(keysOf(trailingTree.get("trailing").get("activationPrice").toString()))
+                .as("U13.1: цена активации")
+                .containsExactlyInAnyOrderElementsOf(TRIGGER_PRICE_KEYS);
+
+        assertThat(keysOf(converter.retryErrorToJson(new RetryError("51008", "Insufficient balance",
+                RuntimeErrorCode.EXCHANGE_ERROR))))
+                .as("U13.1: последняя ошибка")
+                .containsExactlyInAnyOrder("code", "message", "type");
+    }
+
     // --- материал кейсов --------------------------------------------------
 
     private static Path converterSource(String simpleName) {
@@ -354,6 +414,28 @@ class RuntimeJsonConverterTest extends JsonbOverlayProbe {
         Condition condition = new Condition();
         condition.setType(AlgoOrder.ConditionType.OCO_FULL);
         condition.setTrigger(new Trigger(stopLoss, takeProfit));
+        return condition;
+    }
+
+    /** Триггерная ветка, у которой заполнено каждое поле обеих цен. */
+    private static Condition triggerConditionWithEveryField() {
+        Condition condition = new Condition();
+        condition.setType(AlgoOrder.ConditionType.OCO_FULL);
+        condition.setTrigger(new Trigger(
+                new TriggerPrice(AlgoOrder.TriggerPriceType.LAST, new BigDecimal("30000"), "last",
+                        new BigDecimal("30000")),
+                new TriggerPrice(AlgoOrder.TriggerPriceType.MARK, new BigDecimal("36000"), "mark",
+                        new BigDecimal("36000"))));
+        return condition;
+    }
+
+    /** Трейлинговая ветка с наблюдённым уровнем, у которой заполнено каждое поле. */
+    private static Condition trailingConditionWithEveryField() {
+        Condition condition = trailingCondition();
+        condition.getTrailing().setTrailingStepValue(new BigDecimal("50"));
+        condition.getTrailing().setExternalPrice(new BigDecimal("31500.5"));
+        condition.getTrailing().setActivationPrice(new TriggerPrice(AlgoOrder.TriggerPriceType.LAST,
+                new BigDecimal("33000"), "last", new BigDecimal("33000")));
         return condition;
     }
 

@@ -192,6 +192,12 @@ class RequirementsBoxTest extends SharedMarketDataBox {
      * <p>Поле чужого типа отказывает на входе, а не отбрасывается: иначе
      * идентичность завелась бы с пустым периодом, и расчёт по ней падал бы у
      * другого тика (находка {@code F-10}, закрыта).
+     *
+     * <p><b>Пояснение пишет наша сторона.</b> Отказ производит разбор
+     * сериализатором, и его текст несёт полное имя класса параметров и фразу
+     * разбора; наружу он не идёт (docs/rules/error-handling-policy.md
+     * §«Пояснение отказа пишет наша сторона, а не платформа»). Запрет снимает
+     * чужой текст, а не само поле: пояснение непусто.
      */
     @Test
     @DisplayName("B1.10 — параметры, не разбирающиеся под заявленный тип")
@@ -202,6 +208,8 @@ class RequirementsBoxTest extends SharedMarketDataBox {
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode()).isEqualTo("INVALID_REQUEST");
         assertThat(rows.count("indicator_configs")).isEqualTo(0L);
+        assertThat((String) answer.asObject().get("message")).isNotBlank();
+        assertThat(answer.body()).doesNotContain("com.example", "AtrParams", "Unrecognized field");
     }
 
     @Test
@@ -274,6 +282,104 @@ class RequirementsBoxTest extends SharedMarketDataBox {
         assertThat(rows.count("candle_groups")).isEqualTo(1L);
         assertThat(rows.count("indicator_configs")).isEqualTo(1L);
         assertThat(rows.count("market_structure_configs")).isEqualTo(1L);
+    }
+
+    /**
+     * Ожидание взято из дома: возврат к {@code BACKFILL} пишет приём
+     * требования, и срабатывает ребро из любого живого статуса
+     * (docs/lifecycles/CandleGroup.md §«Возврат к `BACKFILL` по углублённому
+     * требованию») — в том числе тогда, когда группа уже взята шагом цикла.
+     *
+     * <p><b>Требование подаётся ПОСРЕДИ шага:</b> ответ площадки на чтение
+     * истории удержан, и шаг бэкфилла стоит между загрузкой группы и записью
+     * итога. Страница ответа покрывает прежний мелкий горизонт, поэтому шаг,
+     * не заметивший требования, увёл бы группу в {@code CHECK} с прежним
+     * горизонтом — ровно так, как записью группы целиком это и делалось.
+     */
+    @Test
+    @DisplayName("B1.15 — углубление посреди шага цикла загрузки не теряется")
+    void b1_15_aDeepeningInTheMiddleOfALoadingStepIsNotLost() {
+        String instrument = provisionInstruments(INSTRUMENT).getFirst();
+        requireCandles(instrument, HOUR, 50L);
+        tick(Tick.CANDLES);
+        Long shallow = horizonOf();
+        connector.answersHeld(ConnectorStub.HISTORY_CANDLES,
+                Feed.candles(barsAgo(HOUR_MILLIS, 60), HOUR_MILLIS, 60, 50000));
+
+        tickWithMidStep(Tick.CANDLES, () ->
+                assertThat(post(CANDLES, Bodies.candleRequirement(instrument, HOUR, 500L)).status())
+                        .isEqualTo(200));
+
+        assertThat(statusOf()).isEqualTo("BACKFILL");
+        assertThat(horizonOf()).isLessThan(shallow);
+        assertThat(rows.count("candles")).isEqualTo(60L);
+    }
+
+    /**
+     * Ожидание взято из дома: писатель ребра — приём требования, а итог
+     * шага — счёт, границы, статус — пишет цикл
+     * (docs/lifecycles/CandleGroup.md §«Возврат к `BACKFILL` по углублённому
+     * требованию»). Обратная сторона {@code B1.15}: там требование пришло
+     * посреди шага, здесь шаг записал итог посреди требования.
+     *
+     * <p><b>Итог шага ложится между чтением и записью требования:</b> замок
+     * строки группы, взятый снаружи ящика, ставит запись шага в очередь
+     * первой, требование читает группу до её итога, и его запись встаёт
+     * второй ({@link MarketDataBox#tickWithQueuedWrite}). Страница ответа
+     * покрывает прежний мелкий горизонт, и шаг уводит группу в
+     * {@code CHECK} с посчитанными 60 барами; требование, записавшее группу
+     * целиком по своему снимку, вернуло бы счёт к нулю и стёрло границы.
+     */
+    @Test
+    @DisplayName("B1.16 — итог шага цикла, записанный посреди требования, не теряется")
+    void b1_16_aLoadingStepOutcomeWrittenInTheMiddleOfARequirementIsNotLost() {
+        String instrument = provisionInstruments(INSTRUMENT).getFirst();
+        requireCandles(instrument, HOUR, 50L);
+        tick(Tick.CANDLES);
+        Long shallow = horizonOf();
+        connector.answers(ConnectorStub.HISTORY_CANDLES,
+                Feed.candles(barsAgo(HOUR_MILLIS, 60), HOUR_MILLIS, 60, 50000));
+
+        Answer deepening = tickWithQueuedWrite(Tick.CANDLES, "candle_groups",
+                () -> post(CANDLES, Bodies.candleRequirement(instrument, HOUR, 500L)));
+
+        assertThat(deepening.status()).isEqualTo(200);
+        Map<String, Object> group = rows.all("candle_groups").getFirst();
+        assertThat(rows.count("candles")).isEqualTo(60L);
+        assertThat(((Number) group.get("count")).longValue()).isEqualTo(60L);
+        assertThat(group.get("actual_first_utc_millis")).isNotNull();
+        assertThat(group.get("actual_last_utc_millis")).isNotNull();
+        assertThat(statusOf()).isEqualTo("BACKFILL");
+        assertThat(horizonOf()).isLessThan(shallow);
+    }
+
+    /**
+     * Ожидание взято из дома: пустой горизонт — вся история площадки, и
+     * требование без глубины есть требование всей истории, а не отсутствие
+     * требования (docs/lifecycles/CandleGroup.md §«Глубина и покрытие
+     * (`BACKFILL`)»). Отсюда обе стороны: названный горизонт такое
+     * требование углубляет до пустого, а стоящую «всю историю» требование с
+     * глубиной не сужает (docs/models/domain/other/CandleGroup.md
+     * §«Горизонт бэкфилла принадлежит группе»).
+     */
+    @Test
+    @DisplayName("B1.17 — вся история глубже всякого названного горизонта")
+    void b1_17_theWholeHistoryIsDeeperThanAnyNamedHorizon() {
+        String instrument = provisionInstruments(INSTRUMENT).getFirst();
+        requireCandles(instrument, HOUR, 50L);
+        assertThat(post(CANDLES, Bodies.candleRequirement(instrument, "FIVE_MINUTES")).status()).isEqualTo(200);
+        rows.put("update candle_groups set status = 'ACTIVE'");
+
+        Answer toWhole = post(CANDLES, Bodies.candleRequirement(instrument, HOUR));
+        Answer named = post(CANDLES, Bodies.candleRequirement(instrument, "FIVE_MINUTES", 500L));
+
+        assertThat(toWhole.status()).isEqualTo(200);
+        assertThat(named.status()).isEqualTo(200);
+        assertThat(rows.row("candle_groups", "timeframe", HOUR).get("planned_first_utc_millis")).isNull();
+        assertThat(statusOf(HOUR)).isEqualTo("BACKFILL");
+        assertThat(rows.row("candle_groups", "timeframe", "FIVE_MINUTES").get("planned_first_utc_millis"))
+                .isNull();
+        assertThat(statusOf("FIVE_MINUTES")).isEqualTo("ACTIVE");
     }
 
     private Long horizonOf() {

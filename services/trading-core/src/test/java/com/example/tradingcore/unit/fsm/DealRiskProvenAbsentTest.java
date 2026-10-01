@@ -7,6 +7,7 @@ import static com.example.tradingcore.unit.fsm.FsmFixture.closedPosition;
 import static com.example.tradingcore.unit.fsm.FsmFixture.deal;
 import static com.example.tradingcore.unit.fsm.FsmFixture.exposed;
 import static com.example.tradingcore.unit.fsm.FsmFixture.fills;
+import static com.example.tradingcore.unit.fsm.FsmFixture.leg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.livePosition;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveReduceOnlyLeg;
@@ -16,6 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -175,6 +178,83 @@ class DealRiskProvenAbsentTest {
         assertThat(proven).isFalse();
         assertThat(messages).containsExactly(
                 "Exposure is not reconciled dealId=" + DEAL_ID + " dealExposure=-3");
+    }
+
+    /**
+     * Пометка ошибки — наше safety-состояние, а не факт площадки: нога под
+     * ней может стоять живой, и пустое наблюдение нежилостью не читается
+     * (docs/spec/order-lifecycle.json, {@code orderMayBeLive}). Риска транш
+     * не несёт — reduce-only нога не входная, — и гейт держит один
+     * {@code anyLiveOrder}.
+     */
+    @Test
+    @DisplayName("U2.15 — reduce-only нога в ERROR без наблюдения площадки: ложь, гейт держит anyLiveOrder")
+    void u2_15_anUnobservedErrorLegHoldsTheGate() {
+        Deal deal = baseDeal();
+        DealTranche tranche = deal.getTranches().getFirst();
+        tranche.getOrders().add(errorReduceOnlyLeg(null));
+
+        assertThat(tranche.isRiskBearing()).isFalse();
+        assertThat(gate.anyLiveOrder(deal.getTranches())).isTrue();
+        assertThat(gate.riskProvenAbsent(deal, deal.getTranches(), Boolean.TRUE)).isFalse();
+    }
+
+    @Test
+    @DisplayName("U2.16 — та же нога, наблюдённая нежилой: истина")
+    void u2_16_anErrorLegObservedNotLiveNoLongerHoldsTheGate() {
+        Deal deal = baseDeal();
+        DealTranche tranche = deal.getTranches().getFirst();
+        tranche.getOrders().add(errorReduceOnlyLeg(Boolean.FALSE));
+
+        assertThat(gate.anyLiveOrder(deal.getTranches())).isFalse();
+        assertThat(gate.riskProvenAbsent(deal, deal.getTranches(), Boolean.TRUE)).isTrue();
+    }
+
+    /**
+     * Отдельная условная заявка в {@code ERROR} читается тем же правилом:
+     * осиротевшая живая запись защиты сработала бы по чужой позиции того же
+     * инструмента (docs/spec/deal-lifecycle.json,
+     * {@code trancheHasMayBeLiveStandaloneProtection}). Риска транш не несёт —
+     * покрытием заявка в {@code ERROR} не считается, — и гейт держит один
+     * {@code anyLiveOrder}.
+     */
+    @Test
+    @DisplayName("U2.17 — отдельная условная заявка в ERROR без наблюдения площадки: ложь, гейт держит anyLiveOrder")
+    void u2_17_anUnobservedErrorStandaloneProtectionHoldsTheGate() {
+        Deal deal = baseDeal();
+        DealTranche tranche = deal.getTranches().getFirst();
+        tranche.getAlgoOrders().add(errorProtection(null));
+
+        assertThat(tranche.isRiskBearing()).isFalse();
+        assertThat(gate.anyLiveOrder(deal.getTranches())).isTrue();
+        assertThat(gate.riskProvenAbsent(deal, deal.getTranches(), Boolean.TRUE)).isFalse();
+    }
+
+    @Test
+    @DisplayName("U2.18 — та же заявка, наблюдённая нежилой: истина")
+    void u2_18_anErrorStandaloneProtectionObservedNotLiveNoLongerHoldsTheGate() {
+        Deal deal = baseDeal();
+        deal.getTranches().getFirst().getAlgoOrders().add(errorProtection(Boolean.FALSE));
+
+        assertThat(gate.anyLiveOrder(deal.getTranches())).isFalse();
+        assertThat(gate.riskProvenAbsent(deal, deal.getTranches(), Boolean.TRUE)).isTrue();
+    }
+
+    /** Отдельная защита без срабатывания, помеченная ошибкой, с названным наблюдением площадки. */
+    private static AlgoOrder errorProtection(Boolean externalLive) {
+        AlgoOrder algoOrder = protection(41L, TRANCHE_ID, "1");
+        algoOrder.setStatus(AlgoOrder.Status.ERROR);
+        algoOrder.setCloseReason(AlgoOrder.CloseReason.UNKNOWN_EXTERNAL_STATUS);
+        algoOrder.setExternalLive(externalLive);
+        return algoOrder;
+    }
+
+    /** Reduce-only нога без налива, помеченная ошибкой, с названным наблюдением площадки. */
+    private static Order errorReduceOnlyLeg(Boolean externalLive) {
+        Order order = leg(32L, TRANCHE_ID, Order.Status.ERROR, Boolean.TRUE, "0");
+        order.setCloseReason(Order.CloseReason.UNKNOWN_EXTERNAL_STATUS);
+        order.setExternalLive(externalLive);
+        return order;
     }
 
     /**

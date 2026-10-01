@@ -14,10 +14,10 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
- * Вычислитель Kaufman efficiency ratio: ER = |close[i] − close[i−period]|
- * / Σ|побарных изменений| по окну period. ER→1 — тренд, ER→0 — шум/боковик
- * (нормирован по определению). warmup ≈ period. См.
- * docs/models/domain/other/IndicatorValue.md.
+ * Вычислитель эффективности хода Кауфмана. Формула, исход вырожденного окна
+ * и выведенный прогрев — docs/spec/indicator-calculation.json
+ * (`efficiencySignedMoveSum`, `efficiencyTotalMove`, `efficiencyRatio`,
+ * `derivedWarmup`).
  */
 @Component
 public class EfficiencyRatioCalculator implements IndicatorCalculator {

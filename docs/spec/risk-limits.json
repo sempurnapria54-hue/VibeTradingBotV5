@@ -18,6 +18,7 @@
     "feeRate": "ставка комиссии как издержка — InstrumentExternalRules.takerFeeRate(); операнд дома закрытой формы docs/spec/risk-at-stop.json",
     "hasLiveEpisode": "живой эпизод существует; резолв — docs/spec/protection-coverage.json, величина hasLiveEpisode. Оба конъюнкта определения живого риска позиции живут там; здесь берётся значение",
     "position.externalSize": "Position.externalSize живого эпизода; ПУСТО либо 0 — живого эпизода нет вовсе (первый вход сделки). Это факт домена, а не недобытая величина: контекст прохода грузит эпизоды целиком (docs/spec/deal-context-load.json), поэтому отсутствие эпизода отличимо от неполноты загрузки. Отличимость держится не на добросовестности загрузчика: неполный граф до неравенств не доезжает вовсе — операнд graphComplete отправляет потолки в отказ",
+    "position.externalLiquidationPrice": "Position.externalLiquidationPrice живого эпизода — цена ликвидации, которую называет площадка; пусто — не наблюдена либо живого эпизода нет",
     "instrument.contractValue": "InstrumentExternalRules.externalContractValue",
     "entryLegs[]": "строки orders сделки — ноги входа (дом docs/spec/protection-coverage.json, величина isEntryOrder) по всем траншам: потолки агрегатные, транши их не множат",
     "limits.riskPerActionPercent": "StrategyDetail.riskPerActionPercent, проценты",
@@ -31,7 +32,7 @@
     "actNotional": "нотинал акта: плановый размер ноги × стоимость контракта × плановая цена входа для risk-creating, 0 для risk-weakening — новых контрактов такое действие не создаёт; резолв — CalculatedSize и CalculatedPrice проверяемого действия. Цена — плановая цена САМОГО акта и при живом эпизоде тоже: якорь эпизода (entryAnchor, его средняя цена) прайсит только налитые контракты — своим слагаемым livePositionNotional, — а контракты акта по ней налиться не могут. Одно значение читают оба потребителя — катастрофический потолок (withinDealNotional) и маржа акта (actRequiredMargin)",
     "unreflectedLegsNotional": "нотинал живых входных ног сделки, которых снимок средств счёта не отражает: площадка их не подтвердила либо подтвердила позже момента снимка; плановый размер × стоимость контракта × плановая цена входа. Нога, подтверждённая до момента снимка, в свободном остатке уже учтена",
     "pair.leverage": "рабочее плечо пары «счёт, инструмент» — AccountInstrumentState.leverage; пусто у акта, создающего риск, отвергается раньше кодом LEVERAGE_NOT_CONFIGURED (docs/rules/trading-constraints.md)",
-    "balanceSnapshotFresh": "снимок средств счёта есть и обновлён площадкой позже рубежа «сейчас минус толерантность прохода» — тот же предикат и та же толерантность, по которым обработчик предвходовой проверки заказывает добычу (docs/components/TranchePrecheckHandler.md). Ложь — проверки средств счёта не меряются (docs/components/RiskValidator.md)",
+    "balanceSnapshotFresh": "снимок средств счёта есть, и момент, на который площадка собрала сведения о счёте (BalanceContainer.externalUpdatedAt), позже рубежа «сейчас минус толерантность прохода» — тот же предикат и та же толерантность, по которым обработчик предвходовой проверки заказывает добычу (docs/components/TranchePrecheckHandler.md). Ложь — проверки средств счёта не меряются; акт, создающий риск, с таким снимком до преконтроля не доходит ни на какой стадии — его откладывают, — и ложь достаётся только действиям, риска не создающим (docs/components/RiskValidator.md, раздел проверок средств счёта)",
     "settle.cashBalance": "денежный остаток строки расчётной валюты инструмента в снимке средств — Balance.externalCashBalance",
     "settle.equity": "капитал строки расчётной валюты инструмента в снимке средств — Balance.externalEquity",
     "settle.availableBalance": "свободный остаток строки расчётной валюты инструмента в снимке средств — Balance.externalAvailableBalance",
@@ -40,15 +41,24 @@
     "balanceSnapshotAfterTerminal": "снимок BalanceContainer сделан не раньше терминала сделки; false — снимок устарел относительно исхода",
     "riskBaseObservationCandidate": "доступный остаток строки расчётной валюты в приземляемом снимке средств — операнд первого наблюдения базы; пусто — строки расчётной валюты в снимке нет",
     "exchangeRiskBase": "ExchangeAccount.riskBase на момент проверки — живая база счёта, следующая за свободным остатком в обе стороны (величина riskBaseAfter ниже). Делитель первого действия сделки, у которого снимка ещё нет; пуст ⇒ BALANCE_INVALID (docs/components/RiskValidator.md)",
-    "instrumentSafetyRungStanding": "инструмент действия стоит в safety-ступени с блок-сетом — Instrument.safetyRung = ENTRY_BLOCKED либо TRADE_BLOCKED (docs/rules/instrument-hold.md §Enforcement). Рабочее состояние и онбординговые статусы значения не дают",
-    "actInSafetyBlockSet": "класс проверяемого акта входит в блок-сет safety-ступени: risk-creating, risk-increasing либо risk-weakening (ослабление защиты). Защитное действие ослабляет защиту, только когда его уровень отступает от защиты своего транша — величина actStopKeepsProtection (docs/spec/protection-coverage.json) ложна; подтяжка стопа, перевод в безубыток и первая защита над непокрытым траншем в блок-сет не входят, трейлинг и действие без названного транша — входят. Снятие риска и reduce-only-выход в блок-сет не входят — сделки доживают под своей защитой (docs/rules/instrument-hold.md)",
+    "instrumentSafetyRungStanding": "инструмент действия стоит в safety-ступени с блок-сетом — Instrument.safetyRung = ENTRY_BLOCKED либо TRADE_BLOCKED (энфорсмент ступени — docs/rules/instrument-hold.md). Рабочее состояние и онбординговые статусы значения не дают",
+    "actProtective": "проверяемый акт — защитное действие: создаёт, переносит либо замещает уровень остановки убытка. Резолв — docs/spec/strategy-reference.json, величина isProtectiveAction: селектор читает тип условия, который действие ставит САМО, поэтому постановка уровня фиксации прибыли защитным действием не является. Снятие защиты этим операндом не выражается — у снимающего тип условия есть копия типа цели (там же), и у снятия свой операнд actRemovesProtection",
+    "actRemovesProtection": "проверяемый акт — снятие защитной заявки при живой экспозиции, своим вызовом преконтроля (docs/rules/risk-validator-scope.md). Защитность снимаемого читается у цели, а не у снимающего действия (docs/rules/live-risk-protection.md). Teardown-отмена, аварийная дочистка и kill-switch преконтроля не проходят вовсе и значения не дают",
+    "actStopKeepsProtection": "уровень защитного действия не ослабляет защиту своего транша; значение берётся из дома-спеки docs/spec/protection-coverage.json, величина actStopKeepsProtection, — форма здесь не переписывается. ПУСТО у действия без названного транша: подтяжку нечем доказать, и такое действие остаётся в блок-сете — неизмеренное благоприятным умолчанием не читается (docs/concept.md П1)",
     "instrumentLive": "инструмент торгуется — справочные правила инструмента несут статус LIVE (docs/models/domain/other/InstrumentExternalRules.md); прочие статусы (приостановка, предоткрытие, экспирация, тестовый, ненормализованный) — ложь",
-    "blockingCode": "блокирующий код вердикта преконтроля, предъявленного карте реакции при живом риске транша, — значение перечня RiskCheckCode (docs/components/models/RiskCheckResult.md). Операнд покодовый: многокодовый вердикт карта свёртывает конъюнкцией членства (docs/components/RiskBlockResolver.md), и свёртка здесь не переписывается"
+    "blockingCode": "блокирующий код вердикта преконтроля, предъявленного карте реакции при живом риске транша, — значение перечня RiskCheckCode (docs/components/models/RiskCheckResult.md). Операнд покодовый: многокодовый вердикт карта свёртывает конъюнкцией членства (docs/components/RiskBlockResolver.md), и свёртка здесь не переписывается",
+    "actContracts": "плановый размер ноги проверяемого акта в контрактах — CalculatedSize; 0 у акта, новых контрактов не создающего. Тот же размер, на котором стои́т actNotional",
+    "positionTiers[]": "позиционные тиры инструмента для изолированной маржи — строки справочных правил инструмента (docs/models/domain/other/InstrumentExternalRules.md); источник — площадка (docs/integrations/okx/contracts/position-tiers.md). Пустой перечень — тиры не материализованы",
+    "positionTiers[].minSize": "нижняя граница размера позиции тира, в контрактах",
+    "positionTiers[].maxSize": "верхняя граница размера позиции тира, в контрактах",
+    "positionTiers[].maintenanceMarginRate": "ставка поддерживающей маржи тира — доля нотинала позиции",
+    "account.mode": "режим счёта площадки в снимке средств — значение доменного перечня режима счёта, чей дом — снимок средств счёта (docs/models/domain/core/BalanceContainer.md); контур держит значение FUTURES — фьючерсный режим, в котором площадка займа не даёт. Перевод словаря площадки — граница коннектора (docs/integrations/okx/contracts/account-config.md). Пусто — снимок режима не несёт",
+    "account.positionMode": "режим позиций счёта в том же снимке — значение доменного перечня того же дома; контур держит NET. Пусто — снимок режима не несёт"
   },
   "values": [
     {
       "name": "base",
-      "note": "Делитель ВСЕХ ЧЕТЫРЁХ потолков: снимок базы, если он есть, иначе живая база счёта. Развилка не стилистическая — снимок пишет CreateOrderExecutor той же транзакцией, что создаёт ногу, а преконтроль идёт ДО неё, поэтому на первом действии сделки делителя-снимка не существует. Прежняя редакция объявляла делителем сам снимок и ветки его пустоты не имела вовсе: первое действие каждой сделки делилось на пусто, а ни один пример этого не показывал — все подавали снимок непустым. Значением снимок и живая база совпадают ровно в момент заморозки; расходятся они потом, и с этого момента потолки живой сделки считаются от снимка — заморозка внутри сделки и есть смысл поля.",
+      "note": "Делитель ВСЕХ ЧЕТЫРЁХ потолков: снимок базы, если он есть, иначе живая база счёта. Развилка не стилистическая — снимок пишет CreateOrderExecutor той же транзакцией, что создаёт ногу, а преконтроль идёт ДО неё, поэтому на первом действии сделки делителя-снимка не существует. Делитель «только снимок» без ветки его пустоты делил бы первое действие каждой сделки на пусто. Значением снимок и живая база совпадают ровно в момент заморозки; расходятся они потом, и с этого момента потолки живой сделки считаются от снимка — заморозка внутри сделки и есть смысл поля.",
       "expr": "if(notNull(?deal.plannedRiskEquityBase), deal.plannedRiskEquityBase, exchangeRiskBase)"
     },
     {
@@ -134,7 +144,7 @@
     },
     {
       "name": "riskBaseNotObserved",
-      "note": "База осталась пустой, хотя снимок приземлился, — тропа заводит журнальный отчёт RISK_BASE_NOT_OBSERVED. Без него пустая база не отличала бы «команда ни разу не отрабатывала» от «отработала, наблюдать было нечего»: благоприятного умолчания у непроверенного признака быть не может (П1 §4).",
+      "note": "База осталась пустой, хотя снимок приземлился, — тропа заводит журнальный отчёт RISK_BASE_NOT_OBSERVED. Без него пустая база не отличала бы «команда ни разу не отрабатывала» от «отработала, наблюдать было нечего»: благоприятного умолчания у непроверенного признака быть не может (П1: умолчание не бывает благоприятным).",
       "expr": "isNull(riskBaseBefore) && !riskBaseObserved"
     },
     {
@@ -144,7 +154,7 @@
     },
     {
       "name": "baseMoveOmitted",
-      "note": "Ход вниз не произведён из-за негодного операнда — тропа заводит журнальный отчёт: омиссия направлена в разрешающую сторону и обязана быть различима в данных (П1 §4).",
+      "note": "Ход вниз не произведён из-за негодного операнда — тропа заводит журнальный отчёт: омиссия направлена в разрешающую сторону и обязана быть различима в данных (П1: умолчание не бывает благоприятным).",
       "expr": "!baseOperandResolved"
     },
     {
@@ -153,8 +163,13 @@
       "expr": "dealCollapsing && actRiskCreating"
     },
     {
+      "name": "actInSafetyBlockSet",
+      "note": "Класс проверяемого акта входит в блок-сет safety-ступени — и в область проверки торгуемости, у которой различитель тот же (instrumentNotLiveBlocksAction). ДОМ ВЕЛИЧИНЫ — эта спека; правило и его границы — docs/rules/instrument-hold.md, энфорсмент мягкой ступени; область преконтроля — docs/rules/risk-validator-scope.md. Дизъюнктов три: создание и наращивание риска; снятие защиты при живой экспозиции — уровня, который защиту транша не ослаблял бы, у снятия нет; защитное действие, чей уровень отступает от защиты своего транша. Трейлинг (уровень наблюдается после активации) и действие без названного транша попадают в третий дизъюнкт: пустое actStopKeepsProtection читается ослаблением. Вне блок-сета — reduce-only-выход, постановка тейка, подтяжка стопа, перевод в безубыток и первая защита над непокрытым траншем: сделки доживают под своей защитой.",
+      "expr": "actRiskCreating || actRemovesProtection || (actProtective && !coalesce(?actStopKeepsProtection, false))"
+    },
+    {
       "name": "safetyRungBlocksAction",
-      "note": "Блок-сет стоящей safety-ступени инструмента: действие блокируемого класса отвергается преконтролем кодом INSTRUMENT_SAFETY_HOLD, реакция — карв-аут (docs/processes/risk-evaluation.md), возобновление — снятием ступени. Прежде у блок-сета, объявленного домом лестницы, не было ни кода проверки, ни строки развязки — по букве схемы отказ в сопровождении уводил сделку в ERROR вопреки «доживают под защитой» (B4 DOCS_CHECK_33). Дом — docs/rules/instrument-hold.md §Enforcement.",
+      "note": "Блок-сет стоящей safety-ступени инструмента: действие блокируемого класса отвергается преконтролем кодом INSTRUMENT_SAFETY_HOLD, реакция — карв-аут (docs/processes/risk-evaluation.md), возобновление — снятием ступени. Без кода проверки и строки развязки отказ в сопровождении уводил бы сделку в ERROR вопреки «доживают под защитой». Дом энфорсмента ступени — docs/rules/instrument-hold.md.",
       "expr": "instrumentSafetyRungStanding && actInSafetyBlockSet"
     },
     {
@@ -169,13 +184,18 @@
     },
     {
       "name": "balanceNotEnoughBlocksAction",
-      "note": "Свободного остатка расчётной валюты не хватает на маржу акта — отказ BALANCE_NOT_ENOUGH, реакция — карв-аут (docs/processes/risk-evaluation.md). Равенство проходит. Несвежий снимок проверку не меряет — названное ограничение дома docs/components/RiskValidator.md: отказ по несвежести увёл бы сделку при живом риске в аварийный контур.",
+      "note": "Свободного остатка расчётной валюты не хватает на маржу акта — отказ BALANCE_NOT_ENOUGH, реакция — карв-аут (docs/processes/risk-evaluation.md). Равенство проходит. Несвежий снимок проверку не меряет, и до неё акт, создающий риск, с таким снимком не доходит: исполнитель действия его откладывает и проход заказывает добычу снимка (docs/components/RiskValidator.md, раздел проверок средств счёта). Отказ по несвежести увёл бы сделку при живом риске в аварийный контур.",
       "expr": "balanceSnapshotFresh && actRiskCreating && actRequiredMargin > settle.availableBalance"
     },
     {
       "name": "borrowOrDebtDetected",
-      "note": "Обязательство в расчётной валюте — отрицательный денежный остаток либо капитал её строки в свежем снимке: отказ BORROW_OR_DEBT_DETECTED на всяком проверяемом действии. Ноль обязательством не является. Дом правила — docs/rules/trading-constraints.md; признак выразим лишь частью — явных полей обязательств площадки снимок не несёт (docs/components/RiskValidator.md).",
+      "note": "Обязательство в расчётной валюте — отрицательный денежный остаток либо капитал её строки в свежем снимке: отказ BORROW_OR_DEBT_DETECTED на всяком проверяемом действии. Ноль обязательством не является. Дом правила — docs/rules/trading-constraints.md. Заём признак не ловит: его исключает режим счёта (величина accountModeOutOfContour), и полнота правила держится этой парой — явных полей обязательств площадки снимок не несёт и они не вводятся (docs/components/RiskValidator.md, раздел проверок средств счёта).",
       "expr": "balanceSnapshotFresh && (settle.cashBalance < 0 || settle.equity < 0)"
+    },
+    {
+      "name": "accountModeOutOfContour",
+      "note": "Режим счёта вне контура: контур держит один режим счёта — тот, где заём невозможен по построению, — и нетто-позиции (docs/rules/trading-constraints.md). Отказ — ACCOUNT_MODE_OUT_OF_CONTOUR. Меряется на свежем снимке, как проверки средств счёта; пустой режим в свежем снимке читается выходом из контура — непроверенная посылка контура выполненной не считается (docs/concept.md П1). Область — всякое проверяемое действие: признак описывает контур, а не класс акта, как у режима маржи и признаков обязательств.",
+      "expr": "balanceSnapshotFresh && (?account.mode != 'FUTURES' || ?account.positionMode != 'NET')"
     },
     {
       "name": "liveRiskBlockReaction",
@@ -202,12 +222,73 @@
       "name": "withinDealNotional",
       "note": "Слагаемое проверяемого акта обязательно: без него первый вход сравнивал бы с потолком ноль и проходил любым размером — потолок, заведённый против шокового хода, был бы инертен ровно там, где решается размер. Незаданное число риск-аппетита — множитель стратегии или максимальный риск на сделку — отказывает вычислением, а не пропускает действие.",
       "expr": "dealNotional + actNotional <= catastrophicLossCeiling"
+    },
+    {
+      "name": "legUnfilledContracts",
+      "note": "Неисполненная доля ноги входа в контрактах — та же доля, что у legNotional и legUnfilledRisk: налитое уже стои́т в живом эпизоде.",
+      "expr": "plannedSizeContracts - accumulatedFillSize"
+    },
+    {
+      "name": "liveLegsContracts",
+      "note": "Неисполненные контракты живых ног входа сделки по всем траншам.",
+      "op": "sum",
+      "over": "entryLegs",
+      "where": "orderIsLive",
+      "of": "legUnfilledContracts"
+    },
+    {
+      "name": "postActContracts",
+      "note": "Размер позиции, которую сделка будет держать, когда нальются её живые ноги и проверяемый акт. Слагаемых три — те же, что у нотинала катастрофического потолка (dealNotional и actNotional), и по той же причине они не пересекаются. По этому размеру выбирается тир.",
+      "expr": "liveLegsContracts + if(hasLiveEpisode, position.externalSize, 0) + actContracts"
+    },
+    {
+      "name": "postActNotional",
+      "note": "Нотинал той же позиции — левая сторона катастрофического неравенства (withinDealNotional); второй суммы не заводится. Пуст на неполном графе, как и dealNotional.",
+      "expr": "dealNotional + actNotional"
+    },
+    {
+      "name": "postActAveragePrice",
+      "note": "Средняя цена входа позиции после акта: живой эпизод — по фактической средней (entryAnchor), живые ноги и акт — по плановым ценам. Проскок относительно плановой цены оценка не видит — названная цена правила (docs/rules/risk-policy.md).",
+      "expr": "postActNotional / (postActContracts * instrument.contractValue)"
+    },
+    {
+      "name": "postActMaintenanceMarginRate",
+      "note": "Ставка поддерживающей маржи тира, в который ляжет позиция после акта. На стыке тиров берётся большая: ликвидация тогда ближе, и оценка консервативна. Тира нет — перечень пуст либо позиция выше последнего тира — величина ПУСТА, и оценка ликвидации отказывает вычислением: ставка первого тира вместо неизвестной не подставляется — у больших позиций ставка больше.",
+      "op": "max",
+      "over": "positionTiers",
+      "where": "minSize <= postActContracts && postActContracts <= maxSize",
+      "of": "maintenanceMarginRate"
+    },
+    {
+      "name": "estimatedLiquidationPrice",
+      "note": "Оценка цены ликвидации изолированной позиции после акта. Условие ликвидации взято в консервативной форме: изолированная маржа (нотинал, делённый на рабочее плечо пары) за вычетом комиссии открытия плюс нереализованный результат не выше поддерживающей маржи плюс комиссии закрытия. Решено относительно цены: у LONG avg·(1 − 1/L + f)/(1 − mmr − f), у SHORT avg·(1 + 1/L − f)/(1 + mmr + f). Обе комиссии стоят на стороне приближения ликвидации: точная формула площадки корпусом не добыта, и слагаемое, которого у неё нет, сдвигает оценку ко входу, а не от него, — ошибка консервативна. Это ОЦЕНКА, а не факт площадки: у ведомой позиции площадка отдаёт свою цену ликвидации, и читается она (docs/rules/risk-policy.md). Тира нет — пусто.",
+      "expr": "if(isNull(postActMaintenanceMarginRate), null, if(direction == 'LONG', postActAveragePrice * (1 - 1 / pair.leverage + feeRate) / (1 - postActMaintenanceMarginRate - feeRate), postActAveragePrice * (1 + 1 / pair.leverage - feeRate) / (1 + postActMaintenanceMarginRate + feeRate)))"
+    },
+    {
+      "name": "liquidationBoundAfterAct",
+      "note": "Граница ликвидации, с которой сверяется стоп: оценка позиции после акта, а при живом эпизоде с наблюдённой ценой ликвидации площадки — ближайшая ко входу из двух (у LONG верхняя, у SHORT нижняя). Площадка видит то, чего оценка не видит, — изолированную маржу, убывшую на финансировании; добор в сторону от цены отодвигает ликвидацию, и тогда площадочная граница строже оценки — лишний отказ, а не пропуск. Цена площадки не наблюдена — граница есть оценка; оценки нет — пусто.",
+      "expr": "if(isNull(estimatedLiquidationPrice), null, if(hasLiveEpisode && notNull(?position.externalLiquidationPrice), if(direction == 'LONG', max(estimatedLiquidationPrice, position.externalLiquidationPrice), min(estimatedLiquidationPrice, position.externalLiquidationPrice)), estimatedLiquidationPrice))"
+    },
+    {
+      "name": "stopNearestLiquidation",
+      "note": "Уровень остановки убытка позиции после акта, ближайший к ликвидации: наименее благоприятный из устанавливаемого актом и действующего на всю позицию (у LONG нижний, у SHORT верхний). Позиция на инструменте одна, и ликвидация у неё одна, поэтому первым к ней обязан прийти самый дальний стоп. Действующего уровня нет при живом эпизоде — хоть один транш с экспозицией своего уровня не несёт (liveStopPrice, дом docs/spec/protection-coverage.json, величина stopCurrentLive), — величина ПУСТА: уровень акта вместо неизвестного не подставляется. Живого эпизода и действующего уровня нет — уровень акта.",
+      "expr": "if(isNull(?liveStopPrice), if(hasLiveEpisode, null, actStopPrice), if(direction == 'LONG', min(actStopPrice, liveStopPrice), max(actStopPrice, liveStopPrice)))"
+    },
+    {
+      "name": "entryStopBeforeLiquidation",
+      "note": "Инвариант «ликвидация за стопом» на акте, создающем риск: ближайший к ликвидации уровень остановки убытка лежит между ценой и границей ликвидации (liquidationBoundAfterAct) — у LONG строго выше неё, у SHORT строго ниже. Ложь — отказ STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION. ПУСТО — оценка не измерена (тиров нет, позиция выше последнего тира, действующий уровень не резолвится), и отказ тот же: неизмеренный инвариант выполненным не читается (docs/concept.md П1). Область — только акт, создающий риск: у прочих позиция не меняется, и её ликвидацию называет площадка (Position.externalLiquidationPrice; сторона преконтроля — docs/components/RiskValidator.md). Дом правила — docs/rules/risk-policy.md.",
+      "expr": "if(!actRiskCreating, true, if(isNull(liquidationBoundAfterAct) || isNull(stopNearestLiquidation), null, if(direction == 'LONG', stopNearestLiquidation > liquidationBoundAfterAct, stopNearestLiquidation < liquidationBoundAfterAct)))"
+    },
+    {
+      "name": "heldStopBeforeLiquidation",
+      "note": "Инвариант «ликвидация за стопом» у УДЕРЖИВАЕМОЙ позиции — сестра entryStopBeforeLiquidation при нулевом акте: позиция актом не меняется, и потому ни уровня акта, ни оценки ликвидации в форме нет. Действующий уровень остановки убытка на всю позицию (liveStopPrice; дом docs/spec/protection-coverage.json, величина stopCurrentLive) лежит между ценой и ценой ликвидации, которую площадка называет у живого эпизода (position.externalLiquidationPrice), — у LONG строго выше неё, у SHORT строго ниже; равенство — нарушение, сравнение то же нестрогое и в той же ценовой базе, что у отказа STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION. Оценка вместо факта площадки не подставляется: она заведена на случай, когда факта нет, а у ведомой позиции он есть. ПУСТО — не измерено, и ветвей три: живого эпизода нет (ликвидировать нечего; зеркало цены на записи закрытого эпизода не читается), действующего уровня нет (хоть один транш с экспозицией своего уровня не несёт), площадка цены ликвидации не называет. Ложь — признак детектора A13, код INSTRUMENT_LIQUIDATION_BEFORE_STOP; пустоту детектор читает молчанием, а не нарушением, и хозяин у каждой ветви свой (docs/components/AnomalyJob.md, раздел переоценки инварианта ликвидации). Гейт живого обязательства покрытия и гистерезис — детекторные и в форму не входят. Дом правила — docs/rules/risk-policy.md.",
+      "expr": "if(!hasLiveEpisode, null, if(isNull(?liveStopPrice) || isNull(?position.externalLiquidationPrice), null, if(direction == 'LONG', liveStopPrice > position.externalLiquidationPrice, liveStopPrice < position.externalLiquidationPrice)))"
     }
   ],
   "populations": [
     {
       "axis": "значение RiskCheckCode × реакция карты при живом риске транша",
-      "note": "Перечень выводится из ПЕРЕЧНЯ КОДОВ и из таблицы карв-аута дома членства, а не из кодов, встреченных в примерах: перечень встреченного молчит ровно о том коде, которого в нём нет. Второй ключ — сама величина правила, поэтому кортеж примера есть исход формулы, а объявленный член — исход таблицы: расхождение формы с таблицей даёт непокрытый член и член вне перечня сразу. Коды, которых не производит ни одна проверка преконтроля, объявлены недостижимыми и предъявляют контрпример: реакция карты на них определена, а тропы, предъявляющей их карте, нет.",
+      "note": "Перечень выводится из ПЕРЕЧНЯ КОДОВ и из таблицы карв-аута дома членства, а не из кодов, встреченных в примерах: перечень встреченного молчит ровно о том коде, которого в нём нет. Второй ключ — сама величина правила, поэтому кортеж примера есть исход формулы, а объявленный член — исход таблицы: расхождение формы с таблицей даёт непокрытый член и член вне перечня сразу. Перечень кодов равен производимому преконтролем (docs/components/models/RiskCheckResult.md), поэтому недостижимых членов у популяции нет.",
       "rule": [
         "liveRiskBlockReaction"
       ],
@@ -310,16 +391,15 @@
         },
         {
           "member": [
-            "BALANCE_NOT_ENOUGH",
-            "SKIP_ACTION"
+            "ACCOUNT_MODE_OUT_OF_CONTOUR",
+            "MOVE_DEAL_TO_ERROR"
           ]
         },
         {
           "member": [
-            "BALANCE_NOT_FRESH",
-            "MOVE_DEAL_TO_ERROR"
-          ],
-          "unreachable": "несвежий снимок средств преконтролю не предъявляется — обработчик добывает свежий снимок до вызова (docs/processes/risk-evaluation.md), и ни одна проверка преконтроля код не производит (docs/components/RiskValidator.md)"
+            "BALANCE_NOT_ENOUGH",
+            "SKIP_ACTION"
+          ]
         },
         {
           "member": [
@@ -374,41 +454,6 @@
             "RISK_CREATING_ENTRY_WITHOUT_STOP",
             "MOVE_DEAL_TO_ERROR"
           ]
-        },
-        {
-          "member": [
-            "PARTIAL_EXIT_NOT_REDUCE_ONLY",
-            "MOVE_DEAL_TO_ERROR"
-          ],
-          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
-        },
-        {
-          "member": [
-            "PARTIAL_EXIT_INCREASES_POSITION",
-            "MOVE_DEAL_TO_ERROR"
-          ],
-          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
-        },
-        {
-          "member": [
-            "DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN",
-            "MOVE_DEAL_TO_ERROR"
-          ],
-          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
-        },
-        {
-          "member": [
-            "MULTIPLE_POSITIONS_DETECTED",
-            "MOVE_DEAL_TO_ERROR"
-          ],
-          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
-        },
-        {
-          "member": [
-            "POSITION_STATE_UNKNOWN",
-            "MOVE_DEAL_TO_ERROR"
-          ],
-          "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется"
         },
         {
           "member": [
@@ -909,7 +954,7 @@
       }
     },
     {
-      "case": "рост свободного остатка поднимает базу автоматически — тем же ходом, что просадка её режет: движение симметрично, и писателя вверх рукой больше нет",
+      "case": "рост свободного остатка поднимает базу автоматически — тем же ходом, что просадка её режет: движение симметрично, и писателя вверх рукой нет",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -951,7 +996,7 @@
       }
     },
     {
-      "case": "значение берётся из остатка целиком, а не мажорируется прежней базой — контрпример к снятой редакции с min()",
+      "case": "значение берётся из остатка целиком, а не мажорируется предыдущим значением базы — контрпример к форме с min()",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -1841,6 +1886,697 @@
       }
     },
     {
+      "case": "первый вход LONG при плече 10: стоп в 0.6 % от входа лежит до оценки ликвидации",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 2982
+      },
+      "expect": {
+        "postActContracts": 10,
+        "postActNotional": 3000,
+        "postActAveragePrice": 3000,
+        "postActMaintenanceMarginRate": 0.004,
+        "estimatedLiquidationPrice": 2713.711702661979,
+        "stopNearestLiquidation": 2982,
+        "entryStopBeforeLiquidation": true,
+        "liquidationBoundAfterAct": 2713.711702661979
+      },
+      "note": "Живого эпизода и живых ног нет: позиция после акта — сам акт. Оценка лежит почти в 10 % от входа — дальше стопа на порядок."
+    },
+    {
+      "case": "тот же вход при плече 100: ликвидация приходит раньше стопа — отказ",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 100
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 2982
+      },
+      "expect": {
+        "estimatedLiquidationPrice": 2984.932194876946,
+        "entryStopBeforeLiquidation": false
+      },
+      "note": "Изолированная маржа — 1 % нотинала; за вычетом поддерживающей ставки и обеих комиссий до ликвидации около 0.5 % цены, а стоп стои́т в 0.6 %. Позиция потеряла бы маржу целиком раньше, чем сработал бы её worst-case выход, и потеря больше R."
+    },
+    {
+      "case": "SHORT при плече 100: стоп выше оценки ликвидации — отказ",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "SHORT",
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 100
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 3018
+      },
+      "expect": {
+        "estimatedLiquidationPrice": 3014.932802389248,
+        "entryStopBeforeLiquidation": false
+      },
+      "note": "Сторона зеркальна: у SHORT стоп обязан лежать НИЖЕ оценки ликвидации."
+    },
+    {
+      "case": "SHORT при плече 10: стоп ниже оценки ликвидации",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "SHORT",
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 3018
+      },
+      "expect": {
+        "estimatedLiquidationPrice": 3283.723245395719,
+        "entryStopBeforeLiquidation": true,
+        "liquidationBoundAfterAct": 3283.723245395719
+      }
+    },
+    {
+      "case": "добор уводит позицию во второй тир: по ставке первого тира прошёл бы, по своему — отказ",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": true,
+        "position": {
+          "externalSize": 995,
+          "externalLiquidationPrice": 2850
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [
+          {
+            "status": "ACTIVE",
+            "plannedRiskAmount": 20,
+            "plannedSizeContracts": 12,
+            "accumulatedFillSize": 5,
+            "plannedEntryPrice": 2990
+          }
+        ],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 20
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 2950,
+        "actStopPrice": 2866,
+        "liveStopPrice": 2900
+      },
+      "expect": {
+        "liveLegsContracts": 7,
+        "postActContracts": 1012,
+        "postActNotional": 303543,
+        "postActAveragePrice": 2999.436758893281,
+        "postActMaintenanceMarginRate": 0.006,
+        "estimatedLiquidationPrice": 2869.617150808317,
+        "stopNearestLiquidation": 2866,
+        "entryStopBeforeLiquidation": false,
+        "liquidationBoundAfterAct": 2869.617150808317
+      },
+      "note": "Слагаемых три: неисполненные 7 контрактов живой ноги по плановой 2990, живой эпизод 995 по средней 3000, акт 10 по плановой 2950. Позиция 1012 контрактов лежит во втором тире со ставкой 0.006 — оценка 2869.6; по ставке первого тира она была бы 2863.9, и стоп 2866 прошёл бы. Ближайший к ликвидации уровень — нижний из устанавливаемого актом (2866) и действующего (2900)."
+    },
+    {
+      "case": "второй вход сетки при живой ноге первого: неисполненная доля живой ноги в позиции после акта, снятая нога — нет",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [
+          {
+            "status": "ACTIVE",
+            "plannedRiskAmount": 20,
+            "plannedSizeContracts": 10,
+            "accumulatedFillSize": 0,
+            "plannedEntryPrice": 3000
+          },
+          {
+            "status": "CANCELLED",
+            "plannedRiskAmount": 20,
+            "plannedSizeContracts": 20,
+            "accumulatedFillSize": 0,
+            "plannedEntryPrice": 3000
+          }
+        ],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 2982,
+        "liveStopPrice": 2970
+      },
+      "expect": {
+        "liveLegsContracts": 10,
+        "postActContracts": 20,
+        "postActNotional": 6000,
+        "postActAveragePrice": 3000,
+        "stopNearestLiquidation": 2970,
+        "entryStopBeforeLiquidation": true
+      },
+      "note": "Позиция после акта считается так, будто нальются и соседние живые ноги: их налив сдвинет среднюю и размер той же позиции. Встроенная защита живой ноги уже несёт уровень (2970), и самый дальний стоп — её."
+    },
+    {
+      "case": "добор к живой позиции, чья маржа убыла на финансировании: цена ликвидации площадки строже оценки — отказ",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": true,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 2750
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 2740,
+        "liveStopPrice": 2745
+      },
+      "expect": {
+        "postActContracts": 20,
+        "estimatedLiquidationPrice": 2713.711702661979,
+        "liquidationBoundAfterAct": 2750,
+        "stopNearestLiquidation": 2740,
+        "entryStopBeforeLiquidation": false
+      },
+      "note": "Оценка по нотиналу пропустила бы стоп 2740 (оценка 2713.7), но площадка называет ликвидацию живой позиции на 2750: маржа убыла, и добор с таким стопом оставил бы ликвидацию впереди стопа."
+    },
+    {
+      "case": "SHORT: добор к живой позиции — граница берёт нижнюю из оценки и цены площадки",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "SHORT",
+        "hasLiveEpisode": true,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 3250
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 3260,
+        "liveStopPrice": 3255
+      },
+      "expect": {
+        "estimatedLiquidationPrice": 3283.723245395719,
+        "liquidationBoundAfterAct": 3250,
+        "stopNearestLiquidation": 3260,
+        "entryStopBeforeLiquidation": false
+      }
+    },
+    {
+      "case": "стык тиров: позиция на общей границе берёт большую ставку",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 1000,
+        "actNotional": 300000,
+        "actStopPrice": 2982
+      },
+      "expect": {
+        "postActContracts": 1000,
+        "postActMaintenanceMarginRate": 0.006,
+        "entryStopBeforeLiquidation": true
+      }
+    },
+    {
+      "case": "тиры не материализованы — оценка не измерена, и это отказ, а не проход",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 2982
+      },
+      "expect": {
+        "postActMaintenanceMarginRate": null,
+        "estimatedLiquidationPrice": null,
+        "entryStopBeforeLiquidation": null
+      },
+      "note": "Ставку первого тира вместо неизвестной подставлять нельзя, а неизмеренный инвариант выполненным не читается: преконтроль отвечает STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION с текстом «не измерено»."
+    },
+    {
+      "case": "позиция выше последнего тира — оценка не измерена",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": 0
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 6000,
+        "actNotional": 1800000,
+        "actStopPrice": 2982
+      },
+      "expect": {
+        "postActMaintenanceMarginRate": null,
+        "entryStopBeforeLiquidation": null
+      }
+    },
+    {
+      "case": "живой эпизод без действующего уровня на всю позицию — уровень акта не подставляется",
+      "state": {
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "direction": "LONG",
+        "hasLiveEpisode": true,
+        "position": {
+          "externalSize": 30
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "feeRate": 0.0005,
+        "pair": {
+          "leverage": 10
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          },
+          {
+            "minSize": 1000,
+            "maxSize": 5000,
+            "maintenanceMarginRate": 0.006
+          }
+        ],
+        "actContracts": 10,
+        "actNotional": 3000,
+        "actStopPrice": 2982,
+        "liveStopPrice": null
+      },
+      "expect": {
+        "stopNearestLiquidation": null,
+        "entryStopBeforeLiquidation": null
+      },
+      "note": "Хоть один транш с экспозицией своего уровня не несёт: самый дальний стоп позиции неизвестен."
+    },
+    {
+      "case": "акт, риска не создающий, под оценку не подпадает — даже без тиров",
+      "state": {
+        "actRiskCreating": false,
+        "positionTiers": []
+      },
+      "expect": {
+        "entryStopBeforeLiquidation": true
+      },
+      "note": "Позиция актом не меняется; её ликвидацию называет площадка, и сторона преконтроля у такого акта своя (docs/components/RiskValidator.md)."
+    },
+    {
+      "case": "удерживаемый LONG: стоп выше цены ликвидации площадки — инвариант держится",
+      "state": {
+        "direction": "LONG",
+        "hasLiveEpisode": true,
+        "liveStopPrice": 2800,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 2750
+        }
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": true
+      }
+    },
+    {
+      "case": "удерживаемый LONG: маржа убыла на финансировании, ликвидация поднялась выше стопа — нарушение",
+      "state": {
+        "direction": "LONG",
+        "hasLiveEpisode": true,
+        "liveStopPrice": 2800,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 2810
+        }
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": false
+      },
+      "note": "Вход этот инвариант прошёл; сдвинула ликвидацию площадка, а не наш акт, и увидеть это может только переоценка на удерживаемой позиции (docs/components/AnomalyJob.md, строка A13)."
+    },
+    {
+      "case": "удерживаемый LONG: стоп ровно на цене ликвидации — нарушение, граница не проходит",
+      "state": {
+        "direction": "LONG",
+        "hasLiveEpisode": true,
+        "liveStopPrice": 2750,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 2750
+        }
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": false
+      },
+      "note": "Сравнение нестрогое в сторону нарушения, как у отказа STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION: ценовой мёртвой зоны нет, но и равенство выполненным не читается."
+    },
+    {
+      "case": "удерживаемый SHORT: стоп ниже цены ликвидации площадки — инвариант держится",
+      "state": {
+        "direction": "SHORT",
+        "hasLiveEpisode": true,
+        "liveStopPrice": 3200,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 3250
+        }
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": true
+      }
+    },
+    {
+      "case": "удерживаемый SHORT: ликвидация опустилась ниже стопа — нарушение",
+      "state": {
+        "direction": "SHORT",
+        "hasLiveEpisode": true,
+        "liveStopPrice": 3200,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 3190
+        }
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": false
+      }
+    },
+    {
+      "case": "удерживаемый SHORT: стоп ровно на цене ликвидации — нарушение",
+      "state": {
+        "direction": "SHORT",
+        "hasLiveEpisode": true,
+        "liveStopPrice": 3250,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 3250
+        }
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": false
+      }
+    },
+    {
+      "case": "удерживаемая позиция без действующего уровня на всю позицию — не измерено",
+      "state": {
+        "direction": "LONG",
+        "hasLiveEpisode": true,
+        "liveStopPrice": null,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": 2810
+        }
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": null
+      },
+      "note": "Хоть один транш с экспозицией своего уровня не несёт: это окно обязательства покрытия либо его нарушение, то есть предмет A4, и второго ответа тому же состоянию детектор A13 не даёт."
+    },
+    {
+      "case": "площадка цены ликвидации не называет — не измерено, оценка не подставляется",
+      "state": {
+        "direction": "LONG",
+        "hasLiveEpisode": true,
+        "liveStopPrice": 2800,
+        "position": {
+          "externalSize": 10,
+          "externalLiquidationPrice": null
+        },
+        "positionTiers": [
+          {
+            "minSize": 0,
+            "maxSize": 1000,
+            "maintenanceMarginRate": 0.004
+          }
+        ]
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": null
+      },
+      "note": "Тиры в состоянии есть и оценку посчитать было бы из чего; форма её не читает — ложный триггер снял бы покрытый риск по рынку без факта площадки."
+    },
+    {
+      "case": "живого эпизода нет — не измерено, даже если запись закрытого эпизода ещё несёт цену ликвидации",
+      "state": {
+        "direction": "LONG",
+        "hasLiveEpisode": false,
+        "liveStopPrice": 2800,
+        "position": {
+          "externalSize": 0,
+          "externalLiquidationPrice": 2810
+        }
+      },
+      "expect": {
+        "heldStopBeforeLiquidation": null
+      },
+      "note": "Без гейта живости пара «уровень 2800, цена 2810» дала бы нарушение у LONG, и детектор снимал бы риск позиции, которой нет. Ликвидировать нечего."
+    },
+    {
       "case": "первое действие сделки: снимка базы ещё нет, делителем служит живая база счёта",
       "state": {
         "dealCollapsing": false,
@@ -1886,7 +2622,7 @@
       "expect": {
         "base": 8000
       },
-      "note": "Преконтроль идёт до CreateOrderExecutor, а снимок пишет он — значит на первом действии каждой сделки deal.plannedRiskEquityBase пуст. Пример падает при возврате прежней редакции (делитель = только снимок) и потому фальсифицирует развилку. Живая база здесь отличается от нуля и от снимка соседних примеров, чтобы подстановка константы не проходила."
+      "note": "Преконтроль идёт до CreateOrderExecutor, а снимок пишет он — значит на первом действии каждой сделки deal.plannedRiskEquityBase пуст. Пример падает на форме «делитель = только снимок» и потому фальсифицирует развилку. Живая база здесь отличается от нуля и от снимка соседних примеров, чтобы подстановка константы не проходила."
     },
     {
       "case": "снимок базы есть и разошёлся с живой базой — делит снимок, а не счёт",
@@ -2147,7 +2883,7 @@
     },
     {
       "case": "тот же акт, посчитанный по ДЕЙСТВУЮЩЕМУ (более широкому) уровню: потолок не сходится и постановка блокируется",
-      "note": "Пара с примером выше показывает, ЧТО именно решает операнд уровня: одно и то же действие проходит или не проходит в зависимости от того, чей уровень подставлен — устанавливаемый актом или действующий. Прежняя редакция операнда брала действующий и на эталоне блокировала постановку основной защиты бессрочно после рядового адверсного проскока входа.",
+      "note": "Пара с примером выше показывает, ЧТО именно решает операнд уровня: одно и то же действие проходит или не проходит в зависимости от того, чей уровень подставлен — устанавливаемый актом или действующий. Операнд, берущий действующий уровень, на эталоне блокировал бы постановку основной защиты бессрочно после рядового адверсного проскока входа.",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": false,
@@ -2278,7 +3014,7 @@
       "case": "перестановка защиты на инструменте под мягкой ступенью отвергается блок-сетом",
       "state": {
         "dealCollapsing": false,
-        "actRiskCreating": true,
+        "actRiskCreating": false,
         "graphComplete": true,
         "actRisk": 50,
         "actNotional": 1000,
@@ -2309,9 +3045,12 @@
         "feeRate": 0.0005,
         "exchangeRiskBase": 10000,
         "instrumentSafetyRungStanding": true,
-        "actInSafetyBlockSet": true
+        "actProtective": true,
+        "actRemovesProtection": false,
+        "actStopKeepsProtection": false
       },
       "expect": {
+        "actInSafetyBlockSet": true,
         "safetyRungBlocksAction": true
       },
       "note": "Тропа — сама цель ENTRY_BLOCKED: ослабление защиты (risk-weakening REPLACE) блокируется наравне с созданием нового риска; действие ждёт снятия ступени, сделка остаётся в статусе (карв-аут)."
@@ -2320,7 +3059,7 @@
       "case": "reduce-only-выход на том же инструменте блок-сет не трогает — сделки доживают под защитой",
       "state": {
         "dealCollapsing": false,
-        "actRiskCreating": true,
+        "actRiskCreating": false,
         "graphComplete": true,
         "actRisk": 50,
         "actNotional": 1000,
@@ -2351,9 +3090,11 @@
         "feeRate": 0.0005,
         "exchangeRiskBase": 10000,
         "instrumentSafetyRungStanding": true,
-        "actInSafetyBlockSet": false
+        "actProtective": false,
+        "actRemovesProtection": false
       },
       "expect": {
+        "actInSafetyBlockSet": false,
         "safetyRungBlocksAction": false
       },
       "note": "Снятие риска в блок-сет не входит: постановка тейка и выход проходят при стоящей ступени."
@@ -2393,9 +3134,11 @@
         "feeRate": 0.0005,
         "exchangeRiskBase": 10000,
         "instrumentSafetyRungStanding": false,
-        "actInSafetyBlockSet": true
+        "actProtective": false,
+        "actRemovesProtection": false
       },
       "expect": {
+        "actInSafetyBlockSet": true,
         "safetyRungBlocksAction": false
       }
     },
@@ -2403,9 +3146,12 @@
       "case": "вход по неторгуемому инструменту отвергается проверкой торгуемости",
       "state": {
         "instrumentLive": false,
-        "actInSafetyBlockSet": true
+        "actRiskCreating": true,
+        "actProtective": false,
+        "actRemovesProtection": false
       },
       "expect": {
+        "actInSafetyBlockSet": true,
         "instrumentNotLiveBlocksAction": true
       },
       "note": "Неторгуемость запрещает принимать новый риск: вход, добор и замещение с увеличением — в классах проверки."
@@ -2414,9 +3160,13 @@
       "case": "первая защита над непокрытым траншем неторгуемого инструмента проверкой торгуемости не запирается",
       "state": {
         "instrumentLive": false,
-        "actInSafetyBlockSet": false
+        "actRiskCreating": false,
+        "actProtective": true,
+        "actRemovesProtection": false,
+        "actStopKeepsProtection": true
       },
       "expect": {
+        "actInSafetyBlockSet": false,
         "instrumentNotLiveBlocksAction": false
       },
       "note": "Защита, уровня своего транша не ослабляющая, вне классов проверки: принятый риск доживает под своей защитой, и гейт входа её не снимает. Отказ площадки на постановке разбирает граница коннектора (docs/rules/risk-validator-scope.md)."
@@ -2425,12 +3175,73 @@
       "case": "вход по торгуемому инструменту проверкой торгуемости не отвергается",
       "state": {
         "instrumentLive": true,
-        "actInSafetyBlockSet": true
+        "actRiskCreating": true,
+        "actProtective": false,
+        "actRemovesProtection": false
       },
       "expect": {
+        "actInSafetyBlockSet": true,
         "instrumentNotLiveBlocksAction": false
       },
       "note": "Проверка режет только по неторгуемости: класс акта без неё отказа не даёт."
+    },
+    {
+      "case": "снятие защитной заявки при живой экспозиции под ступенью — в блок-сете",
+      "state": {
+        "instrumentSafetyRungStanding": true,
+        "actRiskCreating": false,
+        "actProtective": false,
+        "actRemovesProtection": true
+      },
+      "expect": {
+        "actInSafetyBlockSet": true,
+        "safetyRungBlocksAction": true
+      },
+      "note": "Уровня, который защиту транша не ослаблял бы, у снятия нет: оно в блок-сете всегда (docs/rules/risk-validator-scope.md)."
+    },
+    {
+      "case": "трейлинг под ступенью: подтяжку нечем доказать — в блок-сете",
+      "state": {
+        "instrumentSafetyRungStanding": true,
+        "actRiskCreating": false,
+        "actProtective": true,
+        "actRemovesProtection": false,
+        "actStopKeepsProtection": false
+      },
+      "expect": {
+        "actInSafetyBlockSet": true,
+        "safetyRungBlocksAction": true
+      },
+      "note": "Уровень трейлинга наблюдается после активации; в момент постановки дом даёт ложь (docs/spec/protection-coverage.json, actStopKeepsProtection при пустом уровне акта)."
+    },
+    {
+      "case": "защитное действие без названного транша под ступенью — в блок-сете",
+      "state": {
+        "instrumentSafetyRungStanding": true,
+        "actRiskCreating": false,
+        "actProtective": true,
+        "actRemovesProtection": false
+      },
+      "expect": {
+        "actInSafetyBlockSet": true,
+        "safetyRungBlocksAction": true
+      },
+      "note": "Транш не назван — операнд подтяжки пуст, и пустота ослаблением не оправдывается."
+    },
+    {
+      "case": "подтяжка стопа под ступенью вне блок-сета",
+      "state": {
+        "instrumentSafetyRungStanding": true,
+        "actRiskCreating": false,
+        "actProtective": true,
+        "actRemovesProtection": false,
+        "actStopKeepsProtection": true
+      },
+      "expect": {
+        "actInSafetyBlockSet": false,
+        "safetyRungBlocksAction": false
+      },
+      "note": "Уровень акта не дальше самого благоприятного из действующих уровней транша: защита не ослабляется, сделка доживает под ней."
     },
     {
       "case": "свободного остатка хватает на маржу и комиссию акта — отказа нет",
@@ -2533,7 +3344,7 @@
         "actRequiredMargin": 301.5,
         "balanceNotEnoughBlocksAction": false
       },
-      "note": "Названное ограничение дома: отказ по несвежести увёл бы сделку при живом риске в аварийный контур."
+      "note": "Граница формы, а не штатная тропа: акт, создающий риск, с несвежим снимком до преконтроля не доходит ни на какой стадии — его откладывают до добычи снимка (docs/components/RiskValidator.md, раздел проверок средств счёта). Конъюнкт свежести держит несвежий снимок неизмеренным, а не отказом: отказ по несвежести увёл бы сделку при живом риске в аварийный контур."
     },
     {
       "case": "действие риска не создаёт — маржи не занимает, отказа нет",
@@ -2606,6 +3417,71 @@
       "expect": {
         "borrowOrDebtDetected": false
       }
+    },
+    {
+      "case": "свежий снимок: фьючерсный режим и нетто-позиции — в контуре",
+      "state": {
+        "balanceSnapshotFresh": true,
+        "account": {
+          "mode": "FUTURES",
+          "positionMode": "NET"
+        }
+      },
+      "expect": {
+        "accountModeOutOfContour": false
+      }
+    },
+    {
+      "case": "свежий снимок: мультивалютная маржа — вне контура",
+      "state": {
+        "balanceSnapshotFresh": true,
+        "account": {
+          "mode": "MULTI_CURRENCY_MARGIN",
+          "positionMode": "NET"
+        }
+      },
+      "expect": {
+        "accountModeOutOfContour": true
+      },
+      "note": "В этом режиме площадка допускает заём, и посылка «только свои средства» перестаёт держаться построением: отказ ACCOUNT_MODE_OUT_OF_CONTOUR."
+    },
+    {
+      "case": "свежий снимок: раздельные длинные и короткие позиции — вне контура",
+      "state": {
+        "balanceSnapshotFresh": true,
+        "account": {
+          "mode": "FUTURES",
+          "positionMode": "LONG_SHORT"
+        }
+      },
+      "expect": {
+        "accountModeOutOfContour": true
+      }
+    },
+    {
+      "case": "свежий снимок режима не несёт — вне контура",
+      "state": {
+        "balanceSnapshotFresh": true,
+        "account": {}
+      },
+      "expect": {
+        "accountModeOutOfContour": true
+      },
+      "note": "Пустая посылка контура выполненной не читается."
+    },
+    {
+      "case": "несвежий снимок — режим не меряется",
+      "state": {
+        "balanceSnapshotFresh": false,
+        "account": {
+          "mode": "MULTI_CURRENCY_MARGIN",
+          "positionMode": "NET"
+        }
+      },
+      "expect": {
+        "accountModeOutOfContour": false
+      },
+      "note": "Та же граница, что у проверок средств счёта: до акта, создающего риск, несвежий снимок не допускают — предвходовая проверка и отсрочка акта на сопровождении, — а действия, риска не создающие, свежести не ждут и режим на таком снимке не меряют (docs/components/RiskValidator.md, раздел проверок средств счёта)."
     },
     {
       "case": "отказ RISK_PER_ACTION_EXCEEDED при живом риске транша — ребро сделки в ERROR",
@@ -2734,22 +3610,21 @@
       }
     },
     {
+      "case": "отказ ACCOUNT_MODE_OUT_OF_CONTOUR при живом риске транша — ребро сделки в ERROR",
+      "state": {
+        "blockingCode": "ACCOUNT_MODE_OUT_OF_CONTOUR"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
       "case": "отказ BALANCE_NOT_ENOUGH при живом риске транша — карв-аут, действие не исполняется",
       "state": {
         "blockingCode": "BALANCE_NOT_ENOUGH"
       },
       "expect": {
         "liveRiskBlockReaction": "SKIP_ACTION"
-      }
-    },
-    {
-      "case": "отказ BALANCE_NOT_FRESH при живом риске транша — ребро сделки в ERROR",
-      "unreachable": "несвежий снимок средств преконтролю не предъявляется — обработчик добывает свежий снимок до вызова (docs/processes/risk-evaluation.md), и ни одна проверка преконтроля код не производит (docs/components/RiskValidator.md)",
-      "state": {
-        "blockingCode": "BALANCE_NOT_FRESH"
-      },
-      "expect": {
-        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
       }
     },
     {
@@ -2828,56 +3703,6 @@
       "case": "отказ RISK_CREATING_ENTRY_WITHOUT_STOP при живом риске транша — ребро сделки в ERROR",
       "state": {
         "blockingCode": "RISK_CREATING_ENTRY_WITHOUT_STOP"
-      },
-      "expect": {
-        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
-      }
-    },
-    {
-      "case": "отказ PARTIAL_EXIT_NOT_REDUCE_ONLY при живом риске транша — ребро сделки в ERROR",
-      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
-      "state": {
-        "blockingCode": "PARTIAL_EXIT_NOT_REDUCE_ONLY"
-      },
-      "expect": {
-        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
-      }
-    },
-    {
-      "case": "отказ PARTIAL_EXIT_INCREASES_POSITION при живом риске транша — ребро сделки в ERROR",
-      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
-      "state": {
-        "blockingCode": "PARTIAL_EXIT_INCREASES_POSITION"
-      },
-      "expect": {
-        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
-      }
-    },
-    {
-      "case": "отказ DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN при живом риске транша — ребро сделки в ERROR",
-      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
-      "state": {
-        "blockingCode": "DIRECT_PARTIAL_POSITION_CLOSE_FORBIDDEN"
-      },
-      "expect": {
-        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
-      }
-    },
-    {
-      "case": "отказ MULTIPLE_POSITIONS_DETECTED при живом риске транша — ребро сделки в ERROR",
-      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
-      "state": {
-        "blockingCode": "MULTIPLE_POSITIONS_DETECTED"
-      },
-      "expect": {
-        "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
-      }
-    },
-    {
-      "case": "отказ POSITION_STATE_UNKNOWN при живом риске транша — ребро сделки в ERROR",
-      "unreachable": "код не производит ни одна проверка преконтроля (состав проверок — docs/components/RiskValidator.md): перечень значений шире производимого, и вердикт с этим кодом карте реакции не предъявляется",
-      "state": {
-        "blockingCode": "POSITION_STATE_UNKNOWN"
       },
       "expect": {
         "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"

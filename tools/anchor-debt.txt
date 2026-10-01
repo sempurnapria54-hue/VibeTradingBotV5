@@ -1,29 +1,11 @@
-# Объявленный долг §-адресов `.claude/**` — адреса, неразрешимые на момент
-# ввода расширенного детектора (счёт форм — шапка tools/anchor-check.py).
+# Объявленный долг §-адресов корпуса `.md` — `.claude/**`, `docs/**` и `.md`
+# корня репозитория (область — шапка tools/anchor-check.py): адреса,
+# неразрешимые на момент ввода расширенного детектора.
 # Формат: <файл>\t<имя пассажа без §>. Номеров строк нет намеренно: номер
 # дрейфует от любой правки, и реестр начал бы врать раньше, чем долг погасится.
+# Строка — ОДНО вхождение пары: пара, стоящая в файле дважды, пишется двумя
+# строками, и следующий битый адрес того же имени в том же файле роняет прогон.
 # Погашенный адрес обязан уйти отсюда — прогон падает на устаревшей строке.
-# Владелец погашения — knowledge-curator; носитель задачи — .claude/work/backlog.md
-# §«Неразрешимые адреса пассажей в `.claude/**`».
-.claude/decisions/executor-payload-file-granularity.md	10
-.claude/decisions/executor-payload-file-granularity.md	13
-.claude/decisions/model-layer-ontology.md	Персистентность
-.claude/processes/question-delegation.md	4
-.claude/skills/classify-type.md	Персистентность
-.claude/skills/place-knowledge.md	«Первоисточник правила»
-.claude/work/decision-digest.md	2
-.claude/work/decision-digest.md	3
-.claude/work/decision-digest.md	4
-.claude/work/decision-digest.md	5a
-.claude/work/decision-digest.md	C4
-.claude/work/decision-digest.md	E
-.claude/work/decision-digest.md	H25
-.claude/work/decision-digest.md	MG-базис
-.claude/work/decision-digest.md	«Предусловия `CODE`»
-.claude/work/decision-digest.md	Слово
-.claude/work/questions/open-questions.md	MarketStructureParams
-.claude/work/questions/open-questions.md	StrategyMarketPhaseRule
-.claude/work/questions/open-questions.md	epsilon
-.claude/work/questions/open-questions.md	«Ось упущенных возможностей»
-.claude/work/questions/open-questions.md	«Порядок исполнения»
-.claude/work/roadmap/roadmap.md	IND-Q1.
+# Долг `.claude/**` погашен 2026-09-30; `docs/**` и корень вошли в область
+# 2026-10-01 без неразрешимых. Строк нет, и новый неразрешимый адрес роняет прогон.
+# Долг деревьев кода — отдельный реестр tools/anchor-code-debt.txt.

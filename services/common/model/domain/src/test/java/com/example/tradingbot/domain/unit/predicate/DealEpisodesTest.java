@@ -12,7 +12,6 @@ import com.example.tradingbot.domain.model.core.position.Position;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -40,16 +39,12 @@ class DealEpisodesTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Дом
-     * называет живым эпизодом конъюнкцию двух фактов — активный статус и
-     * положительный нетто-размер, — а реализация резолвит дизъюнкцией
-     * «живой риск ЛИБО просто активная запись» (находка `D-1`,
-     * `.claude/work/backlog.md` §«Живой эпизод сделки резолвится шире, чем
-     * объявлено домом»). Красный прогон и есть предъявление долга; метка
-     * снимется правкой владельца.
+     * Дом называет живым эпизодом конъюнкцию двух фактов — активный статус
+     * и положительный нетто-размер; активная строка без размера — второй
+     * ответ (U7.19), и живым эпизодом не является (находка `D-1` закрыта
+     * сужением предиката до конъюнкции).
      */
     @Test
-    @Tag("debt")
     @DisplayName("U7.2 — эпизод активен, нетто-размер нулевой")
     void u7_2_anActiveEpisodeWithoutSizeIsNotLive() {
         Deal subject = dealWith(episode(Position.Status.ACTIVE, "0", null));
@@ -200,6 +195,26 @@ class DealEpisodesTest {
     @DisplayName("U7.18 — ключ, которого в загруженном графе нет")
     void u7_18_anUnknownKeyGivesEmptiness() {
         assertThat(dealWithTranche().trancheInternalId(8L)).isNull();
+    }
+
+    /** Второй ответ размера не читает: строка активна, хотя живого эпизода нет (U7.2). */
+    @Test
+    @DisplayName("U7.19 — эпизод активен, нетто-размер нулевой: активная строка — он")
+    void u7_19_anActiveEpisodeWithoutSizeIsTheActiveRow() {
+        Position active = episode(Position.Status.ACTIVE, "0", null);
+        Deal subject = dealWith(active);
+
+        assertThat(subject.activeEpisode()).isSameAs(active);
+        assertThat(subject.livePosition()).isNull();
+    }
+
+    @Test
+    @DisplayName("U7.20 — все эпизоды закрыты: активная строка пуста")
+    void u7_20_closedEpisodesLeaveNoActiveRow() {
+        Deal subject = dealWith(episode(Position.Status.CLOSED, "5", "1"),
+                episode(Position.Status.CLOSED, "0", null));
+
+        assertThat(subject.activeEpisode()).isNull();
     }
 
     private static Deal dealWith(Position... episodes) {

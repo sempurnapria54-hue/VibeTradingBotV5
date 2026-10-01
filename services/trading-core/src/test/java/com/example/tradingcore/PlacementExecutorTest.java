@@ -689,7 +689,8 @@ class PlacementExecutorTest {
     }
 
     private CreateAlgoOrderExecutor createAlgoOrderExecutor() {
-        return new CreateAlgoOrderExecutor(algoOrderDataService, actionStateDataService, riskNumbersService);
+        return new CreateAlgoOrderExecutor(algoOrderDataService, actionStateDataService, riskNumbersService,
+                mock(CoreEventWriter.class));
     }
 
     private SubmitAlgoOrderExecutor submitAlgoOrderExecutor() {

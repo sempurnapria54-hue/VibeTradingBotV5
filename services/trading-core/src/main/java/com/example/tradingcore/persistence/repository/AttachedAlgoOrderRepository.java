@@ -10,7 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
  *
  * <p>Защиты грузятся ПАКЕТОМ по перечню родителей, а не запросом на ногу:
  * иначе загрузка графа давала бы N+1 обращений на сделке с N ногами
- * (.claude/rules/codestyle.md §Выборка данных).
+ * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради одного
+ * поля»).
  */
 public interface AttachedAlgoOrderRepository extends JpaRepository<AttachedAlgoOrderEntity, Long> {
 

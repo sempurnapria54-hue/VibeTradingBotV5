@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.IndicatorComponent;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.resolve.StatusResolveResult;
 import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.util.EnumNames;
@@ -15,9 +17,15 @@ import com.example.tradingbot.domain.util.InternalIdFactory;
 import com.example.tradingbot.domain.util.RiskMath;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Set;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Арифметика, формы идентичности, справочники — группа `U19` документа
@@ -26,16 +34,19 @@ import org.junit.jupiter.api.Test;
  * docs/architecture/data-ownership.md §Идентификаторы,
  * docs/integrations/okx/rules/client-id-marker.md,
  * docs/architecture/platform.md §Безопасность,
- * docs/rules/absent-value-semantics.md).
+ * docs/rules/absent-value-semantics.md,
+ * docs/rules/strategy-condition-contract.md §«Адресный компонент
+ * индикаторного операнда»).
  *
  * <p><b>Базовая сборка:</b> статические хелперы пакета {@code util}:
  * зовутся прямо, состояния не держат. Аргументы — числа, строки и
  * значения перечней.
  *
- * <p><b>Две клетки группы не прогоняются, и это не пропуск.</b> `U19.23`
- * и `U19.24` ожидания не имеют: справочник «тип индикатора → допустимые
- * компоненты» указан домом у файла, который его не несёт, а действующий
- * перечень живёт только в коде справочника (находка `D-3`, звено `Z2`).
+ * <p><b>Справочник компонентов индикатора сверяется с таблицей дома, а не
+ * с кодом справочника</b> (находка `D-3` закрыта: перечень «тип → допустимые
+ * компоненты» внесён в docs/rules/strategy-condition-contract.md). Таблица и
+ * перечень однокомпонентных типов переносятся в клетки `U19.23` и `U19.24`
+ * константами.
  *
  * <p><b>Обе прежние пробы предмета поглощены этой группой целиком</b>
  * (Д1828): {@code InternalIdFormTest} — клетками `U19.11`-`U19.14`,
@@ -219,6 +230,31 @@ class MathAndIdentityTest {
     }
 
     /**
+     * Строка таблицы дома «тип → допустимые компоненты» — множество
+     * справочника равно ей: названный компонент обязан принадлежать строке
+     * своего типа, и лишний член нарушал бы контракт авторинга так же, как
+     * недостающий.
+     */
+    @ParameterizedTest
+    @MethodSource("multiComponentTable")
+    @DisplayName("U19.23 — многокомпонентный тип индикатора: допустимые компоненты — строка таблицы дома")
+    void u19_23_aMultiComponentTypeAllowsItsDeclaredComponents(IndicatorValue.Type type,
+                                                             Set<IndicatorComponent> declared) {
+        assertThat(IndicatorComponents.allowedFor(type)).isNotEmpty();
+        assertThat(IndicatorComponents.allowedFor(type)).containsExactlyInAnyOrderElementsOf(declared);
+        assertThat(IndicatorComponents.isMultiComponent(type)).isTrue();
+    }
+
+    /** Перечень однокомпонентных типов — дословно из дома. */
+    @ParameterizedTest
+    @EnumSource(value = IndicatorValue.Type.class, names = {"ATR", "EMA", "RSI", "OBV", "EFFICIENCY_RATIO"})
+    @DisplayName("U19.24 — однокомпонентный тип индикатора: компонентов нет, признак ложен")
+    void u19_24_aSingleComponentTypeAllowsNoComponent(IndicatorValue.Type type) {
+        assertThat(IndicatorComponents.allowedFor(type)).isEmpty();
+        assertThat(IndicatorComponents.isMultiComponent(type)).isFalse();
+    }
+
+    /**
      * Пустое значение читается отсутствием, а не отказом
      * (docs/rules/absent-value-semantics.md): пустой тип индикатора даёт
      * пустое множество и ложный признак многокомпонентности (находка `D-9`
@@ -264,5 +300,21 @@ class MathAndIdentityTest {
                 .distinct()
                 .toList()).containsExactly(EXCHANGE_ID_LIMIT);
         assertThat(InternalIdFactory.forInternalEntity().length()).isNotEqualTo(EXCHANGE_ID_LIMIT);
+    }
+
+    /**
+     * Таблица «тип → допустимые компоненты» дома
+     * (docs/rules/strategy-condition-contract.md §«Адресный компонент
+     * индикаторного операнда»), перенесённая константой.
+     */
+    private static Stream<Arguments> multiComponentTable() {
+        return Stream.of(
+                Arguments.of(IndicatorValue.Type.MACD, Set.of(
+                        IndicatorComponent.MACD_LINE, IndicatorComponent.SIGNAL_LINE, IndicatorComponent.HISTOGRAM)),
+                Arguments.of(IndicatorValue.Type.STOCHASTIC, Set.of(
+                        IndicatorComponent.STOCH_K, IndicatorComponent.STOCH_D)),
+                Arguments.of(IndicatorValue.Type.BOLLINGER_BANDS, Set.of(
+                        IndicatorComponent.UPPER_BAND, IndicatorComponent.MIDDLE_BAND, IndicatorComponent.LOWER_BAND,
+                        IndicatorComponent.BANDWIDTH, IndicatorComponent.PERCENT_B)));
     }
 }

@@ -14,6 +14,7 @@ import com.example.tradingcore.domain.command.risk.RiskBlockResolver;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
+import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -69,23 +70,26 @@ class ReactionBeforeLiveRiskTest {
         assertThat(action.getCloseReason()).isNull();
     }
 
+    /**
+     * Отложенного вердикта карта не знает: несвежий снимок средств
+     * добывает предвходовая проверка до преконтроля, и в вердикт он не
+     * приходит (docs/components/RiskBlockResolver.md §«Отложенного вердикта
+     * карта не знает»). Имена сверяются строкой: снятое значение символом
+     * не назвать.
+     */
     @Test
-    @DisplayName("U23.5 — вердикт из несвежего снимка средств: запрос добычи без причины")
-    void u23_5_aStaleBalanceRequestsRefresh() {
-        RiskBlockAction action = resolve(blockedVerdict(RiskCheckCode.BALANCE_NOT_FRESH));
-
-        assertThat(action.getType()).isEqualTo(RiskBlockAction.Type.REQUEST_REFRESH);
-        assertThat(action.getRiskCode()).isNull();
-        assertThat(action.getCloseReason()).isNull();
-    }
-
-    @Test
-    @DisplayName("U23.6 — несвежий снимок плюс бессрочный код: отложенный вердикт стои́т раньше")
-    void u23_6_theDeferredVerdictPrecedesThePermanenceCheck() {
-        RiskBlockAction action = resolve(blockedVerdict(RiskCheckCode.STOP_LOSS_INVALID_SIDE,
-                RiskCheckCode.BALANCE_NOT_FRESH));
-
-        assertThat(action.getType()).isEqualTo(RiskBlockAction.Type.REQUEST_REFRESH);
+    @DisplayName("U23.5 — перечень кодов и реакций обойдён: кода несвежести нет, запроса добычи карта не даёт")
+    void u23_5_theMapKnowsNoDeferredVerdict() {
+        assertThat(Arrays.stream(RiskCheckCode.values()).map(Enum::name))
+                .doesNotContain("BALANCE_NOT_FRESH");
+        assertThat(Arrays.stream(RiskBlockAction.Type.values()).map(Enum::name))
+                .doesNotContain("REQUEST_REFRESH");
+        for (RiskCheckCode code : RiskCheckCode.values()) {
+            assertThat(resolve(blockedVerdict(code)).getType())
+                    .as("код %s", code)
+                    .isIn(RiskBlockAction.Type.CLOSE_CANDIDATE_DEAL, RiskBlockAction.Type.SKIP_ACTION,
+                            RiskBlockAction.Type.MOVE_DEAL_TO_ERROR);
+        }
     }
 
     @Test
@@ -105,17 +109,6 @@ class ReactionBeforeLiveRiskTest {
         assertThat(action.getType()).isEqualTo(RiskBlockAction.Type.CONTINUE);
         assertThat(action.getRiskCode()).isNull();
         assertThat(action.getCloseReason()).isNull();
-    }
-
-    @Test
-    @DisplayName("U23.9 — решение предупреждение: продолжить с предупреждением, пояснение донесено")
-    void u23_9_aWarningVerdictContinuesAndCarriesItsComment() {
-        RiskValidationResult warning = verdict(RiskDecision.WARNING);
-
-        RiskBlockAction action = resolve(warning);
-
-        assertThat(action.getType()).isEqualTo(RiskBlockAction.Type.CONTINUE_WITH_WARNING);
-        assertThat(action.getComment()).isEqualTo(warning.getComment());
     }
 
     @Test

@@ -256,8 +256,8 @@ public class SafetyHoldCoordinator {
     /**
      * Ключ объекта радиуса. Собственный, а не защита джобы: это не
      * джоба, и общий с ней ключ означал бы, что ручной вызов и тик
-     * вытесняют друг друга (docs/rules/manual-halt.md §«Параллельный
-     * вызов»).
+     * вытесняют друг друга (docs/rules/manual-halt.md §«Параллельный вызов:
+     * анкера статуса хватает не везде»).
      */
     private String objectKey(HoldSignal signal, DealContext dealContext) {
         if (HoldScope.EXCHANGE_ACCOUNT.equals(signal.getScope())) {

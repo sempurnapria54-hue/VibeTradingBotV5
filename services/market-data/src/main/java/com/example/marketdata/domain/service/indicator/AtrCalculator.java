@@ -11,9 +11,16 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-/** Вычислитель ATR (true range, сглаживание Wilder). warmup ≈ 2·period. */
+/**
+ * Вычислитель ATR. Истинный диапазон, затравка, сглаживание и выведенный
+ * прогрев — docs/spec/indicator-calculation.json (`trueRange`,
+ * `indicatorWindowAverage`, `wilderNext`, `derivedWarmup`).
+ */
 @Component
 public class AtrCalculator implements IndicatorCalculator {
+
+    /** Кратность периода в выведенном прогреве сглаживания Уайлдера (`derivedWarmup`). */
+    private static final int WILDER_WARMUP_PERIODS = 3;
 
     @Override
     public IndicatorValue.Type getType() {
@@ -25,7 +32,7 @@ public class AtrCalculator implements IndicatorCalculator {
                                           IndicatorParams params) {
         AtrParams atrParams = (AtrParams) params;
         int period = atrParams.getPeriod();
-        int warmup = effectiveWarmup(atrParams.getWarmup(), 2 * period);
+        int warmup = effectiveWarmup(atrParams.getWarmup(), WILDER_WARMUP_PERIODS * period);
         List<IndicatorValue> result = new ArrayList<>();
         if (closedCandles.size() < period) {
             return result;

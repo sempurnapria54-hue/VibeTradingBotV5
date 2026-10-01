@@ -71,7 +71,7 @@ final class ConnectorStub {
     private ConnectorStub() {
         this.server = new WireMockServer(WireMockConfiguration.options()
                 .dynamicPort()
-                .extensions(new HistoryWindow()));
+                .extensions(new HistoryWindow(), new HeldAnswer()));
         this.server.start();
     }
 
@@ -184,6 +184,19 @@ final class ConnectorStub {
                         .withHeader("Content-Type", "application/json")
                         .withFixedDelay(delayMillis)
                         .withBody(body)));
+    }
+
+    /**
+     * Ответ, удержанный до хода кейса ({@link HeldAnswer}): вход клеток
+     * «посреди шага». Удержание взводится здесь же — прежнее отпускание на
+     * новую заготовку не действует.
+     */
+    void answersHeld(String path, String body) {
+        HeldAnswer.arm();
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
+                .willReturn(WireMock.aResponse()
+                        .withTransformers(HeldAnswer.NAME)
+                        .withTransformerParameter(HeldAnswer.BODY, body)));
     }
 
     /**

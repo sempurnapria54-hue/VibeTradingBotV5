@@ -119,7 +119,8 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
      * таблицы энфорсеров).
      *
      * <p><b>Ноги нет — терминал</b> причиной сделки: живого риска у транша
-     * нет, и выходная проверка сделки ждёт только его.
+     * нет, и выходная проверка сделки ждёт только его. Пустая причина
+     * сделки терминала не даёт — сделка уходит ошибочной тропой.
      *
      * <p><b>Нога вышла за локальное заведение — терминала отсюда нет:</b>
      * живая либо налитая, она несёт риск, и транш уходит через отправленный
@@ -143,7 +144,7 @@ public class TranchePrecheckHandler implements DealTrancheHandler {
     private TrancheTransition underCollapse(DealContext dealContext, DealTranche tranche) {
         Order entry = tranche.entryOrder();
         if (isNull(entry)) {
-            return TrancheTransition.close(disposition.inheritedCloseReason(dealContext.getDeal()));
+            return disposition.inheritedClose(dealContext.getDeal());
         }
         if (isTrue(tranche.entrySubmitted())) {
             return TrancheTransition.moveTo(DealTranche.Status.ENTRY_SUBMITTED);

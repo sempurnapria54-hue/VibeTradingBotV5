@@ -18,7 +18,8 @@ package com.example.tradingbot.domain.event;
  * <p><b>Перечень живёт в общем артефакте, а не у производителя,</b>
  * потому что у этих классов есть ЧИТАТЕЛЬ — торговое ядро; форма,
  * известная только писателю, разошлась бы с чтением первой же правкой
- * (docs/architecture/contracts.md §«Формы событий и запросов»).
+ * (docs/architecture/contracts.md §«Формы событий — классы артефакта
+ * common/model/message»).
  */
 public enum StrategyEventType {
 

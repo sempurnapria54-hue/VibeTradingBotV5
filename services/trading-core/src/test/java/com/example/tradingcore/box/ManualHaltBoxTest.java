@@ -10,7 +10,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -247,6 +246,9 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
         // предусловия пуста.
         fullHalt(ACCOUNT);
         assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        // Пятый признак — срез позиций радиуса: площадка отдаёт его пустым.
+        connector.answers(positionsPath(ACCOUNT), Feed.emptyArray());
+        PeerStub.all().forEach(PeerStub::forgetRequests);
 
         Answer answer = clear("FULL", ACCOUNT);
 
@@ -257,6 +259,31 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
         Answer state = get(SAFETY_STATES + "/" + ACCOUNT);
         assertThat(state.status()).isEqualTo(200);
         assertThat(state.asObject().get("accountSafetyRung")).isEqualTo(HOLD);
+        // К площадке снятие ушло ровно одним чтением — срезом позиций.
+        assertThat(connector.requests(positionsPath(ACCOUNT))).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("B6.16 — живая позиция вне графа сделок снятие сворачивания отвергает")
+    void aLivePositionOutsideTheDealGraphRefusesTheTeardownClearance() {
+        provisionAccounts(ACCOUNT);
+        fullHalt(ACCOUNT);
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        Long journalled = rows.count("anomaly_reports");
+        // Сделок у счёта нет, а площадка держит позицию, которую ни одна
+        // нетерминальная сделка не объясняет: пятый признак живого риска.
+        connector.answers(positionsPath(ACCOUNT), Feed.array(Feed.livePosition("ex-outside-1",
+                FOREIGN_INSTRUMENT, "1", LAST_PRICE, POSITION_MOMENT)));
+
+        Answer answer = clear("FULL", ACCOUNT);
+
+        // Предусловие машинное: снятие поверх живой позиции вернуло бы вход в
+        // торговлю над живым риском.
+        assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(answer.errorCode()).isEqualTo(INVALID_REQUEST);
+        assertThat(answer.status()).isEqualTo(400);
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(rows.count("anomaly_reports")).isEqualTo(journalled);
     }
 
     @Test
@@ -386,7 +413,6 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
-    @Tag("debt")
     @DisplayName("B6.13 — ручное снятие на биржу не ходит и события не производит")
     void theManualClearanceNeitherReachesTheExchangeNorProducesItsFact() {
         provisionAccounts(ACCOUNT);
@@ -400,10 +426,9 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
         // защит не восстанавливает — трогается только гейт.
         assertThat(connector.requests()).isEmpty();
         assertThat(rows.row("anomaly_reports", "code", MANUAL_HALT_CLEARED)).isNotEmpty();
-        // Долг: по дому факт снятия ступени обязан уезжать классом
-        // `HoldReleased`, а писателя у класса нет — его нет и в перечне
-        // классов события (.claude/work/backlog.md §«Класс события
-        // `HoldReleased` и его ручная тропа»).
+        // Факт снятия ступени уезжает классом `HoldReleased`: писатель —
+        // ручная тропа снятия (docs/architecture/contracts.md, строка
+        // `HoldReleased`).
         assertThat(eventTypes()).contains(HOLD_RELEASED);
     }
 
@@ -418,9 +443,7 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
      * <p><b>Живой экспозиции у неё нет, и это названо, а не упущено.</b>
      * Тропа до налива входной ноги в дереве кода обрывается: на статусе
      * отправленного входа живую ногу не опрашивает никто (находка
-     * {@code F-13}, .claude/work/backlog.md §«Налив входной ноги на
-     * отправленном входе не наблюдается ничем»). Живой риск здесь
-     * предъявлен живой НОГОЙ — она и есть один из пяти его признаков
+     * {@code F-13}). Живой риск здесь предъявлен живой НОГОЙ — она и есть один из пяти его признаков
      * (docs/spec/deal-lifecycle.json §riskProvenAbsent), и снятие риска
      * снимает её первой (docs/rules/exit-teardown-order.md).
      *
@@ -610,6 +633,8 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
                   "externalTotalEquity": "100000",
                   "externalAdjustedEquity": "100000",
                   "externalAvailableEquity": "100000",
+                  "accountMode": "FUTURES",
+                  "positionMode": "NET",
                   "balances": [
                     {
                       "externalCurrency": "USDT",

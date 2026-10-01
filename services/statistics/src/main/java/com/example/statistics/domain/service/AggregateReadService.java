@@ -91,7 +91,7 @@ public class AggregateReadService {
     }
 
     /**
-     * Шесть отвержений вопроса, и все шесть — здесь
+     * Отвержения вопроса — все здесь, и ни одно не живёт аннотацией формы
      * (docs/rules/statistics-aggregates.md §«Что это за числа и кто их
      * читает»).
      *
@@ -102,6 +102,12 @@ public class AggregateReadService {
      * <p><b>Зерно проверяется ПЕРВЫМ, и порядок несущий:</b> предикат чужих
      * компонентов позиции спрашивает о выбранном зерне, и на неназванном
      * ответа у него нет.
+     *
+     * <p><b>Пустой строковый компонент позиции проверяется РАНЬШЕ её
+     * состава:</b> пустая строка компонентом не является, и повод «позиция
+     * названа наполовину» либо «несёт чужие компоненты» назвал бы вызывающему
+     * не то, чем вопрос не принят. Повод у трёх компонентов один, а текст
+     * называет компонент.
      */
     private void rejectUnlessAcceptable(AggregateQuery query) {
         if (isFalse(query.hasGrain())) {
@@ -120,6 +126,21 @@ public class AggregateReadService {
             throw new ReadQueryRejectedException(
                     "Окно шире допустимого: " + aggregateReadProperties.getMaxWindowDays()
                             + " суток. Оно не сужается молча — читаются страницы более узких окон");
+        }
+        if (isTrue(query.isCursorAccountBlank())) {
+            throw new ReadQueryRejectedException(
+                    "Биржевой счёт позиции назван пустым значением: компонент позиции либо называется "
+                            + "значением, либо не называется вовсе");
+        }
+        if (isTrue(query.isCursorStrategyBlank())) {
+            throw new ReadQueryRejectedException(
+                    "Определение стратегии позиции названо пустым значением: пустота ключа выражается "
+                            + "отсутствием компонента, а не пустой строкой");
+        }
+        if (isTrue(query.isCursorCurrencyBlank())) {
+            throw new ReadQueryRejectedException(
+                    "Расчётная валюта позиции названа пустым значением: пустота ключа выражается "
+                            + "отсутствием компонента, а не пустой строкой");
         }
         if (isTrue(query.hasPartialCursor())) {
             throw new ReadQueryRejectedException(

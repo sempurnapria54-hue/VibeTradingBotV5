@@ -2,8 +2,10 @@ package com.example.marketdata.unit.calculation;
 
 import static com.example.marketdata.unit.calculation.CalcFixture.COMPUTATION_ID;
 import static com.example.marketdata.unit.calculation.CalcFixture.INSTRUMENT_ID;
+import static com.example.marketdata.unit.calculation.CalcFixture.barAt;
 import static com.example.marketdata.unit.calculation.CalcFixture.closeSeries;
 import static com.example.marketdata.unit.calculation.CalcFixture.fieldNames;
+import static com.example.marketdata.unit.calculation.CalcFixture.flatSeries;
 import static com.example.marketdata.unit.calculation.CalcFixture.risingSeries;
 import static com.example.marketdata.unit.calculation.CalcFixture.rsiParams;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,8 +34,8 @@ import org.junit.jupiter.api.Test;
  * в своих пределах» падает на перепутанных местами приросте и убытке ровно
  * так же, как падало бы точное число, и не падает на смене последнего
  * разряда деления — то есть мерит предмет, а не арифметику библиотеки.
- * Клетки `U5.6` (вырожденное окно) и `U5.7` (выведенный прогрев) кода не
- * получили: их ожидание живёт только в реализации (M-1).
+ * Исход вырожденного окна (`U5.6`) и выведенный прогрев (`U5.7`) берутся из
+ * спеки: docs/spec/indicator-calculation.json (`rsiValue`, `derivedWarmup`).
  */
 class RsiRangeTest {
 
@@ -87,6 +89,34 @@ class RsiRangeTest {
         assertThatCode(() -> assertThat(calculate(risingSeries(3), rsiParams(3, 0))).isEmpty())
                 .as("исключения нет")
                 .doesNotThrowAnyException();
+    }
+
+    /**
+     * Плоский ряд — вырожденное окно: ни прироста, ни убыли, и значение
+     * стои́т на середине шкалы, а не на верхней границе — иначе рынок,
+     * который не двигался, читался бы предельной перекупленностью
+     * (docs/spec/indicator-calculation.json, величина `rsiValue`).
+     */
+    @Test
+    @DisplayName("U5.6 — ряд из 12 равных закрытий: все значения равны 50, а не 100")
+    void u5_6_aFlatSeriesSitsInTheMiddleOfTheScale() {
+        assertThat(calculate(flatSeries(12, "100"), rsiParams(3, 0)))
+                .hasSize(9)
+                .allSatisfy(value -> assertThat(((RsiValue) value).getRsi()).isEqualByComparingTo("50"));
+    }
+
+    /**
+     * Выведенный прогрев — три периода: сглаживание Уайлдера вдвое
+     * медленнее EMA (docs/spec/indicator-calculation.json, величина
+     * `derivedWarmup`).
+     */
+    @Test
+    @DisplayName("U5.7 — прогрев не переопределён, период 3: ряд начинается с бара 9")
+    void u5_7_theDerivedWarmupIsThreePeriods() {
+        List<IndicatorValue> values = calculate(risingSeries(20), rsiParams(3, null));
+
+        assertThat(values).hasSize(11);
+        assertThat(values.getFirst().getCandleTimestamp()).isEqualTo(barAt(9));
     }
 
     /** Есть и прирост, и убыток — значение строго между границами. */

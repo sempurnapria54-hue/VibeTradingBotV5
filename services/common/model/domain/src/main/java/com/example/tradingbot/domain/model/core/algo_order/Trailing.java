@@ -10,7 +10,7 @@ import lombok.Setter;
  * Trailing-механизм algo-order: callback в процентах/значении, цена
  * активации (null — активен сразу), текущее биржевое значение trailing.
  * Раздел модели AlgoOrder. См. docs/models/domain/core/AlgoOrder.md
- * (§Condition-модель).
+ * (§«Условие срабатывания»).
  */
 @Getter
 @Setter

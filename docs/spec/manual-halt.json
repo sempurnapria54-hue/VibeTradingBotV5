@@ -5,15 +5,16 @@
   "operands": {
     "callOrigin": "кто собрал сигнал: HOLDER — явный вызов держателя ручной поверхностью, DETECTOR — автоматический триггер лестницы. Резолвится по коду сигнала: MANUAL_HALT_REQUESTED ⇒ HOLDER, всякий иной код ⇒ DETECTOR. Различает право на доведение недоделанного И наличие строки журнала у ПОГЛОЩЁННОГО вызова: ручное вмешательство — единственный вход в лестницу без детектора, поэтому его основание обязано попасть в журнал; у автоматического триггера строка уже заведена его собственной тропой. На состав и порядок реакции не влияет (docs/components/SafetyHoldCoordinator.md)",
     "standingRungRaisedManually": "стоящая на объекте ступень поднята ручным вызовом, и её снятие риска ещё не подтверждено: по ключу состояния объекта стоит НЕЗАКРЫТАЯ строка критичной тропы с ручным кодом. Закрытая строка означает подтверждённое снятие, и риск, появившийся после него, получает свою строку — такая строка операнд не поднимает. При автоматическом происхождении ступени ручной строки по ключу нет — коды не пересекаются. Добытчик — docs/components/SafetyHoldCoordinator.md",
-    "standingManualReportSeverity": "severity СТОЯЩЕЙ ручной строки отчёта на объекте радиуса; пусто — ручной строки на объекте нет вовсе. Операнд ключа дедупа, а не происхождения ступени: ключ отчёта-состояния — «объект радиуса + code + severity» (docs/rules/error-handling-policy.md), и по разным severity строки РАЗНЫЕ. Прежняя редакция разводила поглощённые классы парой операндов, о severity умалчивавшей, и гасила строку там, где по ключу дома её нет: мягкий ручной вызов поверх СВОЕЙ ЖЕ жёсткой ступени.",
+    "standingManualReportSeverity": "severity СТОЯЩЕЙ ручной строки отчёта на объекте радиуса; пусто — ручной строки на объекте нет вовсе. Операнд ключа дедупа, а не происхождения ступени: ключ отчёта-состояния — «объект радиуса + code + severity» (docs/rules/error-handling-policy.md), и по разным severity строки РАЗНЫЕ. Поэтому поглощённый вызов разводит ключ, а не пара «вызов ручной, ступень поднята не ручным вызовом»: мягкий ручной вызов поверх СВОЕЙ ЖЕ жёсткой ступени строки по ключу не имеет.",
     "fullReactionRunningOnObject": "полная реакция по этому объекту радиуса уже идёт (исключающий ключ занят)",
     "operation": "операция ручной поверхности: RAISE — постановка ступени, CLEAR — снятие названной ступени",
     "requestedScope": "радиус вызова: EXCHANGE_ACCOUNT либо INSTRUMENT; групповых значений нет",
     "requestedClass": "ступень, названная вызовом, выраженная классом реакции сигнала: SOFT — мягкая на инструменте, FREEZE — мягкая на бирже, FULL — сворачивание с закрытием открытых сделок по рынку",
-    "objectStatusBefore": "статус объекта блокировки до вызова; какие значения являются ступенью — зависит от радиуса (см. hardStanding / softStanding / onboardingStanding)",
-    "objectInWorkingState": "объект в рабочем состоянии, то есть множество входа мягкой ступени выполнено; под стоящей ступенью — false",
-    "nonTerminalDealWithLiveRiskOnScope": "на радиусе есть НЕтерминальная сделка с живым риском по предикату сделки (docs/lifecycles/Deal.md, §«Живой риск»; гейт riskProvenAbsent в docs/spec/deal-lifecycle.json)",
-    "onboardingIncomplete": "инструмент не завершил онбординг к моменту подъёма ступени (спецификация не синхронизирована либо свечи не догружены); на биржевом радиусе значения не имеет и всегда false",
+    "objectStatusBefore": "ступень объекта блокировки до вызова — значение перечня ступеней его радиуса; какие значения являются стоящей ступенью — hardStanding / softStanding. На инструментном радиусе это ступень ПАРЫ «счёт, инструмент» (ACTIVE, ENTRY_BLOCKED, TRADE_BLOCKED): онбординговый статус инструмента — другое поле в другой базе, и его читает objectInWorkingState",
+    "accountHardRungStanding": "на счёте радиуса стои́т жёсткая ступень счёта — сворачивание (TRADE_BLOCKED лестницы счёта). Ребро подъёма читает её своей транзакцией, а не со снимка вызова: счёт, свёрнутый тем же проходом раньше, снимок не видит (docs/components/HoldService.md). На счётном радиусе операнд совпадает с objectStatusBefore == 'TRADE_BLOCKED' и доминирования не даёт — монотонность своей лестницы держит hardStanding. Мягкий холд счёта операнд не поднимает: он не доминирует ни одного инструментного сигнала (дом доминирования — docs/rules/exchange-hold.md)",
+    "objectInWorkingState": "объект в рабочем состоянии, то есть множество входа мягкой ступени выполнено. Рабочее состояние лежит вне лестницы: у счёта — реестровый статус, у пары — онбординговый статус инструмента ACTIVE (docs/rules/manual-halt.md)",
+    "nonTerminalDealWithLiveRiskOnScope": "на радиусе есть НЕтерминальная сделка с живым риском по предикату сделки (живой риск сделки — docs/lifecycles/Deal.md; гейт riskProvenAbsent в docs/spec/deal-lifecycle.json)",
+    "positionSliceLiveOnScope": "срез позиций площадки по радиусу — счёт целиком, у пары суженный инструментом — несёт живую позицию (ненулевой размер) либо не добыт: не добытый срез отсутствия риска не доказывает. Та же форма, которой kill-switch подтверждает радиус (docs/components/KillSwitchExecutor.md)",
     "consecutiveLossCountBefore": "ExchangeAccount.consecutiveLossCount до вызова; дом величины — docs/rules/loss-streak-halt.md"
   },
   "values": [
@@ -29,7 +30,7 @@
     },
     {
       "name": "validPair",
-      "note": "Допустимых пар четыре, и перечень задан не поверхностью, а лестницами: мягкий класс инструментного радиуса биржевым статусом не выражается, и наоборот (docs/models/domain/core/Exchange.md). Перечень общий для обеих операций — поверхность своего не заводит.",
+      "note": "Допустимых пар четыре, и перечень задан не поверхностью, а лестницами: мягкий класс инструментного радиуса биржевым статусом не выражается, и наоборот (docs/models/domain/core/ExchangeAccount.md). Перечень общий для обеих операций — поверхность своего не заводит.",
       "expr": "(requestedScope == 'EXCHANGE_ACCOUNT' && in(requestedClass, 'FREEZE', 'FULL')) || (requestedScope == 'INSTRUMENT' && in(requestedClass, 'SOFT', 'FULL'))"
     },
     {
@@ -44,18 +45,13 @@
     },
     {
       "name": "softStanding",
-      "note": "На объекте уже стоит мягкая ступень СВОЕГО радиуса, и операнд обязан ветвиться радиусом: HOLD — мягкая ступень только на бирже, ENTRY_BLOCKED — только на инструменте. Радиус-независимая редакция зачисляла онбординговый Instrument.HOLD в стоящую мягкую ступень, из-за чего мягкая ручная постановка не отвергалась и затирала онбординговый статус (docs/rules/instrument-hold.md, §Правило: онбординговый HOLD к safety-холду отношения не имеет).",
+      "note": "На объекте уже стоит мягкая ступень СВОЕГО радиуса, и операнд ветвится радиусом: перечни ступеней у лестниц разные — HOLD есть мягкая ступень только счёта, ENTRY_BLOCKED — только пары «счёт, инструмент».",
       "expr": "(requestedScope == 'EXCHANGE_ACCOUNT' && objectStatusBefore == 'HOLD') || (requestedScope == 'INSTRUMENT' && objectStatusBefore == 'ENTRY_BLOCKED')"
     },
     {
-      "name": "onboardingStanding",
-      "note": "Инструмент стоит в онбординговом HOLD — это не ступень лестницы и множеством входа мягкой ступени не является. Пересечения с лестницей нет по построению: softStanding на инструментном радиусе требует ENTRY_BLOCKED, hardStanding — TRADE_BLOCKED, и ни один с HOLD не совпадает. Носители клейма — примеры онбординга, где onboardingStanding истинен при ложном softStanding.",
-      "expr": "requestedScope == 'INSTRUMENT' && objectStatusBefore == 'HOLD'"
-    },
-    {
       "name": "liveRiskOnScope",
-      "note": "Выборка предусловия — нетерминальные сделки радиуса целиком. Мотивирующая тропа — неподтверждённое снятие риска — держит сделку в ERROR, то есть в этой выборке: в аварийный терминал сделка уходит только по доказанному отсутствию риска. Терминальных выборка не берёт по построению: оба терминальных ребра гейтятся тем же предикатом riskProvenAbsent (docs/spec/deal-lifecycle.json), а терминальную сделку не ведёт ни одна тропа (docs/lifecycles/Deal.md, §«Инварианты переходов»), — терминальная сделка с недоказанным отсутствием риска недостижима. Полнота названа и ограничена: предикат покрывает 4 признака живого риска из 5; пятый — неизвестная живая сущность на бирже — операндом прохода не выражается по построению, его носитель инструмент-скоупный, биржевой формы у него нет (docs/lifecycles/Deal.md, §«У каждого признака свой носитель, и не все они — операнды прохода»).",
-      "expr": "nonTerminalDealWithLiveRiskOnScope"
+      "note": "Живой риск на радиусе — два носителя, по одному на род признаков. Первый — нетерминальные сделки радиуса целиком: мотивирующая тропа — неподтверждённое снятие риска — держит сделку в ERROR, то есть в этой выборке, а терминальных выборка не берёт по построению — оба терминальных ребра гейтятся тем же предикатом riskProvenAbsent (docs/spec/deal-lifecycle.json), и терминальную сделку не ведёт ни одна тропа (docs/lifecycles/Deal.md). Так покрыты четыре признака живого риска из пяти. Второй — пятый признак, неизвестная живая сущность на бирже, в форме РАДИУСА: срез позиций площадки по радиусу, тот же, которым kill-switch подтверждает радиус (docs/components/KillSwitchExecutor.md). Граница формы — позиции: заявки вне графа сделок и встроенная защита в неё не входят, потому что снятие риска их не отменяет, и требование к ним оставило бы ступень без выхода повторным полным вызовом; их наблюдатель — проактивная детекция (docs/components/AnomalyJob.md). Отсюда клейм: сворачивание не снимается, пока на радиусе жива позиция, которой не объясняет ни одна нетерминальная сделка, — носитель клейма пример «снятие: сворачивание счёта при живой позиции вне графа сделок отвергается».",
+      "expr": "nonTerminalDealWithLiveRiskOnScope || positionSliceLiveOnScope"
     },
     {
       "name": "raiseRefused",
@@ -64,7 +60,7 @@
     },
     {
       "name": "clearanceRefused",
-      "note": "Отказ при запуске снятия, три основания. Недопустимая пара — как у постановки. Названа мягкая ступень, а стоит жёсткая — прыжка через ступень нет: прежде снимают сворачивание (docs/rules/exchange-hold.md, §«Снятие — вручную и только в HOLD»). Снятие сворачивания при непогашенном живом риске — предусловие машинное, а не заявляемое: реакция сворачивания best-effort по составу, kill-switch мог не подтвердиться, и снятие вернуло бы вход в торговлю поверх живого риска (разрешающая ошибка, П1 следствие 3). Отсюда клейм: пока на радиусе есть живой риск, сворачивание не снимается — носители клейма примеры отказа при живом риске нетерминальной сделки.",
+      "note": "Отказ при запуске снятия, три основания. Недопустимая пара — как у постановки. Названа мягкая ступень, а стоит жёсткая — прыжка через ступень нет: прежде снимают сворачивание (снятие — вручную и только в HOLD: docs/rules/exchange-hold.md). Снятие сворачивания при непогашенном живом риске — предусловие машинное, а не заявляемое: реакция сворачивания best-effort по составу, kill-switch мог не подтвердиться, и снятие вернуло бы вход в торговлю поверх живого риска (разрешающая ошибка, П1 следствие 3). Отсюда клейм: пока на радиусе есть живой риск, сворачивание не снимается — носители клейма примеры отказа при живом риске нетерминальной сделки.",
       "expr": "isClear && (!validPair || (requestedClass != 'FULL' && hardStanding) || (requestedClass == 'FULL' && hardStanding && liveRiskOnScope))"
     },
     {
@@ -74,18 +70,23 @@
     },
     {
       "name": "launchForm",
-      "note": "Форма запуска. Асинхронна только полная постановка: она и есть операция, чей ход идёт на биржу с повторами, а исход несёт AnomalyReport, — признак применимости асинхронной формы из docs/rules/error-handling-policy.md, §«Внешняя поверхность». Мягкая постановка на биржу не ходит и повторов не имеет, поэтому синхронна по тому же доводу, что и снятие. Безусловно-асинхронная редакция делала невидимым отказ по недопустимой паре — самой названной ошибке держателя: 202 в ответ, ступень не поднята, отчёта нет. Отсюда клейм: отказ при запуске в асинхронную форму не уходит никогда — все отказные примеры несут SYNC.",
+      "note": "Форма запуска. Асинхронна только полная постановка: она и есть операция, чей ход идёт на биржу с повторами, а исход несёт AnomalyReport, — признак применимости асинхронной формы из политики внешней поверхности, docs/rules/error-handling-policy.md. Мягкая постановка на биржу не ходит и повторов не имеет, поэтому синхронна по тому же доводу, что и снятие. Асинхронная форма у всех операций сделала бы невидимым отказ по недопустимой паре — самой названной ошибке держателя: 202 в ответ, ступень не поднята, отчёта нет. Отсюда клейм: отказ при запуске в асинхронную форму не уходит никогда — все отказные примеры несут SYNC.",
       "expr": "if(isRaise && requestedClass == 'FULL', 'ASYNC', 'SYNC')"
     },
     {
-      "name": "absorbed",
-      "note": "Запрос ступени слабее стоящей поглощается: объект под сворачиванием от мягкой постановки не понижается и реакции не запускает (docs/rules/exchange-hold.md, §«Границы и эскалация»). Понижение делает снятие, а не постановка.",
-      "expr": "isRaise && validPair && !launchRefused && hardStanding && requestedClass != 'FULL'"
+      "name": "riskTeardownRetry",
+      "note": "Выход из ступени сворачивания при неподтверждённом kill-switch: повторный полный вызов ДЕРЖАТЕЛЯ на уже стоящей жёсткой ступени, пока на радиусе остался живой риск, анкером НЕ поглощается и гоняет снятие риска заново. Право на доведение имеет ТОЛЬКО явный вызов держателя (callOrigin): автоматический сигнал того же класса анкер по-прежнему поглощает, иначе периодический детектор непогашенного риска слал бы flatten каждым тиком. Без этой тропы состояние не имело бы выхода вовсе: снятие отвергается предусловием, а повтор постановки гасился бы анкером — то самое «система, попав в холд, не смогла бы из него выйти», которое docs/concept.md называет недопустимым. Анкер идемпотентности от этого не отменяется, а уточняется: он стоит на паре «статус стоит И риск погашен» (последовательность координатора — docs/components/SafetyHoldCoordinator.md) — это и есть обещанное политикой отказов «следующий проход доводит недоделанное».",
+      "expr": "isRaise && callOrigin == 'HOLDER' && validPair && !launchRefused && requestedClass == 'FULL' && objectStatusBefore == requestedRung && liveRiskOnScope"
     },
     {
-      "name": "riskTeardownRetry",
-      "note": "Выход из ступени сворачивания при неподтверждённом kill-switch: повторный полный вызов ДЕРЖАТЕЛЯ на уже стоящей жёсткой ступени, пока на радиусе остался живой риск, анкером НЕ поглощается и гоняет снятие риска заново. Право на доведение имеет ТОЛЬКО явный вызов держателя (callOrigin): автоматический сигнал того же класса анкер по-прежнему поглощает, иначе периодический детектор непогашенного риска слал бы flatten каждым тиком. Без этой тропы состояние не имело бы выхода вовсе: снятие отвергается предусловием, а повтор постановки гасился бы анкером — то самое «система, попав в холд, не смогла бы из него выйти», которое docs/concept.md называет недопустимым. Анкер идемпотентности от этого не отменяется, а уточняется: он стоит на паре «статус стоит И риск погашен» (docs/components/SafetyHoldCoordinator.md, §Последовательность) — это и есть обещанное политикой отказов «следующий проход доводит недоделанное».",
-      "expr": "isRaise && callOrigin == 'HOLDER' && validPair && !launchRefused && requestedClass == 'FULL' && objectStatusBefore == requestedRung && liveRiskOnScope"
+      "name": "dominatedByAccountRung",
+      "note": "Инструментная постановка на счёте в сворачивании поглощается ребром подъёма: сворачивание покрывает состав любой инструментной ступени — блок всех торговых команд счёта и снятие его риска (дом правила — docs/rules/exchange-hold.md; носитель у него один, ребро подъёма, docs/components/HoldService.md). Правило одно на автоматическую и ручную постановку, и ручная поверхность своего не заводит. Счётный вызов доминированием не гасится.",
+      "expr": "requestedScope == 'INSTRUMENT' && accountHardRungStanding"
+    },
+    {
+      "name": "absorbed",
+      "note": "Поглощаются два класса запроса. Запрос ступени слабее стоящей своего радиуса: объект под сворачиванием от мягкой постановки не понижается и реакции не запускает (границы и эскалация ступеней — docs/rules/exchange-hold.md); понижение делает снятие, а не постановка. И инструментный запрос любого класса на свёрнутом счёте (dominatedByAccountRung): ступень пары не переставляется, снятия риска нет — носители клейма примеры «доминирование: полная постановка на паре под свёрнутым счётом» и «доминирование: мягкая постановка на паре под свёрнутым счётом». Доведение недоделанного постановкой не является и не поглощается: повторный полный вызов держателя по стоящей жёсткой ступени пары гоняет её снятие риска и под свёрнутым счётом — носитель пример «доминирование: доведение на паре под свёрнутым счётом гоняет снятие риска».",
+      "expr": "isRaise && validPair && !launchRefused && !riskTeardownRetry && ((hardStanding && requestedClass != 'FULL') || dominatedByAccountRung)"
     },
     {
       "name": "repeatAtSameRung",
@@ -94,8 +95,8 @@
     },
     {
       "name": "escalationApplied",
-      "note": "Полный режим поверх мягкой ступени своего радиуса проходит: мягкая ступень анкером идемпотентности не является. Онбординговый статус инструмента эскалацией не является — эскалировать нечего, ступень не стояла.",
-      "expr": "isRaise && validPair && !launchRefused && softStanding && requestedClass == 'FULL'"
+      "note": "Полный режим поверх мягкой ступени своего радиуса проходит: мягкая ступень анкером идемпотентности не является. Полный режим на объекте без стоящей ступени — подъём, а не эскалация: эскалировать нечего. Под свёрнутым счётом полный вызов поверх мягкой ступени пары эскалацией не является: он поглощён доминированием (absorbed), и ступень пары остаётся мягкой — носитель пример «доминирование: полная постановка поверх мягкой ступени пары под свёрнутым счётом».",
+      "expr": "isRaise && validPair && !launchRefused && !absorbed && softStanding && requestedClass == 'FULL'"
     },
     {
       "name": "reactionApplied",
@@ -119,18 +120,23 @@
     },
     {
       "name": "clearanceTarget",
-      "note": "Куда ведёт снятие. Биржевое сворачивание снимается ТОЛЬКО в мягкую ступень: два условия снятия лестница проверяет по одному, прыжка сразу в рабочее состояние нет. Инструмент, у которого ступень затёрла незавершённый онбординг, возвращается в ОНБОРДИНГОВЫЙ HOLD, а не в ACTIVE: снятие safety-ступени не выдаёт права торговать, которого у объекта не было до её подъёма, — иначе инструмент с несинхронизированной спецификацией попадал бы в выборку входа (docs/lifecycles/Instrument.md, §Охват). Остальные снятия ведут в рабочее состояние ACTIVE. Отсюда клейм: снятие биржевого сворачивания сразу в рабочее состояние не ведёт — носитель клейма пример «снятие: биржевое сворачивание при погашенном риске даёт мягкую ступень». Инструментное сворачивание сегодня одноходовое — поверхность наследует редакцию лестницы, своей не вводит; асимметрия названа в доме.",
-      "expr": "if(clearanceApplied, if(requestedClass == 'FULL' && requestedScope == 'EXCHANGE_ACCOUNT', 'HOLD', if(requestedScope == 'INSTRUMENT' && onboardingIncomplete, 'HOLD', 'ACTIVE')), null)"
+      "note": "Куда ведёт снятие. Жёсткая ступень снимается ТОЛЬКО в мягкую ступень своего радиуса — на счёте HOLD, на паре ENTRY_BLOCKED: два условия снятия лестница проверяет по одному, прыжка сразу в рабочее состояние нет ни на одном радиусе (docs/rules/exchange-hold.md — дом порядка снятия у обеих лестниц). Мягкая ступень снимается в рабочее состояние ACTIVE; на инструментном радиусе это ступень ПАРЫ, и онбординга она не касается: онбординговый статус инструмента — другое поле в другой базе, ступень его не затирает и снятие не восстанавливает, а права торговать инструменту с незавершённым онбордингом не выдаёт отбор входа, который берёт только инструменты в онбординговом ACTIVE (docs/rules/instrument-hold.md). Отсюда клейм: снятие жёсткой ступени сразу в рабочее состояние не ведёт — носители клейма примеры «снятие: биржевое сворачивание при погашенном риске даёт мягкую ступень» и «снятие: холд инструмента с kill-switch при погашенном риске даёт мягкий запрет входов».",
+      "expr": "if(clearanceApplied, if(requestedClass == 'FULL', if(requestedScope == 'EXCHANGE_ACCOUNT', 'HOLD', 'ENTRY_BLOCKED'), 'ACTIVE'), null)"
     },
     {
       "name": "statusAfter",
-      "note": "Статус объекта после вызова. Поглощённый, отказавший, недопустимый и холостой вызов статус не трогают; принятая постановка приводит объект к названной ступени, принятое снятие — к цели снятия. Значения — настоящие статусы сущностей (docs/models/domain/core/Exchange.md, docs/lifecycles/Instrument.md), собственных имён спека не вводит.",
+      "note": "Статус объекта после вызова. Поглощённый, отказавший, недопустимый и холостой вызов статус не трогают; принятая постановка приводит объект к названной ступени, принятое снятие — к цели снятия. Значения — настоящие статусы сущностей (docs/models/domain/core/ExchangeAccount.md, docs/lifecycles/Instrument.md), собственных имён спека не вводит.",
       "expr": "if(isRaise, if(validPair && !launchRefused && !absorbed, requestedRung, objectStatusBefore), if(clearanceApplied, clearanceTarget, objectStatusBefore))"
     },
     {
+      "name": "callSeverity",
+      "note": "Критичность основания, которое несёт вызов: задаётся составом ЗАТРЕБОВАННОЙ реакции, а не тем, состоялась ли она — полная постановка затребовала kill-switch и несёт CRITICAL, мягкая постановка и снятие — NON_CRITICAL (docs/models/domain/other/AnomalyReport.md). Операнд ключа дедупа отчёта наравне с кодом: поглощённый полный вызов kill-switch не гоняет, а строка его критична.",
+      "expr": "if(isRaise && requestedClass == 'FULL', 'CRITICAL', 'NON_CRITICAL')"
+    },
+    {
       "name": "reportProduced",
-      "note": "Новая строка журнала. Ручное вмешательство — единственный вход в лестницу без детектора, поэтому применённая операция строку заводит. Отказ, холостое снятие и вызов поверх идущей реакции её не заводят. ПОГЛОЩЕНИЕ и ПОВТОР НА СТОЯЩЕЙ СТУПЕНИ гасят смену статуса, состав реакции и факт подъёма, но не отчёт: отчёт идемпотентен по СВОЕМУ ключу (объект + code + severity), и у ручного основания поверх ступени, поднятой АВТОМАТИКОЙ, строки по этому ключу нет — коды троп не пересекаются. Оба поглощённых класса разведены одной парой операндов (callOrigin == 'HOLDER' и !standingRungRaisedManually), а не соотношением запрошенной и стоящей ступени: довод у них общий, и асимметрии между «запрос слабее» и «запрос равен» правило не знает. Поглощённый вызов поверх ступени, поднятой ТЕМ ЖЕ ручным вызовом, строки не заводит: она уже стоит. Дом стыковой истины — docs/rules/error-handling-policy.md. Отсюда клейм: ручное доведение поверх автоматической ступени без строки журнала не остаётся — носитель клейма пример «постановка: ручное доведение поверх АВТОМАТИЧЕСКИ поднятой ступени, пока полная реакция объекта идёт».",
-      "expr": "clearanceApplied || ((absorbed || repeatAtSameRung) && callOrigin == 'HOLDER' && (isNull(?standingManualReportSeverity) || standingManualReportSeverity != 'NON_CRITICAL')) || (reactionApplied && (!fullReactionRunningOnObject || riskTeardownRetry) && (!riskTeardownRetry || !standingRungRaisedManually))"
+      "note": "Новая строка журнала. Ручное вмешательство — единственный вход в лестницу без детектора, поэтому применённая операция строку заводит. Отказ, холостое снятие и вызов поверх идущей реакции её не заводят. ПОГЛОЩЕНИЕ и ПОВТОР НА СТОЯЩЕЙ СТУПЕНИ гасят смену статуса, состав реакции и факт подъёма, но не отчёт: отчёт идемпотентен по СВОЕМУ ключу (объект + code + severity), и у ручного основания поверх ступени, поднятой АВТОМАТИКОЙ, строки по этому ключу нет — коды троп не пересекаются. Оба поглощённых класса разведены одной парой операндов (callOrigin == 'HOLDER' и стоящая ручная строка standingManualReportSeverity против callSeverity), а не соотношением запрошенной и стоящей ступени: довод у них общий, и асимметрии между «запрос слабее» и «запрос равен» правило не знает. Поглощённый вызов поверх ступени, поднятой ТЕМ ЖЕ ручным вызовом, строки не заводит: она уже стоит. Дом стыковой истины — docs/rules/error-handling-policy.md. Отсюда клейм: ручное доведение поверх автоматической ступени без строки журнала не остаётся — носитель клейма пример «постановка: ручное доведение поверх АВТОМАТИЧЕСКИ поднятой ступени, пока полная реакция объекта идёт». Стоящая ручная строка сравнивается с критичностью САМОГО вызова (callSeverity), а не с литералом мягкой: поглощается и полный вызов — инструментный под свёрнутым счётом, — и его ключ несёт CRITICAL; носитель пример «доминирование: полная постановка поверх мягкой ступени пары под свёрнутым счётом». Тот же ключ гасит строку у повтора полной ступени, поднятой тем же ручным вызовом, — носитель пример «постановка: повтор ТОЙ ЖЕ полной ступени, поднятой тем же ручным вызовом».",
+      "expr": "clearanceApplied || ((absorbed || repeatAtSameRung) && callOrigin == 'HOLDER' && (isNull(?standingManualReportSeverity) || standingManualReportSeverity != callSeverity)) || (reactionApplied && (!fullReactionRunningOnObject || riskTeardownRetry) && (!riskTeardownRetry || !standingRungRaisedManually))"
     },
     {
       "name": "reportCode",
@@ -144,8 +150,8 @@
     },
     {
       "name": "reportSeverity",
-      "note": "Критичность задаётся составом реакции, а не поводом: kill-switch гоняется — CRITICAL, не гоняется — NON_CRITICAL (docs/models/domain/other/AnomalyReport.md). Снятие kill-switch не гоняет никогда. Критичность входит в ключ состояния, поэтому эскалация мягкой ступени в полную даёт свою строку, а не схлопывается с мягкой.",
-      "expr": "if(reportProduced, if(isRaise && requestedClass == 'FULL', 'CRITICAL', 'NON_CRITICAL'), null)"
+      "note": "Критичность строки — критичность основания вызова (callSeverity): задаётся составом затребованной реакции, а не поводом и не тем, состоялась ли реакция (docs/models/domain/other/AnomalyReport.md). Снятие kill-switch не гоняет никогда. Критичность входит в ключ состояния, поэтому эскалация мягкой ступени в полную даёт свою строку, а не схлопывается с мягкой.",
+      "expr": "if(reportProduced, callSeverity, null)"
     },
     {
       "name": "consecutiveLossCountAfterOperation",
@@ -154,12 +160,12 @@
     },
     {
       "name": "rungRankBefore",
-      "note": "Ранг стоящей ступени: 2 — сворачивание, 1 — мягкая ступень своего радиуса, 0 — ступени нет (включая онбординговый статус инструмента).",
+      "note": "Ранг стоящей ступени: 2 — сворачивание, 1 — мягкая ступень своего радиуса, 0 — ступени нет.",
       "expr": "if(hardStanding, 2, if(softStanding, 1, 0))"
     },
     {
       "name": "rungRankAfter",
-      "note": "Ранг ступени после вызова — по той же шкале и тому же радиусу. Постановка холд не снимает и ступень не понижает: ни срока действия, ни обратного хода у неё нет. Клейм выражен РАНГОМ, а не членством в перечне ступеней: редакция «statusAfter не входит в перечень ступеней» тождественно ложна (при постановке statusAfter всегда одна из ступеней) и понижения не ловила вовсе. Носители клейма — примеры поглощения, где rungRankBefore = rungRankAfter = 2.",
+      "note": "Ранг ступени после вызова — по той же шкале и тому же радиусу. Постановка холд не снимает и ступень не понижает: ни срока действия, ни обратного хода у неё нет. Клейм выражен РАНГОМ, а не членством в перечне ступеней: при постановке statusAfter всегда одна из ступеней, и членство понижения не ловит. Носители клейма — примеры поглощения, где rungRankBefore = rungRankAfter = 2.",
       "expr": "if(statusAfter == 'TRADE_BLOCKED', 2, if((requestedScope == 'EXCHANGE_ACCOUNT' && statusAfter == 'HOLD') || (requestedScope == 'INSTRUMENT' && statusAfter == 'ENTRY_BLOCKED'), 1, 0))"
     }
   ],
@@ -174,9 +180,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -203,9 +210,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 2
       },
       "expect": {
@@ -231,9 +239,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -256,9 +265,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "FULL",
         "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -271,7 +281,7 @@
       }
     },
     {
-      "case": "постановка: мягкий вызов на онбординговом инструменте отвергается — онбординговый HOLD ступенью не является",
+      "case": "постановка: мягкий вызов на паре инструмента с незавершённым онбордингом отвергается — рабочее состояние пары читается онбордингом, а не ступенью",
       "state": {
         "callOrigin": "HOLDER",
         "standingRungRaisedManually": false,
@@ -279,26 +289,25 @@
         "operation": "RAISE",
         "requestedScope": "INSTRUMENT",
         "requestedClass": "SOFT",
-        "objectStatusBefore": "HOLD",
+        "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": true,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
         "validPair": true,
-        "onboardingStanding": true,
         "softStanding": false,
         "launchRefused": true,
         "launchForm": "SYNC",
         "reactionApplied": false,
-        "escalationApplied": false,
-        "statusAfter": "HOLD",
+        "statusAfter": "ACTIVE",
         "reportProduced": false
       }
     },
     {
-      "case": "постановка: полный вызов на онбординговом инструменте применяется — авария приоритетнее онбординга, но эскалацией мягкой ступени не является",
+      "case": "постановка: полный вызов на паре инструмента с незавершённым онбордингом применяется — авария приоритетнее онбординга, но эскалацией мягкой ступени не является",
       "state": {
         "callOrigin": "HOLDER",
         "standingRungRaisedManually": false,
@@ -306,14 +315,14 @@
         "operation": "RAISE",
         "requestedScope": "INSTRUMENT",
         "requestedClass": "FULL",
-        "objectStatusBefore": "HOLD",
+        "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": true,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
-        "onboardingStanding": true,
         "softStanding": false,
         "escalationApplied": false,
         "reactionApplied": true,
@@ -333,9 +342,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -361,9 +371,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -385,9 +396,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 3
       },
       "expect": {
@@ -399,7 +411,7 @@
         "statusAfter": "HOLD",
         "consecutiveLossCountAfterOperation": 3
       },
-      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё перезапуск вмешательства человеком журналу неизвестен, а довод «за что стоял холд, различается машинным кодом» перестаёт выполняться."
+      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё вмешательство человека журналу неизвестно, и разбор держателя не нашёл бы ручного основания среди запрашивавших ступень (docs/concept.md, П3)."
     },
     {
       "case": "постановка: повторный полный вызов на сворачивании, поднятом АВТОМАТИКОЙ — kill-switch заново не гоняется, строка журнала заводится",
@@ -411,9 +423,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -427,7 +440,7 @@
         "statusAfter": "TRADE_BLOCKED",
         "reportProduced": true
       },
-      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё перезапуск вмешательства человеком журналу неизвестен, а довод «за что стоял холд, различается машинным кодом» перестаёт выполняться."
+      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё вмешательство человека журналу неизвестно, и разбор держателя не нашёл бы ручного основания среди запрашивавших ступень (docs/concept.md, П3)."
     },
     {
       "case": "постановка: повторный полный вызов при неподтверждённом kill-switch гоняет снятие риска заново — это и есть выход из ступени сворачивания",
@@ -439,9 +452,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -466,9 +480,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -477,6 +492,31 @@
         "repeatAtSameRung": false,
         "killSwitchRun": true,
         "statusAfter": "TRADE_BLOCKED"
+      }
+    },
+    {
+      "case": "постановка: повторный полный вызов держателя при живой позиции вне графа сделок гоняет снятие риска заново — у отказа снятия по пятому признаку выход тот же",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": true,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": false,
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "positionSliceLiveOnScope": true,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "liveRiskOnScope": true,
+        "riskTeardownRetry": true,
+        "repeatAtSameRung": false,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false
       }
     },
     {
@@ -489,9 +529,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "HOLD",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 4
       },
       "expect": {
@@ -515,9 +556,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -542,9 +584,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -566,9 +609,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "CLOSED",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -590,9 +634,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "ERROR",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -614,20 +659,20 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "ENTRY_BLOCKED",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
         "softStanding": true,
-        "onboardingStanding": false,
         "repeatAtSameRung": true,
         "reactionApplied": false,
         "statusAfter": "ENTRY_BLOCKED",
         "reportProduced": true
       },
-      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё перезапуск вмешательства человеком журналу неизвестен, а довод «за что стоял холд, различается машинным кодом» перестаёт выполняться."
+      "note": "Ручное основание поверх ступени, поднятой автоматикой, по ключу отчёта строки не имеет: коды троп не пересекаются. Без неё вмешательство человека журналу неизвестно, и разбор держателя не нашёл бы ручного основания среди запрашивавших ступень (docs/concept.md, П3)."
     },
     {
       "case": "снятие: биржевое сворачивание при погашенном риске даёт мягкую ступень, а не рабочее состояние",
@@ -639,9 +684,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 3
       },
       "expect": {
@@ -669,9 +715,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 3
       },
       "expect": {
@@ -687,6 +734,32 @@
       }
     },
     {
+      "case": "снятие: сворачивание счёта при живой позиции вне графа сделок отвергается — пятый признак живого риска читается срезом позиций радиуса",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "CLEAR",
+        "requestedScope": "EXCHANGE_ACCOUNT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
+        "objectInWorkingState": false,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "positionSliceLiveOnScope": true,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "liveRiskOnScope": true,
+        "clearanceRefused": true,
+        "launchRefused": true,
+        "launchForm": "SYNC",
+        "clearanceApplied": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false
+      }
+    },
+    {
       "case": "снятие: мягкая биржевая ступень при погашенном риске возвращает рабочее состояние",
       "state": {
         "callOrigin": "HOLDER",
@@ -696,14 +769,14 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 5
       },
       "expect": {
         "clearanceRefused": false,
-        "onboardingStanding": false,
         "clearanceApplied": true,
         "clearanceTarget": "ACTIVE",
         "statusAfter": "ACTIVE",
@@ -722,9 +795,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 3
       },
       "expect": {
@@ -743,9 +817,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -766,9 +841,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "HOLD",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 3
       },
       "expect": {
@@ -790,9 +866,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": false,
         "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -804,7 +881,7 @@
       }
     },
     {
-      "case": "снятие: холд инструмента с kill-switch снимается одним ходом — сегодняшняя редакция инструментной лестницы",
+      "case": "снятие: холд инструмента с kill-switch при погашенном риске даёт мягкий запрет входов, а не рабочее состояние",
       "state": {
         "callOrigin": "HOLDER",
         "standingRungRaisedManually": false,
@@ -813,21 +890,24 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
         "clearanceApplied": true,
-        "clearanceTarget": "ACTIVE",
-        "statusAfter": "ACTIVE",
+        "clearanceTarget": "ENTRY_BLOCKED",
+        "statusAfter": "ENTRY_BLOCKED",
+        "rungRankBefore": 2,
+        "rungRankAfter": 1,
         "reportCode": "MANUAL_HALT_CLEARED",
         "reportKind": "EVENT"
       }
     },
     {
-      "case": "снятие: инструмент, заблокированный из незавершённого онбординга, возвращается в онбординговый HOLD, а не в торговлю",
+      "case": "снятие: повторный вызов «снять сворачивание» на паре, уже спущенной в мягкий запрет входов, по лестнице не шагает",
       "state": {
         "callOrigin": "HOLDER",
         "standingRungRaisedManually": false,
@@ -835,18 +915,19 @@
         "operation": "CLEAR",
         "requestedScope": "INSTRUMENT",
         "requestedClass": "FULL",
-        "objectStatusBefore": "TRADE_BLOCKED",
-        "objectInWorkingState": false,
+        "objectStatusBefore": "ENTRY_BLOCKED",
+        "accountHardRungStanding": false,
+        "objectInWorkingState": true,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": true,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
-        "clearanceApplied": true,
-        "clearanceTarget": "HOLD",
-        "statusAfter": "HOLD",
-        "reportCode": "MANUAL_HALT_CLEARED",
-        "reportKind": "EVENT"
+        "clearanceRefused": false,
+        "clearanceNoop": true,
+        "clearanceApplied": false,
+        "statusAfter": "ENTRY_BLOCKED",
+        "reportProduced": false
       }
     },
     {
@@ -859,9 +940,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "ENTRY_BLOCKED",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -882,9 +964,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "SOFT",
         "objectStatusBefore": "HOLD",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -906,9 +989,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -928,9 +1012,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -953,9 +1038,10 @@
         "requestedScope": "INSTRUMENT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -976,9 +1062,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -1001,9 +1088,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -1022,11 +1110,12 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "standingRungRaisedManually": true,
         "fullReactionRunningOnObject": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 2
       },
       "expect": {
@@ -1044,11 +1133,12 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FULL",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "standingRungRaisedManually": false,
         "fullReactionRunningOnObject": true,
         "nonTerminalDealWithLiveRiskOnScope": true,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 3
       },
       "expect": {
@@ -1073,9 +1163,10 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
@@ -1099,15 +1190,166 @@
         "requestedScope": "EXCHANGE_ACCOUNT",
         "requestedClass": "FREEZE",
         "objectStatusBefore": "HOLD",
+        "accountHardRungStanding": false,
         "objectInWorkingState": false,
         "nonTerminalDealWithLiveRiskOnScope": false,
-        "onboardingIncomplete": false,
+        "positionSliceLiveOnScope": false,
         "consecutiveLossCountBefore": 0
       },
       "expect": {
         "reactionApplied": false,
         "rungRankBefore": 1,
         "rungRankAfter": 1,
+        "reportProduced": false,
+        "reportSeverity": null
+      }
+    },
+    {
+      "case": "доминирование: полная постановка на паре под свёрнутым счётом поглощается — ступень пары не переставлена, kill-switch не гоняется, а критичная строка журнала заводится",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": true,
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "positionSliceLiveOnScope": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "dominatedByAccountRung": true,
+        "hardStanding": false,
+        "launchRefused": false,
+        "launchForm": "ASYNC",
+        "riskTeardownRetry": false,
+        "absorbed": true,
+        "reactionApplied": false,
+        "killSwitchRun": false,
+        "statusAfter": "ACTIVE",
+        "rungRankBefore": 0,
+        "rungRankAfter": 0,
+        "reportProduced": true,
+        "reportCode": "MANUAL_HALT_REQUESTED",
+        "reportKind": "STATE",
+        "reportSeverity": "CRITICAL"
+      }
+    },
+    {
+      "case": "доминирование: мягкая постановка на паре под свёрнутым счётом поглощается так же — запрета входов пары нет, строка журнала есть",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "SOFT",
+        "objectStatusBefore": "ACTIVE",
+        "accountHardRungStanding": true,
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "positionSliceLiveOnScope": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "dominatedByAccountRung": true,
+        "launchRefused": false,
+        "launchForm": "SYNC",
+        "absorbed": true,
+        "reactionApplied": false,
+        "killSwitchRun": false,
+        "statusAfter": "ACTIVE",
+        "rungRankAfter": 0,
+        "reportProduced": true,
+        "reportSeverity": "NON_CRITICAL"
+      }
+    },
+    {
+      "case": "доминирование: полная постановка поверх мягкой ступени пары под свёрнутым счётом — эскалации нет, и критичная строка заводится мимо стоящей мягкой ручной",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "ENTRY_BLOCKED",
+        "accountHardRungStanding": true,
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "positionSliceLiveOnScope": false,
+        "consecutiveLossCountBefore": 0,
+        "standingManualReportSeverity": "NON_CRITICAL"
+      },
+      "expect": {
+        "softStanding": true,
+        "dominatedByAccountRung": true,
+        "absorbed": true,
+        "escalationApplied": false,
+        "reactionApplied": false,
+        "killSwitchRun": false,
+        "statusAfter": "ENTRY_BLOCKED",
+        "rungRankBefore": 1,
+        "rungRankAfter": 1,
+        "callSeverity": "CRITICAL",
+        "reportProduced": true,
+        "reportSeverity": "CRITICAL"
+      }
+    },
+    {
+      "case": "доминирование: доведение на паре под свёрнутым счётом гоняет снятие риска — доведение постановкой не является",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": true,
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "INSTRUMENT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": true,
+        "positionSliceLiveOnScope": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "dominatedByAccountRung": true,
+        "riskTeardownRetry": true,
+        "absorbed": false,
+        "repeatAtSameRung": false,
+        "reactionApplied": true,
+        "killSwitchRun": true,
+        "statusAfter": "TRADE_BLOCKED",
+        "reportProduced": false
+      }
+    },
+    {
+      "case": "постановка: повтор ТОЙ ЖЕ полной ступени, поднятой тем же ручным вызовом, при погашенном риске — строка по ключу уже стои́т",
+      "state": {
+        "callOrigin": "HOLDER",
+        "standingRungRaisedManually": false,
+        "standingManualReportSeverity": "CRITICAL",
+        "fullReactionRunningOnObject": false,
+        "operation": "RAISE",
+        "requestedScope": "EXCHANGE_ACCOUNT",
+        "requestedClass": "FULL",
+        "objectStatusBefore": "TRADE_BLOCKED",
+        "accountHardRungStanding": true,
+        "objectInWorkingState": true,
+        "nonTerminalDealWithLiveRiskOnScope": false,
+        "positionSliceLiveOnScope": false,
+        "consecutiveLossCountBefore": 0
+      },
+      "expect": {
+        "riskTeardownRetry": false,
+        "repeatAtSameRung": true,
+        "reactionApplied": false,
+        "killSwitchRun": false,
+        "statusAfter": "TRADE_BLOCKED",
+        "callSeverity": "CRITICAL",
         "reportProduced": false,
         "reportSeverity": null
       }

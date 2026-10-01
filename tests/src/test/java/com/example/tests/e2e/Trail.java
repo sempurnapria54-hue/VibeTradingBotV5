@@ -116,6 +116,9 @@ public final class Trail implements AutoCloseable {
 
     public static final String EXCHANGE_BALANCE = "/api/v5/account/balance";
 
+    /** Конфигурация счёта у площадки: вторая половина снимка средств — режим счёта и режим позиций. */
+    public static final String EXCHANGE_ACCOUNT_CONFIG = "/api/v5/account/config";
+
     public static final String EXCHANGE_LEVERAGE = "/api/v5/account/set-leverage";
 
     public static final String EXCHANGE_ORDER = "/api/v5/trade/order";
@@ -1016,6 +1019,12 @@ public final class Trail implements AutoCloseable {
      * подтверждает плечо и постановку, а заявку, которой ещё не наливал,
      * не знает.
      *
+     * <p>Снимок средств — два ответа: баланс и конфигурация счёта. Режимы
+     * конфигурации — те, что держит контур (фьючерсный режим счёта,
+     * нетто-позиции): иной либо пустой режим преконтроль читает выходом из
+     * контура и вход отвергает (docs/spec/risk-limits.json, величина
+     * {@code accountModeOutOfContour}).
+     *
      * <p>Это общее предусловие тропы; кейс, перекрывший ответ своим (отказ
      * постановки), возвращает его этим же ходом.
      */
@@ -1025,6 +1034,9 @@ public final class Trail implements AutoCloseable {
                   "adjEq": "10000", "availEq": "10000", "details": [{"ccy": "USDT",
                   "uTime": "{{now format='epoch'}}", "eq": "10000",
                   "cashBal": "10000", "availBal": "10000", "frozenBal": "0"}]}]}
+                """);
+        exchange.answers(EXCHANGE_ACCOUNT_CONFIG, """
+                {"code": "0", "msg": "", "data": [{"acctLv": "2", "posMode": "net_mode"}]}
                 """);
         exchange.answersPost(EXCHANGE_LEVERAGE, """
                 {"code": "0", "msg": "", "data": [{"lever": "10", "mgnMode": "isolated", "instId": "%s",
@@ -1495,6 +1507,14 @@ public final class Trail implements AutoCloseable {
                 """.formatted(instrumentInternalId, externalInstrumentId, externalInstrumentId.split("-")[0]);
     }
 
+    /**
+     * Правила инструмента, которые стаб владельца рыночных данных отдаёт по
+     * его идентичности.
+     *
+     * <p><b>Тир один и покрывает всякий размер позиции тропы:</b> без тиров
+     * оценка ликвидации после входа не измерена, и преконтроль вход отвергает
+     * (docs/spec/risk-limits.json, величина {@code postActMaintenanceMarginRate}).
+     */
     private static String rulesBody(String externalInstrumentId) {
         return """
                 {
@@ -1511,7 +1531,8 @@ public final class Trail implements AutoCloseable {
                   "externalFeeGroupId": "1",
                   "instrumentType": "SWAP",
                   "status": "LIVE",
-                  "externalState": "live"
+                  "externalState": "live",
+                  "positionTiers": [{"minSize": 0, "maxSize": 1000000, "maintenanceMarginRate": 0.004}]
                 }
                 """.formatted(externalInstrumentId, externalInstrumentId.split("-")[0]);
     }

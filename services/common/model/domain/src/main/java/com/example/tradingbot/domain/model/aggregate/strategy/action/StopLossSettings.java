@@ -13,7 +13,7 @@ import lombok.Setter;
  * настройки рыночных данных — «мягкие», по ключу (резолвит приложение):
  * indicatorKey — для ATR_PERCENT, structureKey — для
  * MARKET_STRUCTURE_BUFFER_PERCENT. См.
- * docs/models/domain/aggregate/Strategy.md (§StopLossSettings).
+ * docs/models/domain/aggregate/Strategy.md (§Действия).
  */
 @Getter
 @Setter

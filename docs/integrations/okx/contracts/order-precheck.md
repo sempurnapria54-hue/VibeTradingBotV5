@@ -19,7 +19,12 @@ Book Trading → Trade», секция «POST / Order precheck»). Процед�
 биржу за ограничениями не ходит). Серверный `order-precheck` неприменим в
 нашем режиме маржи (isolated/Futures, `acctLv=2` — ограничение ниже) и в
 фазе 1 не используется; door-open при смене режима. Решение —
-`docs/models/domain/other/InstrumentExternalRules.md`.
+`docs/models/domain/other/InstrumentExternalRules.md`. Кандидатом
+преконтроля и теперь не является (`.claude/decisions/server-side-precheck-not-adopted.md`):
+единственное, чего собственный преконтроль не имел, — оценку цены
+ликвидации до входа (`liqPx`), — он получил своей оценкой
+(`docs/rules/risk-policy.md`), а режим счёта контура эндпоинт исключает
+сам.
 
 ## Ограничение применимости (офдок)
 

@@ -28,7 +28,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class StrategyIndicatorSetting {
 
-    /** Технический ID настройки (strategy-scope-строка; цель FK результата расчёта). */
+    /** Технический ID настройки (strategy-scope-строка). */
     private Long id;
 
     /** Стабильный ключ настройки — по нему ссылается индикаторный операнд условия. */

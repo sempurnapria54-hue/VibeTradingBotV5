@@ -74,6 +74,13 @@ public class AlgoOrderEntity extends AuditableEntity {
     @Column(name = "external_status")
     private String externalStatus;
 
+    /**
+     * Наблюдённая живость на площадке последней добычей; пусто значаще —
+     * не наблюдалась либо статус не разобран.
+     */
+    @Column(name = "external_live")
+    private Boolean externalLive;
+
     @Column(name = "fail_code")
     private String failCode;
 

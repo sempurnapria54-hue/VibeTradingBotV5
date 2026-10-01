@@ -44,4 +44,10 @@ public class BalanceContainerEntity extends AuditableEntity {
 
     @Column(name = "external_available_equity", precision = 36, scale = 18)
     private BigDecimal externalAvailableEquity;
+
+    @Column(name = "account_mode")
+    private String accountMode;
+
+    @Column(name = "position_mode")
+    private String positionMode;
 }

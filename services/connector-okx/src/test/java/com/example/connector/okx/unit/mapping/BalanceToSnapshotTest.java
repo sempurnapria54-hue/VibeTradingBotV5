@@ -33,7 +33,7 @@ class BalanceToSnapshotTest {
     @Test
     @DisplayName("U17.1 — контейнер: момент разобран, три величины остались строками")
     void u17_1_theContainerParsesOnlyTheMoment() {
-        BalanceContainerExternalSnapshot snapshot = mapper.integrationToSnapshot(OkxFixture.balance());
+        BalanceContainerExternalSnapshot snapshot = mapper.integrationToSnapshot(OkxFixture.balance(), OkxFixture.accountConfig());
 
         assertThat(snapshot.getExternalUpdatedAt()).isEqualTo(OffsetDateTime.parse("2023-11-14T22:13:20Z"));
         assertThat(snapshot.getExternalTotalEquity()).isEqualTo("1000");
@@ -46,7 +46,7 @@ class BalanceToSnapshotTest {
     @DisplayName("U17.2 — валютный снапшот: момент разобран, четыре величины строками")
     void u17_2_theCurrencyLevelParsesOnlyTheMoment() {
         BalanceExternalSnapshot currency =
-                mapper.integrationToSnapshot(OkxFixture.balance()).getBalances().getFirst();
+                mapper.integrationToSnapshot(OkxFixture.balance(), OkxFixture.accountConfig()).getBalances().getFirst();
 
         assertThat(currency.getExternalCurrency()).isEqualTo("USDT");
         assertThat(currency.getExternalUpdatedAt()).isEqualTo(OffsetDateTime.parse("2023-11-14T22:14:20Z"));
@@ -63,7 +63,7 @@ class BalanceToSnapshotTest {
         BalanceOkxResponse response = OkxFixture.balance();
         response.setDetails(List.of());
 
-        assertThat(mapper.integrationToSnapshot(response).getBalances()).isNotNull().isEmpty();
+        assertThat(mapper.integrationToSnapshot(response, OkxFixture.accountConfig()).getBalances()).isNotNull().isEmpty();
     }
 
     @Test
@@ -72,7 +72,7 @@ class BalanceToSnapshotTest {
         BalanceOkxResponse response = OkxFixture.balance();
         response.setDetails(null);
 
-        assertThat(mapper.integrationToSnapshot(response).getBalances()).isNull();
+        assertThat(mapper.integrationToSnapshot(response, OkxFixture.accountConfig()).getBalances()).isNull();
     }
 
     @Test
@@ -83,7 +83,7 @@ class BalanceToSnapshotTest {
                 OkxFixture.balanceDetail("BTC"),
                 OkxFixture.balanceDetail("ETH")));
 
-        assertThat(mapper.integrationToSnapshot(response).getBalances())
+        assertThat(mapper.integrationToSnapshot(response, OkxFixture.accountConfig()).getBalances())
                 .extracting(BalanceExternalSnapshot::getExternalCurrency)
                 .containsExactly("USDT", "BTC", "ETH");
     }
@@ -95,7 +95,7 @@ class BalanceToSnapshotTest {
         BalanceOkxResponse response = OkxFixture.balance();
         response.setuTime("");
 
-        BalanceContainerExternalSnapshot snapshot = mapper.integrationToSnapshot(response);
+        BalanceContainerExternalSnapshot snapshot = mapper.integrationToSnapshot(response, OkxFixture.accountConfig());
 
         assertThat(snapshot.getExternalUpdatedAt()).isNull();
         assertThat(snapshot.getBalances().getFirst().getExternalUpdatedAt())
@@ -109,7 +109,7 @@ class BalanceToSnapshotTest {
         BalanceOkxResponse response = OkxFixture.balance();
         response.setTotalEq("");
 
-        assertThat(mapper.integrationToSnapshot(response).getExternalTotalEquity())
+        assertThat(mapper.integrationToSnapshot(response, OkxFixture.accountConfig()).getExternalTotalEquity())
                 .isNotNull().isEmpty();
     }
 
@@ -122,10 +122,33 @@ class BalanceToSnapshotTest {
                 .doesNotContain("exchangeAccountId", "accountId");
     }
 
+    /** Перевода здесь нет: режимы едут строками, словарь переводит следующий переход. */
+    @Test
+    @DisplayName("U17.10 — режимы конфигурации счёта едут в снапшот сырыми строками")
+    void u17_10_theAccountConfigModesAreCarriedRaw() {
+        BalanceContainerExternalSnapshot snapshot =
+                mapper.integrationToSnapshot(OkxFixture.balance(), OkxFixture.accountConfig());
+
+        assertThat(snapshot.getExternalAccountLevel()).isEqualTo("2");
+        assertThat(snapshot.getExternalPositionMode()).isEqualTo("net_mode");
+    }
+
+    /** Две формы источника независимы: пустота одной не гасит другую. */
+    @Test
+    @DisplayName("U17.11 — пустая конфигурация даёт пустые режимы при заполненных средствах")
+    void u17_11_anEmptyConfigLeavesTheModesEmptyAndTheFundsFilled() {
+        BalanceContainerExternalSnapshot snapshot = mapper.integrationToSnapshot(OkxFixture.balance(), null);
+
+        assertThat(snapshot.getExternalAccountLevel()).isNull();
+        assertThat(snapshot.getExternalPositionMode()).isNull();
+        assertThat(snapshot.getExternalTotalEquity()).isEqualTo("1000");
+        assertThat(snapshot.getBalances()).hasSize(1);
+    }
+
     @Test
     @DisplayName("U17.9 — пустота вместо формы источника даёт пустоту на обоих уровнях")
     void u17_9_emptinessInIsEmptinessOutOnBothLevels() {
-        assertThat(mapper.integrationToSnapshot((BalanceOkxResponse) null)).isNull();
+        assertThat(mapper.integrationToSnapshot(null, null)).isNull();
         assertThat(mapper.integrationToSnapshot((BalanceDetailOkxResponse) null)).isNull();
     }
 }

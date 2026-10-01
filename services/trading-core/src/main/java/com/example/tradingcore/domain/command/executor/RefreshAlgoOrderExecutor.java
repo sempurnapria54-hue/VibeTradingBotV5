@@ -1,6 +1,5 @@
 package com.example.tradingcore.domain.command.executor;
 
-import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
@@ -44,7 +43,9 @@ import org.springframework.transaction.annotation.Transactional;
  * основанием не является (docs/rules/controlled-exchange-exceptions.md).
  * У НЕОТПРАВЛЕННОЙ заявки исчерпанный цикл терминал другой — «не дошла до
  * площадки», без броска и без биржевой ступени
- * (docs/lifecycles/AlgoOrder.md).
+ * (docs/lifecycles/AlgoOrder.md). У ЛОКАЛЬНО ТЕРМИНАЛЬНОЙ — третий: её
+ * запись ушла за горизонт выдачи, ничего не пишется, броска нет
+ * (docs/spec/external-status-resolution.json, {@code notFoundPastLocalTerminal}).
  *
  * <p><b>Сырой статус резолвит коннектор, и отказ приезжает броском
  * ЧТЕНИЯ.</b> Неизвестный либо проблемный статус роняет вызов целиком, а
@@ -83,13 +84,17 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
         RefreshAlgoOrderCommandPayload payload = (RefreshAlgoOrderCommandPayload) command.getPayload();
         AlgoOrder algoOrder = target(payload.getAlgoOrderId(), dealContext);
         AlgoOrder fetched = fetchOrFail(algoOrder, dealContext);
-        if (isNull(fetched)) {
-            algoOrder.toNotPlaced();
-        } else {
+        Boolean recordsObservation = nonNull(fetched) || isTrue(algoOrder.isNotSubmitted())
+                || isTrue(algoOrder.isError());
+        if (nonNull(fetched)) {
             algoOrderMapper.updateFromFetched(fetched, algoOrder);
             applyStatus(algoOrder, fetched);
+        } else if (isTrue(algoOrder.isNotSubmitted())) {
+            algoOrder.toNotPlaced();
         }
-        algoOrderDataService.save(algoOrder);
+        if (isTrue(recordsObservation)) {
+            algoOrderDataService.save(algoOrder);
+        }
         if (isFalse(dealRiskNumbersService.recompute(dealContext))) {
             return ServiceCommandExecutionResult.notCompleted(
                     "Deal graph incomplete: risk numbers not recomputed for algo order " + algoOrder.getId());
@@ -113,40 +118,60 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
     }
 
     /**
-     * Цикл добычи; исчерпан без находки — сущность в ошибочное состояние и
-     * бросок. Контролируемое исключение чтения помечает сущность своей
-     * причиной и уходит дальше нетронутым.
+     * Цикл добычи; у живой заявки исчерпан без находки — сущность в
+     * ошибочное состояние и бросок. Контролируемое исключение чтения
+     * помечает сущность своей причиной и уходит дальше нетронутым.
      *
      * <p><b>Пусто — у неотправленной заявки:</b> исчерпанный цикл
      * доказывает, что на площадке её нет, и терминал ей ставит вызывающий.
      *
-     * <p><b>Терминальной заявке ошибочное состояние не ставится</b> — рёбер
-     * из терминала матрица жизненного цикла не содержит
-     * (docs/spec/order-lifecycle.json), — но отказ добычи уходит дальше тем
-     * же броском: исход отказа объявляет спека резолва
-     * (docs/spec/external-status-resolution.json).
+     * <p><b>Пусто — и у локально терминальной, без броска:</b> её запись
+     * ушла за горизонт выдачи, а факт терминала добыт раньше и стоит. Ничего
+     * не пишется, исключения и биржевой ступени нет, звено завершается
+     * (docs/spec/external-status-resolution.json, величина
+     * {@code notFoundPastLocalTerminal}).
+     *
+     * <p><b>Отказ разбора статуса бросок сохраняет и у терминальной</b> —
+     * неизвестное слово есть дефект словаря площадки, а не свойство заявки, —
+     * но ошибочного состояния ей не ставит: рёбер из терминала матрица
+     * жизненного цикла не содержит (docs/spec/algo-order-lifecycle.json).
+     *
+     * <p><b>Каждая добыча пишет наблюдённую живость заявки</b>
+     * ({@code AlgoOrder.externalLive}) — до броска, тем же проходом, в том
+     * числе у заявки, чей статус матрица уже не двигает: запись найдена
+     * живой — истина; найдена терминальной либо полный цикл её не нашёл
+     * (обе ветви — {@code MISSING_AFTER_REFRESH} и
+     * {@code notFoundPastLocalTerminal}) — ложь; отказ разбора известным
+     * словом отказа — ложь, словом, которого словарь площадки не знает, —
+     * пусто. Заявке в {@code ERROR} это единственный носитель живости: его
+     * читают снятие риска и гейт доказанного отсутствия риска сделки
+     * (docs/lifecycles/AlgoOrder.md §«Заявка в {@code ERROR}: живость на
+     * площадке читается наблюдением»). Поэтому ненайденность локально
+     * терминальной заявки сохраняется только у заявки в {@code ERROR}:
+     * у сработавшей и отменённой живость читает статус, и по
+     * {@code notFoundPastLocalTerminal} у них не пишется ничего.
      */
     private AlgoOrder fetchOrFail(AlgoOrder algoOrder, DealContext dealContext) {
         AlgoOrder fetched;
         try {
             fetched = findFetched(algoOrder, dealContext);
         } catch (ExternalStatusException e) {
+            algoOrder.observeRefusedStatus(e.getReasonCode());
             if (isTrue(algoOrder.isLive())) {
-                failWith(algoOrder, toCloseReason(e.getReasonCode()));
+                algoOrder.toError(toCloseReason(e.getReasonCode()));
             }
+            algoOrderDataService.save(algoOrder);
             throw e;
         }
-        if (isNull(fetched) && isTrue(algoOrder.isNotSubmitted())) {
-            return null;
+        algoOrder.observeOnVenue(fetched);
+        if (nonNull(fetched) || isTrue(algoOrder.isNotSubmitted()) || isTrue(algoOrder.isLocallyTerminal())) {
+            return fetched;
         }
-        if (isNull(fetched)) {
-            if (isTrue(algoOrder.isLive())) {
-                failWith(algoOrder, AlgoOrder.CloseReason.MISSING_AFTER_REFRESH);
-            }
-            throw new ExternalNotFoundException(
-                    "Algo order not found after full evidence cycle: " + algoOrder.getInternalId());
+        if (isTrue(algoOrder.isLive())) {
+            failWith(algoOrder, AlgoOrder.CloseReason.MISSING_AFTER_REFRESH);
         }
-        return fetched;
+        throw new ExternalNotFoundException(
+                "Algo order not found after full evidence cycle: " + algoOrder.getInternalId());
     }
 
     /** Заявка по идентификатору → ожидающие → история; обрыв на первом нашедшем. */

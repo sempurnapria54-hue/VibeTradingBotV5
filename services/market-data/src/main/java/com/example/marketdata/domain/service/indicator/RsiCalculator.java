@@ -13,11 +13,21 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-/** Вычислитель RSI (Wilder smoothing) по close. warmup ≈ 2·period. */
+/**
+ * Вычислитель RSI. Прирост и убыль, сглаживание, исход вырожденного окна и
+ * выведенный прогрев — docs/spec/indicator-calculation.json (`rsiGain`,
+ * `rsiLoss`, `wilderNext`, `rsiValue`, `derivedWarmup`).
+ */
 @Component
 public class RsiCalculator implements IndicatorCalculator {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100L);
+
+    /** Середина шкалы — исход вырожденного окна: ни прироста, ни убыли (`rsiValue`). */
+    private static final BigDecimal FLAT_WINDOW_VALUE = BigDecimal.valueOf(50L);
+
+    /** Кратность периода в выведенном прогреве сглаживания Уайлдера (`derivedWarmup`). */
+    private static final int WILDER_WARMUP_PERIODS = 3;
 
     @Override
     public IndicatorValue.Type getType() {
@@ -29,7 +39,7 @@ public class RsiCalculator implements IndicatorCalculator {
                                           IndicatorParams params) {
         RsiParams rsiParams = (RsiParams) params;
         int period = rsiParams.getPeriod();
-        int warmup = effectiveWarmup(rsiParams.getWarmup(), 2 * period);
+        int warmup = effectiveWarmup(rsiParams.getWarmup(), WILDER_WARMUP_PERIODS * period);
         List<IndicatorValue> result = new ArrayList<>();
         if (closedCandles.size() <= period) {
             return result;
@@ -63,7 +73,7 @@ public class RsiCalculator implements IndicatorCalculator {
 
     private BigDecimal rsi(BigDecimal avgGain, BigDecimal avgLoss) {
         if (avgLoss.signum() == 0) {
-            return HUNDRED;
+            return avgGain.signum() == 0 ? FLAT_WINDOW_VALUE : HUNDRED;
         }
         BigDecimal rs = avgGain.divide(avgLoss, DomainMath.CONTEXT);
         return HUNDRED.subtract(HUNDRED.divide(BigDecimal.ONE.add(rs), DomainMath.CONTEXT));

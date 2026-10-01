@@ -52,7 +52,7 @@ class CandleBackfillTest {
         instrument.setId(INSTRUMENT_ID);
         instrument.setExternalId("BTC-USDT-SWAP");
         when(instrumentDataService.getRequiredById(INSTRUMENT_ID)).thenReturn(instrument);
-        when(candleGroupDataService.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(candleGroupDataService.saveLoadingStep(any(), any(), any())).thenReturn(Boolean.TRUE);
     }
 
     /** Пустой ответ площадки — история кончилась, бэкфилл завершён. */
@@ -113,7 +113,7 @@ class CandleBackfillTest {
     private CandleGroup.Status savedStatus() {
         ArgumentCaptor<CandleGroup> saved = ArgumentCaptor.forClass(CandleGroup.class);
         org.mockito.Mockito.verify(candleGroupDataService, org.mockito.Mockito.atLeastOnce())
-                .save(saved.capture());
+                .saveLoadingStep(saved.capture(), any(), any());
         return saved.getValue().getStatus();
     }
 

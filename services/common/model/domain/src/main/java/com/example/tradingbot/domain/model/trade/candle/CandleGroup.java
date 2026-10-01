@@ -108,6 +108,20 @@ public class CandleGroup extends Auditable {
         return actual == expected;
     }
 
+    /**
+     * Недостача ряда до плотности на фактических границах: ожидаемое по
+     * density-инварианту минус поддерживаемый {@code count}; пустой
+     * {@code count} читается нулём.
+     *
+     * <p>Мера прогресса починки, а не число вставленных свечей: бары ниже
+     * нижней границы ряда её не сокращают (docs/lifecycles/CandleGroup.md
+     * §«Докачка дыр (`REPAIR`)»).
+     */
+    public Long deficit() {
+        long actual = isNull(count) ? 0L : count;
+        return expectedCount() - actual;
+    }
+
     /** Расходует одну попытку докачки дыр. */
     public void registerRepairAttempt() {
         repairAttempts = spentRepairAttempts() + 1;

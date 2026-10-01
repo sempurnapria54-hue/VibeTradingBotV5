@@ -173,7 +173,7 @@ public class CreateAlgoOrderActionExecutor implements StrategyActionExecutor {
     /**
      * Дерево условия: ровно один механизм — триггер либо трейлинг, — и
      * заполненные ноги обязаны соответствовать объявленному типу
-     * (docs/models/domain/core/AlgoOrder.md §Condition-модель).
+     * (docs/models/domain/core/AlgoOrder.md §«Условие срабатывания»).
      */
     private Condition condition(StrategyAlgoOrderAction action, CalculatedPrice price) {
         AlgoOrder.ConditionType type = action.getConditionType();

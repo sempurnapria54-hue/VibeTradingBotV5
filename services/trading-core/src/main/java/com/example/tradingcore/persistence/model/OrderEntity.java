@@ -65,6 +65,10 @@ public class OrderEntity extends AuditableEntity {
     @Column(name = "external_status")
     private String externalStatus;
 
+    /** Наблюдённая живость на площадке последней добычей; пусто — не наблюдалась либо статус не разобран. */
+    @Column(name = "external_live")
+    private Boolean externalLive;
+
     @Column(name = "price", precision = 36, scale = 18)
     private BigDecimal price;
 
@@ -87,29 +91,29 @@ public class OrderEntity extends AuditableEntity {
     @Column(name = "replaces_internal_id")
     private String replacesInternalId;
 
-    @Column(name = "planned_entry_price", precision = 36, scale = 18)
+    @Column(name = "planned_entry_price", updatable = false, precision = 36, scale = 18)
     private BigDecimal plannedEntryPrice;
 
-    @Column(name = "planned_stop_price", precision = 36, scale = 18)
+    @Column(name = "planned_stop_price", updatable = false, precision = 36, scale = 18)
     private BigDecimal plannedStopPrice;
 
-    @Column(name = "planned_size_contracts", precision = 36, scale = 18)
+    @Column(name = "planned_size_contracts", updatable = false, precision = 36, scale = 18)
     private BigDecimal plannedSizeContracts;
 
-    @Column(name = "planned_contract_value", precision = 36, scale = 18)
+    @Column(name = "planned_contract_value", updatable = false, precision = 36, scale = 18)
     private BigDecimal plannedContractValue;
 
-    @Column(name = "planned_risk_amount", precision = 36, scale = 18)
+    @Column(name = "planned_risk_amount", updatable = false, precision = 36, scale = 18)
     private BigDecimal plannedRiskAmount;
 
-    @Column(name = "planned_risk_currency")
+    @Column(name = "planned_risk_currency", updatable = false)
     private String plannedRiskCurrency;
 
     /** Измеритель: запас до ликвидации на момент постановки; пуст — не наблюдался. */
-    @Column(name = "liquidation_distance_ratio", precision = 36, scale = 18)
+    @Column(name = "liquidation_distance_ratio", updatable = false, precision = 36, scale = 18)
     private BigDecimal liquidationDistanceRatio;
 
     /** Измеритель: ёмкость стакана на момент постановки; пуста — свежих данных не было. */
-    @Column(name = "book_depth_at_placement", precision = 36, scale = 18)
+    @Column(name = "book_depth_at_placement", updatable = false, precision = 36, scale = 18)
     private BigDecimal bookDepthAtPlacement;
 }

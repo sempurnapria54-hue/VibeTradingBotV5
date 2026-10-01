@@ -8,17 +8,13 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Правило условия — единая структура; операнды опциональны (левый /
- * правый / оба / нет — отсутствующий не пишется). Доменные правила —
- * плоские: ruleType + простые поля (percents, timeframe); сравнивающие
- * — operator + симметричные структурированные операнды. Любой источник
- * — на любой стороне (число слева или справа, indicator-vs-indicator —
- * базовый кейс кроссовера). Rule-level sourceType/timeframe-источника и
- * объектные ссылки на настройки убраны — их несёт операнд. Per-ruleType
- * контракт полей дозаполняется инкрементально при реализации каждого
- * ruleType. См. docs/models/domain/aggregate/Strategy.md
- * (§StrategyConditionRule),
- * docs/rules/strategy-condition-contract.md.
+ * Правило условия — единая структура на все типы правил: доменные
+ * правила — плоские (ruleType и простые поля), сравнивающие — operator и
+ * структурированные операнды. Какие поля и операнды обязательны у
+ * каждого типа правила и какие источники допустимы на каждой стороне —
+ * контракт по типу правила, его дом — docs/rules/strategy-condition-contract.md
+ * §«Правило и операнды». См. также docs/models/domain/aggregate/Strategy.md
+ * (§StrategyConditionRule).
  */
 @Getter
 @Setter

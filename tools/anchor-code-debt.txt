@@ -1,0 +1,80 @@
+# Объявленный долг §-адресов деревьев кода и манифестов (`services/**`,
+# `tests/**`, `web/**`, `deploy/**`) — адреса в комментариях и литералах,
+# неразрешимые на момент ввода оси кода у tools/anchor-check.py (формы
+# носителя и счёт — шапка детектора). `deploy/**` вошёл в область 2026-10-01
+# с четырьмя строками долга.
+# Формат: <файл>\t<имя пассажа без §>. Номеров строк нет намеренно: номер
+# дрейфует от любой правки, и реестр начал бы врать раньше, чем долг погасится.
+# Строка — ОДНО вхождение пары: пара, стоящая в файле дважды, пишется двумя
+# строками, и следующий битый адрес того же имени в том же файле роняет прогон.
+# Погашенный адрес обязан уйти отсюда — прогон падает на устаревшей строке.
+# Реестр отдельный от tools/anchor-debt.txt: адрес кода чинит правка дерева
+# кода, а не курация `.claude/**`. Носитель задачи — .claude/work/backlog.md.
+deploy/base/network-platform-allowances.yaml	«Транспорт внутри кластера — пересмотр перед первым `prod`»
+deploy/base/platform/argocd-project.yaml	«Чем различаются окружения»
+deploy/base/services/auth.yaml	«Манифесты развёртывания сервисов»
+deploy/base/services/bff.yaml	«Дедуплицирует клиент…»
+services/audit/src/main/java/com/example/audit/config/ReceptionKafkaConfig.java	«Форма — слушатель контейнера, а не опрашивающий цикл»
+services/audit/src/main/java/com/example/audit/domain/model/JournalCompleteness.java	«Граница мерится приёмом, а клейм говорит о производстве»
+services/audit/src/main/java/com/example/audit/exception/handler/GlobalExceptionHandler.java	«Единый error-DTO у поверхностей соседних сервисов»
+services/audit/src/main/java/com/example/audit/integration/internal/event/JournalRebalanceListener.java	«Обнаружение разрыва — сравнение смещений»
+services/audit/src/main/java/com/example/audit/integration/internal/event/JournalReceptionErrorHandler.java	«Обработчик отказа — часть конструкции, а не настройка»
+services/audit/src/main/java/com/example/audit/integration/internal/event/ReceptionOffsetTracker.java	«Обнаружение разрыва — сравнение смещений»
+services/audit/src/main/java/com/example/audit/persistence/model/journal/JournalReceptionStateEntity.java	«Строка состояния приёма — таблица reception_states»
+services/audit/src/main/java/com/example/audit/persistence/repository/ReceptionStateCompletenessQueries.java	«Выборка данных»
+services/audit/src/main/resources/db/migration/audit/V1__audit_baseline.sql	«Строка состояния приёма — таблица reception_states»
+services/audit/src/test/java/com/example/audit/ReceptionHaltTest.java	«Обработчик отказа — часть конструкции, а не настройка»
+services/audit/src/test/java/com/example/audit/box/AuditBox.java	«Строки пары ещё нет — не пишется ничего»
+services/audit/src/test/java/com/example/audit/box/JournalCleanupBoxTest.java	«B4 — Обнаружение разрыва: три исхода сравнения смещений»
+services/audit/src/test/java/com/example/audit/box/Wire.java	«Обработчик отказа — часть конструкции, а не настройка»
+services/bff/src/main/java/com/example/bff/api/controller/PerimeterController.java	«Владельца называет путь…»
+services/bff/src/main/java/com/example/bff/api/controller/PerimeterController.java	«Форму задаёт происхождение: порождённое — своё, пересланное — чужое»
+services/bff/src/main/java/com/example/bff/api/controller/ProxyController.java	«Синхронные вызовы»
+services/bff/src/main/java/com/example/bff/config/PerimeterKafkaConfig.java	«Тропа к брокеру у построенных соседей…»
+services/bff/src/main/java/com/example/bff/exception/handler/GlobalExceptionHandler.java	«Отказ соседа по ярусу — свой класс»
+services/bff/src/main/resources/application.yaml	«Дедуплицирует клиент…»
+services/bff/src/test/java/com/example/bff/box/Subscription.java	«Новая ось формы — ПОТОК В БРАУЗЕР»
+services/bff/src/test/java/com/example/bff/unit/domain/TicketForge.java	«Состояния, недостижимые предъявителю»
+services/common/model/message/src/main/java/com/example/tradingbot/message/OrderDecidedMessage.java	«Содержимое несёт идентичности»
+services/common/platform/src/test/java/com/example/platform/jobs/JobExecutionGuardTest.java	«Решение: где живёт дерево прогона»
+services/common/platform/src/test/java/com/example/platform/security/ActorProviderTest.java	«Решение: где живёт дерево прогона»
+services/common/strategy-engine/src/main/java/com/example/strategy/engine/calc/ExitOutcome.java	ExitOutcome
+services/common/strategy-engine/src/main/java/com/example/strategy/engine/calc/SizeMode.java	SizeMode
+services/common/strategy-engine/src/main/java/com/example/strategy/engine/calc/StrategyPricePurpose.java	StrategyPricePurpose
+services/common/strategy-engine/src/test/java/com/example/strategy/engine/unit/calc/MarketEntryPriceTest.java	Округление
+services/common/strategy-engine/src/test/java/com/example/strategy/engine/unit/condition/ConditionConjunctionTest.java	«Кейсы, не прогоняемые сегодня»
+services/common/strategy-engine/src/test/java/com/example/strategy/engine/unit/condition/ConditionFixture.java	«Новая ось формы: выход булев, и ложь у него одна на все причины»
+services/common/test-support/src/main/java/com/example/testsupport/InstrumentRulesOverlayCopyContract.java	«Состав ключей строки задаёт не перечень полей»
+services/common/test-support/src/main/java/com/example/testsupport/PeerCallContract.java	«U12 — Тождество копий формы»
+services/common/test-support/src/main/java/com/example/testsupport/StrategyOverlayCopyContract.java	«U10 — Тождество копий формы»
+services/common/test-support/src/main/java/com/example/testsupport/StrategyOverlayCopyContract.java	«Новая ось формы: выход кейса — ТОЖДЕСТВО пары»
+services/common/test-support/src/test/java/com/example/tradingbot/spec/Spec.java	«Охранный инвариант доказывается предъявленным контрпримером»
+services/common/test-support/src/test/java/com/example/tradingbot/spec/SpecMutation.java	«Мутационная проба — условие приёмки спеки, а не только правки»
+services/statistics/src/main/java/com/example/statistics/config/ReceptionKafkaConfig.java	«Форма — слушатель контейнера, а не опрашивающий цикл»
+services/statistics/src/main/java/com/example/statistics/domain/model/ReceptionCompleteness.java	«Граница мерится приёмом, а клейм говорит о производстве»
+services/statistics/src/main/java/com/example/statistics/exception/handler/GlobalExceptionHandler.java	«Единый error-DTO у поверхностей соседних сервисов»
+services/statistics/src/main/java/com/example/statistics/integration/internal/event/ReceptionErrorHandler.java	«Обработчик отказа — часть конструкции, а не настройка»
+services/statistics/src/main/java/com/example/statistics/integration/internal/event/ReceptionOffsetTracker.java	«Обнаружение разрыва — сравнение смещений»
+services/statistics/src/main/java/com/example/statistics/integration/internal/event/ReceptionRebalanceListener.java	«Обнаружение разрыва — сравнение смещений»
+services/statistics/src/main/java/com/example/statistics/integration/internal/event/model/StatisticsEventMessage.java	«Популяция долей»
+services/statistics/src/main/java/com/example/statistics/persistence/model/facts/DealFactEntity.java	«Почему это не второй журнал»
+services/statistics/src/main/java/com/example/statistics/persistence/repository/ReceptionStateCompletenessQueries.java	«Выборка данных»
+services/statistics/src/main/java/com/example/statistics/persistence/repository/facts/DealFactRepository.java	«Дедуп проверкой существования перед вставкой»
+services/statistics/src/test/java/com/example/statistics/ReceptionHaltTest.java	«Обработчик отказа — часть конструкции, а не настройка»
+services/statistics/src/test/java/com/example/statistics/box/Facts.java	«Чем достаются выходы»
+services/statistics/src/test/java/com/example/statistics/box/PoisonedReceptionBox.java	«Обработчик отказа — часть конструкции, а не настройка»
+services/statistics/src/test/java/com/example/statistics/box/UnsubscribedPairBoundBoxTest.java	«Строка состояния приёма — таблица `reception_states`»
+services/statistics/src/test/java/com/example/statistics/box/Wire.java	«Обработчик отказа — часть конструкции, а не настройка»
+services/strategies/src/main/java/com/example/strategies/config/SurfaceProperties.java	«Выборка данных»
+services/strategies/src/main/java/com/example/strategies/exception/handler/GlobalExceptionHandler.java	«Отказ соседа по ярусу — свой класс»
+services/strategies/src/main/java/com/example/strategies/persistence/repository/OutboxRepository.java	«Чтение — окном»
+services/strategies/src/main/java/com/example/strategies/persistence/repository/StrategyRepository.java	«Выборка данных»
+services/strategies/src/main/resources/application.yaml	«Выборка данных»
+services/strategies/src/test/java/com/example/strategies/box/StrategiesSubstrate.java	«Оснований брать свой контейнер ДВА…»
+services/strategies/src/test/java/com/example/strategies/unit/config/AsyncActorContextConfigurerTest.java	«Решение: где живёт дерево прогона»
+services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql	«База следует за балансом»
+services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql	«Срок свежести проекции»
+services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql	«Ступень и настройки счёта на инструменте»
+services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql	«Четыре потолка»
+tests/src/test/java/com/example/tests/e2e/safetyteardown/TeardownTrail.java	«Новая ось формы — ВХОД ТРОПЫ ЕСТЬ РАСХОЖДЕНИЕ, А НЕ ХОД»
+tests/src/test/java/com/example/tests/e2e/strategytodeal/DealEntryPathTest.java	«Новая ось формы — СТОРОНА ТРОПЫ И ЕЁ СЛЕД»

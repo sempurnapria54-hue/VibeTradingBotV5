@@ -17,20 +17,18 @@ risk-policy проверки; unexpected exceptions в него не превр�
 | Поле | Тип | Назначение |
 |---|---|---|
 | `decision` | `RiskDecision` | Итоговое решение risk-layer. |
-| `checks` | `List<RiskCheckResult>` | Детальные результаты отдельных проверок (см. `docs/components/models/RiskCheckResult.md`). |
+| `checks` | `List<RiskCheckResult>` | Отказы отдельных проверок; пуст — действие разрешено (см. `docs/components/models/RiskCheckResult.md`). |
 | `comment` | `String` | Короткое пояснение для логов / будущей истории исполнения. |
 
 ## Енум `RiskDecision`
 
 - `ALLOWED` — действие разрешено;
-- `WARNING` — есть риск-предупреждения, но действие не блокируется;
 - `BLOCKED` — действие заблокировано risk-policy.
 
 ## Обработка результата
 
 Реакция на `decision` принимается не здесь: `RiskBlockResolver` маппит
 `BLOCKED` в `RiskBlockAction`, FSM handler исполняет (см.
-`docs/processes/risk-evaluation.md`). `WARNING` не блокирует и сам в
-`ERROR` не переводит; `ALLOWED` разрешает per-type
+`docs/processes/risk-evaluation.md`). `ALLOWED` разрешает per-type
 `StrategyActionExecutor` (`CreateOrderActionExecutor`) собрать команду
 действия (см. `docs/components/StrategyActionExecutor.md`).

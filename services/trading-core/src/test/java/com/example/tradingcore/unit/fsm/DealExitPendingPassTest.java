@@ -210,8 +210,14 @@ class DealExitPendingPassTest {
         assertThat(commandTypes(transition)).contains(ServiceCommandType.CLOSE_POSITION_COMMAND);
     }
 
+    /**
+     * Закреплённая деталь входной проверкой прохода не является, и
+     * сворачиванию она не нужна: каскад, закрытие нетто-экспозиции, добыча и
+     * финализация её операндов не читают (docs/components/DealExitPendingHandler.md
+     * §«Закреплённая деталь стратегии входной проверкой прохода не является»).
+     */
     @Test
-    @DisplayName("U10.12 — сделка без закреплённой детали: сворачиванию деталь не нужна")
+    @DisplayName("U10.12 — сделка без закреплённой детали: деталь входной проверкой прохода не является, проход идёт штатно")
     void u10_12_aRecoveredDealCollapsesTheSameWay() {
         Deal collapsing = baseDeal();
         collapsing.setEntryReason(Deal.EntryReason.RECOVERY);

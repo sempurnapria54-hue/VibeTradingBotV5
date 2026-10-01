@@ -79,8 +79,11 @@ kubectl apply -k "$ROOT/deploy/$ENVIRONMENT"
 say "6. Vault: распечатывание и настройка"
 bash "$ROOT/tools/stand/vault-setup.sh"
 
-say "7. Секрет клиента провайдера идентичности"
+say "7. Секреты служебных клиентов провайдера идентичности"
 bash "$ROOT/tools/stand/identity-client-secret.sh"
+
+say "8. Вход снаружи: учётная запись держателя и сертификат ингресса"
+bash "$ROOT/tools/stand/external-access.sh"
 
 say "Готово. Состояние:"
 kubectl get pods -A --no-headers | grep -Ev "Running|Completed" || echo "все поды Running/Completed"

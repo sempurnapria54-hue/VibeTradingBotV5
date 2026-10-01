@@ -184,7 +184,8 @@ public class AnomalyJob {
                 accountInstrumentStateDataService.findInstrumentIdsUnderHardRung(account.getId()));
         // Объяснённость парного слота — операнд КАЖДОГО инструмента контура,
         // поэтому читается пачкой на счёт, а не запросом на итерацию
-        // (.claude/rules/codestyle.md §«Выборка данных»).
+        // (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+        // одного поля»).
         Set<Long> explainedPairs = dealDataService.findInstrumentIdsWithActiveDeal(account.getId());
         for (Instrument instrument : contour) {
             try {

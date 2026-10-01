@@ -26,7 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p><b>Защиты грузятся ПАКЕТОМ на все ноги сделки.</b> Запрос на ногу
  * давал бы N+1 обращений там, где число ног растёт вместе со стратегией
- * (.claude/rules/codestyle.md §«Выборка данных»).
+ * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради одного
+ * поля»).
  */
 @Service
 @RequiredArgsConstructor
@@ -84,8 +85,8 @@ public class OrderDataService {
      * Заявка по нашему клиентскому идентификатору; пусто — строки нет.
      *
      * <p>Встроенные защиты сюда не доливаются: читателю нужен статус
-     * самой ноги, а не её граф (.claude/rules/codestyle.md §«Выборка
-     * данных»).
+     * самой ноги, а не её граф (.claude/rules/codestyle.md §«Выборка данных: не
+     * тянем сущность ради одного поля»).
      */
     @Transactional(readOnly = true)
     public Optional<Order> findByInternalId(String internalId) {

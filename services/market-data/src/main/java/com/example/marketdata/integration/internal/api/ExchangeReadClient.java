@@ -190,6 +190,12 @@ public class ExchangeReadClient {
      * Разводит отказ доступа и лимита от рядового отказа чтения: первый
      * прекращает проход, второй — пропускает инструмент
      * (docs/processes/snapshot-collection.md §«Отказ на проходе»).
+     *
+     * <p><b>Текст отказа пишет наша сторона.</b> Он уезжает наружу
+     * пояснением отказа зависимости, поэтому статус ответа коннектора в нём —
+     * число, а не фраза статуса транспорта (docs/rules/error-handling-policy.md
+     * §«Пояснение отказа пишет наша сторона, а не платформа»); первопричина
+     * едет {@code cause}.
      */
     private <T> T call(String endpoint, Supplier<T> read) {
         if (isFalse(addressConfigured)) {
@@ -202,9 +208,10 @@ public class ExchangeReadClient {
             if (status.isSameCodeAs(HttpStatus.UNAUTHORIZED)
                     || status.isSameCodeAs(HttpStatus.FORBIDDEN)
                     || status.isSameCodeAs(HttpStatus.TOO_MANY_REQUESTS)) {
-                throw new ExchangeAccessException("Connector refused read [" + endpoint + "]: " + status, e);
+                throw new ExchangeAccessException(
+                        "Connector refused read [" + endpoint + "], status " + status.value(), e);
             }
-            throw new ExchangeReadException("Connector read failed [" + endpoint + "]: " + status, e);
+            throw new ExchangeReadException("Connector read failed [" + endpoint + "], status " + status.value(), e);
         } catch (RestClientException e) {
             throw new ExchangeReadException("Connector transport error [" + endpoint + "]", e);
         }

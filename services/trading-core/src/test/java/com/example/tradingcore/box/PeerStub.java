@@ -277,6 +277,35 @@ final class PeerStub {
     }
 
     /**
+     * Чтение, ПЕРЕКЛЮЧАЮЩЕЕ состояние сценария: в названном состоянии оно
+     * отвечает заданным кодом и телом и переводит сценарий в следующее.
+     *
+     * <p>Им ставится однократный ответ посреди сценария, который потом
+     * продолжает переключаться командами ({@link #flipsOn}): очередь ответов
+     * ({@link #answersInTurn}) держала бы последний ответ и команды бы не
+     * слышала. Заготовка новее прочих заготовок того же состояния и потому
+     * берёт верх над ними.
+     *
+     * @param scenario имя сценария
+     * @param path     путь чтения
+     * @param state    состояние, в котором действует этот ответ
+     * @param status   код ответа
+     * @param body     тело ответа
+     * @param newState состояние сценария после ответа
+     */
+    void answersInStateAndMoves(String scenario, String path, String state, Integer status, String body,
+                                String newState) {
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
+                .inScenario(scenario)
+                .whenScenarioStateIs(state)
+                .willSetStateTo(newState)
+                .willReturn(WireMock.aResponse()
+                        .withStatus(status)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+    }
+
+    /**
      * То же чтение с условием на query-параметр: им разводятся ноги
      * разбора истории, которые площадка отдаёт одним путём.
      */

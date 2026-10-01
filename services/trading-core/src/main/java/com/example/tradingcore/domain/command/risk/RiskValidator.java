@@ -1,9 +1,11 @@
 package com.example.tradingcore.domain.command.risk;
 
+import static java.math.BigDecimal.ONE;
 import static java.math.BigDecimal.ZERO;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
@@ -24,8 +26,10 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrd
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPlacementRole;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.balance.Balance;
+import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingbot.domain.model.core.instrument.PositionTier;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
@@ -35,7 +39,6 @@ import com.example.tradingcore.config.DealContextProperties;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
-import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckStatus;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.InstrumentExternalRulesDataService;
@@ -102,8 +105,8 @@ public class RiskValidator {
      * (docs/rules/risk-validator-scope.md).
      *
      * <p><b>Транш действия — операнд различителя блок-сета, и только его.</b>
-     * Потолки считаются по всей сделке (§«Действие транша, потолки сделки»
-     * дома scope); транш нужен одному вопросу — ослабляет ли защитное
+     * Потолки считаются по всей сделке (docs/rules/risk-validator-scope.md
+     * §«Действие транша, потолки сделки»); транш нужен одному вопросу — ослабляет ли защитное
      * действие уровень СВОЕГО транша. Спрашивают его две проверки —
      * стоящая ступень и торгуемость инструмента: область у них одна.
      * Пустой транш этот вопрос оставляет без ответа, и защитное действие
@@ -171,8 +174,11 @@ public class RiskValidator {
         checkMarginMode(pairState, checks);
         checkSizeBounds(rules, sizeContracts, price, checks);
         checkLeverage(calculatedAction.getSourceAction(), pairState, rules, checks);
-        checkFeeRate(price, rules, dealContext, checks);
-        checkAccountFunds(calculatedAction, dealContext, rules, pairState, checks);
+        checkFeeRate(touchesStopLevel(price), rules, dealContext, checks);
+        Balance settlement = checkAccountFunds(dealContext, checks);
+        if (nonNull(settlement)) {
+            checkBalanceEnough(calculatedAction, dealContext, rules, pairState, settlement, checks);
+        }
         checkRiskCreatingEntryProtection(calculatedAction, checks);
         checkStopLossSide(calculatedAction.getSourceAction(), price.getStopLossPrice(), entryAnchor,
                 direction, checks);
@@ -180,7 +186,7 @@ public class RiskValidator {
                 entryAnchor, direction, checks);
         checkStopDistanceFloor(price.getStopLossPrice(), entryAnchor, direction, rules, checks);
         checkTakeProfitSide(price.getTakeProfitPrice(), entryAnchor, direction, checks);
-        checkLiquidationGuard(price.getStopLossPrice(), position, direction, checks);
+        checkLiquidation(calculatedAction, dealContext, rules, pairState, entryAnchor, checks);
         checkCollapseWindow(calculatedAction, dealContext, checks);
         checkSafetyRung(calculatedAction, tranche, direction, pairState, checks);
         checkCeilings(calculatedAction, dealContext, rules, appetite, base, entryAnchor, checks);
@@ -191,43 +197,142 @@ public class RiskValidator {
     /**
      * Ветка ослабления защиты для СНЯТИЯ отдельной защиты при живой
      * экспозиции (docs/rules/risk-validator-scope.md): снятие риск не
-     * снимает, а увеличивает. Операнд — покрытие транша после того, как
-     * снимаемая защита исчезнет (docs/spec/protection-coverage.json,
-     * величина {@code removalAllowed}); ниже экспозиции этого транша —
-     * отказ. Защиты соседних траншей в операнд не входят.
+     * снимает, а увеличивает (docs/components/RiskValidator.md §«Ветка
+     * ослабления защиты»).
      *
-     * <p><b>Блок-сет ступени действует и здесь:</b> снятие защиты при живой
-     * экспозиции есть risk-weakening, а ступень блокирует его наравне с
-     * созданием нового риска (docs/rules/instrument-hold.md §Enforcement).
-     * Аварийная дочистка и kill-switch сюда не приходят вовсе — они вне
-     * scope преконтроля.
+     * <p><b>Набор тот же, что у рассчитанного действия, и в том же
+     * порядке</b> — за вычетом проверок, чей операнд собственный размер,
+     * цена либо уровень акта (у снятия их нет), и проверок, чья область —
+     * действие, создающее риск: входные гейты, торгуемость, режим маржи,
+     * биржевой максимум плеча, ставка при живом эпизоде, проверки средств
+     * на свежем снимке, стоящая ступень, потолки и последним — покрытие
+     * транша после снятия. Класс действия ни одного неравенства не
+     * выключает (docs/rules/risk-policy.md, риск акта по классу действия):
+     * катастрофическое неравенство, выключенное на снятии, пропускало бы
+     * ослабление защиты сверх потолка.
      *
-     * <p>Предикат, отказавший вычислением, даёт
-     * {@code DEAL_GRAPH_INCOMPLETE}: пустота нулём не подменяется, иначе
-     * сравнение с нулём разрешило бы снятие последней защиты над живой
-     * экспозицией.
+     * <p><b>Потолки считаются при нулевых слагаемых акта и ДОАКТНОМ
+     * уровне</b> — снимаемая защита ещё действует, и уровень берётся
+     * наименее благоприятный среди действующих, её включая. Поактный
+     * тривиально истинен и не считается; кумулятивный, оба одновременных и
+     * катастрофический сравнивают с потолком уже взятое и уже живое.
+     * <b>Это не вторая точка входа:</b> там отсутствие операнда — молчание,
+     * здесь — отказ, как на всяком проверяемом действии.
+     *
+     * <p><b>Последним — покрытие транша после снятия</b>
+     * (docs/spec/protection-coverage.json, величина {@code removalAllowed});
+     * ниже экспозиции этого транша — отказ, защиты соседних траншей в
+     * операнд не входят. Предикат, отказавший вычислением, обрывает
+     * перечень отказом {@code DEAL_GRAPH_INCOMPLETE}: пустота нулём не
+     * подменяется, иначе сравнение с нулём разрешило бы снятие последней
+     * защиты над живой экспозицией.
      */
     public RiskValidationResult validateProtectionRemoval(DealContext dealContext, DealTranche tranche,
                                                           Long algoOrderId) {
         List<RiskCheckResult> checks = new ArrayList<>();
-        AccountInstrumentState pairState = accountInstrumentStateDataService.getRequiredByPair(
-                dealContext.getExchangeAccount().getId(), dealContext.getInstrument().getId());
+        ExchangeAccount account = dealContext.getExchangeAccount();
+
+        if (isNotTrue(dealContext.getGraphComplete())) {
+            return blockedResult(checks, RiskCheckCode.DEAL_GRAPH_INCOMPLETE,
+                    "Deal graph is not fully presented by the pass context");
+        }
+        InstrumentExternalRules rules = rulesDataService
+                .findByInstrumentId(dealContext.getInstrument().getId(), account.getId())
+                .orElse(null);
+        if (isNull(rules)) {
+            return blockedResult(checks, RiskCheckCode.INSTRUMENT_RULES_MISSING,
+                    "Instrument external rules not materialized");
+        }
+        if (isNull(rules.contractValue())) {
+            return blockedResult(checks, RiskCheckCode.INSTRUMENT_RULES_MISSING,
+                    "Instrument contract value not materialized: live risk and notional are unmeasured");
+        }
+        if (isBlank(dealContext.getInstrument().getExternalSettlementCurrency())) {
+            return blockedResult(checks, RiskCheckCode.INSTRUMENT_SETTLE_CURRENCY_MISSING,
+                    "Instrument settlement currency is not resolved");
+        }
+        BigDecimal base = dealContext.riskBase();
+        if (isNull(base) || base.signum() <= 0) {
+            return blockedResult(checks, RiskCheckCode.BALANCE_INVALID,
+                    "Risk base is missing or non-positive");
+        }
+        Tenant appetite = tenantRiskAppetiteDataService
+                .findByTenantInternalId(account.getTenantId())
+                .orElse(new Tenant());
+        if (isNull(appetite.getGlobalConsecutiveLossLimit())) {
+            return blockedResult(checks, RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED,
+                    "globalConsecutiveLossLimit is not assigned for tenant " + account.getTenantId());
+        }
+        if (isNull(appetite.getGlobalSimultaneousRiskPerDealPercent())) {
+            return blockedResult(checks, RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
+                    "globalSimultaneousRiskPerDealPercent is not assigned for tenant " + account.getTenantId());
+        }
+
+        AccountInstrumentState pairState = accountInstrumentStateDataService
+                .getRequiredByPair(account.getId(), dealContext.getInstrument().getId());
+        BigDecimal entryAnchor = entryAnchor(dealContext.getDeal().livePosition(), null);
+
+        checkInstrumentLiveForRemoval(rules, checks);
+        checkMarginMode(pairState, checks);
+        checkLeverage(null, pairState, rules, checks);
+        checkFeeRate(false, rules, dealContext, checks);
+        checkAccountFunds(dealContext, checks);
         if (isTrue(pairState.hasStandingSafetyRung())) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.INSTRUMENT_SAFETY_HOLD,
                     "Instrument stands in safety rung " + pairState.getSafetyRung()
                             + " whose block set covers protection removal", null));
         }
+        checkCeilingsWithoutActOperands(dealContext, rules, appetite, base, entryAnchor, checks);
+
         Boolean allowed = tranche.removalAllowed(algoOrderId);
         if (isNull(allowed)) {
             return blockedResult(checks, RiskCheckCode.DEAL_GRAPH_INCOMPLETE,
                     "Tranche graph incomplete: live protection with no orders presented");
         }
         if (isFalse(allowed)) {
-            return blockedResult(checks, RiskCheckCode.PROTECTION_COVERAGE_REDUCED,
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.PROTECTION_COVERAGE_REDUCED,
                     "Coverage after removal " + tranche.coverageWithoutAlgoOrder(algoOrderId)
-                            + " below tranche exposure " + tranche.exposure());
+                            + " below tranche exposure " + tranche.exposure(), null));
         }
         return aggregate(checks);
+    }
+
+    /**
+     * Торгуемость инструмента на снятии защиты: снятие при живой экспозиции
+     * входит в блок-сет всегда — уровня, который защиту транша не
+     * ослаблял бы, у него нет (docs/rules/risk-validator-scope.md
+     * §«Торгуемость инструмента запирает набор риска, а не защиту»).
+     */
+    private void checkInstrumentLiveForRemoval(InstrumentExternalRules rules, List<RiskCheckResult> checks) {
+        if (isTrue(rules.isLive())) {
+            return;
+        }
+        checks.add(RiskCheckResult.blocked(RiskCheckCode.INSTRUMENT_NOT_LIVE,
+                "Instrument not tradeable: " + rules.getStatus() + ", protection removal is in the block set",
+                null));
+    }
+
+    /**
+     * Потолки на снятии защиты: слагаемые акта нулевые, уровень — ДОАКТНЫЙ
+     * (снимаемая защита ещё действует). Поактный потолок тривиально
+     * истинен и не считается; незаявленное деталью число отказывает, как
+     * у рассчитанного действия: незаявленный процент на действие снимает
+     * все потолки, прочие числа — только свой.
+     */
+    private void checkCeilingsWithoutActOperands(DealContext dealContext, InstrumentExternalRules rules,
+                                                 Tenant appetite, BigDecimal base, BigDecimal entryAnchor,
+                                                 List<RiskCheckResult> checks) {
+        StrategyDetail detail = dealContext.getStrategyDetail();
+        if (isNull(detail) || isNull(detail.getRiskPerActionPercent())) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
+                    "riskPerActionPercent is not declared by the pinned strategy detail", null));
+            return;
+        }
+        BigDecimal perAction = percentOf(detail.getRiskPerActionPercent(), base);
+        checkCumulative(dealContext, detail, ZERO, perAction, checks);
+        checkSimultaneous(dealContext, detail, appetite, rules, base, entryAnchor, ZERO,
+                dealContext.getDeal().currentStopLevel(), checks);
+        checkCatastrophicNotional(dealContext, detail, appetite, rules, base, entryAnchor, ZERO, checks);
     }
 
     /**
@@ -334,7 +439,8 @@ public class RiskValidator {
 
         checkPerAction(actRisk, perAction, calculatedAction, rules, checks);
         checkCumulative(dealContext, detail, actRisk, perAction, checks);
-        checkSimultaneous(dealContext, detail, appetite, rules, base, entryAnchor, actRisk, calculatedAction, checks);
+        checkSimultaneous(dealContext, detail, appetite, rules, base, entryAnchor, actRisk,
+                stopPriceAfterAct(calculatedAction, dealContext), checks);
         checkCatastrophicNotional(dealContext, detail, appetite, rules, base, entryAnchor, actNotional, checks);
     }
 
@@ -397,10 +503,9 @@ public class RiskValidator {
      */
     private void checkSimultaneous(DealContext dealContext, StrategyDetail detail, Tenant appetite,
                                    InstrumentExternalRules rules, BigDecimal base, BigDecimal entryAnchor,
-                                   BigDecimal actRisk, CalculatedStrategyAction calculatedAction,
+                                   BigDecimal actRisk, BigDecimal stopAfterAct,
                                    List<RiskCheckResult> checks) {
-        BigDecimal livePositionRisk = livePositionRiskAtStop(dealContext, rules, entryAnchor,
-                stopPriceAfterAct(calculatedAction, dealContext));
+        BigDecimal livePositionRisk = livePositionRiskAtStop(dealContext, rules, entryAnchor, stopAfterAct);
         if (isNull(livePositionRisk)) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.PROTECTION_COVERAGE_REDUCED,
                     "No stop level remains after the act while the episode is live", null));
@@ -722,12 +827,10 @@ public class RiskValidator {
      * асимметрично: заниженная ставка освобождает бюджет риска и даёт
      * позицию больше положенной.
      */
-    private void checkFeeRate(CalculatedPrice price, InstrumentExternalRules rules, DealContext dealContext,
+    private void checkFeeRate(Boolean touchesStopLevel, InstrumentExternalRules rules, DealContext dealContext,
                               List<RiskCheckResult> checks) {
-        boolean touchesStopLevel = nonNull(price.getStopLossPrice())
-                && nonNull(price.getStopLossPrice().getTriggerPrice());
         boolean episodeLive = nonNull(dealContext.getDeal().livePosition());
-        if (isFalse(touchesStopLevel || episodeLive)) {
+        if (isFalse(touchesStopLevel) && isFalse(episodeLive)) {
             return;
         }
         if (isNull(rules.takerFeeRate())) {
@@ -736,39 +839,57 @@ public class RiskValidator {
         }
     }
 
+    /** Действие ставит либо переносит уровень остановки убытка. */
+    private Boolean touchesStopLevel(CalculatedPrice price) {
+        return nonNull(price.getStopLossPrice()) && nonNull(price.getStopLossPrice().getTriggerPrice());
+    }
+
     /**
-     * Проверки средств счёта — признаки обязательств и достаточность
-     * свободной маржи — по СВЕЖЕМУ снимку средств
+     * Проверки средств счёта — режим счёта и признаки обязательств — по
+     * СВЕЖЕМУ снимку средств; достаточность свободной маржи вызывающий меряет по
+     * возвращённой строке, и только у действия, создающего риск
      * (docs/components/RiskValidator.md §«Проверки средств счёта»).
      *
-     * <p><b>Меряются только на свежем снимке, и это названное ограничение, а
-     * не пропуск.</b> Свежесть обеспечивает обработчик предвходовой
-     * проверки добычей до преконтроля; на стадиях сопровождения её не
-     * обеспечивает никто, и там снимок обычно старше толерантности. Отказ по
-     * несвежести уводил бы такую сделку в аварийный контур — карта реакции
-     * ведёт недобытый операнд при живом риске в {@code ERROR}, — а проверка
-     * по старому снимку мерила бы не то состояние счёта.
+     * <p><b>Меряются только на свежем снимке — тем же предикатом и той же
+     * толерантностью, по которым добычу заказывает обработчик предвходовой
+     * проверки.</b> Акт, создающий риск, с несвежим снимком сюда не доходит
+     * ни на одной стадии транша: на входе снимок добыт до работы, на
+     * сопровождении исполнитель откладывает акт до расчёта, и проход
+     * заказывает добычу (отсрочка до свежего снимка —
+     * docs/components/models/ActionPlan.md). Несвежий снимок здесь бывает
+     * только у действий, риска не создающих, — защитного и снятия защиты:
+     * они свежести не ждут, и проверки средств у них остаются неизмеренными,
+     * потому что отсрочка защиты ради проверки контура ослабляла бы то, что
+     * защищает.
+     *
+     * <p><b>Кода несвежести у преконтроля нет.</b> Отказ по несвежести при
+     * живом риске — код вне карв-аута, и карта реакции ведёт его в
+     * {@code ERROR}; проверка по старому снимку мерила бы не то состояние
+     * счёта и ошибалась бы в разрешающую сторону
+     * (docs/components/models/RiskCheckResult.md).
      *
      * <p><b>Свежий снимок без полной строки расчётной валюты — отказ
      * {@code BALANCE_INVALID}:</b> снимок, обязанный её нести, негоден, а
      * пустой остаток нулём и благоприятным умолчанием не подменяется
      * (docs/rules/absent-value-semantics.md).
+     *
+     * @return полная строка расчётной валюты свежего снимка; пусто —
+     *         проверки средств не меряются либо снимок негоден
      */
-    private void checkAccountFunds(CalculatedStrategyAction calculatedAction, DealContext dealContext,
-                                   InstrumentExternalRules rules, AccountInstrumentState pairState,
-                                   List<RiskCheckResult> checks) {
+    private Balance checkAccountFunds(DealContext dealContext, List<RiskCheckResult> checks) {
         if (isFalse(dealContext.balanceFresh(properties.getBalanceFreshness()))) {
-            return;
+            return null;
         }
+        checkAccountMode(dealContext.getBalanceContainer(), checks);
         Balance settlement = dealContext.settlementBalance();
         if (isNull(settlement) || isNull(settlement.getExternalCashBalance())
                 || isNull(settlement.getExternalEquity()) || isNull(settlement.getExternalAvailableBalance())) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.BALANCE_INVALID,
                     "Fresh balance snapshot carries no complete settlement currency row", null));
-            return;
+            return null;
         }
         checkBorrowOrDebt(settlement, checks);
-        checkBalanceEnough(calculatedAction, dealContext, rules, pairState, settlement, checks);
+        return settlement;
     }
 
     /**
@@ -780,11 +901,14 @@ public class RiskValidator {
      * <p><b>Область — всякое проверяемое действие</b>, как у режима маржи:
      * признак описывает состояние контура, а не класс акта.
      *
-     * <p><b>Признак выразим лишь частью.</b> Явных полей обязательств
-     * площадки (заём, замороженное под заём, проценты) снимок не несёт, а
-     * обязательства в иных валютах не видит вовсе — снимок добывается по
-     * одной расчётной валюте (docs/components/RiskValidator.md §«Проверки
-     * средств счёта»).
+     * <p><b>Эта проверка — половина пары, и заём она не ловит.</b> Знак
+     * остатка ловит долг без займа; заём площадка даёт лишь в режимах счёта
+     * вне контура, и исключает его вторая половина — режим счёта. Поэтому
+     * явных полей обязательств площадки снимок не несёт намеренно: в
+     * контурном режиме они описывали бы то, чего нет по построению. Долг
+     * иной валюты операндом акта не является, и снимок остаётся по одной
+     * расчётной валюте (docs/components/RiskValidator.md §«Проверки средств
+     * счёта»).
      */
     private void checkBorrowOrDebt(Balance settlement, List<RiskCheckResult> checks) {
         BigDecimal cash = settlement.getExternalCashBalance();
@@ -794,6 +918,31 @@ public class RiskValidator {
                     "Settlement currency " + settlement.getExternalCurrency() + " carries a liability: cash "
                             + cash + ", equity " + equity, cash.min(equity)));
         }
+    }
+
+    /**
+     * Режим счёта и режим позиций — посылки контура, а не данность
+     * (docs/rules/trading-constraints.md): контур держит фьючерсный режим, в
+     * котором площадка займа не даёт по построению, и нетто-позиции. Иное —
+     * отказ {@code ACCOUNT_MODE_OUT_OF_CONTOUR} (docs/spec/risk-limits.json,
+     * величина {@code accountModeOutOfContour}).
+     *
+     * <p><b>Пустой режим свежего снимка — тоже выход из контура:</b>
+     * непроверенная посылка выполненной не читается (docs/concept.md П1).
+     * Меряется на том же свежем снимке, что признаки обязательств, и на
+     * всяком проверяемом действии: признак описывает контур, а не класс
+     * акта. Строки расчётной валюты проверка не требует — режим несёт
+     * контейнер снимка, а не его валютная строка. Сам вопрос «режим вне
+     * контура» задаёт модель снимка —
+     * {@link BalanceContainer#isAccountModeOutOfContour()}.
+     */
+    private void checkAccountMode(BalanceContainer container, List<RiskCheckResult> checks) {
+        if (isFalse(container.isAccountModeOutOfContour())) {
+            return;
+        }
+        checks.add(RiskCheckResult.blocked(RiskCheckCode.ACCOUNT_MODE_OUT_OF_CONTOUR,
+                "Account mode out of contour: account " + container.getAccountMode()
+                        + ", positions " + container.getPositionMode(), null));
     }
 
     /**
@@ -1063,6 +1212,218 @@ public class RiskValidator {
         }
     }
 
+    /**
+     * Инвариант «ликвидация за стопом»: ближайший к ликвидации уровень
+     * остановки убытка лежит между ценой и границей ликвидации
+     * (docs/rules/risk-policy.md, правило о ликвидации до входа).
+     *
+     * <p><b>Тропы две, и различает их класс акта.</b> Акт, создающий риск,
+     * меняет позицию, и её ликвидацию площадка ещё не называла: граница —
+     * ОЦЕНКА позиции после акта (docs/spec/risk-limits.json, величина
+     * {@code entryStopBeforeLiquidation}). У прочих актов позиция не
+     * меняется, и граница — цена ликвидации, которую площадка называет у
+     * живой позиции.
+     *
+     * <p><b>Неизмеренная оценка — тот же отказ, а не проход:</b> тиров нет,
+     * позиция выше последнего тира, уровень живой позиции не резолвится —
+     * неизмеренный инвариант выполненным не читается (docs/concept.md П1).
+     *
+     * <p><b>Операнд, чья пустота уже отказ СВОИМ кодом, проверку молчит</b>,
+     * как у прочих уровневых проверок и у достаточности маржи: уровня акта
+     * нет — {@code RISK_CREATING_ENTRY_WITHOUT_STOP}; якоря либо плановой
+     * цены акта нет — {@code CALCULATED_ACTION_INVALID} у потолков; плеча
+     * нет — {@code LEVERAGE_NOT_CONFIGURED}; ставки нет —
+     * {@code FEE_RATE_UNAVAILABLE}. Вердикт в каждом из этих случаев уже
+     * отказ, и второй код о том же операнде диагностики не добавил бы.
+     */
+    private void checkLiquidation(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                                  InstrumentExternalRules rules, AccountInstrumentState pairState,
+                                  BigDecimal entryAnchor, List<RiskCheckResult> checks) {
+        StrategyTradeDirection direction = dealContext.getDeal().getDirection();
+        ResolvedStopLossPrice actStop = calculatedAction.getCalculatedPrice().getStopLossPrice();
+        if (isFalse(isRiskCreatingEntry(calculatedAction.getSourceAction()))) {
+            checkLiquidationGuard(actStop, dealContext.getDeal().livePosition(), direction, checks);
+            return;
+        }
+        if (isNull(actStop) || isNull(actStop.getTriggerPrice()) || isNull(entryAnchor)
+                || isNull(calculatedAction.getCalculatedPrice().getRoundedPrice())
+                || isNull(pairState.getLeverage()) || isNull(rules.takerFeeRate())) {
+            return;
+        }
+        BigDecimal nearestStop = stopNearestLiquidation(actStop.getTriggerPrice(), dealContext);
+        if (isNull(nearestStop)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION,
+                    "Liquidation before stop not measured: stop level of the position after the act"
+                            + " is not resolved", null));
+            return;
+        }
+        BigDecimal bound = liquidationBoundAfterAct(calculatedAction, dealContext, rules, pairState, entryAnchor);
+        if (isNull(bound)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION,
+                    "Liquidation before stop not measured: no position tier covers the position after the act",
+                    nearestStop));
+            return;
+        }
+        boolean beforeLiquidation = StrategyTradeDirection.LONG.equals(direction)
+                ? nearestStop.compareTo(bound) > 0
+                : nearestStop.compareTo(bound) < 0;
+        if (isFalse(beforeLiquidation)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION,
+                    "Stop-loss not ahead of liquidation bound after the act " + bound, nearestStop));
+        }
+    }
+
+    /**
+     * Уровень остановки убытка позиции после акта, ближайший к ликвидации:
+     * наименее благоприятный из устанавливаемого актом и действующего на всю
+     * позицию — у LONG нижний, у SHORT верхний (docs/spec/risk-limits.json,
+     * величина {@code stopNearestLiquidation}). Позиция на инструменте одна,
+     * и первым к её ликвидации обязан прийти самый дальний стоп.
+     *
+     * <p><b>Пусто при живом эпизоде без действующего уровня:</b> хоть один
+     * транш с экспозицией своего уровня не несёт, и уровень акта вместо
+     * неизвестного не подставляется. Живого эпизода и действующего уровня
+     * нет — уровень акта.
+     */
+    private BigDecimal stopNearestLiquidation(BigDecimal actLevel, DealContext dealContext) {
+        BigDecimal liveLevel = dealContext.getDeal().currentStopLevel();
+        if (isNull(liveLevel)) {
+            return isTrue(liveEpisode(dealContext.getDeal().livePosition())) ? null : actLevel;
+        }
+        return StrategyTradeDirection.LONG.equals(dealContext.getDeal().getDirection())
+                ? actLevel.min(liveLevel)
+                : actLevel.max(liveLevel);
+    }
+
+    /**
+     * Граница ликвидации, с которой сверяется стоп: оценка позиции после
+     * акта, а при живом эпизоде с наблюдённой ценой ликвидации площадки —
+     * ближайшая ко входу из двух, у LONG верхняя, у SHORT нижняя
+     * (docs/spec/risk-limits.json, величина {@code liquidationBoundAfterAct}).
+     * Площадка видит маржу, убывшую на финансировании, которой оценка не
+     * видит; строже она — лишний отказ, а не пропуск. Оценки нет — пусто.
+     */
+    private BigDecimal liquidationBoundAfterAct(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                                                InstrumentExternalRules rules, AccountInstrumentState pairState,
+                                                BigDecimal entryAnchor) {
+        BigDecimal estimate = estimatedLiquidationPrice(calculatedAction, dealContext, rules, pairState,
+                entryAnchor);
+        Position live = dealContext.getDeal().livePosition();
+        if (isNull(estimate) || isFalse(liveEpisode(live)) || isNull(live.getExternalLiquidationPrice())) {
+            return estimate;
+        }
+        return StrategyTradeDirection.LONG.equals(dealContext.getDeal().getDirection())
+                ? estimate.max(live.getExternalLiquidationPrice())
+                : estimate.min(live.getExternalLiquidationPrice());
+    }
+
+    /**
+     * Оценка цены ликвидации изолированной позиции после акта
+     * (docs/spec/risk-limits.json, величина {@code estimatedLiquidationPrice}):
+     * у LONG {@code avg·(1 − 1/L + f)/(1 − mmr − f)}, у SHORT
+     * {@code avg·(1 + 1/L − f)/(1 + mmr + f)}. Обе комиссии стоят на стороне
+     * приближения ликвидации — ошибка консервативна.
+     *
+     * <p><b>Пусто — не измерено:</b> тир позиции не найден либо рабочее
+     * плечо пары непозитивно. Ни то, ни другое нулём и соседним значением
+     * не подменяется.
+     */
+    private BigDecimal estimatedLiquidationPrice(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                                                 InstrumentExternalRules rules, AccountInstrumentState pairState,
+                                                 BigDecimal entryAnchor) {
+        Integer leverage = pairState.getLeverage();
+        BigDecimal feeRate = rules.takerFeeRate();
+        if (isNull(leverage) || leverage <= 0 || isNull(feeRate)) {
+            return null;
+        }
+        BigDecimal contracts = postActContracts(calculatedAction, dealContext);
+        BigDecimal notional = postActNotional(calculatedAction, dealContext, rules, entryAnchor);
+        BigDecimal maintenanceMarginRate = postActMaintenanceMarginRate(rules.getPositionTiers(), contracts);
+        if (isNull(maintenanceMarginRate) || contracts.signum() <= 0) {
+            return null;
+        }
+        BigDecimal average = notional.divide(contracts.multiply(rules.contractValue()), DomainMath.CONTEXT);
+        BigDecimal inverseLeverage = ONE.divide(new BigDecimal(leverage), DomainMath.CONTEXT);
+        boolean isLong = StrategyTradeDirection.LONG.equals(dealContext.getDeal().getDirection());
+        BigDecimal numerator = isLong
+                ? ONE.subtract(inverseLeverage).add(feeRate)
+                : ONE.add(inverseLeverage).subtract(feeRate);
+        BigDecimal denominator = isLong
+                ? ONE.subtract(maintenanceMarginRate).subtract(feeRate)
+                : ONE.add(maintenanceMarginRate).add(feeRate);
+        if (denominator.signum() <= 0) {
+            return null;
+        }
+        return average.multiply(numerator).divide(denominator, DomainMath.CONTEXT);
+    }
+
+    /**
+     * Размер позиции, которую сделка будет держать, когда нальются её живые
+     * ноги и проверяемый акт: неисполненные контракты живых ног входа, живой
+     * эпизод и акт (docs/spec/risk-limits.json, величина
+     * {@code postActContracts}). Слагаемые те же, что у нотинала
+     * катастрофического потолка, и по той же причине не пересекаются.
+     */
+    private BigDecimal postActContracts(CalculatedStrategyAction calculatedAction, DealContext dealContext) {
+        BigDecimal legs = liveEntryLegs(dealContext).stream()
+                .map(RiskValidator::legUnfilledContracts)
+                .reduce(ZERO, BigDecimal::add);
+        Position live = dealContext.getDeal().livePosition();
+        BigDecimal episode = isTrue(liveEpisode(live)) ? live.getExternalSize() : ZERO;
+        return legs.add(episode).add(calculatedAction.getCalculatedSize().getSizeContracts());
+    }
+
+    /**
+     * Нотинал той же позиции — левая сторона катастрофического неравенства
+     * (docs/spec/risk-limits.json, величина {@code postActNotional}):
+     * экспозиция сделки до акта плюс нотинал акта. Второй суммы не
+     * заводится — слагаемые считают те же формы, что у потолка.
+     *
+     * <p>Плановая цена акта и якорь живого эпизода здесь непусты: их
+     * пустоту проверка отвергает раньше своими кодами, и нулём слагаемое не
+     * подменяется ({@link #checkLiquidation}).
+     */
+    private BigDecimal postActNotional(CalculatedStrategyAction calculatedAction, DealContext dealContext,
+                                       InstrumentExternalRules rules, BigDecimal entryAnchor) {
+        return dealNotional(dealContext, rules, entryAnchor).add(actNotional(calculatedAction, rules));
+    }
+
+    /**
+     * Ставка поддерживающей маржи тира, в который ляжет позиция после акта
+     * (docs/spec/risk-limits.json, величина
+     * {@code postActMaintenanceMarginRate}): на стыке тиров — большая,
+     * ликвидация тогда ближе и оценка консервативна.
+     *
+     * <p><b>Пусто — тира нет:</b> перечень не материализован либо позиция
+     * выше последнего тира. Ставка первого тира вместо неизвестной не
+     * подставляется — у больших позиций ставка больше. Покрывающий тир без
+     * ставки делает пустым и ответ: большая из известных могла бы оказаться
+     * меньше неизвестной. Покрывает ли тир размер, отвечает сам тир —
+     * {@link PositionTier#covers(BigDecimal)}.
+     */
+    private static BigDecimal postActMaintenanceMarginRate(List<PositionTier> tiers, BigDecimal contracts) {
+        List<PositionTier> covering = emptyIfNull(tiers).stream()
+                .filter(tier -> nonNull(tier) && isTrue(tier.covers(contracts)))
+                .collect(Collectors.toList());
+        if (isEmpty(covering) || covering.stream().anyMatch(tier -> isNull(tier.maintenanceMarginRate()))) {
+            return null;
+        }
+        return covering.stream()
+                .map(PositionTier::maintenanceMarginRate)
+                .max(BigDecimal::compareTo)
+                .orElse(null);
+    }
+
+    /** Неисполненная доля ноги входа в контрактах — налитое уже стои́т в живом эпизоде. */
+    private static BigDecimal legUnfilledContracts(Order leg) {
+        return zeroIfNull(leg.getPlannedSizeContracts()).subtract(zeroIfNull(leg.getAccumulatedFillSize()));
+    }
+
+    /**
+     * Сверка стопа с ценой ликвидации, которую площадка называет у живой
+     * позиции, — тропа актов, риска не создающих: позиция ими не меняется.
+     * Цена не наблюдена — проверка не меряется.
+     */
     private void checkLiquidationGuard(ResolvedStopLossPrice stopLoss, Position position,
                                        StrategyTradeDirection direction, List<RiskCheckResult> checks) {
         if (isNull(stopLoss) || isNull(stopLoss.getTriggerPrice())
@@ -1121,13 +1482,14 @@ public class RiskValidator {
                 .build();
     }
 
+    /**
+     * Свёртка перечня в решение: перечень несёт только отказы, поэтому
+     * решение блокирующее ровно при непустом перечне
+     * (docs/components/models/RiskCheckResult.md §«Исход проверки — только
+     * отказ»).
+     */
     private RiskValidationResult aggregate(List<RiskCheckResult> checks) {
-        RiskDecision decision = RiskDecision.ALLOWED;
-        if (checks.stream().anyMatch(check -> RiskCheckStatus.BLOCKED.equals(check.getStatus()))) {
-            decision = RiskDecision.BLOCKED;
-        } else if (checks.stream().anyMatch(check -> RiskCheckStatus.WARNING.equals(check.getStatus()))) {
-            decision = RiskDecision.WARNING;
-        }
+        RiskDecision decision = isEmpty(checks) ? RiskDecision.ALLOWED : RiskDecision.BLOCKED;
         return RiskValidationResult.builder()
                 .decision(decision)
                 .checks(checks)

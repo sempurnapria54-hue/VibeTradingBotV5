@@ -2,10 +2,15 @@ package com.example.audit.domain.model;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import com.example.audit.util.Constants.JournalQueryOperands;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
@@ -39,6 +44,11 @@ import lombok.Value;
  * которых радиуса нет» есть экранный срез, отложенный вместе с прочими
  * (.claude/work/backlog.md §«Состав экранных операций чтения
  * истории — по появлению их потребителя»).
+ *
+ * <p><b>Строковый операнд, названный пустым, — дефект вопроса.</b> Отбор
+ * и идентичность события в курсоре либо не переданы, либо несут значение:
+ * пустое не читается ни значением, ни «отбор не задан»
+ * ({@link #blankOperands()}).
  */
 @Value
 @Builder
@@ -123,5 +133,42 @@ public class JournalQuery {
             return Boolean.FALSE;
         }
         return isNull(cursorOccurredAt) || isNull(cursorEventId);
+    }
+
+    /**
+     * Хотя бы один строковый операнд вопроса назван пустым.
+     *
+     * <p><b>Пустой операнд — отказ, а не значение и не «отбор не задан».</b>
+     * Операнд либо не передаётся, либо несёт значение; третьего прочтения у
+     * пустого нет (docs/models/domain/other/AuditRecord.md §«Как журнал
+     * читается»).
+     */
+    public Boolean hasBlankOperand() {
+        return isNotEmpty(blankOperands());
+    }
+
+    /**
+     * Имена строковых операндов, названных пустыми либо из одних пробельных
+     * символов, — в порядке формы вопроса; пусто, если таких нет.
+     *
+     * <p><b>Непереданный операнд пустым не считается:</b> отсутствие отбора
+     * законно, а отсутствие второй половины курсора — другой повод
+     * ({@link #hasPartialCursor()}). Имена — те, которыми операнд называет
+     * читатель: пояснение отказа обязано назвать операнд.
+     */
+    public List<String> blankOperands() {
+        List<String> blank = new ArrayList<>();
+        collectIfBlank(blank, JournalQueryOperands.CURSOR_EVENT_ID, cursorEventId);
+        collectIfBlank(blank, JournalQueryOperands.EXCHANGE_ACCOUNT_INTERNAL_ID, exchangeAccountInternalId);
+        collectIfBlank(blank, JournalQueryOperands.INSTRUMENT_INTERNAL_ID, instrumentInternalId);
+        collectIfBlank(blank, JournalQueryOperands.DEAL_INTERNAL_ID, dealInternalId);
+        collectIfBlank(blank, JournalQueryOperands.STRATEGY_INTERNAL_ID, strategyInternalId);
+        return blank;
+    }
+
+    private static void collectIfBlank(List<String> blank, String name, String value) {
+        if (nonNull(value) && isBlank(value)) {
+            blank.add(name);
+        }
     }
 }

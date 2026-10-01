@@ -12,6 +12,12 @@ balance snapshot. Получает от `IntegrationService` уже validated
 отсутствии, обновляет account-level поля и полностью заменяет список
 `Balance` (см. `docs/models/domain/core/BalanceContainer.md`).
 
+**Режим счёта и режим позиций приземляются той же транзакцией**, что и
+прочие account-level поля. Пустой режим ответа переносится пустотой, а не
+прежним значением строки: непроверенная посылка контура выполненной не
+читается, и преконтроль отвечает на неё отказом
+(`docs/components/RiskValidator.md`, раздел проверок средств счёта).
+
 Особенности: баланс не управляемая торговая сущность (нет active/closed
 lifecycle, нет status resolver), `REFRESH_BALANCE_COMMAND` не проходит через
 `RiskValidator` (см. `docs/rules/risk-validator-scope.md`). Normal `null`
@@ -24,17 +30,16 @@ settleCurrency / invalid fields → controlled external/account error (см.
 Не знает про raw OKX response и не валидирует OKX-specific поля: цепочка
 `IntegrationService → raw DTO → validation → BalanceContainerMapper →
 BalanceContainerExternalSnapshot → upsert BalanceContainer → replace
-balances`. Исполнение команды объясняется историей (см.
-`docs/rules/audit-not-runtime-source.md`).
+balances`.
 
-**Чем именно объясняется и когда — названо, потому что сегодня не
-объясняется ничем.** Durable-носитель у исполнения есть: команда идёт
+**Журналом исполнение не объясняется, и это сужение решением, а не
+недостроенная фича.** Durable-носитель у исполнения есть: команда идёт
 звеном системного действия `REFRESH_DEAL_CONTEXT_ACTION`, у которого полная
-тропа статусов (`docs/lifecycles/DealActionState.md`). В журнал исполнение
-уедет вместе с появлением **класса события на переход строки исполнения**;
-сегодня такого класса нет ни одного, и клейм правила **верен и не
-обеспечен**. Дом ограничения — `.claude/work/backlog.md`, секция о классе
-события на переход строки исполнения.
+тропа статусов (`docs/lifecycles/DealActionState.md`). Класс события на
+переход строки исполнения не заводится; объясняются решения, зависящие от
+средств, — операндами их собственных событий. Дом сужения —
+`docs/rules/audit-not-runtime-source.md`; довод и условие возврата —
+`.claude/decisions/execution-row-event-class-declined.md`.
 
 ## Первое наблюдение базы риска
 

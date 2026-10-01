@@ -1,11 +1,15 @@
 package com.example.connector.okx.unit.mapping;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.connector.okx.mapping.InstrumentExternalRulesMapper;
 import com.example.connector.okx.snapshot.InstrumentExternalRulesExternalSnapshot;
+import com.example.connector.okx.snapshot.PositionTierExternalSnapshot;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingbot.domain.model.core.instrument.PositionTier;
 import java.lang.reflect.Field;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -55,7 +59,7 @@ class InstrumentRulesToSnapshotTest {
     @DisplayName("U15.1 — пятнадцать сырых строк переносятся один к одному, перечни не резолвятся")
     void u15_1_fifteenRawStringsAreCarriedOneToOne() {
         InstrumentExternalRulesExternalSnapshot built =
-                mapper.integrationToSnapshot(OkxFixture.instrument());
+                mapper.integrationToSnapshot(OkxFixture.instrument(), null);
 
         assertThat(built.getExternalInstrumentId()).isEqualTo(OkxFixture.INSTRUMENT);
         assertThat(built.getExternalInstrumentType()).isEqualTo("SWAP");
@@ -185,11 +189,73 @@ class InstrumentRulesToSnapshotTest {
         assertThat(rules.getExternalInstrumentId()).isEqualTo(OkxFixture.INSTRUMENT);
     }
 
+    /** Тиры едут в снапшот сырыми строками, как прочие поля правил. */
+    @Test
+    @DisplayName("U15.15 — позиционные тиры семьи едут в снапшот сырыми строками в порядке ответа")
+    void u15_15_positionTiersAreCarriedRawInResponseOrder() {
+        InstrumentExternalRulesExternalSnapshot built = mapper.integrationToSnapshot(OkxFixture.instrument(),
+                List.of(OkxFixture.positionTier("1", "0", "1000", "0.004"),
+                        OkxFixture.positionTier("2", "1000", "5000", "0.006")));
+
+        assertThat(built.getExternalPositionTiers()).hasSize(2);
+        PositionTierExternalSnapshot second = built.getExternalPositionTiers().get(1);
+        assertThat(second.getExternalMinSize()).isEqualTo("1000");
+        assertThat(second.getExternalMaxSize()).isEqualTo("5000");
+        assertThat(second.getExternalMaintenanceMarginRate()).isEqualTo("0.006");
+        assertThat(built.getExternalTickSize()).isEqualTo("0.01");
+    }
+
+    /** Разбор в числа — на материализации, как у прочих чисел правил. */
+    @Test
+    @DisplayName("U15.16 — материализация разбирает тиры в числа")
+    void u15_16_materializationParsesTheTiers() {
+        InstrumentExternalRules rules = mapper.snapshotToDomain(snapshot()
+                .externalPositionTiers(List.of(PositionTierExternalSnapshot.builder()
+                        .externalMinSize("0")
+                        .externalMaxSize("1000")
+                        .externalMaintenanceMarginRate("0.004")
+                        .build()))
+                .build());
+
+        assertThat(rules.getPositionTiers()).hasSize(1);
+        PositionTier tier = rules.getPositionTiers().getFirst();
+        assertThat(tier.minSize()).isEqualByComparingTo("0");
+        assertThat(tier.maxSize()).isEqualByComparingTo("1000");
+        assertThat(tier.maintenanceMarginRate()).isEqualByComparingTo("0.004");
+    }
+
+    /** Пустота остаётся пустотой: «не прочли» и «нет» оценке ликвидации неразличимы. */
+    @Test
+    @DisplayName("U15.17 — правила без тиров материализуются с пустыми тирами, а не с пустым перечнем")
+    void u15_17_rulesWithoutTiersKeepTheTiersEmpty() {
+        InstrumentExternalRules rules = mapper.snapshotToDomain(
+                mapper.integrationToSnapshot(OkxFixture.instrument(), null), 42L);
+
+        assertThat(rules.getPositionTiers()).isNull();
+        assertThat(rules.getExternalTickSize()).isEqualTo("0.01");
+    }
+
+    /** Неразбираемое число отвергает сеть разбора шлюза — классом, который она и ловит. */
+    @Test
+    @DisplayName("U15.18 — неразбираемое число тира отказывает на материализации")
+    void u15_18_anUnparsableTierNumberFailsOnMaterialization() {
+        InstrumentExternalRulesExternalSnapshot broken = snapshot()
+                .externalPositionTiers(List.of(PositionTierExternalSnapshot.builder()
+                        .externalMinSize("0")
+                        .externalMaxSize("1000")
+                        .externalMaintenanceMarginRate("n/a")
+                        .build()))
+                .build();
+
+        assertThatThrownBy(() -> mapper.snapshotToDomain(broken, 42L))
+                .isInstanceOf(NumberFormatException.class);
+    }
+
     /** Охрана конъюнктивна (звено `Z1`): пустота обоих источников — и только она — даёт пустоту. */
     @Test
     @DisplayName("U15.14 — пустота вместо снапшота: порознь у формы без ключа и с ключом")
     void u15_14_emptinessMeetsAConjunctiveGuard() {
-        assertThat(mapper.snapshotToDomain(null)).isNull();
+        assertThat(mapper.snapshotToDomain((InstrumentExternalRulesExternalSnapshot) null)).isNull();
 
         InstrumentExternalRules withKeyOnly = mapper.snapshotToDomain(null, 42L);
 

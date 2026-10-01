@@ -23,10 +23,57 @@ public class CandleGroupDataService {
 
     private final CandleGroupRepository repository;
     private final CandleGroupMapper mapper;
+    private final PointWriteAudit audit;
 
     @Transactional
     public CandleGroup save(CandleGroup group) {
         return mapper.persistenceToDomain(repository.save(mapper.domainToPersistence(group)));
+    }
+
+    /**
+     * Итог шага цикла загрузки — статус, счёт, фактические границы и
+     * попытки докачки — точечной записью, если статус и горизонт группы
+     * остались теми, что шаг застал. Горизонт не пишется: его писатель —
+     * приём требования потребителя (docs/lifecycles/CandleGroup.md §«Возврат
+     * к `BACKFILL` по углублённому требованию»).
+     *
+     * @param group         группа с итогом шага
+     * @param loadedStatus  статус, застанный в начале шага
+     * @param loadedHorizon горизонт, застанный в начале шага; пусто — «вся история»
+     * @return записан ли итог: ложь — группу переписали посреди шага
+     */
+    @Transactional
+    public Boolean saveLoadingStep(CandleGroup group, CandleGroup.Status loadedStatus, Long loadedHorizon) {
+        Integer written = repository.applyLoadingStep(group.getId(), group.getStatus().name(), group.getCount(),
+                group.getActualFirstUtcMillis(), group.getActualLastUtcMillis(), group.getRepairAttempts(),
+                loadedStatus.name(), loadedHorizon, audit.moment(), audit.writer());
+        return written > 0;
+    }
+
+    /**
+     * Углублённый горизонт и статус, выведенный из него, — точечной
+     * записью, если статус и горизонт группы остались теми, что приём
+     * требования застал. Счёт, границы и попытки докачки не пишутся: их
+     * писатель — шаг цикла загрузки (docs/lifecycles/CandleGroup.md
+     * §«Возврат к `BACKFILL` по углублённому требованию»).
+     *
+     * @param group         группа с углублённым горизонтом и статусом
+     * @param loadedStatus  статус, застанный приёмом требования
+     * @param loadedHorizon горизонт, застанный приёмом требования; пусто — «вся история»
+     * @return записан ли горизонт: ложь — шаг цикла переписал группу между чтением и записью
+     */
+    @Transactional
+    public Boolean saveDeepenedHorizon(CandleGroup group, CandleGroup.Status loadedStatus, Long loadedHorizon) {
+        Integer written = repository.applyDeepenedHorizon(group.getId(), group.getPlannedFirstUtcMillis(),
+                group.getStatus().name(), loadedStatus.name(), loadedHorizon, audit.moment(), audit.writer());
+        return written > 0;
+    }
+
+    @Transactional(readOnly = true)
+    public CandleGroup getRequiredById(Long id) {
+        return repository.findById(id)
+                .map(mapper::persistenceToDomain)
+                .orElseThrow(() -> new IllegalArgumentException("Candle group not found: " + id));
     }
 
     @Transactional(readOnly = true)

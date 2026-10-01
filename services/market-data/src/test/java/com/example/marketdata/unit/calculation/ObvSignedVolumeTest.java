@@ -12,6 +12,7 @@ import com.example.marketdata.domain.service.indicator.ObvCalculator;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.indicator.ObvValue;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -29,11 +30,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Базовая сборка:</b> параметры знаковой суммы объёма; ряд закрытых
  * свечей с объявленным объёмом; прогрев переопределён единицей — первому
- * бару предыдущего закрытия не даёт никто.
- *
- * <p>Клетка `U9.6` (непроставленный объём читается нулём — M-8) и `U9.9`
- * (класс выведения прогрева у кумулятивного типа в доме отсутствует — M-1)
- * кода не получили.
+ * бару предыдущего закрытия не даёт никто. Затравка — последнее записанное
+ * значение ряда — подаётся только клетками `U9.10` и `U9.11`; прочие считают ряд без
+ * неё (docs/spec/indicator-calculation.json, `obvSeed`, `obvNext`).
  */
 class ObvSignedVolumeTest {
 
@@ -95,6 +94,101 @@ class ObvSignedVolumeTest {
         assertThatCode(() -> assertThat(calculate(series(new String[] {"100"}, new String[] {"5"}))).isEmpty())
                 .as("исключения нет")
                 .doesNotThrowAnyException();
+    }
+
+    /**
+     * Непроставленный объём не читается нулём: бар 2 с выросшим закрытием
+     * значения не имеет, бар 3 продолжает сумму от значения бара 1 без
+     * вклада бара 2, а бар 4 с равным закрытием значение имеет — объём в
+     * его шаг не входит.
+     */
+    @Test
+    @DisplayName("U9.6 — объём баров 2 и 4 пуст: у бара 2 (рост) значения нет, бар 3 несёт 6+8=14, бар 4 (равное) — 14")
+    void u9_6_anUnsetVolumeIsNotReadAsZero() {
+        List<Candle> candles = series(new String[] {"100", "101", "102", "103", "103"},
+                new String[] {"5", "6", "7", "8", "9"});
+        candles.get(2).setVolume(null);
+        candles.get(4).setVolume(null);
+
+        List<IndicatorValue> values = calculate(candles);
+
+        assertThat(values).extracting(IndicatorValue::getCandleTimestamp)
+                .as("у бара с изменившимся закрытием и пустым объёмом значения нет")
+                .containsExactly(barAt(1), barAt(3), barAt(4));
+        assertThat(((ObvValue) values.get(0)).getObv()).isEqualByComparingTo("6");
+        assertThat(((ObvValue) values.get(1)).getObv())
+                .as("предыдущее определённое значение плюс собственный объём — вклада пропущенного бара нет")
+                .isEqualByComparingTo("14");
+        assertThat(((ObvValue) values.get(2)).getObv())
+                .as("при равном закрытии значение есть и равно предыдущему")
+                .isEqualByComparingTo("14");
+    }
+
+    /** Прогрев не переопределён — выведенный прогрев типа равен единице. */
+    @Test
+    @DisplayName("U9.9 — прогрев не переопределён: первое значение стои́т на баре 1 — втором баре ряда")
+    void u9_9_theDerivedWarmupIsOneBar() {
+        List<IndicatorValue> values = calculator.calculate(INSTRUMENT_ID, COMPUTATION_ID,
+                series(new String[] {"100", "101", "102"}, new String[] {"5", "6", "7"}), obvParams(null));
+
+        assertThat(values).extracting(IndicatorValue::getCandleTimestamp)
+                .containsExactly(barAt(1), barAt(2));
+    }
+
+    /**
+     * Затравка — последнее записанное значение ряда на баре 2 — продолжает
+     * сумму с бара после неё: бары до затравки и она сама значений не
+     * получают, а первое значение равно затравке плюс знаковый объём своего
+     * бара.
+     */
+    @Test
+    @DisplayName("U9.10 — затравка 1000 на баре 2: значения только на барах 3 и 4 — 1000−4=996 и 996+5=1001")
+    void u9_10_aSeedContinuesTheStoredSeriesFromTheBarAfterIt() {
+        List<Candle> candles = series(new String[] {"100", "101", "103", "102", "104"},
+                new String[] {"1", "2", "3", "4", "5"});
+        ObvValue seed = new ObvValue();
+        seed.setCandleTimestamp(barAt(2));
+        seed.setObv(new BigDecimal("1000"));
+
+        List<IndicatorValue> values = calculator.calculate(INSTRUMENT_ID, COMPUTATION_ID, candles, obvParams(1),
+                seed);
+
+        assertThat(values).extracting(IndicatorValue::getCandleTimestamp)
+                .as("на баре затравки и до него значений нет")
+                .containsExactly(barAt(3), barAt(4));
+        assertThat(((ObvValue) values.get(0)).getObv())
+                .as("затравка плюс знаковый объём бара, а не нуль начала окна")
+                .isEqualByComparingTo("996");
+        assertThat(((ObvValue) values.get(1)).getObv()).isEqualByComparingTo("1001");
+    }
+
+    /**
+     * Продолженный ряд прогрев уже прошёл в проходе, записавшем затравку, —
+     * прогрев больше номера любого бара окна не отсекает ни одного бара после
+     * затравки. Клетка охраняет ветвь затравки, которую `U9.10` с прогревом 1
+     * не различает: там номер каждого бара после затравки и так не меньше
+     * прогрева.
+     */
+    @Test
+    @DisplayName("U9.11 — затравка 1000 на баре 1, прогрев 10 при пяти барах: значения на барах 2, 3, 4 — 1003, 999, 1004")
+    void u9_11_aContinuedSeriesIsNotCutByAWarmupBeyondTheBarIndex() {
+        List<Candle> candles = series(new String[] {"100", "101", "103", "102", "104"},
+                new String[] {"1", "2", "3", "4", "5"});
+        ObvValue seed = new ObvValue();
+        seed.setCandleTimestamp(barAt(1));
+        seed.setObv(new BigDecimal("1000"));
+
+        List<IndicatorValue> values = calculator.calculate(INSTRUMENT_ID, COMPUTATION_ID, candles, obvParams(10),
+                seed);
+
+        assertThat(values).extracting(IndicatorValue::getCandleTimestamp)
+                .as("прогрев продолженного ряда не отсекает баров после затравки")
+                .containsExactly(barAt(2), barAt(3), barAt(4));
+        assertThat(((ObvValue) values.get(0)).getObv())
+                .as("затравка плюс знаковый объём первого бара после неё")
+                .isEqualByComparingTo("1003");
+        assertThat(((ObvValue) values.get(1)).getObv()).isEqualByComparingTo("999");
+        assertThat(((ObvValue) values.get(2)).getObv()).isEqualByComparingTo("1004");
     }
 
     /**

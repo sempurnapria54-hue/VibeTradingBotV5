@@ -14,14 +14,17 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
- * Вычислитель стохастического осциллятора: rawK = 100·(close − llv) /
- * (hhv − llv) по окну kPeriod; %K = SMA(smoothPeriod) от rawK; %D =
- * SMA(dPeriod) от %K. warmup ≈ kPeriod + smoothPeriod + dPeriod.
+ * Вычислитель стохастического осциллятора. Сырое значение с исходом
+ * вырожденного окна, две линии и выведенный прогрев —
+ * docs/spec/indicator-calculation.json (`stochasticRawK`,
+ * `indicatorWindowAverage`, `derivedWarmup`).
  */
 @Component
 public class StochasticCalculator implements IndicatorCalculator {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100L);
+
+    /** Середина шкалы — исход окна с нулевым диапазоном (`stochasticRawK`). */
     private static final BigDecimal FLAT_WINDOW_VALUE = BigDecimal.valueOf(50L);
 
     @Override

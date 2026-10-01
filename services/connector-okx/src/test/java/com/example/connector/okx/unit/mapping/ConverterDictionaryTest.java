@@ -7,11 +7,17 @@ import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import com.example.connector.okx.exception.ExternalStatusException;
 import com.example.connector.okx.mapping.OkxResponseConverter;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.balance.AccountMode;
+import com.example.tradingbot.domain.model.core.balance.PositionMode;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Конвертер: словари площадки и перечни — группа `U6` документа
@@ -27,7 +33,9 @@ import org.junit.jupiter.api.Test;
  * (поля нет — обновления не происходит), значение и отказ (поле есть,
  * значение неизвестно). Второй и третий у разных полей решены
  * по-разному, и различие названо: у стороны заявки неизвестное значение
- * отказывает, у ценовой базы триггера — даёт пустоту.
+ * отказывает, у ценовой базы триггера — даёт пустоту. У режимов счёта и
+ * позиций — тоже пустоту: пустой режим преконтроль читает как режим вне
+ * контура (docs/models/mapping/Balance.md).
  */
 class ConverterDictionaryTest {
 
@@ -215,5 +223,56 @@ class ConverterDictionaryTest {
     void u6_26_anEmptyCodeIsNotSuccess() {
         assertThat(converter.ackSuccess("")).isFalse();
         assertThat(converter.ackSuccess(null)).isFalse();
+    }
+
+    /** Словарь режима счёта обходится целиком: преконтроль ветвится по каждому значению. */
+    @ParameterizedTest
+    @CsvSource({"1,SPOT", "2,FUTURES", "3,MULTI_CURRENCY_MARGIN", "4,PORTFOLIO_MARGIN"})
+    @DisplayName("U6.27 — все четыре режима счёта площадки переводятся в домен")
+    void u6_27_allFourAccountLevelsTranslate(String raw, AccountMode expected) {
+        assertThat(converter.accountMode(raw)).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("U6.28 — обрамляющие пробелы режима счёта снимаются")
+    void u6_28_theAccountLevelIsTrimmed() {
+        assertThat(converter.accountMode(" 2 ")).isEqualTo(AccountMode.FUTURES);
+    }
+
+    /** Угаданного режима нет: вне словаря — пустота, а не ближайший режим и не отказ. */
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "5", "futures", "2.0"})
+    @DisplayName("U6.29 — режим счёта вне словаря даёт пустоту")
+    void u6_29_anAccountLevelOutsideTheDictionaryIsEmptiness(String raw) {
+        assertThat(converter.accountMode(raw)).isNull();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  "})
+    @DisplayName("U6.30 — пустой и отсутствующий режим счёта дают пустоту")
+    void u6_30_anEmptyAccountLevelIsEmptiness(String raw) {
+        assertThat(converter.accountMode(raw)).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"net_mode,NET", "long_short_mode,LONG_SHORT"})
+    @DisplayName("U6.31 — оба режима позиций площадки переводятся в домен")
+    void u6_31_bothPositionModesTranslate(String raw, PositionMode expected) {
+        assertThat(converter.positionMode(raw)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"net", "NET_MODE", "hedge_mode"})
+    @DisplayName("U6.32 — режим позиций вне словаря даёт пустоту")
+    void u6_32_aPositionModeOutsideTheDictionaryIsEmptiness(String raw) {
+        assertThat(converter.positionMode(raw)).isNull();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @DisplayName("U6.33 — пустой и отсутствующий режим позиций дают пустоту")
+    void u6_33_anEmptyPositionModeIsEmptiness(String raw) {
+        assertThat(converter.positionMode(raw)).isNull();
     }
 }

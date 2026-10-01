@@ -39,10 +39,10 @@ import org.junit.jupiter.api.Test;
  * с объявлением; чужого живого риска нет, живого эпизода нет; снимок
  * средств свежий; рабочий блок подменён и молчит; диспозиция настоящая.
  *
- * <p><b>Кейс {@code U17.11} не прогоняется</b>: дом объявляет запасное
- * значение причины закрытия транша ненаписуемым, а код пишет его
- * фолбэком (находка {@code F-2}) — двух носителей на одно ожидание
- * достаточно, чтобы ожидания не было.
+ * <p><b>Пустая наследуемая причина терминала не даёт</b> ({@code U17.11}):
+ * запасного значения у причины транша нет, и сделка уходит ошибочной
+ * тропой (docs/lifecycles/DealTranche.md §«Писатель причины закрытия
+ * транша — обработчик терминального ребра»).
  *
  * <p><b>Граница свежести РОВНО на пороге кейса не получает:</b> предикат
  * читает часы процесса напрямую, и детерминизм ему даёт размах — момент
@@ -192,6 +192,19 @@ class TranchePrecheckPassTest {
         assertThat(transition.getNextStatus()).isEqualTo(DealTranche.Status.CLOSED);
         assertThat(transition.getCloseReason()).isEqualTo(DealTranche.CloseReason.STRATEGY_EXIT);
         harness.verifyWorkPassNotRun();
+    }
+
+    @Test
+    @DisplayName("U17.11 — сделка сворачивается без наследуемой причины: ошибочная тропа, ребра и причины нет")
+    void u17_11_aCollapsingDealWithoutAnInheritableReasonEscalates() {
+        DealContext context = contextOf(Deal.Status.EXIT_PENDING, precheckTranche());
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.getDealErrorRequested()).isTrue();
+        assertThat(transition.getNextStatus()).isNull();
+        assertThat(transition.getCloseReason()).isNull();
+        assertThat(transition.hasCommands()).isFalse();
     }
 
     @Test

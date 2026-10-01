@@ -11,7 +11,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>Потолок окна — защита от тяжёлого запроса: в расчёт грузится
  * ограниченное недавнее окно, а не вся история
- * (.claude/rules/codestyle.md §«Выборка данных»). CRON читает
+ * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+ * одного поля»). CRON читает
  * {@code @Scheduled} прямо из плейсхолдера.
  */
 @Getter

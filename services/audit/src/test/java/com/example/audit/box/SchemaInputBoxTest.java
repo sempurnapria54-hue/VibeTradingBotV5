@@ -44,8 +44,11 @@ class SchemaInputBoxTest extends SharedAuditBox {
     /** Возраст события, с которым клетки ходят в тему. */
     private static final Duration EVENT_AGE = Duration.ofMinutes(5);
 
-    /** Единственная миграция цепочки: она у сервиса своя и начинается с неё. */
+    /** Базовая миграция цепочки: цепочка у сервиса своя и начинается с неё. */
     private static final String BASELINE = "1";
+
+    /** Вторая миграция цепочки — комментарий колонки момента разрыва. */
+    private static final String GAP_MOMENT_COMMENT = "2";
 
     /** Идентичность события, которой клетки ставят строку журнала. */
     private static final String EVENT = "E-B10-SCHEMA";
@@ -81,7 +84,7 @@ class SchemaInputBoxTest extends SharedAuditBox {
     void theSchemaIsMigratedAndTheMappingMeetsIt() {
         assertThat(rows.appliedMigrations())
                 .as("цепочка у сервиса одна и накатана со своего начала")
-                .containsExactly(BASELINE);
+                .containsExactly(BASELINE, GAP_MOMENT_COMMENT);
         assertThat(rows.tableNames())
                 .contains(JOURNAL_TABLE, RECEPTION_TABLE, DENIALS_TABLE);
         assertThat(List.of(JOURNAL_TABLE, RECEPTION_TABLE, DENIALS_TABLE))

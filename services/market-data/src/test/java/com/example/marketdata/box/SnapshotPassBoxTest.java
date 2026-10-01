@@ -201,8 +201,8 @@ class SnapshotPassBoxTest extends SharedMarketDataBox {
         stubFullMarket();
         // Ни CREATED, ни CLOSED не пишет ни одна тропа сервиса (находка F-3;
         // писателя снятия с торгов нет — .claude/work/backlog.md
-        // §«Периферийные статусы `Instrument` — онбординговый `HOLD`,
-        // `ERROR`-recovery, повторный онбординг, `CLOSED`»), и состояние
+        // §«Уход инструмента из листинга и повторный онбординг — писатель
+        // `CLOSED`»), и состояние
         // ставится прямо. CREATED взят потому, что онбординговый статус
         // срезов не отсекает: срезу нужна только биржевая идентичность.
         rows.put("update instruments set status = 'CREATED' where external_id = ?", INSTRUMENT);

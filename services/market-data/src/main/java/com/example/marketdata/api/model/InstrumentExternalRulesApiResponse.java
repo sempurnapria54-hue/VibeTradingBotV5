@@ -1,6 +1,7 @@
 package com.example.marketdata.api.model;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -84,4 +85,7 @@ public class InstrumentExternalRulesApiResponse {
 
     @Schema(description = "Ключ комиссионной группы; ставку по нему резолвит владелец счёта")
     private String externalFeeGroupId;
+
+    @Schema(description = "Позиционные тиры изолированной маржи; пусто — тиры не материализованы")
+    private List<PositionTierApiResponse> positionTiers;
 }

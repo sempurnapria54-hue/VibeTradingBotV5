@@ -7,7 +7,8 @@ import lombok.Value;
 /**
  * Снапшот триггерной цены ноги algo-order: биржевой тип и значение.
  * Раздел AlgoOrderExternalSnapshot. См.
- * docs/models/domain/core/AlgoOrder.md (§External snapshots).
+ * docs/models/mapping/AlgoOrder.md (§«AlgoOrderExternalSnapshot →
+ * AlgoOrder»).
  */
 @Value
 @Builder

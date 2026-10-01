@@ -115,6 +115,37 @@ public class OkxConstants {
     /** Путь конфигурации аккаунта (acctLv/posMode, GET). Приватный endpoint. */
     public static final String ACCOUNT_CONFIG_PATH = "/api/v5/account/config";
 
+    /** Режим счёта OKX (acctLv): спотовый. */
+    public static final String ACCOUNT_LEVEL_SPOT = "1";
+
+    /** Режим счёта OKX (acctLv): фьючерсный — режим контура. */
+    public static final String ACCOUNT_LEVEL_FUTURES = "2";
+
+    /** Режим счёта OKX (acctLv): мультивалютная маржа. */
+    public static final String ACCOUNT_LEVEL_MULTI_CURRENCY_MARGIN = "3";
+
+    /** Режим счёта OKX (acctLv): портфельная маржа. */
+    public static final String ACCOUNT_LEVEL_PORTFOLIO_MARGIN = "4";
+
+    /** Режим позиций OKX (posMode): нетто — режим контура. */
+    public static final String POS_MODE_NET = "net_mode";
+
+    /** Режим позиций OKX (posMode): раздельные длинная и короткая. */
+    public static final String POS_MODE_LONG_SHORT = "long_short_mode";
+
+    /**
+     * Путь позиционных тиров (GET). Публичный endpoint: ось запроса —
+     * семья инструмента, а не инструмент
+     * (docs/integrations/okx/contracts/position-tiers.md).
+     */
+    public static final String POSITION_TIERS_PATH = "/api/v5/public/position-tiers";
+
+    /** Имя query-параметра tdMode (режим маржи). */
+    public static final String PARAM_TD_MODE = "tdMode";
+
+    /** Имя query-параметра instFamily (семья инструмента). */
+    public static final String PARAM_INST_FAMILY = "instFamily";
+
     /** Путь выставления плеча инструмента (POST). Приватный endpoint. */
     public static final String ACCOUNT_SET_LEVERAGE_PATH = "/api/v5/account/set-leverage";
 

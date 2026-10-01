@@ -19,6 +19,14 @@ public class InstrumentOkxResponse {
     /** Тип инструмента (instType): SPOT/MARGIN/SWAP/FUTURES/OPTION. */
     private String instType;
 
+    /**
+     * Семья инструмента (instFamily) — операнд запроса позиционных тиров:
+     * площадка отдаёт их по семье, а не по инструменту
+     * (docs/integrations/okx/contracts/position-tiers.md). В снапшот и
+     * домен не переносится.
+     */
+    private String instFamily;
+
     /** Базовая валюта (baseCcy). */
     private String baseCcy;
 

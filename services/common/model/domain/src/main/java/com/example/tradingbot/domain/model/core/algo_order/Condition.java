@@ -11,7 +11,7 @@ import lombok.Setter;
  * AlgoOrder.conditionType. Только условие срабатывания (размер —
  * AlgoOrder.size, closeFraction — strategy/action sizing intent).
  * Персистится jsonb на строке AlgoOrder. См.
- * docs/models/domain/core/AlgoOrder.md (§Condition-модель).
+ * docs/models/domain/core/AlgoOrder.md (§«Условие срабатывания»).
  */
 @Getter
 @Setter

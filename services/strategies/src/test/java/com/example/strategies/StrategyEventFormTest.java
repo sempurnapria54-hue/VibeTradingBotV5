@@ -209,7 +209,7 @@ class StrategyEventFormTest {
                 .as("узел опознаётся положением в дереве: состав и порядок доезжают без ключей")
                 .extracting(StrategyAction::getKey)
                 .containsExactly("entry", "sl");
-        assertThat(detail.getStepsByStatus().get(Deal.Status.EXIT_PENDING).get(0).getActions())
+        assertThat(detail.getStepsByStatus().get(Deal.Status.ACTIVE).get(0).getActions())
                 .extracting(StrategyAction::getKey)
                 .containsExactly("exit-all");
         assertThat(read.definition().getInstrumentInternalId())
@@ -357,6 +357,11 @@ class StrategyEventFormTest {
      * объявления, деталь, транш, шаги обоих уровней и
      * действия трёх видов. Значения ключей — как их выдала бы база
      * владельца.
+     *
+     * <p>Шаг уровня сделки стои́т под {@code ACTIVE} — единственным статусом
+     * сделки, под которым такие шаги отбирают: статус шага в снимке обязан
+     * быть достижимым, а шаг под иным статусом создание отвергает
+     * (docs/rules/strategy-validation.md §«Что проверяется на создании»).
      */
     private Strategy keyedDefinition() {
         StrategyOrderAction entry = new StrategyOrderAction();
@@ -380,7 +385,7 @@ class StrategyEventFormTest {
         detail.setMarketPhaseType(MarketPhase.Type.BULL_TREND);
         detail.setPhaseEntryPolicy(PhaseEntryPolicy.FOLLOW_PHASE);
         detail.setTranches(List.of(tranche));
-        detail.setStepsByStatus(Map.of(Deal.Status.EXIT_PENDING,
+        detail.setStepsByStatus(Map.of(Deal.Status.ACTIVE,
                 List.of(keyedStep(202L, StrategyStepType.EXIT, List.of(exit)))));
 
         StrategyMarketPhaseSetting phaseSetting = new StrategyMarketPhaseSetting();

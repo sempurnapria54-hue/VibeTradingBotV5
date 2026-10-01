@@ -10,8 +10,7 @@
 
 | OKX field | Тип | Семантика |
 |---|---|---|
-| `instId` | string | имя инструмента: сверка expected **и** адресация снапшота в срезе по множеству инструментов (`externalInstrumentId`) |
-| `instType` | string | тип инструмента (для сверки) |
+| `instId` | string | имя инструмента: адресация снапшота в срезе по множеству инструментов (`externalInstrumentId`); с запрошенным инструментом не сверяется (`docs/models/mapping/Position.md`) |
 | `posId` | string | биржевой id позиции |
 | `pos` | string-decimal | размер со знаком (`+` long, `−` short в net mode) |
 | `avgPx` | string-decimal | средняя цена входа |
@@ -21,9 +20,6 @@
 | `upl` | string-decimal | unrealized PnL (по mark) |
 | `cTime` | string-ms | время создания |
 | `uTime` | string-ms | время обновления |
-| `mgnMode` | string | режим маржи (`isolated`/`cross`); adapter сверяет `=isolated` |
-| `posSide` | string | сторона позиции (`net`/`long`/`short`); adapter сверяет `=net` |
-| `lever` | string-decimal | плечо; adapter сверяет `≤` биржевого максимума (`externalMaxLeverage`) |
 
 ### Не используется bot'ом (отбрасывается на маппинге)
 
@@ -52,6 +48,10 @@
 - **Deprecated** (помечены устаревшими): `baseBal`, `quoteBal`,
   `baseBorrowed`, `quoteBorrowed`, `baseInterest`, `quoteInterest`.
 - **Прочее:** `posCcy`, `bizRefId`, `bizRefType`.
+- **Контур и режим:** `instType` (параметр запроса среза, в ответе не
+  читается), `mgnMode`, `posSide`, `lever` — не читаются и не сверяются:
+  посылки, которые они выражают, меряет преконтроль перед действием, а не
+  ответ чтения (`docs/models/mapping/Position.md`).
 
 Причины фильтра: `availPos` не нужен (partial exit — через
 reduce-only `Order`/`AlgoOrder`, не close-position); `bePx` не нужен

@@ -146,6 +146,12 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     /** Потолок проходов сопровождения, за который пакет из четырёх действий обязан исчерпаться. */
     private static final Integer PACKAGE_PASS_LIMIT = 30;
 
+    /** Режим счёта, который держит контур: фьючерсный, займа площадка в нём не даёт. */
+    private static final String CONTOUR_ACCOUNT_MODE = "FUTURES";
+
+    /** Режим мультивалютной маржи: площадка допускает заём — вне контура. */
+    private static final String MULTI_CURRENCY_MARGIN = "MULTI_CURRENCY_MARGIN";
+
     /** Код блок-сета стоящей ступени. */
     private static final String SAFETY_HOLD_CODE = "INSTRUMENT_SAFETY_HOLD";
 
@@ -203,6 +209,54 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
 
         tick(Tick.DEAL_ORCHESTRATOR);
 
+        assertThat(rows.count("orders")).isZero();
+        assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B4.15 — режим счёта вне контура: вход отвергнут бессрочно, транш закрыт без аварии")
+    void aMultiCurrencyAccountModeRejectsTheEntryPermanently() {
+        // Снимок средств приносит режим счёта, и мультивалютная маржа —
+        // режим, где площадка даёт заём: посылка «только свои средства»
+        // построением больше не держится (docs/rules/trading-constraints.md).
+        // Код бессрочен, живого риска у транша нет — реакция та же, что у
+        // B4.4, и различает их только операнд.
+        assignRiskAppetite();
+        openGatedDeal(workingDefinition(), WITH_FEE_RATE,
+                balanceBody(OffsetDateTime.now(ZoneOffset.UTC), MULTI_CURRENCY_MARGIN),
+                Feed.featuresWithPrice(PHASE.name(), LAST_PRICE));
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        assertThat(rows.row("balance_containers", "account_mode", MULTI_CURRENCY_MARGIN)).isNotEmpty();
+        assertThat(trancheStatus()).isEqualTo("CLOSED");
+        assertThat(trancheRow().get("close_reason")).isEqualTo("RISK_CONTROL");
+        assertThat(dealStatus()).isNotEqualTo("ERROR");
+        assertThat(rows.count("orders")).isZero();
+        assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B4.16 — позиционных тиров нет: оценка ликвидации не измерена, вход отвергнут")
+    void anEntryWithoutPositionTiersIsRejectedAsUnmeasuredLiquidation() {
+        // Тиры сняты тем же тиком синка, которым их принёс владелец
+        // каталога: навес правил перечитан без ключа. Неизмеренный
+        // инвариант «ликвидация за стопом» выполненным не читается
+        // (docs/rules/risk-policy.md, правило о ликвидации до входа), и
+        // отказ бессрочен — реакция та же, что у B4.4.
+        assignRiskAppetite();
+        openGatedDeal(workingDefinition());
+        marketData.answers(PEER_INSTRUMENTS + "/" + INSTRUMENT + "/rules",
+                Feed.instrumentRulesWithoutTiers(EXTERNAL_INSTRUMENT));
+        tick(Tick.REGISTRY_PROJECTIONS);
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        assertThat(String.valueOf(rows.row("instruments", "internal_id", INSTRUMENT).get("external_rules")))
+                .doesNotContain("positionTiers");
+        assertThat(trancheStatus()).isEqualTo("CLOSED");
+        assertThat(trancheRow().get("close_reason")).isEqualTo("RISK_CONTROL");
+        assertThat(dealStatus()).isNotEqualTo("ERROR");
         assertThat(rows.count("orders")).isZero();
         assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
     }
@@ -702,13 +756,26 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
      */
     private void openGatedDeal(Strategy definition, Boolean withFeeRate, Boolean freshBalance,
                                String features) {
+        openGatedDeal(definition, withFeeRate, balanceBody(balanceMoment(freshBalance)), features);
+    }
+
+    /**
+     * То же предусловие с НАЗВАННЫМ телом снимка средств: им подаётся
+     * операнд, которого штатный снимок не несёт (режим счёта вне контура).
+     *
+     * @param definition  определение, которым сделка заводится
+     * @param withFeeRate синкать ли ставку комиссии своим тиком
+     * @param balance     тело снимка средств, который отдаёт коннектор
+     * @param features    тело связки фич момента у владельца данных
+     */
+    private void openGatedDeal(Strategy definition, Boolean withFeeRate, String balance, String features) {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
         assignLeverage(ACCOUNT, INSTRUMENT);
         if (Boolean.TRUE.equals(withFeeRate)) {
             syncFeeRate();
         }
         marketData.answers(featuresPath(INSTRUMENT), features);
-        connector.answers(balancePath(ACCOUNT), balanceBody(balanceMoment(freshBalance)));
+        connector.answers(balancePath(ACCOUNT), balance);
         connector.answers(PEER_SERVER_TIME, Feed.serverTime(EXCHANGE_MOMENT));
         activate(definition);
         tick(Tick.ENTRY_SCANNER);
@@ -778,6 +845,17 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
      * @param moment момент снимка у площадки
      */
     private String balanceBody(OffsetDateTime moment) {
+        return balanceBody(moment, CONTOUR_ACCOUNT_MODE);
+    }
+
+    /**
+     * Снимок средств названным моментом и названным режимом счёта; режим
+     * позиций — нетто, как держит контур.
+     *
+     * @param moment      момент снимка у площадки
+     * @param accountMode режим счёта площадки — имя доменного перечня
+     */
+    private String balanceBody(OffsetDateTime moment, String accountMode) {
         String at = moment.toString();
         return """
                 {
@@ -785,6 +863,8 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
                   "externalTotalEquity": "100000",
                   "externalAdjustedEquity": "100000",
                   "externalAvailableEquity": "100000",
+                  "accountMode": "%s",
+                  "positionMode": "NET",
                   "balances": [
                     {
                       "externalCurrency": "USDT",
@@ -796,6 +876,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
                     }
                   ]
                 }
-                """.formatted(at, at);
+                """.formatted(at, accountMode, at);
     }
 }

@@ -31,6 +31,16 @@ final class Feed {
     /** Ключ комиссионной группы счёта: им ставка связывается с навесом. */
     static final String FEE_GROUP = "1";
 
+    /**
+     * Позиционные тиры рабочего инструмента — член тела правил: один тир,
+     * покрывающий всякий размер, с малой ставкой поддержания.
+     */
+    private static final String WORKING_POSITION_TIERS = """
+            ,
+              "positionTiers": [
+                {"minSize": 0, "maxSize": 1000000000, "maintenanceMarginRate": 0.004}
+              ]""";
+
     /** Половина спреда: ею стороны стакана разводятся с последней ценой. */
     private static final BigDecimal SPREAD_HALF = new BigDecimal("0.1");
 
@@ -96,9 +106,38 @@ final class Feed {
      * ставка не резолвится ни при каком синке — сайзинг отказывает
      * {@code FEE_RATE_UNAVAILABLE}.
      *
+     * <p><b>Позиционные тиры объявлены, и они несущие тоже:</b> без них
+     * оценка ликвидации позиции после акта, создающего риск, не
+     * вычисляется, и преконтроль отвергает КАЖДЫЙ вход кодом
+     * {@code STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION} (docs/rules/risk-policy.md,
+     * правило о ликвидации до входа). Тир один и покрывает всякий размер;
+     * ставка поддержания малая, так что при рабочем плече оценка лежит
+     * далеко за стопом всякого кейса.
+     *
      * @param externalId идентичность инструмента на площадке
      */
     static String instrumentRules(String externalId) {
+        return instrumentRules(externalId, WORKING_POSITION_TIERS);
+    }
+
+    /**
+     * Те же справочные правила БЕЗ позиционных тиров: навес у владельца
+     * каталога их не материализовал, и ключа в ответе нет вовсе.
+     *
+     * @param externalId идентичность инструмента на площадке
+     */
+    static String instrumentRulesWithoutTiers(String externalId) {
+        return instrumentRules(externalId, "");
+    }
+
+    /**
+     * Тело справочных правил с названным членом позиционных тиров.
+     *
+     * @param externalId          идентичность инструмента на площадке
+     * @param positionTiersMember член тела с тирами вместе с ведущей запятой;
+     *                            пусто — ключа нет
+     */
+    private static String instrumentRules(String externalId, String positionTiersMember) {
         return """
                 {
                   "externalInstrumentId": "%s",
@@ -114,10 +153,10 @@ final class Feed {
                   "externalFeeGroupId": "%s",
                   "instrumentType": "%s",
                   "status": "LIVE",
-                  "externalState": "live"
+                  "externalState": "live"%s
                 }
                 """.formatted(externalId, INSTRUMENT_TYPE, externalId.split("-")[0], FEE_GROUP,
-                INSTRUMENT_TYPE);
+                INSTRUMENT_TYPE, positionTiersMember);
     }
 
     /**

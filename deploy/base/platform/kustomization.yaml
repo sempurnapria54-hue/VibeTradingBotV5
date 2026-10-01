@@ -26,6 +26,7 @@ resources:
   - operator-eck.yaml
   - operator-kube-prometheus-stack.yaml
   - operator-keycloak.yaml
+  - ingress-controller.yaml
 
 # Синхронизация кластерного слоя — автоматическая, и это не ослабление
 # правила «тропа к деньгам содержит человека». Версия чарта закреплена

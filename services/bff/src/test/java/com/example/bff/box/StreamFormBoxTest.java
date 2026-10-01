@@ -2,11 +2,13 @@ package com.example.bff.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.bff.api.model.stream.AlgoOrderDecidedStreamApiModel;
 import com.example.bff.api.model.stream.AnomalyReportedStreamApiModel;
 import com.example.bff.api.model.stream.DealClosedStreamApiModel;
 import com.example.bff.api.model.stream.DealOpenedStreamApiModel;
 import com.example.bff.api.model.stream.DealShutdownInitiatedStreamApiModel;
 import com.example.bff.api.model.stream.HoldRaisedStreamApiModel;
+import com.example.bff.api.model.stream.HoldReleasedStreamApiModel;
 import com.example.bff.api.model.stream.OrderDecidedStreamApiModel;
 import com.example.bff.api.model.stream.StrategyActivatedStreamApiModel;
 import com.example.bff.api.model.stream.StrategyLifecycleStreamApiModel;
@@ -44,17 +46,23 @@ import org.junit.jupiter.api.Test;
  */
 class StreamFormBoxTest extends SharedBffBox {
 
-    /** Объявленная форма периметра по классу события. */
-    private static final Map<String, Class<? extends Record>> FORMS = Map.of(
-            "ORDER_DECIDED", OrderDecidedStreamApiModel.class,
-            "DEAL_OPENED", DealOpenedStreamApiModel.class,
-            "DEAL_SHUTDOWN_INITIATED", DealShutdownInitiatedStreamApiModel.class,
-            "DEAL_CLOSED", DealClosedStreamApiModel.class,
-            "HOLD_RAISED", HoldRaisedStreamApiModel.class,
-            "ANOMALY_REPORTED", AnomalyReportedStreamApiModel.class,
-            "STRATEGY_ACTIVATED", StrategyActivatedStreamApiModel.class,
-            "STRATEGY_DEACTIVATED", StrategyLifecycleStreamApiModel.class,
-            "STRATEGY_DELETED", StrategyLifecycleStreamApiModel.class);
+    /**
+     * Объявленная форма периметра по классу события. Парами-записями, а не
+     * перечнем аргументов: у {@code Map.of} потолок в десять пар, а классов
+     * больше.
+     */
+    private static final Map<String, Class<? extends Record>> FORMS = Map.ofEntries(
+            Map.entry("ORDER_DECIDED", OrderDecidedStreamApiModel.class),
+            Map.entry("ALGO_ORDER_DECIDED", AlgoOrderDecidedStreamApiModel.class),
+            Map.entry("DEAL_OPENED", DealOpenedStreamApiModel.class),
+            Map.entry("DEAL_SHUTDOWN_INITIATED", DealShutdownInitiatedStreamApiModel.class),
+            Map.entry("DEAL_CLOSED", DealClosedStreamApiModel.class),
+            Map.entry("HOLD_RAISED", HoldRaisedStreamApiModel.class),
+            Map.entry("HOLD_RELEASED", HoldReleasedStreamApiModel.class),
+            Map.entry("ANOMALY_REPORTED", AnomalyReportedStreamApiModel.class),
+            Map.entry("STRATEGY_ACTIVATED", StrategyActivatedStreamApiModel.class),
+            Map.entry("STRATEGY_DEACTIVATED", StrategyLifecycleStreamApiModel.class),
+            Map.entry("STRATEGY_DELETED", StrategyLifecycleStreamApiModel.class));
 
     @Test
     @DisplayName("B7.1 — Доменного класса в проводе нет ни в одном поле")
@@ -139,20 +147,20 @@ class StreamFormBoxTest extends SharedBffBox {
     }
 
     @Test
-    @DisplayName("B7.6 — Девять несомых классов переводятся восемью формами, и это не описка")
-    void b7_6_nineClassesTravelInEightForms() {
+    @DisplayName("B7.6 — Одиннадцать несомых классов переводятся десятью формами, и это не описка")
+    void b7_6_elevenClassesTravelInTenForms() {
         List<Subscription.Frame> frames = everyClassArrived("TF6", "b7-6");
         Set<String> producerClasses = Stream.concat(
                         Arrays.stream(CoreEventType.values()).map(Enum::name),
                         Arrays.stream(StrategyEventType.values()).map(Enum::name))
                 .collect(Collectors.toSet());
 
-        // Доезжают все девять, и класс записи — имя значения перечня.
+        // Доезжают все одиннадцать, и класс записи — имя значения перечня.
         assertThat(frames.stream().map(Subscription.Frame::type))
                 .containsExactlyInAnyOrderElementsOf(producerClasses);
-        assertThat(producerClasses).hasSize(9);
-        // Форм содержимого восемь: деактивация и удаление едут одной.
-        assertThat(frames.stream().map(frame -> contentOf(frame).keySet()).distinct()).hasSize(8);
+        assertThat(producerClasses).hasSize(11);
+        // Форм содержимого десять: деактивация и удаление едут одной.
+        assertThat(frames.stream().map(frame -> contentOf(frame).keySet()).distinct()).hasSize(10);
         // Пустым содержимым не приезжает ни одна.
         assertThat(frames).allSatisfy(frame -> assertThat(contentOf(frame)).isNotEmpty());
     }

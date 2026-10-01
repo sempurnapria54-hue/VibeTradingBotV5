@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.example.platform.security.ActorProvider;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.deal.DealContextService;
@@ -19,11 +20,14 @@ import com.example.tradingcore.domain.deal.DealTerminalGate;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.ManualHaltService;
+import com.example.tradingcore.domain.safety.PositionSliceReader;
 import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -33,7 +37,8 @@ import java.util.List;
  *
  * <p>Службы счёта, инструмента и пары отдают объекты в рабочем
  * состоянии без стоящих ступеней; гейт терминала подтверждает
- * отсутствие живого риска; сервис блокировки и координатор подменены —
+ * отсутствие живого риска, срез позиций радиуса добыт пустым; сервис
+ * блокировки и координатор подменены —
  * они соседние единицы предмета, а не предмет этих групп.
  */
 final class ManualHaltHarness {
@@ -66,9 +71,23 @@ final class ManualHaltHarness {
     /** Сервис журнала: строка операции. */
     final AnomalyReportService reports = mock(AnomalyReportService.class);
 
+    /**
+     * Срез позиций площадки по радиусу — второй носитель предусловия живого
+     * риска. Подменён: он граница с площадкой, у него своя проверка
+     * (группа `U15`).
+     */
+    final PositionSliceReader slices = mock(PositionSliceReader.class);
+
+    /**
+     * Писатель факта снятия. Подменён: состав формы мерит тест у писателя
+     * ({@code CoreEventFormTest}), а не эти группы.
+     */
+    final CoreEventWriter coreEventWriter = mock(CoreEventWriter.class);
+
     /** Предмет групп. */
     final ManualHaltService manualHalt = new ManualHaltService(accounts, instruments, pairStates,
-            deals, contexts, terminalGate, coordinator, holdService, reports);
+            deals, contexts, terminalGate, coordinator, holdService, reports, slices, new ActorProvider(),
+            coreEventWriter);
 
     ManualHaltHarness() {
         accountStands(ExchangeAccount.SafetyRung.ACTIVE, ExchangeAccount.Status.ACTIVE);
@@ -76,6 +95,7 @@ final class ManualHaltHarness {
         when(deals.findNonTerminalByExchangeAccountId(anyLong())).thenReturn(List.of());
         when(deals.findNonTerminalOnPair(anyLong(), anyLong())).thenReturn(List.of());
         when(terminalGate.riskProvenAbsent(any(), any(), any())).thenReturn(true);
+        when(slices.livePositions(any(), any())).thenReturn(new ArrayList<>());
         when(accounts.clearRung(anyLong(), any(), any())).thenReturn(true);
         when(pairStates.clearRung(anyLong(), anyLong(), any(), any())).thenReturn(true);
     }

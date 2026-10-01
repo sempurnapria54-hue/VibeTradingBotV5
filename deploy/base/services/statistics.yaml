@@ -71,7 +71,10 @@ spec:
       serviceAccountName: statistics
       containers:
         - name: statistics
-          image: registry.invalid/vibetrading/statistics
+          # Метка `unpromoted` — зарезервированная: сервис, чей тег в
+          # окружение не продвинут, не разворачивается
+          # (docs/architecture/platform.md §Развёртывание).
+          image: registry.invalid/vibetrading/statistics:unpromoted
           # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
           # поэтому образ, уже лежащий на узле, — тот самый.
           imagePullPolicy: IfNotPresent
@@ -88,11 +91,20 @@ spec:
             # фактов нет ни в одном окружении, а профиль хранения журнала
             # предмета статистики не покидает
             # (docs/models/domain/other/StatisticsFact.md §Персистентность).
-            # Провайдер идентичности — сервис того же пространства имён:
-            # окружение и есть пространство имён, поэтому адрес не несёт
-            # его имени и одинаков во всех трёх.
+            # Провайдер идентичности. Издатель токена — имя хоста окружения
+            # (значение приезжает осью окружения, поэтому манифест одинаков
+            # во всех трёх), ключи подписи — внутренний адрес провайдера:
+            # наружу за ключами сервис не ходит (docs/architecture/platform.md
+            # §Безопасность).
+            - name: PLATFORM_INGRESS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: ingressHost
             - name: OIDC_ISSUER_URI
-              value: http://platform-identity-service:8080/realms/vibetrading
+              value: https://$(PLATFORM_INGRESS_HOST)/realms/vibetrading
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/certs
             # Брокер: своя durable-группа читает тему каждого производителя
             # несомых классов (docs/models/domain/other/StatisticsFact.md
             # §«Подписка, группа и позиция чтения»). Группа СВОЯ, а не
@@ -223,6 +235,28 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+---
+# Встречное разрешение на стороне провайдера идентичности: подпись токена
+# сервис проверяет локально, а ключи подписи забирает у провайдера.
+# Исходящего правила мало — запрет по умолчанию действует в обе стороны.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: identity-ingress-from-statistics
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: statistics
+      ports:
+        - protocol: TCP
+          port: 8080
 ---
 # СЪЁМ МЕТРИК: наблюдатель окружения приходит к службе за экспозицией
 # сервиса (docs/architecture/platform.md §Наблюдаемость).

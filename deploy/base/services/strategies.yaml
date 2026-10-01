@@ -49,7 +49,10 @@ spec:
       serviceAccountName: strategies
       containers:
         - name: strategies
-          image: registry.invalid/vibetrading/strategies
+          # Метка `unpromoted` — зарезервированная: сервис, чей тег в
+          # окружение не продвинут, не разворачивается
+          # (docs/architecture/platform.md §Развёртывание).
+          image: registry.invalid/vibetrading/strategies:unpromoted
           # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
           # поэтому образ, уже лежащий на узле, — тот самый: ходить за ним
           # в реестр незачем.
@@ -63,23 +66,38 @@ spec:
                 configMapKeyRef:
                   name: environment-axes
                   key: environment
-            # Провайдер идентичности — сервис того же пространства имён:
-            # окружение и есть пространство имён, поэтому адрес не несёт
-            # его имени и одинаков во всех трёх.
+            # Провайдер идентичности. Издатель токена — имя хоста окружения
+            # (значение приезжает осью окружения, поэтому манифест одинаков
+            # во всех трёх), ключи подписи — внутренний адрес провайдера:
+            # наружу за ключами сервис не ходит (docs/architecture/platform.md
+            # §Безопасность).
+            - name: PLATFORM_INGRESS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: ingressHost
             - name: OIDC_ISSUER_URI
-              value: http://platform-identity-service:8080/realms/vibetrading
+              value: https://$(PLATFORM_INGRESS_HOST)/realms/vibetrading
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/certs
             - name: OIDC_TOKEN_URI
               value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/token
             # Исходящая сервисная идентичность: под ней владелец
             # определений читает у ядра числа риск-аппетита и разрешимость
             # ссылок (docs/architecture/contracts.md §«Синхронные вызовы»).
+            # Клиент — свой, `strategies` в реалме окружения; идентификатор и
+            # секрет — из одного секрета клиента (docs/architecture/platform.md
+            # §Безопасность).
             - name: SERVICE_CLIENT_ID
-              value: platform-services
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-strategies
+                  key: client-id
             - name: SERVICE_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: platform-service-client
-                  key: secret
+                  name: oidc-client-strategies
+                  key: client-secret
             - name: TRADING_CORE_BASE_URL
               value: http://trading-core:8080
             # Брокер: реле outbox публикует активации в свою тему
@@ -158,6 +176,11 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # Брокер — тропа к инстансу данных, а не строка таблицы синхронных
+    # вызовов: реле outbox публикует в свою тему, потребительской стороны у
+    # сервиса нет. Порт — открытого слушателя кластера Kafka
+    # (deploy/base/data/kafka-cluster.yaml), того же, что называет адрес в
+    # переменной окружения выше.
     - to:
         - podSelector:
             matchLabels:
@@ -189,6 +212,28 @@ spec:
         - protocol: TCP
           port: 5432
 ---
+# Встречное разрешение на стороне брокера — тот же довод, что у базы:
+# запрет по умолчанию двусторонний.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-ingress-from-strategies
+spec:
+  podSelector:
+    matchExpressions:
+      - key: strimzi.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: strategies
+      ports:
+        - protocol: TCP
+          port: 9092
+---
 # Встречное разрешение на стороне ядра: владелец определений читает его
 # поверхность.
 apiVersion: networking.k8s.io/v1
@@ -199,6 +244,28 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: trading-core
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: strategies
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Встречное разрешение на стороне провайдера идентичности: подпись токена
+# сервис проверяет локально, а ключи подписи забирает у провайдера.
+# Исходящего правила мало — запрет по умолчанию действует в обе стороны.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: identity-ingress-from-strategies
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
   policyTypes:
     - Ingress
   ingress:

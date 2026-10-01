@@ -12,12 +12,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Клетки {@code B6.1}, {@code B6.2}, {@code B6.3}, {@code B6.4},
- * {@code B6.5}, {@code B6.6} и {@code B6.7} — предикат непрерывности на
- * штатном положении осей
+ * {@code B6.5}, {@code B6.6}, {@code B6.7} и {@code B6.9} — предикат
+ * непрерывности на штатном положении осей
  * (.claude/tests/cases/audit.md §«B6 — Полнота: предикат непрерывности»).
  *
  * <p><b>Класс равен КОНФИГУРАЦИИ КОНТЕКСТА</b>, как у соседней группы: все
- * семь клеток берут штатные оси у {@link SharedAuditBox} — подписку на обе
+ * восемь клеток берут штатные оси у {@link SharedAuditBox} — подписку на обе
  * темы, включённый тик, допустимый возраст строки состояния величиной
  * субстрата, — и расходятся только состоянием строк пар, которое каждая
  * ставит себе сама.
@@ -85,6 +85,9 @@ class ContinuityPredicateBoxTest extends SharedAuditBox {
 
     /** Насколько раньше «сейчас» наблюдают свои темы пары клеток. */
     private static final Duration OBSERVED_AGO = Duration.ofHours(2);
+
+    /** Возраст разрыва: позже момента наблюдения пары, раньше такта «сейчас». */
+    private static final Duration GAP_AGO = Duration.ofMinutes(90);
 
     /** Тема, которой в объявленной подписке нет: её пару такт и снимает. */
     private static final String DEPARTED_TOPIC = "b6-5.departed";
@@ -296,6 +299,36 @@ class ContinuityPredicateBoxTest extends SharedAuditBox {
         assertThat(lowerBoundMoment())
                 .as("а позднейший момент наблюдения чужой группы границы не поднимает")
                 .isEqualTo(boundBefore);
+    }
+
+    @Test
+    @DisplayName("B6.9 — Строка новой темы двигает границу за разрыв: предикат утверждаем")
+    void aNewTopicRowMovesTheBoundPastTheGapAndTheClaimReturns() {
+        OffsetDateTime gapAt = momentsAgo(GAP_AGO);
+        givenPair(CORE, momentsAgo(OBSERVED_AGO), Boolean.TRUE, Boolean.FALSE, gapAt, null);
+
+        assertThat(pairs())
+                .as("вход поставлен: строки новой темы ещё нет, журнал пуст").hasSize(1);
+        assertThat(lowerBoundMoment().toInstant())
+                .as("граница — момент наблюдения единственной пары, и разрыв лежит ПОЗЖЕ неё")
+                .isBefore(gapAt.toInstant());
+        assertThat(continuityClaimable())
+                .as("поэтому до такта непрерывность не утверждаема").isEqualTo(Boolean.FALSE);
+
+        givenReceptionStateRows();
+
+        assertThat(instant(pair(STRATEGY), OBSERVED_COLUMN))
+                .as("такт завёл строку новой темы моментом, лежащим позже разрыва")
+                .isAfter(gapAt.toInstant());
+        assertThat(lowerBoundMoment().toInstant())
+                .as("и граница, позднейший из моментов наблюдения, ушла за разрыв")
+                .isAfter(gapAt.toInstant());
+        assertThat(instant(pair(CORE), GAP_COLUMN))
+                .as("момент разрыва при этом цел: снятия у величины нет ни у одного писателя")
+                .isEqualTo(gapAt.toInstant());
+        assertThat(continuityClaimable())
+                .as("непрерывность утверждаема: разрыв раньше границы дыры в обещаемом ряду не даёт")
+                .isEqualTo(Boolean.TRUE);
     }
 
     /** Страница журнала тенанта за окно, которым ящик читает полноту. */

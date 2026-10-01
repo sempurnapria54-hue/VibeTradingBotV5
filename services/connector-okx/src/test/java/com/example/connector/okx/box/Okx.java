@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  *
  * <p><b>Записи от КОНТРАКТА, а не с площадки:</b> прогонов мишени
  * {@code -D} ещё не было, и цена этого названа документом кейсов
- * (§«Две мишени и суффикс метки»).
+ * (.claude/tests/cases/connector-okx.md §«Две мишени и суффикс метки»).
  */
 final class Okx {
 
@@ -104,6 +104,19 @@ final class Okx {
                 "ctVal", "0.01", "ctValCcy", "BTC", "ctMult", "1", "ctType", "linear",
                 "tickSz", "0.1", "maxLmtSz", "100000", "maxMktSz", "10000",
                 "maxTriggerSz", "10000", "maxStopSz", "10000", "state", "live", "lever", "50");
+    }
+
+    /** Конфигурация счёта: режим счёта и режим позиций в словаре площадки. */
+    static String accountConfig(String acctLv, String posMode) {
+        return record("uid", "44705892343619584", "mainUid", "44705892343619584",
+                "acctLv", acctLv, "posMode", posMode, "perm", "read_only,trade",
+                "acctStpMode", "cancel_maker", "level", "Lv1").text();
+    }
+
+    /** Позиционный тир изолированной маржи семьи инструмента. */
+    static Record positionTier(String instFamily, String tier, String minSz, String maxSz, String mmr) {
+        return record("instFamily", instFamily, "uly", instFamily, "tier", tier,
+                "minSz", minSz, "maxSz", maxSz, "mmr", mmr, "imr", "0.01", "maxLever", "100");
     }
 
     /** Тикер инструмента. */

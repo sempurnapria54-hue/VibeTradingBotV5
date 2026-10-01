@@ -61,8 +61,8 @@
 
 Если не выполнено ни одно условие — отдельный файл процесса **не
 создаётся**: содержание распределяется по владельцам (правило идёт
-к своему первоисточнику, см. `classify-type` §«Первоисточник
-правила»; довод — `.claude/decisions/rule-source-of-truth.md`). Обоснование
+к своему первоисточнику, см. `.claude/skills/classify-type.md` §«Первоисточник
+правила: кто им владеет»; довод — `.claude/decisions/rule-source-of-truth.md`). Обоснование
 критерия и прогон по кандидатам —
 `.claude/decisions/process-materialization-criterion.md`.
 

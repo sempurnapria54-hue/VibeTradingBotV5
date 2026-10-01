@@ -43,6 +43,7 @@ class IndicatorSettingsTest {
 
     private static final String BELOW_MINIMUM = "is below derived minimum";
     private static final String EXPIRATION_NOT_DECLARED = "STRATEGY_MARKET_DATA_EXPIRATION_NOT_DECLARED";
+    private static final String EXPIRATION_NOT_POSITIVE = "STRATEGY_MARKET_DATA_EXPIRATION_NOT_POSITIVE";
 
     @Test
     @DisplayName("U24.1 — базовая сборка: шесть настроек с уникальными ключами")
@@ -204,6 +205,46 @@ class IndicatorSettingsTest {
                 .singleElement()
                 .asString()
                 .contains(".expirationDuration " + EXPIRATION_NOT_DECLARED);
+    }
+
+    /**
+     * Нулевой срок разбирается, но свежим на нём не бывает ни одно значение:
+     * исход тот же, что без срока. Обязательность и диапазон разведены
+     * кодами — кода обязательности здесь нет, срок объявлен.
+     */
+    @Test
+    @DisplayName("U24.16 — срок годности нулевой: нарушение диапазона, обязательность молчит")
+    void u24_16_aZeroDurationIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        indicator(request, "atr_15m").setExpirationDuration("PT0S");
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("strategy.indicatorSettings[5].expirationDuration " + EXPIRATION_NOT_POSITIVE)
+                .endsWith("получено PT0S");
+    }
+
+    @Test
+    @DisplayName("U24.17 — срок годности отрицательный: то же нарушение диапазона")
+    void u24_17_aNegativeDurationIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        indicator(request, "atr_15m").setExpirationDuration("PT-1H");
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".expirationDuration " + EXPIRATION_NOT_POSITIVE)
+                .endsWith("получено PT-1H");
+    }
+
+    @Test
+    @DisplayName("U24.18 — срок годности в одну секунду: нарушений нет, граница диапазона открыта снизу")
+    void u24_18_theSmallestPositiveDurationIsLegal() {
+        CreateStrategyApiRequest request = reference();
+        indicator(request, "atr_15m").setExpirationDuration("PT1S");
+
+        assertThat(violations(request)).isEmpty();
     }
 
     @Test

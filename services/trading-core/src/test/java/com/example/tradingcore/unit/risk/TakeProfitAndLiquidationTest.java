@@ -10,6 +10,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.episode;
 import static com.example.tradingcore.unit.risk.RiskFixture.episodeWithLiquidation;
 import static com.example.tradingcore.unit.risk.RiskFixture.priceBuilder;
 import static com.example.tradingcore.unit.risk.RiskFixture.protection;
+import static com.example.tradingcore.unit.risk.RiskFixture.protectionAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.reducingOnlyAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.takeProfit;
 import static com.example.tradingcore.unit.risk.RiskFixture.tranche;
@@ -35,10 +36,12 @@ import org.junit.jupiter.api.Test;
  * {@code STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION}).
  *
  * <p><b>Базовая сборка</b> — U1.1, направление длинное. Клетки запаса
- * до ликвидации берут эпизод единичного размера и вход на пять
- * контрактов: при базовом размере живое слагаемое вместе с актом
- * перебирало бы одновременный потолок и подмешивало бы его код к
- * предмету группы.
+ * до ликвидации берут эпизод единичного размера и ЗАЩИТНОЕ действие, а не
+ * вход: сверка с ценой ликвидации, которую называет площадка, — тропа
+ * актов, риска не создающих. У акта, создающего риск, граница — оценка
+ * ликвидации позиции после акта, и её клетки — группа {@code U33}
+ * ({@link EntryLiquidationEstimateTest}; дом — docs/rules/risk-policy.md,
+ * правило о ликвидации до входа).
  */
 class TakeProfitAndLiquidationTest {
 
@@ -84,20 +87,20 @@ class TakeProfitAndLiquidationTest {
     @Test
     @DisplayName("U8.6 — уровень стопа ВЫШЕ цены ликвидации: стоп первым на пути к ней")
     void u8_6_aStopAheadOfTheLiquidationPricePasses() {
-        assertThat(codes(harness.validate(smallEntry("2910"), episodeContext("2800")))).isEmpty();
+        assertThat(codes(harness.validate(protectionAction("2910"), episodeContext("2800")))).isEmpty();
     }
 
     @Test
     @DisplayName("U8.7 — уровень стопа ниже цены ликвидации: стоп за ценой ликвидации")
     void u8_7_aStopBeyondTheLiquidationPriceIsRejected() {
-        assertThat(codes(harness.validate(smallEntry("2910"), episodeContext("2950"))))
+        assertThat(codes(harness.validate(protectionAction("2910"), episodeContext("2950"))))
                 .containsExactly(RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION);
     }
 
     @Test
     @DisplayName("U8.8 — уровень стопа РАВЕН цене ликвидации: запаса нет")
     void u8_8_aStopExactlyAtTheLiquidationPriceIsRejected() {
-        assertThat(codes(harness.validate(smallEntry("2910"), episodeContext("2910"))))
+        assertThat(codes(harness.validate(protectionAction("2910"), episodeContext("2910"))))
                 .containsExactly(RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION);
     }
 
@@ -107,17 +110,17 @@ class TakeProfitAndLiquidationTest {
         Deal deal = dealWith(episodeWithLiquidation("1", ANCHOR, "3000"));
         deal.setDirection(StrategyTradeDirection.SHORT);
 
-        assertThat(codes(harness.validate(smallEntry("3050"), context(deal))))
+        assertThat(codes(harness.validate(protectionAction("3050"), context(deal))))
                 .containsExactly(RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION);
     }
 
     @Test
     @DisplayName("U8.10 — эпизода нет либо цена ликвидации пуста: сверять не с чем")
     void u8_10_withoutALiquidationPriceTheGuardIsSilent() {
-        assertThat(codes(harness.validate(smallEntry("2910"), workingContext())))
+        assertThat(codes(harness.validate(protectionAction("2910"), workingContext())))
                 .as("эпизода нет вовсе")
                 .isEmpty();
-        assertThat(codes(harness.validate(smallEntry("2910"), context(dealWith(episode("1", ANCHOR))))))
+        assertThat(codes(harness.validate(protectionAction("2910"), context(dealWith(episode("1", ANCHOR))))))
                 .as("эпизод есть, цены ликвидации у него нет")
                 .isEmpty();
     }
@@ -136,11 +139,6 @@ class TakeProfitAndLiquidationTest {
         return withPrice(entryAction(), priceBuilder(ANCHOR, STOP.toPlainString())
                 .takeProfitPrice(takeProfit(takeProfitPrice))
                 .build());
-    }
-
-    /** Вход на пять контрактов: живое слагаемое вместе с ним укладывается в потолки. */
-    private static CalculatedStrategyAction smallEntry(String stopPrice) {
-        return entryAction("5", ANCHOR, stopPrice);
     }
 
     /** Контекст со сделкой, несущей эпизод единичного размера и названную цену ликвидации. */

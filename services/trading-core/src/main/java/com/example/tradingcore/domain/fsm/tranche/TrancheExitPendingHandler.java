@@ -61,7 +61,7 @@ import org.springframework.stereotype.Component;
  * <p><b>Закреплённые объявление и деталь входными проверками выхода не
  * являются</b> (docs/components/TrancheExitPendingHandler.md
  * §«Закреплённые объявление транша и деталь стратегии входными проверками
- * выхода не являются»).
+ * выхода не являются, и восстановленный транш сюда доходит штатно»).
  */
 @Slf4j
 @Component
@@ -242,11 +242,18 @@ public class TrancheExitPendingHandler implements DealTrancheHandler {
         if (isTrue(tranche.isRiskBearing())) {
             return disposition.contextFetch(dealContext);
         }
-        return TrancheTransition.close(closeReason(dealContext, tranche));
+        if (isTrue(dealContext.getDeal().isCollapsing())) {
+            return disposition.inheritedClose(dealContext.getDeal());
+        }
+        return TrancheTransition.close(closeReason(tranche));
     }
 
     /**
-     * Причина закрытия транша — по инициатору выхода.
+     * Причина закрытия транша вне сворачивания — по инициатору выхода. Под
+     * сворачиванием причину наследует терминал сделки, и пустая наследуемая
+     * причина терминала не даёт — сделка уходит ошибочной тропой
+     * (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша —
+     * обработчик терминального ребра»).
      *
      * <p><b>Инициатора нет вовсе — {@code EXTERNAL_CLOSE}:</b> экспозиция
      * обнулилась вне нашего ведения, и ни одно из наличных значений этого
@@ -254,10 +261,7 @@ public class TrancheExitPendingHandler implements DealTrancheHandler {
      * же выход, и у обычного, чью позицию закрыли на бирже руками
      * (docs/lifecycles/DealTranche.md).
      */
-    private DealTranche.CloseReason closeReason(DealContext dealContext, DealTranche tranche) {
-        if (isTrue(dealContext.getDeal().isCollapsing())) {
-            return disposition.inheritedCloseReason(dealContext.getDeal());
-        }
+    private DealTranche.CloseReason closeReason(DealTranche tranche) {
         DealTranche.CloseReason initiated = tranche.exitInitiatedReason();
         return isNull(initiated) ? DealTranche.CloseReason.EXTERNAL_CLOSE : initiated;
     }

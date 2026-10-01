@@ -11,6 +11,11 @@
 # (`.claude/skills/local-stand.md`); в целевой конструкции — Vault
 # (docs/architecture/platform.md §Безопасность). Секрет, записанный в
 # манифест, лежал бы в git открытым текстом.
+#
+# УЧЁТНЫХ ЗАПИСЕЙ ЗДЕСЬ НЕТ ТОЖЕ, и по той же причине: пароль субъекта лежал
+# бы в git. Учётную запись держателя заводит он сам — на стенде командой
+# tools/stand/external-access.sh, в прочих окружениях в консоли
+# администратора реалма (docs/rules/api-access-policy.md).
 apiVersion: k8s.keycloak.org/v2beta1
 kind: KeycloakRealmImport
 metadata:
@@ -54,6 +59,18 @@ spec:
           - "https://dev.vibetrading.invalid/*"
         webOrigins:
           - "https://dev.vibetrading.invalid"
+      # СЛУЖЕБНЫЕ КЛИЕНТЫ — по одному на сервис с исходящим синхронным
+      # вызовом соседа; имя клиента — имя сервиса, секрет — `oidc-client-<имя>`
+      # (конвенция — docs/architecture/platform.md §Безопасность). Команда
+      # постановки берёт перечень ОТСЮДА — клиенты с serviceAccountsEnabled:
+      # true (tools/stand/identity-client-secret.sh), второй его копии нет.
+      #
+      # Клиента нет у сервиса, который служебного токена не берёт: периметр
+      # ходит под токеном пользователя (выше), коннектор — только к площадке
+      # и в Vault, `auth` — только в Vault (оба входят методом Kubernetes),
+      # `audit` и `statistics` синхронных вызовов не делают вовсе — только
+      # брокер. Появился такой вызов — клиент заводится здесь тем же ходом.
+      #
       # Исходящая идентичность market-data: под ней он ходит к коннектору
       # за публичными чтениями площадки. Грант — client credentials:
       # пользователя в этом вызове нет.
@@ -67,6 +84,15 @@ spec:
       # Исходящая идентичность торгового ядра: под ней оно ходит к
       # коннектору, к auth за реестром счетов и к market-data за фичами.
       - clientId: trading-core
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        serviceAccountsEnabled: true
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+      # Исходящая идентичность владельца определений: под ней он читает у
+      # ядра числа риск-аппетита и разрешимость ссылок.
+      - clientId: strategies
         enabled: true
         protocol: openid-connect
         publicClient: false

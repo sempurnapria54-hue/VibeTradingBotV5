@@ -63,7 +63,7 @@ class OutboxRelayTest {
         assertThat(row.getTenantId()).isEqualTo(TENANT);
         assertThat(row.getEventType()).isEqualTo(CoreEventType.DEAL_OPENED.name());
         assertThat(row.getTopic()).isEqualTo("trading-core.facts");
-        assertThat(row.getVersion()).isEqualTo(2);
+        assertThat(row.getVersion()).isEqualTo(3);
         assertThat(row.getEventId()).isNotBlank();
         assertThat(row.getOccurredAt()).isNotNull();
         assertThat(row.getPublishedAt()).isNull();

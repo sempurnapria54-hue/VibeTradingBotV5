@@ -23,15 +23,22 @@ import org.springframework.test.context.DynamicPropertySource;
  * нельзя: тема неизменяема.
  *
  * <p><b>Момент разрыва — durable-ВХОД клетки, а не её выход.</b> Кейс
- * утверждает, что разрыв, если он был записан, <b>не гаснет</b>: гасящего
- * писателя у него нет вовсе — гасит разрыв чистка следствий, а чистки у фактов
- * не существует (docs/models/domain/other/StatisticsFact.md §«Состояние приёма
- * и полнота чисел статистики»). Поставить его тропой ящика значило бы заодно
- * двинуть смещения, о неподвижности которых клетка утверждает.
+ * утверждает, что разрыв, если он был записан, <b>не гаснет</b>: снятия у
+ * момента нет ни у одного писателя (docs/rules/durable-consumer-reception.md
+ * §«Писатели величин — по роли, а не по имени класса»). Поставить его тропой
+ * ящика значило бы заодно двинуть смещения, о неподвижности которых клетка
+ * утверждает.
  *
- * <p><b>Предикат непрерывности остаётся ложным НАВСЕГДА</b>, и это верно по
- * существу: дыра в принятом безвозвратна, а снятый флаг остановки говорит лишь
- * о том, что приём пошёл дальше.
+ * <p><b>Разрыв кладётся ВНУТРЬ обещаемого ряда, и это несущее.</b> Момент
+ * разрыва читается против нижней границы: разрыв раньше неё дыры не даёт, и
+ * предикат утверждался бы по поводу, которого клетка не ставила. Поэтому
+ * момент наблюдения пары отодвигается назад прямой записью — тик ставит его
+ * своим тактом, то есть «сейчас», — а разрыв ложится между ним и «сейчас».
+ *
+ * <p><b>Предикат непрерывности остаётся ложным, пока граница разрыва не
+ * минует</b>, и это верно по существу: дыра в принятом безвозвратна, а снятый
+ * флаг остановки говорит лишь о том, что приём пошёл дальше. Восстановление
+ * приёма границы не двигает.
  */
 class ProducerRecoveryBoxTest extends PoisonedReceptionBox {
 
@@ -40,6 +47,17 @@ class ProducerRecoveryBoxTest extends PoisonedReceptionBox {
 
     /** Смещение, зафиксированное группой после принятой годной записи. */
     private static final Long CONSUMED_BOTH = 2L;
+
+    /** Насколько раньше «сейчас» пара наблюдает тему: разрыв ложится позже. */
+    private static final Duration OBSERVED_AGO = Duration.ofHours(2);
+
+    /** Возраст разрыва: внутри обещаемого ряда, то есть позже момента наблюдения. */
+    private static final Duration GAP_AGO = Duration.ofHours(1);
+
+    /** Запись момента наблюдения одной пары. */
+    private static final String SET_PAIR_OBSERVED = """
+            update reception_states set observed_since = ? where consumer_group = ? and topic = ?
+            """;
 
     @DynamicPropertySource
     static void substrate(DynamicPropertyRegistry registry) {
@@ -50,8 +68,12 @@ class ProducerRecoveryBoxTest extends PoisonedReceptionBox {
     @DisplayName("B2.14 — Восстановление после починки производителя")
     void receptionResumesOnceTheProducerIsFixed() {
         givenReceptionStateRows();
-        OffsetDateTime gapAt = momentsAgo(Duration.ofHours(1));
+        rows.write(SET_PAIR_OBSERVED, momentsAgo(OBSERVED_AGO), consumerGroup(), topic());
+        OffsetDateTime gapAt = momentsAgo(GAP_AGO);
         givenGapOf(topic(), gapAt);
+        assertThat(lowerBoundMoment().toInstant())
+                .as("вход поставлен: разрыв лежит внутри обещаемого ряда — позже нижней границы")
+                .isBefore(gapAt.toInstant());
         poisonWithout(EVENT_ID);
         OffsetDateTime healthy = momentsAgo(Duration.ofMinutes(1));
         publish("E-OK", DEAL_CLOSED, healthy, Bodies.dealClosed(ACCOUNT, "S-1"));
@@ -70,10 +92,13 @@ class ProducerRecoveryBoxTest extends PoisonedReceptionBox {
         assertThat(Wire.endOffset(topic()))
                 .as("лаг по паре убыл до нуля").isEqualTo(CONSUMED_BOTH);
         assertThat(instant(pair(topic()), GAP_COLUMN))
-                .as("момент разрыва не гаснет: гасящего писателя у него нет")
+                .as("момент разрыва не гаснет: снятия у него нет ни у одного писателя")
                 .isEqualTo(gapAt.toInstant());
+        assertThat(lowerBoundMoment().toInstant())
+                .as("и восстановление приёма границы за него не двинуло")
+                .isBefore(gapAt.toInstant());
         assertThat(continuityClaimable())
-                .as("предикат непрерывности ложен навсегда: дыра безвозвратна")
+                .as("предикат непрерывности ложен: дыра безвозвратна")
                 .isEqualTo(Boolean.FALSE);
     }
 

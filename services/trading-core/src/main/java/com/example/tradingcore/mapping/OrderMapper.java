@@ -40,7 +40,9 @@ public interface OrderMapper {
      * ноги — он наше решение о её роли; встроенные защиты — у них своя
      * строка и свой резолв состояния; статус и причина закрытия — их
      * назначает исполнитель доменным переходом, а причина write-once
-     * (docs/rules/external-status-resolution.md).
+     * (docs/rules/external-status-resolution.md); наблюдённая живость — её
+     * пишет исполнитель по итогу всего цикла добычи, а не по одной записи
+     * (docs/components/RefreshOrderExecutor.md).
      */
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
@@ -48,6 +50,7 @@ public interface OrderMapper {
     @Mapping(target = "type", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "closeReason", ignore = true)
+    @Mapping(target = "externalLive", ignore = true)
     @Mapping(target = "attachedAlgoOrders", ignore = true)
     void updateFromFetched(Order fetched, @MappingTarget Order order);
 }

@@ -45,8 +45,9 @@ class AbsentOutputsBoxTest extends SharedTradingCoreBox {
      * ({@code CoreEventType}) — он закрыт, и опубликованное из него не
      * выходит.
      */
-    private static final List<String> CORE_EVENT_TYPES = List.of("ORDER_DECIDED", "DEAL_OPENED",
-            "DEAL_SHUTDOWN_INITIATED", "DEAL_CLOSED", HOLD_RAISED, "ANOMALY_REPORTED");
+    private static final List<String> CORE_EVENT_TYPES = List.of("ORDER_DECIDED", "ALGO_ORDER_DECIDED",
+            "DEAL_OPENED", "DEAL_SHUTDOWN_INITIATED", "DEAL_CLOSED", HOLD_RAISED, HOLD_RELEASED,
+            "ANOMALY_REPORTED");
 
     @Test
     @DisplayName("B14.1 — ядро не говорит с площадкой напрямую")
@@ -136,8 +137,8 @@ class AbsentOutputsBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
-    @DisplayName("B14.7 — событие, которого ядро не публикует")
-    void theCorePublishesNeitherAHoldReleaseNorAForeignDefinitionFact() {
+    @DisplayName("B14.7 — снятие ступени едет фактом, чужое определение — нет")
+    void theCorePublishesAHoldReleaseButNoForeignDefinitionFact() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
         Wire.Mark mark = Wire.mark();
         assertThat(freeze(ACCOUNT).status()).isEqualTo(204);
@@ -152,11 +153,10 @@ class AbsentOutputsBoxTest extends SharedTradingCoreBox {
                 .map(Wire.Published::eventType)
                 .toList();
         assertThat(published).contains(HOLD_RAISED);
-        // Снятия ступени в теме нет ни одной строкой: класса `HoldReleased`
-        // у ядра не существует, и писателя у него нет (долг —
-        // .claude/work/backlog.md §«Класс события `HoldReleased` и его
-        // ручная тропа»). След снятия остаётся ОТЧЁТОМ, а не фактом ребра.
-        assertThat(published).doesNotContain(HOLD_RELEASED);
+        // Снятие ступени едет фактом `HoldReleased` рядом с журнальным
+        // отчётом: писатель — ручная тропа снятия, той же транзакцией
+        // (docs/architecture/contracts.md, строка `HoldReleased`).
+        assertThat(published).contains(HOLD_RELEASED);
         assertThat(rows.row("anomaly_reports", "code", MANUAL_HALT_CLEARED)).isNotEmpty();
         // Чужого определения ядро не переопубликовывает: потребление
         // следствия в теме не порождает — копия заведена, а классов

@@ -99,6 +99,35 @@ final class Rows {
                 .toList();
     }
 
+    /**
+     * Переводит счёт в статус прямой записью в базу — <b>предусловие, а не
+     * наблюдение</b>, и единственная запись этого класса.
+     *
+     * <p><b>Почему не тропой ящика, вопреки правилу предусловий
+     * {@link AuthBox#provisionTenant}:</b> операции, производящей
+     * {@code CLOSED}, у поверхности сегодня нет — отключение счёта не
+     * построено (секция бэклога об отключении биржевого счёта у `auth`), и
+     * состояние достижимо только прямой записью. Кейс,
+     * который на ней стои́т, называет это в своих предусловиях; с
+     * появлением операции предусловие переводится на неё.
+     *
+     * @param accountInternalId идентичность счёта
+     * @param status            статус, который получает строка
+     */
+    void forceAccountStatus(String accountInternalId, String status) {
+        String sql = "update exchange_accounts set status = ? where internal_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, status);
+            statement.setString(2, accountInternalId);
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("Предусловие не поставлено: счёта " + accountInternalId + " нет");
+            }
+        } catch (SQLException failure) {
+            throw new IllegalStateException("База субстрата не ответила: " + sql, failure);
+        }
+    }
+
     private Long number(String sql, Object... arguments) {
         List<Map<String, Object>> found = rows(sql, arguments);
         return ((Number) found.getFirst().values().iterator().next()).longValue();

@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * (docs/rules/statistics-aggregates.md §«Что это за числа и кто их
  * читает»).
  *
- * <p><b>Поводов шесть, а класс отказа один, и различает их ТЕКСТ.</b>
+ * <p><b>Поводов несколько, а класс отказа один, и различает их ТЕКСТ.</b>
  * Поэтому пробы смотрят не только на факт отказа: сняв охрану зерна, вопрос
  * без зерна всё равно упёрся бы в выбор запроса, а сняв охрану «окна нет» —
  * в охрану перевёрнутого окна, потому что пустые границы порядка не
@@ -212,6 +212,49 @@ class AggregateReadBoundariesTest {
     }
 
     /**
+     * Строковый компонент позиции, названный пустым либо пробелами, — отказ
+     * с названным компонентом, и до выборки вопрос не доходит.
+     *
+     * <p><b>Позиция в остальном полна:</b> иначе отказ мог бы прийти поводом
+     * «половина позиции», и проба не различила бы, чей он. У пустого счёта
+     * это несущее вдвойне — без своей охраны он считался бы названным
+     * обязательным компонентом.
+     */
+    @Test
+    @DisplayName("Пустой строковый компонент позиции — отказ, называющий компонент, а не пустая страница")
+    void aBlankStringCursorComponentIsRejected() {
+        for (String blank : List.of("", "   ")) {
+            assertThatThrownBy(() -> service.read(fullCursor().cursorExchangeAccountInternalId(blank).build()))
+                    .isInstanceOf(ReadQueryRejectedException.class)
+                    .hasMessageContaining("Биржевой счёт позиции назван пустым значением");
+            assertThatThrownBy(() -> service.read(fullCursor().cursorStrategyInternalId(blank).build()))
+                    .isInstanceOf(ReadQueryRejectedException.class)
+                    .hasMessageContaining("Определение стратегии позиции названо пустым значением");
+            assertThatThrownBy(() -> service.read(fullCursor().cursorResultCurrency(blank).build()))
+                    .isInstanceOf(ReadQueryRejectedException.class)
+                    .hasMessageContaining("Расчётная валюта позиции названа пустым значением");
+        }
+
+        verify(dealAggregateDataService, never()).findPage(any(), anyInt());
+    }
+
+    /**
+     * Пустая строка у компонента чужого зерна называет пустоту, а не чужое
+     * зерно: форма компонента проверяется раньше состава позиции.
+     */
+    @Test
+    @DisplayName("Пустой компонент проверяется раньше состава позиции")
+    void aBlankComponentIsNamedBeforeTheCursorComposition() {
+        assertThatThrownBy(() -> service.read(query().grain(AggregateGrain.INCIDENT)
+                .cursorBucketDate(FROM)
+                .cursorExchangeAccountInternalId("acc-1")
+                .cursorStrategyInternalId("")
+                .build()))
+                .isInstanceOf(ReadQueryRejectedException.class)
+                .hasMessageContaining("Определение стратегии позиции названо пустым значением");
+    }
+
+    /**
      * Позиция с пустыми хвостовыми компонентами законна и означает строку
      * с пустым ключом: «сделка стратегии не имеет», «валюта не
      * резолвилась». Отвергнутая, она обрубила бы хвост суток.
@@ -266,5 +309,13 @@ class AggregateReadBoundariesTest {
                 .grain(AggregateGrain.DEAL)
                 .from(FROM)
                 .to(FROM.plusDays(1));
+    }
+
+    /** Вопрос сделочного зерна с позицией, полной всеми четырьмя компонентами. */
+    private AggregateQuery.AggregateQueryBuilder fullCursor() {
+        return query().cursorBucketDate(FROM)
+                .cursorExchangeAccountInternalId("acc-1")
+                .cursorStrategyInternalId("strategy-1")
+                .cursorResultCurrency("USDT");
     }
 }

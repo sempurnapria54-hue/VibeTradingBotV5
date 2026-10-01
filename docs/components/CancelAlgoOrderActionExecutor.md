@@ -19,8 +19,8 @@ SUBMITTED -> REFRESH_ALGO_ORDER_COMMAND
 Стадии `CREATED` у снятия нет: локальной сущности оно не создаёт. Факт
 снятия подтверждает добыча, а не приём команды
 (`docs/rules/ack-not-runtime-truth.md`). Повтор строки с заполненной целью
-идёт с `SUBMITTED`, а не с начала (`docs/lifecycles/DealActionState.md`
-§«Повтор возвращает исполнение на стадию факта»).
+идёт с `SUBMITTED`, а не с начала (повтор возвращает исполнение на стадию
+факта — `docs/lifecycles/DealActionState.md`).
 
 ## Снятие проходит преконтроль
 
@@ -33,8 +33,8 @@ SUBMITTED -> REFRESH_ALGO_ORDER_COMMAND
 
 **Отказ — отложение, а не авария.** Действие не исполняется, транш
 остаётся в своём статусе, позицию всё это время держит прежняя защита
-(`docs/rules/live-risk-protection.md` §«Снятие защиты — риск-увеличивающее
-действие»). Верхней границы ожидания нет.
+(снятие защиты — риск-увеличивающее действие,
+`docs/rules/live-risk-protection.md`). Верхней границы ожидания нет.
 
 **Преконтроль стои́т в двух местах, и это не дубль.** Гейт готовности
 (`readiness`) отвечает **до** того, как заведена строка исполнения:
@@ -50,8 +50,7 @@ SUBMITTED -> REFRESH_ALGO_ORDER_COMMAND
 ключ → `DealActionState` → `targetEntityId` → живая отдельная
 защита транша. Цели среди живых защит нет — снимать нечего: действие
 неактуально, пакет шага берёт следующее
-(`docs/components/StrategyActionOrchestrator.md` §«Порядок выбора
-действия»).
+(порядок выбора действия — `docs/components/StrategyActionOrchestrator.md`).
 
 **Резолв по корню цепочки замещений** (`docs/spec/strategy-walkthrough.json`,
 величина `cancelTargetCandidates`) здесь не воплощён — названное

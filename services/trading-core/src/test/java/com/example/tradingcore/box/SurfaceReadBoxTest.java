@@ -62,7 +62,8 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
         List<Map<String, Object>> deals = answer.asList();
         // Выборка оборвана окном, а не размером истории счёта: читатель
         // приходит за текущим состоянием торговой строки, и история растёт
-        // без предела (.claude/rules/codestyle.md §«Выборка данных»).
+        // без предела (.claude/rules/codestyle.md §«Выборка данных: не тянем
+        // сущность ради одного поля»).
         assertThat(deals).hasSize(DEAL_WINDOW);
         // Порядок от новых: обрезана хвостовая, самая старая сделка.
         assertThat(deals.getFirst().get("internalId")).isEqualTo("D" + (DEAL_WINDOW + 1));

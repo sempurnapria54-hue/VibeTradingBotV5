@@ -276,6 +276,8 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
                   "externalTotalEquity": "100000",
                   "externalAdjustedEquity": "100000",
                   "externalAvailableEquity": "100000",
+                  "accountMode": "FUTURES",
+                  "positionMode": "NET",
                   "balances": [
                     {
                       "externalCurrency": "USDT",

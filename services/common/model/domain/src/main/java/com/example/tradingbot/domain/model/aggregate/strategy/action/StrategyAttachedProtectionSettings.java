@@ -11,8 +11,7 @@ import lombok.Setter;
  * (ENTRY_ATTACHED_STOP_LOSS). Хранятся JSONB-полем на строке
  * strategy_order_action. Attached protection не материализуется
  * автоматически в standalone AlgoOrder. См.
- * docs/models/domain/aggregate/Strategy.md
- * (§StrategyAttachedProtectionSettings).
+ * docs/models/domain/aggregate/Strategy.md (§Действия).
  */
 @Getter
 @Setter

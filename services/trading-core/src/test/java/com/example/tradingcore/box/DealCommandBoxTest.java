@@ -187,8 +187,10 @@ class DealCommandBoxTest extends SharedLiveDealBox {
     void theUnfetchedFactLeavesTheLinkIncompleteAndRetriesWithinTheBudget() {
         openLiveDeal();
         standExchangeFollowingCommands(REALIZED_LOSS);
-        // Запись закрытия эпизода площадка не отдаёт НИ ОДНОЙ ногой: позиция
-        // закрыта, а звено добычи её факта не добывает.
+        // Запись закрытия эпизода площадка не отдаёт НИ ОДНОЙ ногой: живая
+        // нога позицию не находит, а закрыть эпизод без записи его пары
+        // нельзя — звено добычи не завершается
+        // (docs/spec/external-status-resolution.json, positionCloseCorroborated).
         connector.answers(closedPositionsPath(ACCOUNT), Feed.emptyArray());
         exitByDeletion(workingDefinition());
         Map<Object, Integer> attemptsSeenLive = new HashMap<>();
@@ -230,10 +232,13 @@ class DealCommandBoxTest extends SharedLiveDealBox {
 
         tick(Tick.DEAL_ORCHESTRATOR);
 
-        // Новой строки той же надобности следующий проход не заводит:
-        // сделка уже не в сопровождении.
+        // Сопровождение кончилось, а добыча — нет: эпизод без записи
+        // закрытия остаётся живым, отсутствие риска не доказано, и
+        // ошибочная тропа ведёт СВОЮ добычу, а не аварийный терминал
+        // (.claude/decisions/position-close-corroboration.md, §Цена).
+        assertThat(dealStatus()).isEqualTo("ERROR");
         assertThat(rows.countWhere("deal_system_action_states", "system_action_type", REFRESH_DEAL_CONTEXT))
-                .isEqualTo(rowsOfTheNeed);
+                .isEqualTo(rowsOfTheNeed + 1);
     }
 
     @Test

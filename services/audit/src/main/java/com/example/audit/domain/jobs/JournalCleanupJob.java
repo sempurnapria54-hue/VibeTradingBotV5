@@ -5,7 +5,6 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.audit.config.EnvironmentProperties;
 import com.example.audit.config.JournalCleanupProperties;
-import com.example.audit.config.ReceptionProperties;
 import com.example.audit.domain.model.JournalRetentionProfile;
 import com.example.audit.domain.service.JournalCleanupService;
 import com.example.platform.jobs.JobExecutionGuard;
@@ -19,9 +18,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Чистит журнал аудита в непроизводственном окружении: удаляет строки,
- * принятые раньше назначенной глубины, и тем же проходом гасит момент
- * разрыва у пар, чей разрыв эта чистка вынесла за нижнюю границу полноты
- * (docs/components/JournalCleanupJob.md).
+ * принятые раньше назначенной глубины (docs/components/JournalCleanupJob.md).
  *
  * <p><b>Почему исполнитель вообще нужен.</b> Первый операнд нижней границы
  * полноты объявлен несущим ИМЕННО ПОТОМУ, что непроизводственное окружение
@@ -49,10 +46,12 @@ import org.springframework.stereotype.Component;
  * CRON: он бьёт независимо от того, кончился ли предыдущий проход, а
  * проход длителен по построению.
  *
- * <p><b>Границы:</b> строк состояния приёма он не трогает, кроме момента
- * разрыва — состав пар, признак подписки и момент обновления ведёт
- * {@code ReceptionStateJob}; агрегатов не трогает вовсе (строка выводима
- * из журнала повторным пересчётом), хотя косвенно и сужает область
+ * <p><b>Границы:</b> строк состояния приёма он не трогает вовсе, включая
+ * момент разрыва — снятия у того нет ни у одного писателя, а разрыв,
+ * вынесенный удалением за нижнюю границу, перестаёт давать дыру сравнением
+ * при чтении (docs/rules/durable-consumer-reception.md §«Писатели величин —
+ * по роли, а не по имени класса»); агрегатов не трогает вовсе (строка
+ * выводима из журнала повторным пересчётом), хотя косвенно и сужает область
  * пересчёта, двигая вперёд самую раннюю уцелевшую строку.
  *
  * <p><b>Строк отказа доступа он тоже не трогает, и это названо.</b>
@@ -82,7 +81,6 @@ public class JournalCleanupJob {
 
     private final JournalCleanupProperties properties;
     private final EnvironmentProperties environmentProperties;
-    private final ReceptionProperties receptionProperties;
     private final JobExecutionGuard executionGuard;
     private final JournalCleanupService journalCleanupService;
 
@@ -95,20 +93,12 @@ public class JournalCleanupJob {
         executionGuard.runExclusively(JOB_NAME, this::run);
     }
 
-    /**
-     * Проход: сперва удаление порциями, затем снятие момента разрыва.
-     *
-     * <p><b>Порядок несущий.</b> Момент разрыва гаснет по НОВОЙ нижней
-     * границе — той, которую подвинуло удаление; снятие, сделанное до
-     * удаления, мерило бы границу, которой этот проход ещё не создал, и
-     * оставляло бы разрыв ложным ещё на один такт.
-     */
+    /** Проход: удаление порциями всего, что старше глубины. */
     private void run() {
         if (isFalse(isApplicable())) {
             return;
         }
         deleteRecordedBefore(OffsetDateTime.now(ZoneOffset.UTC).minusDays(properties.getDepthDays()));
-        journalCleanupService.clearGapsOutsideLowerBound(receptionProperties.getGroupId());
     }
 
     /**

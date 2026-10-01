@@ -6,10 +6,11 @@ import lombok.experimental.UtilityClass;
 import com.example.tradingbot.domain.util.DomainMath;
 
 /**
- * Числовые помощники расчёта индикаторов (переиспользуемые между
- * вычислителями): экспоненциальная скользящая, простая скользящая,
- * популяционное СКО. Точная арифметика — деталь реализации (CODE).
- * Утилитный класс — живёт в пакете util (конвенция проекта).
+ * Числовые помощники расчёта индикаторов, общие для вычислителей: серия
+ * EMA, простое среднее окна, популяционное отклонение. Формы —
+ * docs/spec/indicator-calculation.json (`indicatorWindowAverage`, `emaNext`,
+ * `bollingerVariance`); точность промежуточного деления —
+ * docs/rules/decimal-arithmetic.md.
  */
 @UtilityClass
 public class IndicatorMath {
@@ -17,9 +18,8 @@ public class IndicatorMath {
     private static final BigDecimal TWO = BigDecimal.valueOf(2L);
 
     /**
-     * Серия EMA по значениям: индексы до (period-1) — null (разгон),
-     * seed на (period-1) = SMA первых period значений, далее рекурсивно
-     * EMA[i] = EMA[i-1] + k·(value[i] − EMA[i-1]), k = 2/(period+1).
+     * Серия EMA, выровненная по входу: члены до затравки пусты, затравка
+     * стоит на члене {@code period - 1}, дальше — шаг `emaNext`.
      */
     public static BigDecimal[] emaSeries(List<BigDecimal> values, int period) {
         BigDecimal[] result = new BigDecimal[values.size()];
@@ -40,7 +40,7 @@ public class IndicatorMath {
         return result;
     }
 
-    /** SMA окна [from, from+period) по значениям. */
+    /** Простое среднее окна {@code [from, from + period)} (`indicatorWindowAverage`). */
     public static BigDecimal sma(List<BigDecimal> values, int from, int period) {
         BigDecimal sum = BigDecimal.ZERO;
         for (int index = from; index < from + period; index++) {
@@ -49,7 +49,7 @@ public class IndicatorMath {
         return sum.divide(BigDecimal.valueOf(period), DomainMath.CONTEXT);
     }
 
-    /** Популяционное СКО окна [from, from+period) с заранее посчитанным средним. */
+    /** Корень популяционной дисперсии окна {@code [from, from + period)} (`bollingerVariance`). */
     public static BigDecimal populationStdDev(List<BigDecimal> values, int from, int period, BigDecimal mean) {
         BigDecimal sumSquares = BigDecimal.ZERO;
         for (int index = from; index < from + period; index++) {

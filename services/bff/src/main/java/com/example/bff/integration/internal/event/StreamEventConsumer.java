@@ -12,11 +12,13 @@ import com.example.bff.mapping.StreamEventMapper;
 import com.example.bff.util.Constants;
 import com.example.tradingbot.domain.event.CoreEventType;
 import com.example.tradingbot.domain.event.StrategyEventType;
+import com.example.tradingbot.message.AlgoOrderDecidedMessage;
 import com.example.tradingbot.message.AnomalyReportedMessage;
 import com.example.tradingbot.message.DealClosedMessage;
 import com.example.tradingbot.message.DealOpenedMessage;
 import com.example.tradingbot.message.DealShutdownInitiatedMessage;
 import com.example.tradingbot.message.HoldRaisedMessage;
+import com.example.tradingbot.message.HoldReleasedMessage;
 import com.example.tradingbot.message.OrderDecidedMessage;
 import com.example.tradingbot.message.StrategyActivatedMessage;
 import com.example.tradingbot.message.StrategyLifecycleMessage;
@@ -124,11 +126,14 @@ public class StreamEventConsumer {
     private Object coreContent(CoreEventType type, String payload) {
         return switch (type) {
             case ORDER_DECIDED -> streamEventMapper.messageToApi(read(payload, OrderDecidedMessage.class));
+            case ALGO_ORDER_DECIDED ->
+                    streamEventMapper.messageToApi(read(payload, AlgoOrderDecidedMessage.class));
             case DEAL_OPENED -> streamEventMapper.messageToApi(read(payload, DealOpenedMessage.class));
             case DEAL_SHUTDOWN_INITIATED ->
                     streamEventMapper.messageToApi(read(payload, DealShutdownInitiatedMessage.class));
             case DEAL_CLOSED -> streamEventMapper.messageToApi(read(payload, DealClosedMessage.class));
             case HOLD_RAISED -> streamEventMapper.messageToApi(read(payload, HoldRaisedMessage.class));
+            case HOLD_RELEASED -> streamEventMapper.messageToApi(read(payload, HoldReleasedMessage.class));
             case ANOMALY_REPORTED -> streamEventMapper.messageToApi(read(payload, AnomalyReportedMessage.class));
         };
     }

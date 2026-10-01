@@ -136,6 +136,7 @@ class AccessContourBoxTest extends SharedMarketDataBox {
 
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode()).isEqualTo("EXCHANGE_ACCESS_REFUSED");
+        assertThat(answer.body()).doesNotContain("TOO_MANY_REQUESTS", "Too Many Requests");
     }
 
     @Test
@@ -149,6 +150,7 @@ class AccessContourBoxTest extends SharedMarketDataBox {
 
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode()).isEqualTo("EXCHANGE_READ_FAILED");
+        assertThat(answer.body()).doesNotContain("INTERNAL_SERVER_ERROR", "Internal Server Error");
     }
 
     /**

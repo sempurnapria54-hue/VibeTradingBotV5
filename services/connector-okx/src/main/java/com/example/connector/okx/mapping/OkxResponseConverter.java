@@ -8,6 +8,8 @@ import com.example.connector.okx.exception.ExternalStatusException;
 import com.example.connector.okx.util.OkxConstants;
 import com.example.connector.okx.util.OkxParse;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.balance.AccountMode;
+import com.example.tradingbot.domain.model.core.balance.PositionMode;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
@@ -16,6 +18,7 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
+import lombok.extern.slf4j.Slf4j;
 import org.mapstruct.Named;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +27,7 @@ import org.springframework.stereotype.Component;
  * типам / qualifiedByName): empty→null, epoch-ms→время UTC, abs/знак pos
  * позиции. Общий для OrderMapper/PositionMapper/AlgoOrderMapper.
  */
+@Slf4j
 @Component
 public class OkxResponseConverter {
 
@@ -192,5 +196,57 @@ public class OkxResponseConverter {
                 .filter(type -> type.name().equalsIgnoreCase(rawType.trim()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * Режим счёта площадки ({@code acctLv}) → доменный режим счёта
+     * (docs/integrations/okx/contracts/account-config.md).
+     *
+     * <p><b>Значение вне словаря даёт пустоту, а не угаданный режим</b>
+     * (docs/models/mapping/Balance.md): пустой режим в свежем снимке
+     * преконтроль читает как режим вне контура, то есть ошибка выходит в
+     * запрещающую сторону. Отказом чтения оно не является — снимок средств
+     * без режима остаётся годным для прочих проверок, а неизвестность режима
+     * запирает действия ровно тем кодом, который её и называет.
+     */
+    @Named("okxAccountMode")
+    public AccountMode accountMode(String acctLv) {
+        if (isBlank(acctLv)) {
+            return null;
+        }
+        return switch (acctLv.trim()) {
+            case OkxConstants.ACCOUNT_LEVEL_SPOT -> AccountMode.SPOT;
+            case OkxConstants.ACCOUNT_LEVEL_FUTURES -> AccountMode.FUTURES;
+            case OkxConstants.ACCOUNT_LEVEL_MULTI_CURRENCY_MARGIN -> AccountMode.MULTI_CURRENCY_MARGIN;
+            case OkxConstants.ACCOUNT_LEVEL_PORTFOLIO_MARGIN -> AccountMode.PORTFOLIO_MARGIN;
+            default -> {
+                logUnknownMode("acctLv", acctLv);
+                yield null;
+            }
+        };
+    }
+
+    /**
+     * Режим позиций площадки ({@code posMode}) → доменный режим позиций;
+     * значение вне словаря — пустота, довод — {@link #accountMode}.
+     */
+    @Named("okxPositionMode")
+    public PositionMode positionMode(String posMode) {
+        if (isBlank(posMode)) {
+            return null;
+        }
+        return switch (posMode.trim()) {
+            case OkxConstants.POS_MODE_NET -> PositionMode.NET;
+            case OkxConstants.POS_MODE_LONG_SHORT -> PositionMode.LONG_SHORT;
+            default -> {
+                logUnknownMode("posMode", posMode);
+                yield null;
+            }
+        };
+    }
+
+    /** Значение режима вне словаря оставляет след в логе: пустота одна, а причин у неё две. */
+    private void logUnknownMode(String field, String raw) {
+        log.warn("OKX account config value outside the dictionary [account-config] {}={}", field, raw);
     }
 }

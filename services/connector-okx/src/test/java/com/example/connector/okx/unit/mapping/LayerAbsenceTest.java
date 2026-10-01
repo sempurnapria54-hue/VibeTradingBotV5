@@ -152,13 +152,13 @@ class LayerAbsenceTest {
     @DisplayName("U32.9 — числового ключа базы не добывает ни один переход")
     void u32_9_noTransitionObtainsANumericKey() {
         assertThat(Mappers.instrumentRules().snapshotToDomain(
-                Mappers.instrumentRules().integrationToSnapshot(OkxFixture.instrument()))
+                Mappers.instrumentRules().integrationToSnapshot(OkxFixture.instrument(), null))
                 .getInstrumentId()).isNull();
         assertThat(Mappers.marketPrice().snapshotToDomain(
                 Mappers.marketPrice().integrationToSnapshot(OkxFixture.ticker()))
                 .getInstrumentId()).isNull();
         assertThat(Mappers.instrumentRules().snapshotToDomain(
-                Mappers.instrumentRules().integrationToSnapshot(OkxFixture.instrument()), 42L)
+                Mappers.instrumentRules().integrationToSnapshot(OkxFixture.instrument(), null), 42L)
                 .getInstrumentId()).isEqualTo(42L);
     }
 

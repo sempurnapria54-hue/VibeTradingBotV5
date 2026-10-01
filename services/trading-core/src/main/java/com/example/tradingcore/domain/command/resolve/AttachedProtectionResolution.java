@@ -42,6 +42,17 @@ public class AttachedProtectionResolution {
         return new AttachedProtectionResolution(null, null, true);
     }
 
+    /**
+     * Исход «ждать» у родителя без наблюдения: защита не двигается —
+     * статус прежний, причины нет, — и сигнала нет. Отличается от
+     * {@link #undetermined()} тем, что факта не искали вовсе: о родителе
+     * площадка не показала ничего, и судьба защиты не выводится ни из чего
+     * (docs/spec/order-lifecycle.json, {@code attachedOutcomeByParent}).
+     */
+    public static AttachedProtectionResolution waiting() {
+        return new AttachedProtectionResolution(null, null, false);
+    }
+
     /** Есть ли что применять к сущности. */
     public Boolean hasStatus() {
         return nonNull(status);

@@ -25,7 +25,10 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -154,6 +157,43 @@ class JournalReadBoundariesTest {
         verify(auditRecordDataService, never()).findPage(any(), anyInt());
     }
 
+    /**
+     * Пустой строковый операнд — отказ, а не значение и не «отбор не задан»
+     * (docs/models/domain/other/AuditRecord.md §«Как журнал читается»).
+     * Каждый из пяти операндов берётся порознь, пустым и из одних пробелов:
+     * предикат, забывший хоть один, пропустил бы его значением в выборку.
+     */
+    @Test
+    @DisplayName("Строковый операнд назван пустым — отказ, и текст называет операнд")
+    void aBlankStringOperandIsRejectedAndNamed() {
+        for (String blank : List.of("", "   ")) {
+            Map<String, UnaryOperator<JournalQuery.JournalQueryBuilder>> operands = new LinkedHashMap<>();
+            operands.put("cursorEventId", builder -> builder.cursorOccurredAt(FROM.plusHours(1)).cursorEventId(blank));
+            operands.put("exchangeAccountInternalId", builder -> builder.exchangeAccountInternalId(blank));
+            operands.put("instrumentInternalId", builder -> builder.instrumentInternalId(blank));
+            operands.put("dealInternalId", builder -> builder.dealInternalId(blank));
+            operands.put("strategyInternalId", builder -> builder.strategyInternalId(blank));
+            operands.forEach((name, naming) -> assertThatThrownBy(() -> service.read(
+                    naming.apply(query().from(FROM).to(FROM.plusDays(1))).build()))
+                    .as("операнд %s, названный «%s», не читается ни значением, ни «отбор не задан»", name, blank)
+                    .isInstanceOf(ReadQueryRejectedException.class)
+                    .hasMessageContaining(name));
+        }
+
+        verify(auditRecordDataService, never()).findPage(any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("Строковый операнд со значением либо непереданный — не отказ")
+    void aStringOperandWithAValueOrAbsentIsAccepted() {
+        assertThatCode(() -> service.read(query().from(FROM).to(FROM.plusDays(1))
+                .cursorOccurredAt(FROM.plusHours(1)).cursorEventId("event-1")
+                .dealInternalId(" D-1 ")
+                .build()))
+                .as("значение с пробелами по краям пустым не является; прочие отборы не переданы")
+                .doesNotThrowAnyException();
+    }
+
     @Test
     @DisplayName("Курсора нет вовсе — читается первая страница окна, и это не отказ")
     void anAbsentCursorIsNotAPartialOne() {
@@ -163,7 +203,7 @@ class JournalReadBoundariesTest {
 
     /**
      * Текст отказа называет ПОВОД, а не класс: не сказав, чем вопрос не
-     * принят, поверхность оставила бы читателя перебирать четыре повода.
+     * принят, поверхность оставила бы читателя перебирать поводы.
      */
     @Test
     @DisplayName("Отказ называет повод, а не только факт отказа")

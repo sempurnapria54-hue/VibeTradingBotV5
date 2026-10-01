@@ -23,6 +23,7 @@ import static com.example.tests.e2e.safetyteardown.TeardownTrail.ANOMALY_REPORTE
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.DEAL_SHUTDOWN_INITIATED;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.FOREIGN_ORDER;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.HOLD_RAISED;
+import static com.example.tests.e2e.safetyteardown.TeardownTrail.HOLD_RELEASED;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.MANUAL_CLEARED;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.MANUAL_REQUESTED;
 import static com.example.tests.e2e.safetyteardown.TeardownTrail.MIN_AGE;
@@ -356,8 +357,8 @@ class TeardownManualPathTest {
                 .query("select event_id, event_type from outbox_events where "
                         + Trail.BY_TENANT + " order by id", trail.tenant())
                 .subList(outboxRows.intValue(), trail.rows(Party.TRADING_CORE, "outbox_events").intValue());
-        assertThat(fresh).as("E6.6: прибавилась одна строка — отчёт; класса снятия нет").singleElement()
-                .satisfies(row -> assertThat(row.get("event_type")).isEqualTo(ANOMALY_REPORTED));
+        assertThat(fresh).as("E6.6: прибавились две строки — отчёт и снятие ступени, в порядке решений")
+                .extracting(row -> row.get("event_type")).containsExactly(ANOMALY_REPORTED, HOLD_RELEASED);
         assertThat(trail.exchange().requests()).as("E6.6: запросов к площадке нет ни одного").isEmpty();
         assertThat(awaitJournalRow(trail, fresh.getFirst().get("event_id")).get("content").toString())
                 .as("E6.6: строка журнала об отчёте снятия").contains(MANUAL_CLEARED);
@@ -438,8 +439,8 @@ class TeardownManualPathTest {
         List<Map<String, Object>> fresh = trail.database(Party.TRADING_CORE)
                 .query("select event_id, event_type from outbox_events where "
                         + Trail.BY_TENANT + " order by id offset ?", trail.tenant(), outboxRows);
-        assertThat(fresh).as("E6.9: у операций — подъём и два отчёта").extracting(row -> row.get("event_type"))
-                .containsExactlyInAnyOrder(HOLD_RAISED, ANOMALY_REPORTED, ANOMALY_REPORTED);
+        assertThat(fresh).as("E6.9: у операций — подъём, снятие и два отчёта").extracting(row -> row.get("event_type"))
+                .containsExactlyInAnyOrder(HOLD_RAISED, HOLD_RELEASED, ANOMALY_REPORTED, ANOMALY_REPORTED);
         fresh.forEach(row -> awaitJournalRow(trail, row.get("event_id")));
     }
 

@@ -30,8 +30,9 @@ pos < 0  → Direction.SHORT
 externalSize = abs(pos)
 ```
 
-Если direction ≠ expected direction текущей сделки — нарушение
-invariant.
+Направление выводится из знака и с направлением сделки не сверяется:
+какой эпизод перед нами, определяет пара идентичности записи, а не
+направление (`docs/components/RefreshPositionExecutor.md`).
 
 ### `IntegrationService` контракт (snapshot / null / exception)
 
@@ -54,23 +55,30 @@ problem-flow.
 
 ### Invariant checks (общая идея)
 
-Перед созданием `PositionExternalSnapshot` adapter проверяет (если
-поля есть в источнике):
+**Ответ чтения живой позиции с ожиданием не сверяется**: ни
+принадлежность записи запрошенному инструменту, ни сторона позиции, ни
+режим маржи, ни плечо. Посылки, которые эти поля выражают, меряются не на
+ответе, а преконтролем перед действием: режим позиций — на снимке средств
+(`docs/integrations/okx/contracts/account-config.md`), режим маржи и плечо
+пары против биржевого максимума — на строке состояния пары
+(`docs/components/RiskValidator.md`). `lever` не хранится ни в `Position`,
+ни в `PositionExternalSnapshot`.
 
-```text
-instId    == expected Instrument.externalId
-posSide   == net (если применимо)
-mgnMode   == isolated (если применимо)
-lever     <= биржевой максимум (externalMaxLeverage)
-```
+**Отказ чтения здесь один — значение вне формы контракта** (число, время,
+длина позиционной строки — сеть разбора коннектора):
+`ExternalInvariantViolationException`, сделка уходит в `ERROR` и
+safety-flow, статус позиции остаётся последним применённым фактом
+(`docs/rules/controlled-exchange-exceptions.md`). **Нулевая нога
+(`pos = 0`) направления не имеет:** направление пусто, а не подставлено —
+подставленное стало бы наблюдением, которого не было.
 
-Нарушение invariant → `ExternalInvariantViolationException`
-(`posSide != net`, `mgnMode != isolated`, `instId != expected`,
-`lever > allowed`, direction нельзя определить) → `Position.status =
-ERROR`, `closeReason = EXCHANGE_INVARIANT_VIOLATION`, `Deal → ERROR /
-safety-flow`. `lever` не хранится в `Position` /
-`PositionExternalSnapshot`. Проверка leverage может выполняться при
-создании сделки/расчёте action и дополнительно при `REFRESH_POSITION_COMMAND`.
+**Названное ограничение: режим маржи записи чтение не проверяет.** Чтение
+по инструменту берёт запись ответа без отбора по режиму маржи, и
+принадлежность записи изолированному контуру держится ограничением контура
+«не более одной позиции на пару счёт-инструмент»
+(`docs/rules/trading-constraints.md`), а не наблюдением. Принадлежность инструменту
+сверяет только чтение закрытых позиций
+(`docs/models/integrations/okx/PositionsHistoryOkxResponse.md`).
 
 ### Close-position request
 
@@ -87,7 +95,7 @@ adapter technical policy → autoCxl
 
 Валюта расчёта необязательна и на входе коннектора: снятие риска по позиции
 на инструменте вне контура её не знает
-(`docs/components/KillSwitchExecutor.md` §«Риск вне графа сделок»).
+(риск вне графа сделок — `docs/components/KillSwitchExecutor.md`).
 
 Response — ACK, не финальный статус (`ack-not-runtime-truth.md`).
 
@@ -96,9 +104,9 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 `CLOSE_POSITION_COMMAND` payload несёт `requestedCloseReason`. Допустимы:
 `CLOSED_BY_STRATEGY`, `KILL_SWITCH`. Не используются
 как requested reason: `EXTERNAL_CLOSE` (закрытие на стороне источника
-без команды), `EXCHANGE_INVARIANT_VIOLATION` (problem reason).
+без команды).
 `RefreshPositionExecutor` не перетирает уже заполненный
-`Position.closeReason` (write-once). Перечень значений — четыре, каждое с
+`Position.closeReason` (write-once). Перечень значений — три, каждое с
 названным производителем (`docs/models/domain/core/Position.md`).
 
 ## OKX
@@ -120,22 +128,14 @@ Response — ACK, не финальный статус (`ack-not-runtime-truth.m
 | `cTime` | `externalCreatedAt` |
 | `uTime` | `externalModifiedAt` |
 
-`instType`, `mgnMode`, `posSide`, `lever` — adapter use
-(validation / request constants), в `Position` /
-`PositionExternalSnapshot` не хранятся. **`instId` маппится** — в
+`instType`, `mgnMode`, `posSide`, `lever` — в `Position` /
+`PositionExternalSnapshot` не хранятся и не сверяются (почему — раздел
+проверок чтения в source-agnostic ядре выше); `mgnMode` и `posSide`
+у коннектора есть только константами **запроса** закрытия. **`instId` маппится** — в
 снапшот и дальше в `Position.externalInstrumentId`, атрибут границы без
 колонки: снапшот приходит и СРЕЗОМ по множеству инструментов (чтение
 всех живых позиций одним запросом), где адресат каждого не задан
 запросом.
-
-### OKX response validation (adapter-layer)
-
-```text
-instId  == expected Instrument.externalId
-posSide == net
-mgnMode == isolated
-lever   <= биржевой максимум (externalMaxLeverage)
-```
 
 ### OKX close-position request body
 
@@ -153,5 +153,8 @@ settle currency / USDT    → ccy (опц.; пусто — поле не ухо�
 adapter technical policy  → autoCxl
 ```
 
-`autoCxl=true` рекомендуется — снижает риск, что активный ордер
-снова откроет позицию.
+`autoCxl=true` снимает стоящие **заявки на закрытие** (reduce-only),
+которые иначе отвергли бы закрытие площадки; входные заявки он не
+снимает, и закрытие они переживают (семантика флага и провенанс —
+`docs/integrations/okx/contracts/position.md`). Снятие входных ног —
+забота порядка снятия риска, а не флага (`docs/rules/exit-teardown-order.md`).

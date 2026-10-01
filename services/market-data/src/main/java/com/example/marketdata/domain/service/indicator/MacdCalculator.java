@@ -15,12 +15,15 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
- * Вычислитель MACD: линия = EMA(fast) − EMA(slow) по close, сигнальная =
- * EMA(signal) линии, гистограмма = линия − сигнальная. warmup ≈ slow +
- * signal (сигнальная требует прогрева поверх медленной EMA).
+ * Вычислитель MACD. Линии, гистограмма и выведенный прогрев —
+ * docs/spec/indicator-calculation.json (`emaNext`, `macdLine`,
+ * `macdHistogram`, `derivedWarmup`).
  */
 @Component
 public class MacdCalculator implements IndicatorCalculator {
+
+    /** Кратность медленного периода в выведенном прогреве — остаток затравки EMA (`derivedWarmup`). */
+    private static final int SLOW_WARMUP_PERIODS = 2;
 
     @Override
     public IndicatorValue.Type getType() {
@@ -34,7 +37,7 @@ public class MacdCalculator implements IndicatorCalculator {
         int fast = macdParams.getFastPeriod();
         int slow = macdParams.getSlowPeriod();
         int signal = macdParams.getSignalPeriod();
-        int warmup = effectiveWarmup(macdParams.getWarmup(), slow + signal);
+        int warmup = effectiveWarmup(macdParams.getWarmup(), SLOW_WARMUP_PERIODS * slow + signal);
         List<IndicatorValue> result = new ArrayList<>();
         if (closedCandles.size() < slow) {
             return result;

@@ -52,7 +52,6 @@
 ## Связи
 
 - Инвентарь и ярусы — `docs/architecture/services.md`.
-- Периметр и живые данные — `docs/architecture/contracts.md` §«Живые данные в
-  браузер».
+- Периметр и живые данные — `docs/architecture/contracts.md`.
 - Ингресс и окружения — `docs/architecture/platform.md`.
 - Каталог кода — `web/README.md`.

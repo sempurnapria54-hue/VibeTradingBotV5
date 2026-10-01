@@ -18,10 +18,9 @@ public interface TickerSnapshotRepository extends JpaRepository<TickerSnapshotEn
     /**
      * Безопасная вставка среза по ключу {@code pk_ticker_snapshot}
      * (инструмент плюс момент площадки): повтор того же момента поглощается,
-     * а не роняет запись (docs/rules/idempotency-via-unique.md). Ключ
-     * гипертаблицы включает колонку разбиения, поэтому спецификация
-     * конфликта его находит. Аудит проставляется здесь же — нативная
-     * вставка слушателей JPA не проходит.
+     * а не роняет запись (docs/rules/idempotency-via-unique.md). Форма ключа —
+     * docs/rules/persistence-representation.md §«Ключ гипертаблицы». Аудит
+     * проставляется здесь же — нативная вставка слушателей JPA не проходит.
      */
     @Modifying
     @Query(nativeQuery = true, value = """

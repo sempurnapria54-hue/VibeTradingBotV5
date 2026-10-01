@@ -183,10 +183,46 @@ public class DealTranche extends Auditable {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Заявки транша, чья живость на площадке НЕ ИСКЛЮЧЕНА
+     * ({@link Order#mayBeLive()}; docs/spec/order-lifecycle.json,
+     * {@code orderMayBeLive}): живые по статусу плюс нога в {@code ERROR},
+     * у которой наблюдение не показало нежилости. Пусто — нет.
+     *
+     * <p>Читатели — аварийные: снятие риска (отмена первой очередью,
+     * перечень добычи подтверждения, flat) и доказанное отсутствие живого
+     * риска сделки (docs/spec/deal-lifecycle.json, {@code anyLiveOrder}).
+     * Штатные исполнители читают {@link #liveOrders()}: у ноги в
+     * {@code ERROR} штатной работы нет.
+     */
+    public List<Order> mayBeLiveOrders() {
+        return emptyIfNull(orders).stream()
+                .filter(order -> isTrue(order.mayBeLive()))
+                .collect(Collectors.toList());
+    }
+
     /** Live standalone algo-orders транша; пусто — нет. */
     public List<AlgoOrder> liveAlgoOrders() {
         return emptyIfNull(algoOrders).stream()
                 .filter(algoOrder -> isTrue(algoOrder.isLive()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Отдельные условные заявки транша, чья живость на площадке НЕ
+     * ИСКЛЮЧЕНА ({@link AlgoOrder#mayBeLive()}): живые по статусу плюс
+     * заявка в {@code ERROR}, у которой наблюдение не показало нежилости.
+     * Пусто — нет.
+     *
+     * <p>Читатели — аварийные: снятие риска (очередь защит, перечень добычи
+     * подтверждения, flat) и доказанное отсутствие живого риска сделки
+     * (docs/spec/deal-lifecycle.json, {@code trancheHasMayBeLiveStandaloneProtection}).
+     * Штатные исполнители читают {@link #liveAlgoOrders()}: у заявки в
+     * {@code ERROR} штатной работы нет.
+     */
+    public List<AlgoOrder> mayBeLiveAlgoOrders() {
+        return emptyIfNull(algoOrders).stream()
+                .filter(algoOrder -> isTrue(algoOrder.mayBeLive()))
                 .collect(Collectors.toList());
     }
 
@@ -634,7 +670,12 @@ public class DealTranche extends Auditable {
     /**
      * Итоговая бизнес-причина завершения транша. Старшинство причин при
      * сведе́нии к причине сделки — docs/spec/deal-lifecycle.json
-     * §trancheCloseReasonRank.
+     * §trancheCloseReasonRank; перечень совпадает с перечнем старшинства.
+     *
+     * <p><b>Запасного значения нет.</b> Пустая причина, которую транш
+     * наследует от сворачивающейся сделки, терминала не даёт — сделка уходит
+     * ошибочной тропой (docs/lifecycles/DealTranche.md §«Писатель причины
+     * закрытия транша — обработчик терминального ребра»).
      */
     public enum CloseReason {
 
@@ -654,9 +695,6 @@ public class DealTranche extends Auditable {
         TAKE_PROFIT,
 
         /** Кандидат закрыт до живого риска: условие входа истекло. */
-        ENTRY_CONDITION_EXPIRED,
-
-        /** Fallback. */
-        UNKNOWN
+        ENTRY_CONDITION_EXPIRED
     }
 }

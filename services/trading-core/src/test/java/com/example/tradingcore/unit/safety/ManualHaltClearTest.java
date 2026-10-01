@@ -2,6 +2,7 @@ package com.example.tradingcore.unit.safety;
 
 import static com.example.tradingcore.unit.safety.SafetyFixture.ACCOUNT_ID;
 import static com.example.tradingcore.unit.safety.SafetyFixture.ACCOUNT_INTERNAL_ID;
+import static com.example.tradingcore.unit.safety.SafetyFixture.INSTRUMENT_EXTERNAL_ID;
 import static com.example.tradingcore.unit.safety.SafetyFixture.INSTRUMENT_ID;
 import static com.example.tradingcore.unit.safety.SafetyFixture.INSTRUMENT_INTERNAL_ID;
 import static com.example.tradingcore.unit.safety.SafetyFixture.dealWithLiveRisk;
@@ -11,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -20,14 +22,16 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.ManualHaltClass;
 import com.example.tradingcore.util.Constants;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -72,14 +76,20 @@ class ManualHaltClearTest {
                 ExchangeAccount.SafetyRung.ACTIVE);
     }
 
-    /** Одноходовость инструмента — редакция лестницы, а не свойство радиуса. */
+    /**
+     * Две ступени — два хода и на паре: жёсткая снимается в мягкий запрет
+     * входов, а не в рабочее состояние. Одноходовое снятие пары вернуло бы
+     * вход в торговлю одним нажатием, минуя второе условие снятия.
+     */
     @Test
-    @DisplayName("U13.3 — снятие полного класса на паре: цель — рабочее состояние пары")
-    void u13_3_thePairFullClearanceTargetsTheWorkingState() {
+    @DisplayName("U13.3 — снятие полного класса на паре: цель — мягкий запрет входов пары")
+    void u13_3_thePairFullClearanceTargetsTheSoftRung() {
         harness.manualHalt.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
 
         verify(harness.pairStates).clearRung(ACCOUNT_ID, INSTRUMENT_ID,
-                Instrument.SafetyRung.TRADE_BLOCKED, Instrument.SafetyRung.ACTIVE);
+                Instrument.SafetyRung.TRADE_BLOCKED, Instrument.SafetyRung.ENTRY_BLOCKED);
+        verify(harness.pairStates, never()).clearRung(anyLong(), anyLong(),
+                eq(Instrument.SafetyRung.TRADE_BLOCKED), eq(Instrument.SafetyRung.ACTIVE));
     }
 
     /** Мягкая ступень пары снимается в рабочее состояние. */
@@ -216,27 +226,21 @@ class ManualHaltClearTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Снятие
-     * не выдаёт права торговать, которого у объекта не было до ступени:
-     * инструмент с незавершённым онбордингом объявлен возвращаемым в
-     * онбординговый статус тремя носителями (docs/spec/manual-halt.json,
-     * величина {@code clearanceTarget}), а ветви под это в коде нет и
-     * быть не может — ступень живёт полем пары в базе ядра, онбординг —
-     * полем каталога в базе соседа. Красный прогон и есть предъявление
-     * находки `S-3` (`.claude/work/backlog.md` §«Карв-аут возврата
-     * инструмента в онбординговый статус неисполним и писателя не
-     * имеет»).
+     * Снятие двигает только ступень пары: онбординговый статус инструмента —
+     * другое поле в другой базе, и права торговать не выдаёт отбор входа,
+     * берущий только онбординговый рабочий статус (docs/rules/manual-halt.md).
+     * Цель поэтому та же, что у {@code U13.3}, — мягкий запрет входов пары.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U13.14 — снятие полного класса на паре с незавершённым онбордингом: цель не рабочее состояние")
-    void u13_14_theOnboardingCarveOutIsNotTheWorkingState() {
+    @DisplayName("U13.14 — снятие полного класса на паре с незавершённым онбордингом: цель — мягкий запрет входов пары")
+    void u13_14_anUnfinishedOnboardingDoesNotChangeThePairClearanceTarget() {
         harness.instrumentStands(Instrument.SafetyRung.TRADE_BLOCKED, Instrument.Status.SYNC);
 
         harness.manualHalt.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
 
-        verify(harness.pairStates, never()).clearRung(anyLong(), anyLong(), any(),
-                eq(Instrument.SafetyRung.ACTIVE));
+        verify(harness.pairStates).clearRung(ACCOUNT_ID, INSTRUMENT_ID,
+                Instrument.SafetyRung.TRADE_BLOCKED, Instrument.SafetyRung.ENTRY_BLOCKED);
+        verify(harness.instruments, never()).upsertProjection(any(), any(), any());
     }
 
     /**
@@ -267,6 +271,101 @@ class ManualHaltClearTest {
         harness.manualHalt.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, null);
 
         verify(harness.holdService, never()).raiseManual(any(), any());
+    }
+
+    /**
+     * Пятый признак живого риска читается срезом позиций радиуса: позиция,
+     * которую не объясняет ни одна нетерминальная сделка, снятие
+     * сворачивания отвергает — сделки радиуса риска не несут, а на площадке
+     * он есть.
+     */
+    @Test
+    @DisplayName("U13.17 — снятие полного класса, сделок радиуса нет, в срезе живая позиция: отказ при запуске")
+    void u13_17_aLivePositionOutsideTheDealGraphRefusesTheClearance() {
+        harness.accountStands(ExchangeAccount.SafetyRung.TRADE_BLOCKED, ExchangeAccount.Status.ACTIVE);
+        when(harness.slices.livePositions(any(), any()))
+                .thenReturn(new ArrayList<>(List.of(livePosition(INSTRUMENT_EXTERNAL_ID))));
+
+        assertThatThrownBy(() -> harness.manualHalt.clear(ManualHaltClass.FULL,
+                ACCOUNT_INTERNAL_ID, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(harness.accounts, never()).clearRung(anyLong(), any(), any());
+        verify(harness.reports, never()).journal(any(), any());
+    }
+
+    /** Не добытый срез отсутствия риска не доказывает: пустота ступень не снимает. */
+    @Test
+    @DisplayName("U13.18 — снятие полного класса, срез позиций не добыт: отказ при запуске")
+    void u13_18_anUnfetchedSliceRefusesTheClearance() {
+        harness.accountStands(ExchangeAccount.SafetyRung.TRADE_BLOCKED, ExchangeAccount.Status.ACTIVE);
+        when(harness.slices.livePositions(any(), any())).thenReturn(null);
+
+        assertThatThrownBy(() -> harness.manualHalt.clear(ManualHaltClass.FULL,
+                ACCOUNT_INTERNAL_ID, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(harness.accounts, never()).clearRung(anyLong(), any(), any());
+    }
+
+    /**
+     * Срез читается последним: сделка, риска не доказавшая, решает раньше,
+     * и к площадке снятие тогда не ходит вовсе.
+     */
+    @Test
+    @DisplayName("U13.19 — сделка радиуса риска не доказала: отказ, срез позиций не читается")
+    void u13_19_aRefusingDealLeavesTheSliceUnread() {
+        harness.accountStands(ExchangeAccount.SafetyRung.TRADE_BLOCKED, ExchangeAccount.Status.ACTIVE);
+        liveRiskRemains();
+
+        assertThatThrownBy(() -> harness.manualHalt.clear(ManualHaltClass.FULL,
+                ACCOUNT_INTERNAL_ID, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(harness.slices, never()).livePositions(any(), any());
+    }
+
+    /**
+     * Повторное полное снятие на паре, уже спущенной в мягкий запрет входов,
+     * по лестнице не шагает: жёсткая ступень не стои́т, предусловия нет, и
+     * снятие холостое — ни чтения площадки, ни строки журнала.
+     */
+    @Test
+    @DisplayName("U13.20 — второе полное снятие на паре в мягком запрете входов: холостой ход")
+    void u13_20_aSecondFullClearanceOnTheSoftPairIsANoOp() {
+        harness.instrumentStands(Instrument.SafetyRung.ENTRY_BLOCKED, Instrument.Status.ACTIVE);
+        when(harness.pairStates.clearRung(anyLong(), anyLong(), any(), any())).thenReturn(false);
+
+        assertThatCode(() -> harness.manualHalt.clear(ManualHaltClass.FULL,
+                ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID))
+                .doesNotThrowAnyException();
+
+        verify(harness.pairStates).clearRung(ACCOUNT_ID, INSTRUMENT_ID,
+                Instrument.SafetyRung.TRADE_BLOCKED, Instrument.SafetyRung.ENTRY_BLOCKED);
+        verify(harness.pairStates, never()).clearRung(anyLong(), anyLong(),
+                eq(Instrument.SafetyRung.ENTRY_BLOCKED), eq(Instrument.SafetyRung.ACTIVE));
+        verify(harness.slices, never()).livePositions(any(), any());
+        verify(harness.reports, never()).journal(any(), any());
+    }
+
+    /** Срез — счёт целиком, у радиуса пары суженный его инструментом. */
+    @Test
+    @DisplayName("U13.21 — срез позиций предусловия: счёт целиком на счёте, инструмент пары на паре")
+    void u13_21_theSliceIsNarrowedByThePairInstrumentOnly() {
+        harness.accountStands(ExchangeAccount.SafetyRung.TRADE_BLOCKED, ExchangeAccount.Status.ACTIVE);
+        harness.manualHalt.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, null);
+        verify(harness.slices).livePositions(any(), isNull());
+
+        harness.instrumentStands(Instrument.SafetyRung.TRADE_BLOCKED, Instrument.Status.ACTIVE);
+        harness.manualHalt.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
+        verify(harness.slices).livePositions(any(), eq(INSTRUMENT_EXTERNAL_ID));
+    }
+
+    private static Position livePosition(String externalInstrumentId) {
+        Position position = new Position();
+        position.setExternalInstrumentId(externalInstrumentId);
+        position.setExternalSize(BigDecimal.ONE);
+        return position;
     }
 
     private void liveRiskRemains() {

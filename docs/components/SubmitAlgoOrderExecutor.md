@@ -9,8 +9,10 @@
 Получает `SUBMIT_ALGO_ORDER_COMMAND`. Загружает локальный `AlgoOrder`; если
 `externalId` есть — команда выполнена или требует refresh; если пуст —
 ищет на бирже по `algoClOrdId = algoOrder.internalId`. Найден → обновляет
-локальное состояние; не найден → отправляет на биржу. Обновляет
-`DealActionState.status`.
+локальное состояние — только идентификатор и факт отправки: факты записи
+и сверку её эха с нашей строкой несёт следующая добыча
+(`docs/components/RefreshAlgoOrderExecutor.md`); не найден → отправляет на
+биржу. Обновляет `DealActionState.status`.
 
 **Терминальная заявка не отправляется** — тот же довод, что у обычной
 (`docs/components/SubmitOrderExecutor.md`): добыча, исчерпавшая цикл у

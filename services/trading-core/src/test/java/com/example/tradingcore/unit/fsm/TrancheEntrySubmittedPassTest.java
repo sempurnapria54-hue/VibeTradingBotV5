@@ -100,6 +100,20 @@ class TrancheEntrySubmittedPassTest {
     }
 
     @Test
+    @DisplayName("U18.17 — сворачивание, ноги нет, наследуемой причины нет: ошибочная тропа, ребра и причины нет")
+    void u18_17_aCollapsingDealWithoutAnInheritableReasonEscalates() {
+        DealTranche subject = tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED);
+        subject.getOrders().add(cancelledEntryLeg(30L, TRANCHE_ID));
+
+        TrancheTransition transition = handle(contextOf(Deal.Status.EXIT_PENDING, subject));
+
+        assertThat(transition.getDealErrorRequested()).isTrue();
+        assertThat(transition.getNextStatus()).isNull();
+        assertThat(transition.getCloseReason()).isNull();
+        assertThat(transition.hasCommands()).isFalse();
+    }
+
+    @Test
     @DisplayName("U18.6 — нога терминальна, наливов не было: причина «условие входа истекло»")
     void u18_6_aTerminalLegWithoutFillsClosesOnTheExpiredCondition() {
         DealTranche subject = tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED);

@@ -17,9 +17,13 @@ Data → REST API», секция «Get limit price»). Процедура св�
 live-вызова, а `RiskValidator` фазы 1 в биржу не ходит и кода ценового
 бэнда не несёт (`RiskCheckResult.md`); ордер с ценой вне лимитов биржа
 отклонит (или скорректирует при `pxAmendType=1` — см. `order.md`).
-Предварительная сверка цены с лимитами — **форвард** (в валидатор фазы 1 не
-входит без явной live-точки преконтроля). Решено на шаге 5
-(`docs/models/domain/other/InstrumentExternalRules.md`).
+Предварительная сверка цены с лимитами в преконтроль не берётся: отказ
+площадки по цене вне лимитов громкий, его разбирает граница коннектора
+классификацией отказа команды (`docs/rules/runtime-error-classification.md`),
+и риска сверх объявленного он не создаёт. Решено на шаге 5
+(`docs/models/domain/other/InstrumentExternalRules.md`); подтверждено
+разбором кандидатов преконтроля
+(`.claude/decisions/server-side-precheck-not-adopted.md`).
 
 ## GET /api/v5/public/price-limit
 

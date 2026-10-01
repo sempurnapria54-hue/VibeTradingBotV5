@@ -13,9 +13,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
+import com.example.tradingcore.domain.command.risk.RiskCheckResult;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
+import java.lang.reflect.Field;
+import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,11 +31,9 @@ import org.junit.jupiter.api.Test;
  * <p><b>Свёртка живёт ПРИВАТНЫМ методом валидатора, и публичной тропы к
  * ней с прямо построенным перечнем не существует</b> — три её точки
  * входа принимают состояние, а не список проверок. Поэтому клетки
- * группы, чьи члены валидатор производит сам, прогоняются через
- * преконтроль, а клетки U20.3-U20.5 остаются описанными и
- * непрогоняемыми: их вход требует члена со статусом, которого не ставит
- * ни одна фабрика результата (находка R-2 и её сосед по статусу
- * «пройдено»), — тот же класс, что у объявленного документом U20.6.
+ * группы прогоняются через преконтроль. Статуса у члена перечня нет
+ * (docs/components/models/RiskCheckResult.md §«Исход проверки — только
+ * отказ»): решение читается по членству — непуст перечень либо пуст.
  */
 class VerdictAggregationTest {
 
@@ -58,6 +59,27 @@ class VerdictAggregationTest {
 
         assertThat(codes(result)).containsExactly(RiskCheckCode.INSTRUMENT_NOT_LIVE);
         assertThat(result.getDecision()).isEqualTo(RiskDecision.BLOCKED);
+    }
+
+    @Test
+    @DisplayName("U20.6 — любой вход: статуса у члена нет, решение блокирующее ровно при непустом перечне")
+    void u20_6_theDecisionIsReadByMembership() {
+        assertThat(Arrays.stream(RiskCheckResult.class.getDeclaredFields()).map(Field::getName))
+                .as("статуса у члена перечня нет")
+                .doesNotContain("status");
+        assertThat(RiskDecision.values())
+                .as("третьего решения нет")
+                .containsExactly(RiskDecision.ALLOWED, RiskDecision.BLOCKED);
+        InstrumentExternalRules suspended = workingRules();
+        suspended.setStatus(InstrumentExternalRules.Status.SUSPEND);
+        RiskValidationResult allowed = harness.validate(entryAction(), workingContext());
+        harness.givenRules(suspended);
+        RiskValidationResult blocked = harness.validate(entryAction(), workingContext());
+
+        assertThat(allowed.getChecks()).isEmpty();
+        assertThat(allowed.getDecision()).isEqualTo(RiskDecision.ALLOWED);
+        assertThat(blocked.getChecks()).isNotEmpty();
+        assertThat(blocked.getDecision()).isEqualTo(RiskDecision.BLOCKED);
     }
 
     @Test

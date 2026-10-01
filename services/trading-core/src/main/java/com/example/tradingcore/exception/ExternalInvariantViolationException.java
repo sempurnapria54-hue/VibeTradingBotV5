@@ -7,9 +7,13 @@ package com.example.tradingcore.exception;
  *
  * <p>Инвариант проверяет ГРАНИЦА — там, где ответ впервые разбирается
  * (docs/components/IntegrationService.md §«Проверка инвариантов
- * контракта»); ядро получает уже класс. Причина закрытия сущности —
- * {@code EXCHANGE_INVARIANT_VIOLATION}
- * (docs/rules/controlled-exchange-exceptions.md).
+ * контракта»); ядро получает уже класс.
+ *
+ * <p><b>Статуса сущности класс не меняет и причины закрытия ей не
+ * пишет.</b> Нарушение инварианта — факт о ЧТЕНИИ, а не о сущности: её
+ * судьба им не наблюдена, и статус остаётся последним применённым фактом.
+ * Реакция принадлежит классу отказа — сделка в {@code ERROR}, биржевая
+ * ступень 2 (docs/rules/controlled-exchange-exceptions.md).
  */
 public class ExternalInvariantViolationException extends ControlledExchangeException {
 

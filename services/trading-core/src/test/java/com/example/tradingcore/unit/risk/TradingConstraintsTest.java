@@ -6,7 +6,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.FEE;
 import static com.example.tradingcore.unit.risk.RiskFixture.STOP;
 import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryAction;
-import static com.example.tradingcore.unit.risk.RiskFixture.pairState;
+import static com.example.tradingcore.unit.risk.RiskFixture.pairStateWithLeverage;
 import static com.example.tradingcore.unit.risk.RiskFixture.priceBuilder;
 import static com.example.tradingcore.unit.risk.RiskFixture.protection;
 import static com.example.tradingcore.unit.risk.RiskFixture.protectionAction;
@@ -172,12 +172,19 @@ class TradingConstraintsTest {
                 .containsExactly(RiskCheckCode.SIZE_ABOVE_LIMIT);
     }
 
+    /**
+     * Клетки биржевого максимума плеча берут ЗАЩИТНОЕ действие, а не вход, и
+     * довод несущий: проверка максимума от класса акта не зависит, а у входа
+     * при плече 125 и выше оценка ликвидации позиции после акта ложится ближе
+     * стопа базовой сборки, и его код подмешался бы к предмету группы
+     * (docs/rules/risk-policy.md, правило о ликвидации до входа).
+     */
     @Test
     @DisplayName("U2.13 — плечо пары выше биржевого максимума")
     void u2_13_aLeverageAboveTheExchangeMaximumIsRejected() {
         harness.givenPairState(pairStateWithLeverage(200));
 
-        assertThat(codes(harness.validate(entryAction(), workingContext())))
+        assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), workingContext())))
                 .containsExactly(RiskCheckCode.EXCHANGE_MAX_LEVERAGE_EXCEEDED);
     }
 
@@ -186,7 +193,7 @@ class TradingConstraintsTest {
     void u2_14_aLeverageExactlyAtTheMaximumPasses() {
         harness.givenPairState(pairStateWithLeverage(125));
 
-        assertThat(codes(harness.validate(entryAction(), workingContext()))).isEmpty();
+        assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), workingContext()))).isEmpty();
     }
 
     @Test
@@ -214,7 +221,7 @@ class TradingConstraintsTest {
         harness.givenRules(withoutMaximum);
         harness.givenPairState(pairStateWithLeverage(200));
 
-        assertThat(codes(harness.validate(entryAction(), workingContext()))).isEmpty();
+        assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), workingContext()))).isEmpty();
     }
 
     @Test
@@ -294,12 +301,5 @@ class TradingConstraintsTest {
     private static CalculatedStrategyAction marketPricedEntry(PriceMode priceMode) {
         return withPrice(entryAction(),
                 priceBuilder(ANCHOR, STOP.toPlainString()).priceMode(priceMode).build());
-    }
-
-    /** Строка пары без ступени с названным рабочим плечом. */
-    private static AccountInstrumentState pairStateWithLeverage(Integer leverage) {
-        AccountInstrumentState state = pairState(Instrument.SafetyRung.ACTIVE);
-        state.setLeverage(leverage);
-        return state;
     }
 }

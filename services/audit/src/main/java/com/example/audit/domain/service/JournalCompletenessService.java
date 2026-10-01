@@ -16,11 +16,9 @@ import org.springframework.stereotype.Service;
  * {@code continuityClaimable}).
  *
  * <p><b>Носитель СВЁРТКИ один, и заведён он затем, чтобы остаться
- * одним.</b> Величины читают трое: чистка журнала — чтобы понять, чей
- * разрыв вынесен за границу, — и обе выборки чтения, отдающие обе величины
- * с КАЖДОЙ выдачей чисел. Форма у всех трёх одна, дом её — спека; вторая
- * реализация той же свёртки расходилась бы с первой молча
- * (.claude/rules/policy-home.md).
+ * одним.</b> Величины читает выборка чтения, отдающая обе с КАЖДОЙ выдачей
+ * чисел. Форма у неё одна, дом её — спека; вторая реализация той же свёртки
+ * расходилась бы с первой молча (.claude/rules/policy-home.md).
  *
  * <p><b>Операнды приходят ИСТОЧНИКОМ, а не внедряются сюда</b>
  * ({@link JournalCompletenessSource}). Прежде так было потому, что
@@ -30,8 +28,7 @@ import org.springframework.stereotype.Service;
  * мокается в пробах читателей целиком.
  *
  * <p><b>Собственной транзакции методы не открывают:</b> границу называет
- * вызывающий — у чистки она общая со снятием момента разрыва, чтобы
- * граница и правка по ней говорили об одном состоянии базы.
+ * вызывающий.
  */
 @Service
 public class JournalCompletenessService {
@@ -47,6 +44,11 @@ public class JournalCompletenessService {
      * нет, непрерывность не утверждаема. Выдача, спрашивающая одну без
      * другой, это состояние разложила бы на два разных ответа.
      *
+     * <p><b>Граница считается один раз, и предикат сравнивает момент разрыва
+     * с ней же.</b> Отданная граница и та, против которой читался разрыв,
+     * обязаны быть одним числом: иначе выдача могла бы назвать границу,
+     * позже которой лежит дыра, и одновременно утверждать непрерывность.
+     *
      * @param source      откуда читаются операнды
      * @param staleBefore момент, раньше которого строка состояния приёма
      *                    считается устаревшей: момент выдачи за вычетом
@@ -55,8 +57,9 @@ public class JournalCompletenessService {
     public JournalCompleteness completeness(JournalCompletenessSource source,
                                             String consumerGroup,
                                             OffsetDateTime staleBefore) {
-        return new JournalCompleteness(lowerBound(source, consumerGroup).orElse(null),
-                continuityClaimable(source, consumerGroup, staleBefore));
+        Optional<OffsetDateTime> lowerBound = lowerBound(source, consumerGroup);
+        return new JournalCompleteness(lowerBound.orElse(null),
+                continuityClaimable(source, consumerGroup, staleBefore, lowerBound));
     }
 
     /**
@@ -115,15 +118,37 @@ public class JournalCompletenessService {
      * живой поверхности чтения, очищенная таблица состояния в
      * непроизводственном окружении.
      *
+     * <p><b>Момент разрыва читается против нижней границы</b>
+     * (docs/spec/durable-reception.json, {@code lagExceededRetention}):
+     * разрыв раньше неё дыры внутри обещаемого ряда не образует, и снятия у
+     * момента нет ни у одного писателя — ни у чистки журнала, ни у тика
+     * (docs/rules/durable-consumer-reception.md §«Писатели величин — по роли,
+     * а не по имени класса»).
+     *
      * <p><b>Ложь означает «не утверждаема», а не «дыра есть»:</b> поводов
      * у неё два, и читателю оба говорят одно — числам верить нельзя.
      */
     public Boolean continuityClaimable(JournalCompletenessSource source,
                                        String consumerGroup,
                                        OffsetDateTime staleBefore) {
-        if (source.countSubscribedPairs(consumerGroup) == 0) {
+        return continuityClaimable(source, consumerGroup, staleBefore, lowerBound(source, consumerGroup));
+    }
+
+    /**
+     * Предикат против уже посчитанной границы.
+     *
+     * <p><b>Пустая граница и есть пустая область квантора</b>: границы нет
+     * ровно тогда, когда подписанных пар ноль
+     * (docs/spec/durable-reception.json, {@code receptionLowerBound}), — и о
+     * дырах источник в этой ветви не спрашивается.
+     */
+    private Boolean continuityClaimable(JournalCompletenessSource source,
+                                        String consumerGroup,
+                                        OffsetDateTime staleBefore,
+                                        Optional<OffsetDateTime> lowerBound) {
+        if (lowerBound.isEmpty()) {
             return Boolean.FALSE;
         }
-        return source.countSubscribedPairsWithBreak(consumerGroup, staleBefore) == 0;
+        return source.countSubscribedPairsWithBreak(consumerGroup, staleBefore, lowerBound.get()) == 0;
     }
 }

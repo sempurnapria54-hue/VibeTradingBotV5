@@ -42,6 +42,7 @@
         -->
         <junit-jupiter.version>6.0.1</junit-jupiter.version>
         <assertj.version>3.27.6</assertj.version>
+        <jackson-databind.version>2.20.1</jackson-databind.version>
         <!--
           Версия surefire закреплена по той же причине, что и версия
           компилятора: родителя нет, и умолчание Maven принесло бы провайдер
@@ -129,6 +130,29 @@
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
             <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Сериализатор — ПО ПРЕДЪЯВЛЕННОЙ ПОТРЕБНОСТИ ПРОБЫ, и только в области
+          test. Формы, пересекающие сериализацию, изымают предикаты
+          аннотацией на самой модели (.claude/rules/codestyle.md §«Предикат
+          формы, пересекающей сериализацию, не является её свойством»), а
+          проба «свойства формы = её поля» обязана спросить НАСТОЯЩИЙ
+          интроспектор: какой метод он считает свойством (нульарный
+          is-метод с типом-обёрткой, правила имени), решает он, и
+          пересказ этих правил отражением стал бы вторым носителем,
+          расходящимся с библиотекой молча. Потребителям не уезжает:
+          область test не транзитивна.
+
+          Линия Jackson 2 — та же, что у проб JSONB-навеса
+          (services/common/test-support), и аннотации её с Jackson 3 общие.
+          Версия — та, что закрепляет spring-boot-dependencies 4.0.0
+          (jackson-2-bom), по тому же доводу, что у junit и assertj выше.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson-databind.version}</version>
             <scope>test</scope>
         </dependency>
 

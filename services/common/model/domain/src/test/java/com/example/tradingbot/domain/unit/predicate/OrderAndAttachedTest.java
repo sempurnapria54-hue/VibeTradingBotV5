@@ -4,12 +4,15 @@ import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.atta
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.dec;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.order;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.orderWith;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -19,7 +22,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  * Заявка и её встроенная защита — группа `U9` документа
  * `.claude/tests/cases/domain-model-predicates.md`
  * (docs/spec/order-lifecycle.json, {@code orderIsLive},
- * {@code attachedIsActiveLike}; docs/spec/protection-coverage.json,
+ * {@code orderMayBeLive}, {@code attachedIsActiveLike}; docs/spec/protection-coverage.json,
  * {@code coveredSize} носителя ATTACHED;
  * docs/models/domain/core/Order.md §«Встроенная защита»).
  *
@@ -180,6 +183,57 @@ class OrderAndAttachedTest {
     @DisplayName("U9.19 — нога жива и налита частично: налив не окончателен")
     void u9_19_aLivePartiallyFilledLegHasNoFinalFill() {
         assertThat(order(1L, Order.Status.PARTIALLY_COMPLETED, "2", false).hasFinalFill()).isFalse();
+    }
+
+    /** Пометка ошибки — наше safety-состояние, а не факт площадки. */
+    @Test
+    @DisplayName("U9.20 — ошибочный статус, наблюдения площадки нет: живость не исключена")
+    void u9_20_anErrorLegWithoutObservationMayBeLive() {
+        Order subject = errorLeg(null);
+
+        assertThat(subject.isLive()).isFalse();
+        assertThat(subject.mayBeLive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("U9.21 — ошибочный статус, площадка показала её живой: живость не исключена")
+    void u9_21_anErrorLegObservedLiveMayBeLive() {
+        assertThat(errorLeg(Boolean.TRUE).mayBeLive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("U9.22 — ошибочный статус, площадка показала её нежилой: живость исключена")
+    void u9_22_anErrorLegObservedNotLiveIsExcluded() {
+        assertThat(errorLeg(Boolean.FALSE).mayBeLive()).isFalse();
+    }
+
+    /** Пустое наблюдение читается только у ошибочного статуса. */
+    @ParameterizedTest
+    @EnumSource(value = Order.Status.class, names = {"CANCELED", "COMPLETED"})
+    @DisplayName("U9.23 — снятый либо исполненный статус, наблюдения нет: живость исключена")
+    void u9_23_aRegularTerminalWithoutObservationIsExcluded(Order.Status status) {
+        assertThat(order(1L, status, "0", false).mayBeLive()).isFalse();
+    }
+
+    /** Рёбер из терминала матрица не содержит; живые и созданная — не терминальны. */
+    @ParameterizedTest
+    @EnumSource(AttachedAlgoOrder.Status.class)
+    @DisplayName("U9.24 — встроенная защита, перебор статусов: терминальна ровно у сработавшей, снятой и ошибочной")
+    void u9_24_anAttachedProtectionIsTerminalExactlyWithoutOutgoingEdges(AttachedAlgoOrder.Status status) {
+        AttachedAlgoOrder subject = new AttachedAlgoOrder();
+        subject.setStatus(status);
+
+        assertThat(subject.isTerminal()).isEqualTo(Set.of(AttachedAlgoOrder.Status.COMPLETED,
+                AttachedAlgoOrder.Status.CANCELED, AttachedAlgoOrder.Status.ERROR).contains(status));
+        assertThat(subject.isTerminal()).isEqualTo(Arrays.stream(AttachedAlgoOrder.Status.values())
+                .noneMatch(target -> isTrue(subject.canTransitionTo(target))));
+    }
+
+    private static Order errorLeg(Boolean externalLive) {
+        Order subject = order(1L, Order.Status.ERROR, "0", false);
+        subject.setCloseReason(Order.CloseReason.UNKNOWN_EXTERNAL_STATUS);
+        subject.setExternalLive(externalLive);
+        return subject;
     }
 
     private static Order finalized(Order.Status status, Order.CloseReason reason) {

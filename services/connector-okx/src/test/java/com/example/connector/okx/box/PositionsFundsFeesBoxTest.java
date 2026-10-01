@@ -1,5 +1,6 @@
 package com.example.connector.okx.box;
 
+import static java.util.Objects.nonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.connector.okx.util.OkxConstants;
@@ -139,7 +140,9 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
         exchange.answers(OkxConstants.ACCOUNT_BALANCE_PATH, Okx.ok(
                 "{\"uTime\":\"1758240000000\",\"totalEq\":\"1000\",\"adjEq\":\"990\","
                         + "\"availEq\":\"900\",\"details\":[{\"ccy\":\"USDT\",\"eq\":\"1000\","
-                        + "\"availBal\":\"900\",\"frozenBal\":\"100\"}]}"));
+                        + "\"cashBal\":\"1000\",\"availBal\":\"900\",\"frozenBal\":\"100\"}]}"));
+
+        exchange.answers(OkxConstants.ACCOUNT_CONFIG_PATH, Okx.ok(Okx.accountConfig("2", "net_mode")));
 
         Answer filled = get(account("/balance?settleCurrency=USDT"));
 
@@ -174,6 +177,176 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
             assertThat(answer.errorCode()).as(violation).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
             assertThat(String.valueOf(answer.asObject().get("message"))).as(violation).contains("USDT");
         }
+    }
+
+    /**
+     * Ожидание взято из дома: поля уровня счёта и строки расчётной валюты,
+     * объявленные обязательными, заполнены и разбираются
+     * ({@code docs/models/mapping/Balance.md} §«Validation (структурная, до
+     * маппинга)»); нарушение — та же форма отказа, что у отсутствующей
+     * строки. Вариант на каждое обязательное поле и на каждую форму
+     * нарушения: пусто, нет вовсе, не разбирается.
+     */
+    @Test
+    @DisplayName("B5.11 — баланс с пустым или неразбираемым обязательным полем нарушает инвариант")
+    void b5_11_aBalanceWithABlankOrUnparsedMandatoryFieldViolatesTheInvariant() {
+        List<String> violations = List.of(
+                balanceOf("\"\"", "\"1000\"", "\"990\"", "\"900\"", row("\"1000\"", "\"1000\"", "\"900\"", "\"100\"")),
+                balanceOf(null, "\"1000\"", "\"990\"", "\"900\"", row("\"1000\"", "\"1000\"", "\"900\"", "\"100\"")),
+                balanceOf("\"soon\"", "\"1000\"", "\"990\"", "\"900\"", row("\"1000\"", "\"1000\"", "\"900\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"\"", "\"990\"", "\"900\"",
+                        row("\"1000\"", "\"1000\"", "\"900\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"abc\"", "\"900\"",
+                        row("\"1000\"", "\"1000\"", "\"900\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"abc\"",
+                        row("\"1000\"", "\"1000\"", "\"900\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"900\"",
+                        row("\"\"", "\"1000\"", "\"900\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"900\"",
+                        row("\"1000\"", null, "\"900\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"900\"",
+                        row("\"1000\"", "\"1000\"", "\"\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"900\"",
+                        row("\"1000\"", "\"1000\"", "\"nine\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"900\"",
+                        row("\"1000\"", "\"1000\"", "\"900\"", "\"abc\"")));
+        for (String violation : violations) {
+            exchange.reset();
+            exchange.answers(OkxConstants.ACCOUNT_BALANCE_PATH, Okx.ok(violation));
+
+            Answer answer = get(account("/balance?settleCurrency=USDT"));
+
+            assertThat(answer.carriesErrorDto()).as(violation).isTrue();
+            assertThat(answer.errorCode()).as(violation).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+            assertThat(String.valueOf(answer.asObject().get("message"))).as(violation).contains("USDT");
+        }
+    }
+
+    /**
+     * Ожидание взято из дома: отрицательные свободный и замороженный остатки
+     * строки расчётной валюты запрещены ({@code docs/models/mapping/Balance.md}
+     * §«Validation (структурная, до маппинга)», строка «Numeric»). Вариант на
+     * каждый остаток.
+     */
+    @Test
+    @DisplayName("B5.12 — отрицательный свободный или замороженный остаток нарушает инвариант")
+    void b5_12_aNegativeAvailableOrFrozenBalanceViolatesTheInvariant() {
+        List<String> violations = List.of(
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"900\"",
+                        row("\"1000\"", "\"1000\"", "\"-1\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"900\"",
+                        row("\"1000\"", "\"1000\"", "\"900\"", "\"-0.5\"")));
+        for (String violation : violations) {
+            exchange.reset();
+            exchange.answers(OkxConstants.ACCOUNT_BALANCE_PATH, Okx.ok(violation));
+
+            Answer answer = get(account("/balance?settleCurrency=USDT"));
+
+            assertThat(answer.carriesErrorDto()).as(violation).isTrue();
+            assertThat(answer.errorCode()).as(violation).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+            assertThat(String.valueOf(answer.asObject().get("message"))).as(violation).contains("USDT");
+        }
+    }
+
+    /**
+     * Обратная сторона B5.11 и B5.12 — граница не отвергает законный ответ
+     * ({@code docs/models/mapping/Balance.md} §«Validation (структурная, до
+     * маппинга)» и §«OKX validation notes»): пустые скорректированный и
+     * свободный капитал счёта (режим счёта, где площадка их не ведёт),
+     * пустой замороженный остаток и отрицательные капитал и денежный
+     * остаток строки — признак обязательства, который читает преконтроль
+     * ядра, а не граница. Отказ здесь ронял бы рефреш баланса такого счёта в
+     * аварийный контур.
+     */
+    @Test
+    @DisplayName("B5.13 — пустой капитал вне режима и отрицательные капитал и денежный остаток не отвергаются")
+    void b5_13_optionalBlanksAndNegativeEquityAndCashAreNotRejected() {
+        List<String> lawful = List.of(
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"\"", "\"\"",
+                        row("\"1000\"", "\"1000\"", "\"900\"", "\"100\"")),
+                balanceOf("\"1758240000000\"", "\"1000\"", null, null,
+                        row("\"1000\"", "\"1000\"", "\"900\"", null)),
+                balanceOf("\"1758240000000\"", "\"1000\"", "\"990\"", "\"900\"",
+                        row("\"-5\"", "\"-5\"", "\"0\"", "\"0\"")));
+        for (String answerBody : lawful) {
+            exchange.reset();
+            exchange.answers(OkxConstants.ACCOUNT_BALANCE_PATH, Okx.ok(answerBody));
+            exchange.answers(OkxConstants.ACCOUNT_CONFIG_PATH, Okx.ok(Okx.accountConfig("2", "net_mode")));
+
+            Answer answer = get(account("/balance?settleCurrency=USDT"));
+
+            assertThat(answer.status()).as(answerBody).isEqualTo(200);
+            assertThat(answer.carriesErrorDto()).as(answerBody).isFalse();
+        }
+    }
+
+    /**
+     * Ожидание взято из дома: режим счёта и режим позиций приезжают со
+     * снимком средств, переведённые в доменный словарь на границе
+     * коннектора ({@code docs/models/mapping/Balance.md}
+     * §«`AccountConfigOkxResponse` → snapshot»). Вариант на режим контура, на
+     * режимы вне контура и на значения вне словаря — последние дают пустоту,
+     * а не угаданный режим и не отказ.
+     */
+    @Test
+    @DisplayName("B5.14 — снимок средств несёт режим счёта и режим позиций в доменном словаре")
+    void b5_14_theFundsSnapshotCarriesTheAccountAndPositionModes() {
+        List<List<String>> variants = List.of(
+                List.of("2", "net_mode", "FUTURES", "NET"),
+                List.of("3", "long_short_mode", "MULTI_CURRENCY_MARGIN", "LONG_SHORT"),
+                List.of("4", "net_mode", "PORTFOLIO_MARGIN", "NET"),
+                List.of("1", "net_mode", "SPOT", "NET"),
+                List.of("7", "hedge_mode", "null", "null"));
+        for (List<String> variant : variants) {
+            exchange.reset();
+            exchange.answers(OkxConstants.ACCOUNT_BALANCE_PATH, Okx.ok(balanceAnswer(
+                    ",\"details\":[{\"ccy\":\"USDT\",\"eq\":\"1000\",\"cashBal\":\"1000\","
+                            + "\"availBal\":\"900\",\"frozenBal\":\"100\"}]")));
+            exchange.answers(OkxConstants.ACCOUNT_CONFIG_PATH,
+                    Okx.ok(Okx.accountConfig(variant.get(0), variant.get(1))));
+
+            Answer answer = get(account("/balance?settleCurrency=USDT"));
+
+            assertThat(answer.status()).as(variant.toString()).isEqualTo(200);
+            assertThat(String.valueOf(answer.asObject().get("accountMode"))).as(variant.toString())
+                    .isEqualTo(variant.get(2));
+            assertThat(String.valueOf(answer.asObject().get("positionMode"))).as(variant.toString())
+                    .isEqualTo(variant.get(3));
+            LoggedRequest config = exchange.single(OkxConstants.ACCOUNT_CONFIG_PATH);
+            assertThat(config.containsHeader(OkxConstants.ACCESS_SIGN_HEADER))
+                    .as("конфигурация счёта — приватное чтение с подписью").isTrue();
+            assertThat(answer.body()).doesNotContain("acctLv", "posMode", "net_mode", "long_short_mode");
+        }
+    }
+
+    /**
+     * Ожидание взято из дома: пустой ответ конфигурации — отказ того же
+     * класса, что пустой баланс, — сведений о счёте нет, и повтор осмыслен
+     * ({@code docs/models/mapping/Balance.md} §«Validation (структурная, до
+     * маппинга)»); отвергнутый баланс второго запроса не стоит (там же,
+     * §«OKX validation notes»).
+     */
+    @Test
+    @DisplayName("B5.15 — пустая конфигурация счёта отказывает, а отвергнутый баланс её не читает")
+    void b5_15_anEmptyAccountConfigFailsAndARejectedBalanceDoesNotReadIt() {
+        exchange.answers(OkxConstants.ACCOUNT_BALANCE_PATH, Okx.ok(balanceAnswer(
+                ",\"details\":[{\"ccy\":\"USDT\",\"eq\":\"1000\",\"cashBal\":\"1000\","
+                        + "\"availBal\":\"900\",\"frozenBal\":\"100\"}]")));
+        exchange.answers(OkxConstants.ACCOUNT_CONFIG_PATH, Okx.ok());
+
+        Answer empty = get(account("/balance?settleCurrency=USDT"));
+
+        assertThat(empty.carriesErrorDto()).isTrue();
+        assertThat(empty.errorCode()).isEqualTo("EXCHANGE_ERROR");
+
+        exchange.reset();
+        exchange.answers(OkxConstants.ACCOUNT_BALANCE_PATH, Okx.ok(balanceAnswer(",\"details\":[]")));
+        exchange.answers(OkxConstants.ACCOUNT_CONFIG_PATH, Okx.ok(Okx.accountConfig("2", "net_mode")));
+
+        Answer rejected = get(account("/balance?settleCurrency=USDT"));
+
+        assertThat(rejected.errorCode()).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+        assertThat(exchange.requests(OkxConstants.ACCOUNT_CONFIG_PATH)).isEmpty();
     }
 
     @Test
@@ -269,6 +442,34 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
     private static String balanceAnswer(String details) {
         return "{\"uTime\":\"1758240000000\",\"totalEq\":\"1000\",\"adjEq\":\"990\",\"availEq\":\"900\""
                 + details + "}";
+    }
+
+    /**
+     * Ответ баланса с названными значениями полей уровня счёта и одной
+     * строкой валют. Значение пишется JSON-литералом (строка — в кавычках);
+     * {@code null} — поля в ответе нет вовсе.
+     */
+    private static String balanceOf(String uTime, String totalEq, String adjEq, String availEq, String row) {
+        return "{" + fields("uTime", uTime, "totalEq", totalEq, "adjEq", adjEq, "availEq", availEq)
+                + "\"details\":[" + row + "]}";
+    }
+
+    /** Строка расчётной валюты {@code USDT} с названными остатками; {@code null} — поля нет. */
+    private static String row(String eq, String cashBal, String availBal, String frozenBal) {
+        String body = "\"ccy\":\"USDT\",\"uTime\":\"1758200000000\","
+                + fields("eq", eq, "cashBal", cashBal, "availBal", availBal, "frozenBal", frozenBal);
+        return "{" + body.substring(0, body.length() - 1) + "}";
+    }
+
+    /** Пары «ключ, JSON-литерал» через запятую, каждая с хвостовой запятой; пустое значение пропускается. */
+    private static String fields(String... keysAndValues) {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < keysAndValues.length; i += 2) {
+            if (nonNull(keysAndValues[i + 1])) {
+                text.append('"').append(keysAndValues[i]).append("\":").append(keysAndValues[i + 1]).append(',');
+            }
+        }
+        return text.toString();
     }
 
     private static String feeAnswer(String ts, String group) {

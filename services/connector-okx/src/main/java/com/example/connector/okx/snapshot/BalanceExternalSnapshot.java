@@ -18,7 +18,7 @@ public class BalanceExternalSnapshot {
     /** Валюта (OKX ccy). */
     String externalCurrency;
 
-    /** Время обновления currency snapshot (OKX uTime). */
+    /** Время последнего изменения остатка валюты (OKX uTime строки); базой свежести не служит. */
     OffsetDateTime externalUpdatedAt;
 
     /** Equity по валюте. */

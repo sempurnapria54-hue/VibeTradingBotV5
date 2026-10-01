@@ -2,6 +2,7 @@ package com.example.tradingcore.unit.fsm;
 
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingBoth;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingError;
+import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingRung;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingShutdown;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeWithCommandAndRung;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeWithCommands;
@@ -37,9 +38,10 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка.</b> Та же, что у {@code U7}; каскад подменён и
  * отдаёт объявленный входом кейса свод.
  *
- * <p><b>Кейс {@code U8.9} не прогоняется</b>: судьбу затребованной
- * каскадом ступени на тропе «шага нет» называет код, а на прочих тропах —
- * ни один носитель (находка {@code F-6}).
+ * <p><b>Судьбу затребованной каскадом ступени называет дом:</b> переход
+ * несёт её на каждом исходе прохода, на котором каскад прогонялся
+ * (docs/components/DealActiveHandler.md §«Рабочая логика»). Прочие исходы
+ * входа {@code U8.9} — группа {@code U9}, клетка {@code U9.13}.
  */
 class DealActiveCascadeReactionTest {
 
@@ -154,6 +156,18 @@ class DealActiveCascadeReactionTest {
         assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.CREATE_ORDER_COMMAND);
         assertThat(transition.getHoldSignal()).isEqualTo(INSTRUMENT_RUNG);
         assertThat(transition.movesStatus()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U8.9 — каскад просит только ступень: проход идёт дальше, ступень донесена")
+    void u8_9_aRungOnlyRequestLetsThePassGoOnAndCarriesTheRung() {
+        harness.givenCascade(cascadeAskingRung(INSTRUMENT_RUNG));
+
+        DealTransition transition = harness.handle(context());
+
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.getHoldSignal()).isEqualTo(INSTRUMENT_RUNG);
     }
 
     // --- сборка ------------------------------------------------------------

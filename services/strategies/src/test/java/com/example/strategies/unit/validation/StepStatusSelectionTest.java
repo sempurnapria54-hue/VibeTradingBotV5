@@ -28,7 +28,11 @@ import org.junit.jupiter.api.Test;
  * <p><b>Перечни статусов с отбором у двух уровней разные:</b> у транша —
  * все статусы, кроме терминального, у сделки — только активный. Клетки
  * берут обе стороны каждого уровня: иначе они были бы зелены у валидатора,
- * запрещающего всё, кроме эталонных ключей.
+ * запрещающего всё, кроме эталонных ключей. У сделки клетки перебирают
+ * все четыре статуса без отбора — {@code EXIT_PENDING}, {@code CLOSED},
+ * {@code ERROR}, {@code EMERGENCY_CLOSED} ({@code U37.2}, {@code U37.3},
+ * {@code U37.8}, {@code U37.9}): правка, внёсшая любой из них в перечень
+ * статусов с отбором, роняет свою клетку.
  *
  * <p>Подложенный шаг несёт только выход позиции: такой пакет законен на
  * обоих уровнях и не задевает ни покрытия, ни нотинала — единственным
@@ -111,6 +115,39 @@ class StepStatusSelectionTest {
 
         assertThat(matching(violations, "stepsByStatus key: unknown value ACTIVE")).hasSize(1);
         assertThat(matching(violations, WITHOUT_SELECTION)).isEmpty();
+    }
+
+    /**
+     * Ошибочное состояние сделки шагов уровня сделки не отбирает: обычные
+     * шаги стратегии в нём не выполняются, а единственное ребро из него ведёт
+     * в аварийный терминал — ребра в выход, которое такой шаг делает, у
+     * {@code ERROR} нет (docs/rules/strategy-validation.md §«Что проверяется
+     * на создании»; docs/lifecycles/Deal.md).
+     */
+    @Test
+    @DisplayName("U37.8 — шаг сделки под ошибочным состоянием: ребра в выход у него нет, отбора тоже")
+    void u37_8_aDealStepUnderErrorIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        dealStepsByStatus(bull(request)).put("ERROR", exitStep("deal_error"));
+
+        assertThat(violations(request))
+                .as("U37.8: шаг сделки под ERROR")
+                .singleElement()
+                .asString()
+                .contains("details[0].stepsByStatus[ERROR] " + WITHOUT_SELECTION);
+    }
+
+    @Test
+    @DisplayName("U37.9 — шаг сделки под аварийным терминалом: терминальный статус не отбирает никто")
+    void u37_9_aDealStepUnderEmergencyClosedIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        dealStepsByStatus(bull(request)).put("EMERGENCY_CLOSED", exitStep("deal_emergency_closed"));
+
+        assertThat(violations(request))
+                .as("U37.9: шаг сделки под EMERGENCY_CLOSED")
+                .singleElement()
+                .asString()
+                .contains("details[0].stepsByStatus[EMERGENCY_CLOSED] " + WITHOUT_SELECTION);
     }
 
     /** Шаг выхода с единственным действием выхода позиции — законный пакет обоих уровней. */

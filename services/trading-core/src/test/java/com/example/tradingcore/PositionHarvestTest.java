@@ -196,6 +196,77 @@ class PositionHarvestTest {
     }
 
     /**
+     * Пустой ответ живой ноги один эпизода не закрывает: записи закрытия
+     * его пары нет — строка остаётся живой с последним наблюдённым
+     * размером, звено не завершается. Закрой её пустота — нетто-размер
+     * сделки стал бы нулём, и выход транша снял бы защиту с позиции,
+     * которая на площадке жива (docs/spec/external-status-resolution.json,
+     * величина {@code positionCloseCorroborated}).
+     */
+    @Test
+    void anEmptyLiveLegWithoutACloseRecordKeepsTheEpisodeLive() {
+        Position live = episode(11L, "pos-1", OPENED_AT, Position.Status.ACTIVE, "2");
+        Deal deal = deal(live);
+        givenGraph(deal, List.of(live));
+        when(exchange.getPosition(ACCOUNT, INSTRUMENT)).thenReturn(null);
+        when(exchange.getPositionCloseRecords(ACCOUNT, INSTRUMENT, OPENED_AT)).thenReturn(List.of());
+
+        DealActionState row = row();
+        ServiceCommandExecutionResult result = executor.execute(command(), row, context(deal));
+
+        assertThat(live.getStatus()).isEqualTo(Position.Status.ACTIVE);
+        assertThat(live.getCloseReason()).isNull();
+        assertThat(live.getExternalSize()).isEqualByComparingTo("2");
+        assertThat(result.getSuccess()).isFalse();
+        assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.SUBMITTED);
+        verify(dealDataService, never()).advanceCoverageProvenThrough(any(), any());
+    }
+
+    /**
+     * Запись закрытия СВОЕЙ пары закрывает живую строку, которой живая нога
+     * не нашла: закрытие внешнее, поля положения закрытия и порог доказанного
+     * покрытия ложатся тем же ходом, звено завершается.
+     */
+    @Test
+    void anEmptyLiveLegClosesTheEpisodeByItsCloseRecord() {
+        Position live = episode(11L, "pos-1", OPENED_AT, Position.Status.ACTIVE, "2");
+        Deal deal = deal(live);
+        givenGraph(deal, List.of(live));
+        when(exchange.getPosition(ACCOUNT, INSTRUMENT)).thenReturn(null);
+        when(exchange.getPositionCloseRecords(ACCOUNT, INSTRUMENT, OPENED_AT))
+                .thenReturn(List.of(closeRecord("pos-1", OPENED_AT, "-4.5")));
+
+        ServiceCommandExecutionResult result = executor.execute(command(), row(), context(deal));
+
+        assertThat(live.getStatus()).isEqualTo(Position.Status.CLOSED);
+        assertThat(live.getCloseReason()).isEqualTo(Position.CloseReason.EXTERNAL_CLOSE);
+        assertThat(live.getExternalRealizedProfit()).isEqualByComparingTo("-4.5");
+        assertThat(live.getExternalSize()).isEqualByComparingTo("0");
+        verify(dealDataService).advanceCoverageProvenThrough(eq(DEAL_ID), any());
+        assertThat(result.getSuccess()).isTrue();
+    }
+
+    /**
+     * Запись ЧУЖОЙ пары живую строку не закрывает: переоткрытая позиция
+     * несёт другой момент открытия и за этот эпизод не сойдёт.
+     */
+    @Test
+    void aCloseRecordOfAnotherPairDoesNotCloseTheLiveEpisode() {
+        Position live = episode(11L, "pos-1", OPENED_AT, Position.Status.ACTIVE, "2");
+        Deal deal = deal(live);
+        givenGraph(deal, List.of(live));
+        when(exchange.getPosition(ACCOUNT, INSTRUMENT)).thenReturn(null);
+        when(exchange.getPositionCloseRecords(ACCOUNT, INSTRUMENT, OPENED_AT))
+                .thenReturn(List.of(closeRecord("pos-1", REOPENED_AT, "3")));
+
+        ServiceCommandExecutionResult result = executor.execute(command(), row(), context(deal));
+
+        assertThat(live.getStatus()).isEqualTo(Position.Status.ACTIVE);
+        assertThat(live.getCloseReason()).isNull();
+        assertThat(result.getSuccess()).isFalse();
+    }
+
+    /**
      * Ось эпизода — write-once и по НАЛИТЫМ ногам: без неё ноги закрытых
      * эпизодов неотличимы от ног текущего, и взятое считалось бы по всей
      * истории сделки.

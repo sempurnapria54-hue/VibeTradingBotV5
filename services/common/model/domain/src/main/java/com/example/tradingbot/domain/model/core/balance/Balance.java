@@ -26,7 +26,13 @@ public class Balance extends Auditable {
     /** Валюта по данным биржи (например, USDT). */
     private String externalCurrency;
 
-    /** Время обновления currency-level snapshot на бирже. */
+    /**
+     * Время последнего изменения остатка валюты на бирже. У счёта без
+     * движения средств стоит на месте и потому базой свежести не служит —
+     * снимок датируется моментом контейнера
+     * ({@code BalanceContainer.externalUpdatedAt};
+     * docs/models/mapping/Balance.md).
+     */
     private OffsetDateTime externalUpdatedAt;
 
     /** Equity по валюте. */

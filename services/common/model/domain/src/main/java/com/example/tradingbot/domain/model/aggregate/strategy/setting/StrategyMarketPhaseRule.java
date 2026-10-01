@@ -18,7 +18,7 @@ import lombok.Setter;
  * INDICATOR/MARKET_STRUCTURE/PRICE/CONSTANT/TIME, без MARKET_PHASE и
  * runtime-источников сделки (контекстный whitelist — create-валидация).
  * Хранится JSONB (колонка phase_rules на строке настройки фазы). См.
- * docs/models/domain/aggregate/Strategy.md (§StrategyMarketPhaseRule),
+ * docs/models/domain/aggregate/Strategy.md (§«Настройки рыночных данных»),
  * docs/components/MarketPhaseResolver.md.
  */
 @Getter

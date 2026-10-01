@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotFalse;
 import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
@@ -24,21 +25,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Детекторы инвариантов живой сделки: живой риск без покрытия,
- * расхождение суммы экспозиций с нетто-размером эпизода, нарушение
- * риск-политики при стоящей защите (docs/components/AnomalyJob.md §«Что
- * ищет»).
+ * Детекторы инвариантов живой сделки: живой риск без покрытия ({@code A4}),
+ * расхождение суммы экспозиций с нетто-размером эпизода ({@code A11}),
+ * нарушение риск-политики при стоящей защите ({@code A12}) и ликвидация за
+ * стопом у ведомой позиции ({@code A13}) (docs/components/AnomalyJob.md
+ * §«Что ищет»).
  *
  * <p><b>Своих величин детекторы не заводят.</b> Первый читает предикат
  * покрытия транша, второй — сверку экспозиции, которой гейтится терминал
- * сделки, третий — те же неравенства потолков при нулевом акте. Второй
- * дом у любой из этих форм был бы копией, расходящейся первой же
- * правкой.
+ * сделки, третий — те же неравенства потолков при нулевом акте, четвёртый —
+ * предикат инварианта ликвидации на модели сделки. Второй дом у любой из
+ * этих форм был бы копией, расходящейся первой же правкой.
  *
- * <p><b>Гейт полноты графа обязателен у всех трёх.</b> На неполном графе
- * операнды занижены, и детектор МОЛЧИТ, а не рапортует: ложный триггер
- * первых двух сносит весь счёт, третьего — останавливает входы по
- * инструменту.
+ * <p><b>Гейт полноты графа обязателен у всех четырёх.</b> На неполном
+ * графе операнды занижены, и детектор МОЛЧИТ, а не рапортует: ложный
+ * триггер первых двух сносит весь счёт, третьего — останавливает входы по
+ * инструменту, четвёртого — снимает риск пары.
  */
 @Slf4j
 @Service
@@ -72,6 +74,7 @@ public class DealInvariantDetectors {
                 uncoveredLiveRisk(context, account, observed);
                 exposureMismatch(context, account, observed);
                 riskPolicyBreach(context, account, observed);
+                liquidationBeforeStop(context, account, observed);
             } catch (RuntimeException e) {
                 log.error("Deal invariants are not checked dealId={}", deal.getId(), e);
             }
@@ -169,6 +172,61 @@ public class DealInvariantDetectors {
                 .hysteresisTicks(CONFIRMED_NEXT_TICK)
                 .journalOnly(false)
                 .build(), account);
+    }
+
+    /**
+     * {@code A13}: действующий уровень остановки убытка удерживаемой позиции
+     * не лежит между ценой и ценой ликвидации, которую площадка называет у
+     * живого эпизода. Преконтроль сверяет эту границу только на актах,
+     * создающих риск, а ликвидация едет по мере удержания — маржа убывает на
+     * финансировании, ставку тира меняет площадка; переоценку держит этот
+     * детектор (docs/components/AnomalyJob.md §«Переоценка инварианта
+     * ликвидации»).
+     *
+     * <p><b>Признак читается готовым с модели сделки</b> — оба операнда
+     * лежат в её графе (docs/spec/risk-limits.json, величина
+     * {@code heldStopBeforeLiquidation}). Пусто — не измерено, и детектор
+     * МОЛЧИТ: у каждой пустой ветви свой хозяин, а ложный триггер снял бы
+     * покрытый риск по рынку без факта.
+     *
+     * <p><b>Третья конъюнкта гейта — живое обязательство покрытия у
+     * траншей сделки</b> (docs/spec/protection-coverage.json, величина
+     * {@code hasLiveCommitment}): в окне замены защиты уровень на всю
+     * позицию читается по худшей из двух, и прежняя, ещё не снятая, давала
+     * бы признак, которого после замены не будет. Та же конъюнкта, что у
+     * {@code A4}, — граница области, а не смягчение.
+     *
+     * <p><b>Реакция — снятие риска пары</b>: принятый риск стопом больше не
+     * ограничен, а наш учёт цел — ликвидацию сдвинули операнды площадки.
+     * Гистерезис два тика: налив и замена защиты производят признак нашим
+     * же незавершённым ходом (docs/rules/instrument-hold.md §Триггеры).
+     */
+    private void liquidationBeforeStop(DealContext context, ExchangeAccount account,
+                                       Map<String, Object> observed) {
+        Deal deal = context.getDeal();
+        if (isNotFalse(deal.heldStopBeforeLiquidation())) {
+            return;
+        }
+        if (isTrue(anyLiveCommitment(context))) {
+            return;
+        }
+        log.warn("Held stop is not ahead of the liquidation price dealId={} stop={} liquidation={}",
+                deal.getId(), deal.currentStopLevel(), deal.livePosition().getExternalLiquidationPrice());
+        reaction.apply(AnomalyFinding.builder()
+                .scope(HoldScope.INSTRUMENT)
+                .rung(HoldRung.HARD)
+                .code(Constants.Hold.INSTRUMENT_LIQUIDATION_BEFORE_STOP)
+                .instrument(context.getInstrument())
+                .externalObservation(observed)
+                .hysteresisTicks(CONFIRMED_NEXT_TICK)
+                .journalOnly(false)
+                .build(), account);
+    }
+
+    /** Хоть у одного транша сделки есть живое обязательство покрытия. */
+    private Boolean anyLiveCommitment(DealContext context) {
+        return emptyIfNull(context.getDeal().getTranches()).stream()
+                .anyMatch(tranche -> isTrue(protectionCoverageGate.hasLiveCommitment(context, tranche)));
     }
 
     /**

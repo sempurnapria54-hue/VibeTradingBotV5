@@ -12,6 +12,7 @@ import com.example.connector.okx.integration.external.api.model.okx.request.Clos
 import com.example.connector.okx.integration.external.api.model.okx.request.PlaceAlgoOrderOkxRequest;
 import com.example.connector.okx.integration.external.api.model.okx.request.PlaceOrderOkxRequest;
 import com.example.connector.okx.integration.external.api.model.okx.request.SetLeverageOkxRequest;
+import com.example.connector.okx.integration.external.api.model.okx.response.AccountConfigOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.AlgoOrderAckOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.IndexTickerOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.InstrumentOkxResponse;
@@ -22,6 +23,7 @@ import com.example.connector.okx.integration.external.api.model.okx.response.Okx
 import com.example.connector.okx.integration.external.api.model.okx.response.BalanceOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.AccountBillOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.PositionOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.PositionTierOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.PositionsHistoryOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.ServerTimeOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.TickerOkxResponse;
@@ -103,6 +105,12 @@ public class OkxRestClient {
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<OkxApiResponse<SetLeverageOkxResponse>> SET_LEVERAGE_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<OkxApiResponse<AccountConfigOkxResponse>> ACCOUNT_CONFIG_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<OkxApiResponse<PositionTierOkxResponse>> POSITION_TIER_TYPE =
             new ParameterizedTypeReference<>() {
             };
 
@@ -445,6 +453,26 @@ public class OkxRestClient {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(OkxConstants.PARAM_CCY, ccy);
         return dispatch(HttpMethod.GET, OkxConstants.ACCOUNT_BALANCE_PATH, query, null, credentials, BALANCE_TYPE);
+    }
+
+    /** Конфигурация счёта: режим счёта и режим позиций. Приватный endpoint (подпись), без параметров. */
+    public OkxApiResponse<AccountConfigOkxResponse> getAccountConfig(ExchangeCredentials credentials) {
+        return dispatch(HttpMethod.GET, OkxConstants.ACCOUNT_CONFIG_PATH, null, null, credentials,
+                ACCOUNT_CONFIG_TYPE);
+    }
+
+    /**
+     * Позиционные тиры изолированной маржи семьи инструмента. Публичный
+     * endpoint (без подписи). Ось запроса — семья, а не инструмент: у SWAP
+     * {@code instFamily} обязателен, {@code instId} не принимается
+     * (docs/integrations/okx/contracts/position-tiers.md).
+     */
+    public OkxApiResponse<PositionTierOkxResponse> getPositionTiers(String instType, String instFamily) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put(OkxConstants.PARAM_INST_TYPE, instType);
+        query.put(OkxConstants.PARAM_TD_MODE, OkxConstants.TD_MODE_ISOLATED);
+        query.put(OkxConstants.PARAM_INST_FAMILY, instFamily);
+        return dispatch(HttpMethod.GET, OkxConstants.POSITION_TIERS_PATH, query, null, null, POSITION_TIER_TYPE);
     }
 
     /** Значение пригодно для query-параметра: не null и (для строк) не blank. */

@@ -20,7 +20,7 @@ import lombok.Value;
 @Builder
 public class BalanceContainerExternalSnapshot {
 
-    /** Время обновления account snapshot (OKX uTime). */
+    /** Момент, на который площадка собрала сведения о счёте (OKX uTime счёта). */
     OffsetDateTime externalUpdatedAt;
 
     /** Total equity аккаунта. */
@@ -34,4 +34,10 @@ public class BalanceContainerExternalSnapshot {
 
     /** Балансы по валютам. */
     List<BalanceExternalSnapshot> balances;
+
+    /** Сырой режим счёта (OKX acctLv конфигурации счёта). */
+    String externalAccountLevel;
+
+    /** Сырой режим позиций (OKX posMode конфигурации счёта). */
+    String externalPositionMode;
 }

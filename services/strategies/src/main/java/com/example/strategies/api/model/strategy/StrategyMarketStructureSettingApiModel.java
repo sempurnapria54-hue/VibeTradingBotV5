@@ -41,13 +41,14 @@ public class StrategyMarketStructureSettingApiModel {
     private String destiny;
 
     /**
-     * Обязательность держит валидатор создания кодом
-     * {@code STRATEGY_MARKET_DATA_EXPIRATION_NOT_DECLARED}, а не аннотация:
+     * Обязательность и положительность держит валидатор создания кодами
+     * {@code STRATEGY_MARKET_DATA_EXPIRATION_NOT_DECLARED} и
+     * {@code STRATEGY_MARKET_DATA_EXPIRATION_NOT_POSITIVE}, а не аннотация:
      * Bean Validation отвечает до тела обработчика, и именованный код с ней
      * был бы недостижим (docs/rules/strategy-validation.md).
      */
     @Schema(description = "Срок свежести структуры, ISO-8601 duration (например PT1H); обязателен — "
-            + "без него объявление в запрос рыночных данных не входит",
+            + "без него объявление в запрос рыночных данных не входит; больше нуля",
             requiredMode = Schema.RequiredMode.REQUIRED)
     private String expirationDuration;
 }

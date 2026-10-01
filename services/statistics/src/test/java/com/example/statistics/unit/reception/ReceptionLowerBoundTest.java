@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.statistics.domain.model.ReceptionCompleteness;
 import com.example.statistics.domain.service.ReceptionCompletenessService;
 import com.example.statistics.persistence.service.ReceptionCompletenessSource;
 import java.lang.reflect.Method;
@@ -38,6 +39,9 @@ class ReceptionLowerBoundTest {
 
     private static final OffsetDateTime OBSERVED =
             OffsetDateTime.of(2026, 9, 10, 3, 0, 0, 0, ZoneOffset.UTC);
+
+    private static final OffsetDateTime STALE_BEFORE =
+            OffsetDateTime.of(2026, 9, 12, 12, 0, 0, 0, ZoneOffset.UTC);
 
     private final ReceptionCompletenessService service = new ReceptionCompletenessService();
 
@@ -92,6 +96,21 @@ class ReceptionLowerBoundTest {
                 .as("операнд у границы один: чистки у фактов не существует, и начало ряда двигать нечем")
                 .containsExactlyInAnyOrder("latestObservedSince", "countSubscribedPairs",
                         "countSubscribedPairsWithBreak");
+    }
+
+    @Test
+    @DisplayName("U2.7 — разрыв читается против той же границы, что отдана рядом с предикатом")
+    void u2_7_theBreakIsReadAgainstTheBoundThatTravelsWithThePredicate() {
+        ReceptionCompletenessSource source = source(2L, OBSERVED);
+        when(source.countSubscribedPairsWithBreak(GROUP, STALE_BEFORE, OBSERVED)).thenReturn(0L);
+
+        ReceptionCompleteness completeness = service.completeness(source, GROUP, STALE_BEFORE);
+
+        assertThat(completeness.getLowerBound()).isEqualTo(OBSERVED);
+        verify(source).countSubscribedPairsWithBreak(GROUP, STALE_BEFORE, completeness.getLowerBound());
+        assertThat(completeness.getContinuityClaimable())
+                .as("момент разрыва сравнивается с границей, которую читатель получил рядом")
+                .isTrue();
     }
 
     // --- оснастка ---------------------------------------------------------

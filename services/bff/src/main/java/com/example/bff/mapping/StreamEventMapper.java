@@ -1,18 +1,22 @@
 package com.example.bff.mapping;
 
+import com.example.bff.api.model.stream.AlgoOrderDecidedStreamApiModel;
 import com.example.bff.api.model.stream.AnomalyReportedStreamApiModel;
 import com.example.bff.api.model.stream.DealClosedStreamApiModel;
 import com.example.bff.api.model.stream.DealOpenedStreamApiModel;
 import com.example.bff.api.model.stream.DealShutdownInitiatedStreamApiModel;
 import com.example.bff.api.model.stream.HoldRaisedStreamApiModel;
+import com.example.bff.api.model.stream.HoldReleasedStreamApiModel;
 import com.example.bff.api.model.stream.OrderDecidedStreamApiModel;
 import com.example.bff.api.model.stream.StrategyActivatedStreamApiModel;
 import com.example.bff.api.model.stream.StrategyLifecycleStreamApiModel;
+import com.example.tradingbot.message.AlgoOrderDecidedMessage;
 import com.example.tradingbot.message.AnomalyReportedMessage;
 import com.example.tradingbot.message.DealClosedMessage;
 import com.example.tradingbot.message.DealOpenedMessage;
 import com.example.tradingbot.message.DealShutdownInitiatedMessage;
 import com.example.tradingbot.message.HoldRaisedMessage;
+import com.example.tradingbot.message.HoldReleasedMessage;
 import com.example.tradingbot.message.OrderDecidedMessage;
 import com.example.tradingbot.message.StrategyActivatedMessage;
 import com.example.tradingbot.message.StrategyLifecycleMessage;
@@ -56,6 +60,8 @@ public interface StreamEventMapper {
 
     OrderDecidedStreamApiModel messageToApi(OrderDecidedMessage message);
 
+    AlgoOrderDecidedStreamApiModel messageToApi(AlgoOrderDecidedMessage message);
+
     DealOpenedStreamApiModel messageToApi(DealOpenedMessage message);
 
     DealShutdownInitiatedStreamApiModel messageToApi(DealShutdownInitiatedMessage message);
@@ -63,6 +69,8 @@ public interface StreamEventMapper {
     DealClosedStreamApiModel messageToApi(DealClosedMessage message);
 
     HoldRaisedStreamApiModel messageToApi(HoldRaisedMessage message);
+
+    HoldReleasedStreamApiModel messageToApi(HoldReleasedMessage message);
 
     AnomalyReportedStreamApiModel messageToApi(AnomalyReportedMessage message);
 

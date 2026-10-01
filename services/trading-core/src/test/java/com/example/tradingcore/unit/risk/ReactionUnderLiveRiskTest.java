@@ -84,14 +84,6 @@ class ReactionUnderLiveRiskTest {
     }
 
     @Test
-    @DisplayName("U22.6 — несвежий снимок при живом риске: рассогласование учёта, а не запрос добычи")
-    void u22_6_aStaleBalanceUnderLiveRiskIsAnAccountingMismatch() {
-        RiskBlockAction action = resolve(blockedVerdict(RiskCheckCode.BALANCE_NOT_FRESH));
-
-        assertThat(action.getType()).isEqualTo(RiskBlockAction.Type.MOVE_DEAL_TO_ERROR);
-    }
-
-    @Test
     @DisplayName("U22.7 — живой риск виден только по стадии: стадия сама по себе его означает")
     void u22_7_theStageAloneMarksLiveRisk() {
         RiskBlockAction action = resolve(blockedVerdict(RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_EXCEEDED));

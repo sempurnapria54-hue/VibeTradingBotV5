@@ -26,8 +26,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
  * (docs/models/domain/aggregate/Strategy.md §StrategyTranche), сетку
  * задаёт шаблон объявления, а порядок исполнения пакета шага определяет
  * риск-класс (docs/rules/live-risk-protection.md). См.
- * docs/models/domain/aggregate/Strategy.md (§Действия, §Связь с
- * DealActionState).
+ * docs/models/domain/aggregate/Strategy.md (§Действия); связь со строкой
+ * исполнения — docs/models/domain/other/DealActionState.md.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "actionKind")
 @JsonSubTypes({

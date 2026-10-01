@@ -65,7 +65,7 @@ class ReceptionCompletenessTest extends ReceptionCompletenessContract {
         ReceptionCompletenessSource source = mock(ReceptionCompletenessSource.class);
         when(source.countSubscribedPairs(anyString()))
                 .thenAnswer(invocation -> answers.countSubscribedPairs(invocation.getArgument(0)));
-        when(source.countSubscribedPairsWithBreak(anyString(), any()))
+        when(source.countSubscribedPairsWithBreak(anyString(), any(), any()))
                 .thenAnswer(invocation -> answers.countSubscribedPairsWithBreak(
                         invocation.getArgument(0), invocation.getArgument(1)));
         when(source.latestObservedSince(anyString()))

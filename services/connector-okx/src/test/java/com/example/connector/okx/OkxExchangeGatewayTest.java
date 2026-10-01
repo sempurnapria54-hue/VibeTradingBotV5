@@ -40,7 +40,8 @@ import org.junit.jupiter.api.Test;
  * <p><b>Проверяется то, что отличает коннектор от донорской границы</b> —
  * ключи берутся на КАЖДЫЙ приватный вызов и не берутся вовсе на
  * публичном, а пустой ответ источника остаётся пустотой, а не превращается
- * в отказ ({@code ExchangeGateway} §«Контракт чтения»).
+ * в отказ ({@code ExchangeGateway}; docs/components/IntegrationService.md
+ * §«Контракт чтения»).
  */
 class OkxExchangeGatewayTest {
 

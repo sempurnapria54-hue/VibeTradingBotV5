@@ -33,7 +33,7 @@ calculated-RVO (`CalculatedStrategyAction`, `CalculatedPrice`,
 `CalculatedSize`).
 
 `CalculatedStrategyAction` **не** содержит `RiskValidationResult` и
-`CalculatedRiskMetrics`: метрики для решения `ALLOWED / WARNING / BLOCKED`
+`CalculatedRiskMetrics`: метрики для решения `ALLOWED / BLOCKED`
 считаются внутри risk-layer (см. `docs/components/RiskValidator.md`).
 
 ## Статус кода

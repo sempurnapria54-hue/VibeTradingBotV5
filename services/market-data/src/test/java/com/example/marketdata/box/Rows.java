@@ -179,6 +179,45 @@ final class Rows {
         return counts;
     }
 
+    /**
+     * Берёт замок записи на все строки таблицы своим соединением и держит
+     * его до {@link RowLock#close()}: запись сервиса в эти строки встаёт в
+     * очередь замка.
+     *
+     * <p><b>Замок — {@code for no key update}, а не {@code for update}.</b>
+     * Второй конфликтует и со ссылкой внешнего ключа: вставка строки,
+     * ссылающейся на запертую, встала бы в очередь раньше записи, ради
+     * которой замок взят, и ход кейса пришёлся бы не на то окно.
+     *
+     * @param table таблица
+     * @return удерживаемый замок
+     */
+    RowLock lockForWrites(String table) {
+        Connection connection = null;
+        try {
+            connection = DriverManager.getConnection(jdbcUrl, username, password);
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "select 1 from " + table + " for no key update");
+                 ResultSet ignored = statement.executeQuery()) {
+                return new RowLock(connection);
+            }
+        } catch (SQLException failure) {
+            RowLock.closeQuietly(connection);
+            throw new IllegalStateException("База субстрата не дала замка на " + table, failure);
+        }
+    }
+
+    /**
+     * Число записей сервиса в таблицу, стоящих в очереди замка: запрос
+     * {@code update <таблица>} ждёт чужую транзакцию. Им наблюдается, что
+     * запись дошла до базы и встала, — детерминированно, а не паузой.
+     */
+    Long writesQueuedOn(String table) {
+        return number("select count(*) from pg_stat_activity where wait_event_type = 'Lock' "
+                + "and pid <> pg_backend_pid() and query ilike ?", "update " + table + "%");
+    }
+
     private Long number(String sql, Object... arguments) {
         List<Map<String, Object>> found = rows(sql, arguments);
         return ((Number) found.getFirst().values().iterator().next()).longValue();

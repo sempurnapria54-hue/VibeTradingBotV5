@@ -4,7 +4,8 @@
   "home": "docs/lifecycles/Deal.md",
   "includes": [
     "protection-coverage",
-    "order-lifecycle"
+    "order-lifecycle",
+    "algo-order-lifecycle"
   ],
   "operands": {
     "from": "текущий статус сделки",
@@ -12,12 +13,13 @@
     "tranches[].status": "статус транша; резолв переходов — docs/spec/deal-tranche-lifecycle.json",
     "tranches[].orders[]": "заявки транша — операнд его живого риска",
     "tranches[].protections[]": "защиты транша — операнд его живого риска наравне с заявками",
+    "tranches[].protections[].externalLive": "AlgoOrder.externalLive — что площадка показала о живости ОТДЕЛЬНОЙ условной заявки последней добычей: true — живой статус; false — терминальный статус, в том числе известное слово отказа, либо полный цикл добычи записи не нашёл; ПУСТО — статус не разобран либо наблюдения не было. Читается только у отдельной заявки в ERROR: у прочих живость несёт статус, а у встроенной защиты поля нет — каждая её тропа в ERROR сама есть наблюдение нежилости (docs/lifecycles/Order.md)",
     "position.status": "Position.status — статус биржевой записи эпизода; вместе с нетто-размером образует предикат живого эпизода, дом которого — docs/spec/protection-coverage.json, величина hasLiveEpisode",
     "position.externalSize": "нетто-размер позиции по данным биржи; правая сторона сверки экспозиции",
     "graphComplete": "граф сделки предъявлен контекстом прохода целиком; значение берётся из дома-спеки docs/spec/deal-context-load.json, величина graphComplete — форма здесь не переписывается. Охрана СИММЕТРИЧНА охране результата (docs/spec/deal-result.json) и охране торгового исхода (docs/spec/position-close-outcome.json): агрегаты живого риска считаются по ЗАГРУЖЕННЫМ траншам, и на недогруженном графе «живых заявок нет» ложно молча — то есть риск объявляется доказанно отсутствующим по неполному перечню, а направление ошибки разрешающее",
     "riskBenchmarkResolved": "знаменатель R определён — операнд признака отбора «доступность знаменателя» (docs/models/domain/aggregate/Deal.md, RiskBenchmarkAvailability)",
-    "resultProfit": "число результата сделки; пусто — неисчислимо",
-    "resultProfitCurrency": "валюта результата; пусто — не резолвилась",
+    "resultProfit": "число результата сделки; пусто — неисчислимо. Форма не переписывается, значение берётся из дома-спеки: docs/spec/deal-result.json, величина resultProfit",
+    "resultProfitCurrency": "валюта результата; пусто — не резолвилась. Форма не переписывается, значение берётся из дома-спеки: docs/spec/deal-result.json, величина resultProfitCurrency",
     "resultAvailable": "итог сделки доступен к расчёту НА ЭТОМ ПРОХОДЕ — операнд контракта аварийного терминала, применимый к числу, которое пишет само это ребро (оно пишет его своей транзакцией, поэтому проход и момент записи здесь совпадают). Форма не переписывается, значение берётся из дома-спеки: docs/spec/deal-result.json, величина resultAvailable",
     "resultProfitFinalized": "число уже стояло на сделке ДО этого ребра — durable-факт: его записала финализация выхода, а она завершается только по доступному итогу (docs/spec/deal-result.json, finalizationCompletes). Аварийный терминал такое число не пересчитывает и не затирает, поэтому его законность проверена не здесь, а тем, кто его писал",
     "deal.status": "Deal.status — операнд окна атрибуции закрывающих исполнений уровня сделки; форма окна — docs/spec/protection-coverage.json. Подаётся явно и совпадает с from: from/to здесь адресуют РЕБРО перехода, а не состояние, и в соседней спеке те же имена принадлежат статусу транша — вычислять окно из них значило бы читать чужой субъект",
@@ -48,10 +50,10 @@
     },
     {
       "name": "trancheHasLiveOrder",
-      "note": "Любая живая заявка транша, не только входная: живая reduce-only тоже несёт риск исполнения.",
+      "note": "Любая заявка транша, чья живость на площадке не исключена, не только входная: живая reduce-only тоже несёт риск исполнения, а нога, помеченная ERROR, может стоять на площадке, пока наблюдение не показало обратного (orderMayBeLive, дом — docs/spec/order-lifecycle.json).",
       "op": "any",
       "over": "orders",
-      "of": "orderIsLive"
+      "of": "orderMayBeLive"
     },
     {
       "name": "trancheHasLiveEntryLeg",
@@ -74,10 +76,18 @@
       "of": "trancheHasLiveEntryLeg"
     },
     {
+      "name": "trancheHasMayBeLiveStandaloneProtection",
+      "note": "У транша есть ОТДЕЛЬНАЯ условная заявка, чья живость на площадке не исключена. Предикат одной заявки здесь не объявляется: его дом — docs/spec/algo-order-lifecycle.json §`algoMayBeLive` (подключён своим includes), и это множество живых по статусу, включая созданную, плюс заявка в ERROR без наблюдённой нежилости. Здесь только агрегат по защитам транша с отбором носителя. Встроенная защита сюда не входит: у неё поля наблюдения нет, и её живые несёт trancheHasLiveProtection через живой риск транша. Смысл и таблица наблюдений — docs/lifecycles/AlgoOrder.md.",
+      "op": "any",
+      "over": "protections",
+      "of": "carrier == 'STANDALONE' && algoMayBeLive"
+    },
+    {
       "name": "anyLiveOrder",
+      "note": "Заявка ЛЮБОГО рода, чья живость на площадке не исключена, в любом транше: обычная (trancheHasLiveOrder) либо отдельная условная (trancheHasMayBeLiveStandaloneProtection). Оба множества шире живых по статусу (orderIsLive, algoIsLive) ровно на заявку в ERROR без наблюдённой нежилости.",
       "op": "any",
       "over": "tranches",
-      "of": "trancheHasLiveOrder"
+      "of": "trancheHasLiveOrder || trancheHasMayBeLiveStandaloneProtection"
     },
     {
       "name": "anyLiveProtection",
@@ -88,7 +98,7 @@
     },
     {
       "name": "riskProvenAbsent",
-      "note": "Живой риск снят и это подтверждено фактами прохода. Признаков живого риска пять (перечень — docs/lifecycles/Deal.md), резолвятся здесь ЧЕТЫРЕ: позиция, заявка, условная заявка, расхождение (строки 1, 2, 3, 5 перечня). Конъюнктов ПЯТЬ: dealRiskBearing покрывает сразу ТРИ признака — экспозицию транша, его живую входную заявку и его живую условную заявку (дом определения — docs/lifecycles/DealTranche.md), — а anyLiveOrder расширяет второй признак до заявок вне входного множества; это перекрытие намеренное. ПЯТЫЙ конъюнкт — graphComplete: охрана от терминала на НЕДОГРУЖЕННОМ графе, без неё пустота «мы не всё прочитали» читалась бы как «риска нет». Прежняя редакция ноты и дока-дома называла четыре конъюнкта при пяти — невключённым оказался ровно graphComplete. Отдельного конъюнкта под условную заявку здесь нет: anyLiveProtection поглощён третьим дизъюнктом живого риска транша (anyLiveProtection ⇒ dealRiskBearing), и состояния, где он блокирует один, не существует. Величина сохранена как диагностическая — она называет признак 3 явно в разборе примера. Признак 4, «неизвестная живая сущность на бирже», операндами прохода не резолвится по построению (добыча ходит по известным сущностям сделки) и держится другим носителем: инструмент-скоупным сбором чистоты инструмента, см. ту же секцию дома.",
+      "note": "Живой риск снят и это подтверждено фактами прохода. Признаков живого риска пять (перечень — docs/lifecycles/Deal.md), резолвятся здесь ЧЕТЫРЕ: позиция, заявка, условная заявка, расхождение (строки 1, 2, 3, 5 перечня). Конъюнктов ПЯТЬ: dealRiskBearing покрывает сразу ТРИ признака — экспозицию транша, его живую входную заявку и его живую условную заявку (дом определения — docs/lifecycles/DealTranche.md), — а anyLiveOrder расширяет второй и третий признаки до заявок вне входного множества, до созданной отдельной условной (живой риск транша её не считает — на бирже она не подтверждена, но её приём и не опровергнут) и до заявки в ERROR — ноги либо отдельной условной, — чья живость на площадке не исключена; это перекрытие намеренное. ПЯТЫЙ конъюнкт — graphComplete: охрана от терминала на НЕДОГРУЖЕННОМ графе, без неё пустота «мы не всё прочитали» читалась бы как «риска нет». Отдельного конъюнкта под условную заявку здесь нет: anyLiveProtection поглощён третьим дизъюнктом живого риска транша (anyLiveProtection ⇒ dealRiskBearing), и состояния, где он блокирует один, не существует. Величина сохранена как диагностическая — она называет признак 3 явно в разборе примера. Признак 4, «неизвестная живая сущность на бирже», операндами прохода не резолвится по построению (добыча ходит по известным сущностям сделки) и держится другим носителем: инструмент-скоупным сбором чистоты инструмента, см. ту же секцию дома.",
       "expr": "graphComplete && !hasLiveEpisode && !dealRiskBearing && !anyLiveOrder && exposureReconciled"
     },
     {
@@ -113,12 +123,12 @@
     },
     {
       "name": "trancheCloseReasonRank",
-      "note": "Ранг причины закрытия транша в закрытом перечне старшинства (1 — старшая). Порядок объявлен домом docs/lifecycles/Deal.md: EXTERNAL_CLOSE, RISK_CONTROL, STOP_LOSS, STRATEGY_EXIT, TAKE_PROFIT, ENTRY_CONDITION_EXPIRED. Значение вне перечня даёт 99 — оно не выигрывает никогда; у транша таких значений нет: EMERGENCY_CLOSE на транше не пишется, UNKNOWN тоже (docs/lifecycles/DealTranche.md).",
+      "note": "Ранг причины закрытия транша в закрытом перечне старшинства (1 — старшая). Порядок объявлен домом docs/lifecycles/Deal.md: EXTERNAL_CLOSE, RISK_CONTROL, STOP_LOSS, STRATEGY_EXIT, TAKE_PROFIT, ENTRY_CONDITION_EXPIRED. Значение вне перечня даёт 99 — оно не выигрывает никогда и при сведении к причине сделки превращается в пустоту; у транша таких значений нет: EMERGENCY_CLOSE на транше не пишется, запасного значения у причины транша нет, а пустую наследуемую причину писатель ребра значением не подменяет — он уводит сделку ошибочной тропой (docs/lifecycles/DealTranche.md).",
       "expr": "if(closeReason == 'EXTERNAL_CLOSE', 1, if(closeReason == 'RISK_CONTROL', 2, if(closeReason == 'STOP_LOSS', 3, if(closeReason == 'STRATEGY_EXIT', 4, if(closeReason == 'TAKE_PROFIT', 5, if(closeReason == 'ENTRY_CONDITION_EXPIRED', 6, 99))))))"
     },
     {
       "name": "topTrancheReasonRank",
-      "note": "Ранг СТАРШЕЙ причины среди траншей, несущих причину. Пусто — ни один транш причины не несёт. На ребре, потребляющем резолв, состояние исключено ПОЛНОТОЙ ПЕРЕЧНЯ ПИСАТЕЛЕЙ ТРАНША: у каждого терминального ребра транша перечень значений закрыт и непуст (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша — обработчик терминального ребра»). Прежняя редакция ноты стояла на неполном перечне — у ребра EXIT_PENDING - CLOSED не было значения для тропы «инициатора выхода нет», и восстановленная сделка доходила до штатного терминала с пустой причиной.",
+      "note": "Ранг СТАРШЕЙ причины среди траншей, несущих причину. Пусто — ни один транш причины не несёт. На ребре, потребляющем резолв, состояние исключено ПОЛНОТОЙ ПЕРЕЧНЯ ПИСАТЕЛЕЙ ТРАНША: у каждого терминального ребра транша перечень значений закрыт и непуст (правило писателя причины закрытия транша, дом — docs/lifecycles/DealTranche.md). Прежняя редакция ноты стояла на неполном перечне — у ребра EXIT_PENDING - CLOSED не было значения для тропы «инициатора выхода нет», и восстановленная сделка доходила до штатного терминала с пустой причиной.",
       "op": "min",
       "over": "tranches",
       "where": "notNull(?closeReason)",
@@ -178,14 +188,14 @@
             "ACTIVE",
             "EMERGENCY_CLOSED"
           ],
-          "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+          "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)"
         },
         {
           "member": [
             "EXIT_PENDING",
             "ACTIVE"
           ],
-          "unreachable": "EXIT_PENDING — durable-факт «выходим целиком», возврата в набор риска нет (docs/lifecycles/Deal.md §Статусы)"
+          "unreachable": "EXIT_PENDING — durable-факт «выходим целиком», возврата в набор риска нет (статусная модель сделки, дом — docs/lifecycles/Deal.md)"
         },
         {
           "member": [
@@ -204,56 +214,56 @@
             "EXIT_PENDING",
             "EMERGENCY_CLOSED"
           ],
-          "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+          "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)"
         },
         {
           "member": [
             "CLOSED",
             "ACTIVE"
           ],
-          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+          "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому"
         },
         {
           "member": [
             "CLOSED",
             "EXIT_PENDING"
           ],
-          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+          "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому"
         },
         {
           "member": [
             "CLOSED",
             "ERROR"
           ],
-          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+          "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому"
         },
         {
           "member": [
             "CLOSED",
             "EMERGENCY_CLOSED"
           ],
-          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+          "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому"
         },
         {
           "member": [
             "ERROR",
             "ACTIVE"
           ],
-          "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+          "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)"
         },
         {
           "member": [
             "ERROR",
             "EXIT_PENDING"
           ],
-          "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+          "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)"
         },
         {
           "member": [
             "ERROR",
             "CLOSED"
           ],
-          "unreachable": "из ошибочного состояния в штатный терминал ребра нет (docs/lifecycles/Deal.md §«Инварианты переходов»)"
+          "unreachable": "из ошибочного состояния в штатный терминал ребра нет (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)"
         },
         {
           "member": [
@@ -266,28 +276,28 @@
             "EMERGENCY_CLOSED",
             "ACTIVE"
           ],
-          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+          "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому"
         },
         {
           "member": [
             "EMERGENCY_CLOSED",
             "EXIT_PENDING"
           ],
-          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+          "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому"
         },
         {
           "member": [
             "EMERGENCY_CLOSED",
             "CLOSED"
           ],
-          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+          "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому"
         },
         {
           "member": [
             "EMERGENCY_CLOSED",
             "ERROR"
           ],
-          "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому"
+          "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому"
         }
       ]
     },
@@ -307,7 +317,7 @@
         "dealCloseReasonBySeniority"
       ],
       "where": "in(to, 'EXIT_PENDING', 'CLOSED')",
-      "excludes": "примеры, чей целевой статус — не EXIT_PENDING и не CLOSED. Резолв потребляют только рёбра в эти два статуса — ACTIVE → EXIT_PENDING (маршрут «все транши терминальны») и ACTIVE → CLOSED (тропы без входа); на рёбрах в прочие статусы причина не пишется вовсе (docs/lifecycles/Deal.md §«Причина закрытия — писатель и момент»). Фильтр режет по ЦЕЛЕВОМУ статусу, а не по ребру: прочие рёбра в эти два статуса — EXIT_PENDING → CLOSED, где причина уже стои́т, и недостижимые — он пропускает, и это безвредно: член засчитывается только примером, ожидающим резолв, а такие примеры исходного статуса не называют. Фильтр выражен операндом состояния и ни одного значения резолва из перечня не выводит: фальсифицирующее состояние (пустая причина на потребляющем ребре) фильтр ПРОПУСКАЕТ и предъявляется членом «null».",
+      "excludes": "примеры, чей целевой статус — не EXIT_PENDING и не CLOSED. Резолв потребляют только рёбра в эти два статуса — ACTIVE → EXIT_PENDING (маршрут «все транши терминальны») и ACTIVE → CLOSED (тропы без входа); на рёбрах в прочие статусы причина не пишется вовсе (правило писателя причины закрытия сделки, дом — docs/lifecycles/Deal.md). Фильтр режет по ЦЕЛЕВОМУ статусу, а не по ребру: прочие рёбра в эти два статуса — EXIT_PENDING → CLOSED, где причина уже стои́т, и недостижимые — он пропускает, и это безвредно: член засчитывается только примером, ожидающим резолв, а такие примеры исходного статуса не называют. Фильтр выражен операндом состояния и ни одного значения резолва из перечня не выводит: фальсифицирующее состояние (пустая причина на потребляющем ребре) фильтр ПРОПУСКАЕТ и предъявляется членом «null».",
       "members": [
         {
           "member": [
@@ -343,7 +353,7 @@
           "member": [
             "null"
           ],
-          "unreachable": "на ребре, потребляющем резолв, пустого значения не бывает: у каждого терминального ребра транша перечень значений причины закрыт и непуст (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша — обработчик терминального ребра»), поэтому у сделки со всеми терминальными траншами причину несёт хотя бы один"
+          "unreachable": "на ребре, потребляющем резолв, пустого значения не бывает: у каждого терминального ребра транша перечень значений причины закрыт и непуст (правило писателя причины закрытия транша, дом — docs/lifecycles/DealTranche.md), поэтому у сделки со всеми терминальными траншами причину несёт хотя бы один"
         }
       ]
     }
@@ -424,7 +434,7 @@
     },
     {
       "case": "из ошибочного состояния в штатный терминал ребра нет",
-      "unreachable": "из ошибочного состояния в штатный терминал ребра нет (docs/lifecycles/Deal.md §«Инварианты переходов»): аварийный терминал — единственный выход из ERROR",
+      "unreachable": "из ошибочного состояния в штатный терминал ребра нет (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): аварийный терминал — единственный выход из ERROR",
       "state": {
         "from": "ERROR",
         "to": "CLOSED",
@@ -785,6 +795,267 @@
         "riskProvenAbsent": true,
         "transitionAllowed": true,
         "closeReasonWriter": "ErrorHandler"
+      }
+    },
+    {
+      "case": "нога в ERROR без наблюдения площадки аварийный терминал не пропускает: её живость не исключена",
+      "note": "Изолирует расширение второго признака: экспозиция ноль, входной живой ноги нет, эпизода нет, граф полон — ложен один anyLiveOrder, и держит его reduce-only нога, помеченная ERROR. Пример падает на прежней форме, где trancheHasLiveOrder читал orderIsLive: помеченная нога выпадала из гейта, и сделка уходила в аварийный терминал, пока нога могла стоять на площадке.",
+      "state": {
+        "from": "ERROR",
+        "to": "EMERGENCY_CLOSED",
+        "position": {
+          "status": "CLOSED",
+          "externalSize": 0
+        },
+        "deal": {
+          "status": "ERROR"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              },
+              {
+                "type": "ENTRY",
+                "positionReducingOnly": true,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              },
+              {
+                "type": "ENTRY",
+                "positionReducingOnly": true,
+                "status": "ERROR",
+                "accumulatedFillSize": 0
+              }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "dealRiskBearing": false,
+        "anyLiveOrder": true,
+        "riskProvenAbsent": false,
+        "transitionAllowed": false
+      }
+    },
+    {
+      "case": "та же нога в ERROR, наблюдённая нежилой, аварийный терминал пропускает",
+      "state": {
+        "from": "ERROR",
+        "to": "EMERGENCY_CLOSED",
+        "position": {
+          "status": "CLOSED",
+          "externalSize": 0
+        },
+        "deal": {
+          "status": "ERROR"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              },
+              {
+                "type": "ENTRY",
+                "positionReducingOnly": true,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              },
+              {
+                "type": "ENTRY",
+                "positionReducingOnly": true,
+                "status": "ERROR",
+                "externalLive": false,
+                "accumulatedFillSize": 0
+              }
+            ],
+            "protections": []
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "anyLiveOrder": false,
+        "riskProvenAbsent": true,
+        "transitionAllowed": true
+      }
+    },
+    {
+      "case": "отдельная условная заявка в ERROR без наблюдения площадки аварийный терминал не пропускает: её живость не исключена",
+      "note": "Изолирует расширение гейта на условную заявку: экспозиция ноль, живых ног нет, эпизода нет, граф полон, живой защиты по статусу нет — ложен один anyLiveOrder, и держит его стоп, помеченный ERROR. Пример падает на прежней форме, где anyLiveOrder читал только ноги, а живой риск транша — защиту по статусу: помеченная заявка выпадала из гейта, и сделка уходила в аварийный терминал, пока защита могла стоять на площадке.",
+      "state": {
+        "from": "ERROR",
+        "to": "EMERGENCY_CLOSED",
+        "position": {
+          "status": "CLOSED",
+          "externalSize": 0
+        },
+        "deal": {
+          "status": "ERROR"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              },
+              {
+                "type": "ENTRY",
+                "positionReducingOnly": true,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              }
+            ],
+            "protections": [
+              {
+                "carrier": "STANDALONE",
+                "status": "ERROR",
+                "kind": "STOP",
+                "size": 3,
+                "closedSize": 0
+              }
+            ]
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "dealRiskBearing": false,
+        "anyLiveProtection": false,
+        "anyLiveOrder": true,
+        "riskProvenAbsent": false,
+        "transitionAllowed": false
+      }
+    },
+    {
+      "case": "та же условная заявка в ERROR, наблюдённая нежилой, аварийный терминал пропускает",
+      "state": {
+        "from": "ERROR",
+        "to": "EMERGENCY_CLOSED",
+        "position": {
+          "status": "CLOSED",
+          "externalSize": 0
+        },
+        "deal": {
+          "status": "ERROR"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              },
+              {
+                "type": "ENTRY",
+                "positionReducingOnly": true,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              }
+            ],
+            "protections": [
+              {
+                "carrier": "STANDALONE",
+                "status": "ERROR",
+                "externalLive": false,
+                "kind": "STOP",
+                "size": 3,
+                "closedSize": 0
+              }
+            ]
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "anyLiveOrder": false,
+        "riskProvenAbsent": true,
+        "transitionAllowed": true
+      }
+    },
+    {
+      "case": "созданная отдельная условная заявка аварийный терминал не пропускает: приём не подтверждён, а не опровергнут",
+      "note": "Изолирует созданную: живой риск транша её не считает — покрытие читает множество «стоит на бирже», — и ложен один anyLiveOrder. Ответ на отправку мог потеряться, и запись может стоять на площадке; пример падает на форме, где первое слагаемое предиката одной заявки берёт множество «стоит на бирже» вместо живых по статусу.",
+      "state": {
+        "from": "ERROR",
+        "to": "EMERGENCY_CLOSED",
+        "position": {
+          "status": "CLOSED",
+          "externalSize": 0
+        },
+        "deal": {
+          "status": "ERROR"
+        },
+        "tranches": [
+          {
+            "status": "MANAGING",
+            "orders": [
+              {
+                "type": "ENTRY_ATTACHED_STOP_LOSS",
+                "positionReducingOnly": false,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              },
+              {
+                "type": "ENTRY",
+                "positionReducingOnly": true,
+                "status": "COMPLETED",
+                "accumulatedFillSize": 3
+              }
+            ],
+            "protections": [
+              {
+                "carrier": "STANDALONE",
+                "status": "CREATED",
+                "kind": "STOP",
+                "size": 3,
+                "closedSize": 0
+              }
+            ]
+          }
+        ],
+        "resultProfit": null,
+        "resultProfitCurrency": null,
+        "hadEntry": true,
+        "graphComplete": true
+      },
+      "expect": {
+        "dealRiskBearing": false,
+        "anyLiveProtection": false,
+        "anyLiveOrder": true,
+        "riskProvenAbsent": false,
+        "transitionAllowed": false
       }
     },
     {
@@ -1495,7 +1766,7 @@
     },
     {
       "case": "аварийный терминал приходит на сделку с УЖЕ финализированным числом: признак отбора не пересчитывается",
-      "note": "Популяция третьего дизъюнкта emergencyTerminalContract. Признаки отбора записала финализация выхода на ПОЛНОМ графе; аварийный терминал приходит на усечённом, и знаменатель на нём не резолвится. Тотальная формула прежней редакции выдала бы MISSING и затёрла бы законное значение — пример падает при её возврате и потому фальсифицирует охрану, а не иллюстрирует её.",
+      "note": "Популяция третьего дизъюнкта emergencyTerminalContract. Признаки отбора записала финализация выхода на ПОЛНОМ графе; аварийный терминал приходит на усечённом, и знаменатель на нём не резолвится. Прежняя тотальная формула выдала бы MISSING и затёрла бы законное значение — пример падает при её возврате и потому фальсифицирует охрану, а не иллюстрирует её.",
       "state": {
         "from": "ERROR",
         "to": "EMERGENCY_CLOSED",
@@ -1868,7 +2139,7 @@
     },
     {
       "case": "ребро ACTIVE → EMERGENCY_CLOSED: недостижимо",
-      "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (docs/lifecycles/Deal.md §«Инварианты переходов»)",
+      "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)",
       "state": {
         "from": "ACTIVE",
         "to": "EMERGENCY_CLOSED"
@@ -1880,7 +2151,7 @@
     },
     {
       "case": "ребро EXIT_PENDING → ACTIVE: недостижимо",
-      "unreachable": "EXIT_PENDING — durable-факт «выходим целиком», возврата в набор риска нет (docs/lifecycles/Deal.md §Статусы)",
+      "unreachable": "EXIT_PENDING — durable-факт «выходим целиком», возврата в набор риска нет (статусная модель сделки, дом — docs/lifecycles/Deal.md)",
       "state": {
         "from": "EXIT_PENDING",
         "to": "ACTIVE"
@@ -1892,7 +2163,7 @@
     },
     {
       "case": "ребро EXIT_PENDING → EMERGENCY_CLOSED: недостижимо",
-      "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (docs/lifecycles/Deal.md §«Инварианты переходов»)",
+      "unreachable": "аварийный терминал достижим только после safety-тропы, то есть через ERROR (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)",
       "state": {
         "from": "EXIT_PENDING",
         "to": "EMERGENCY_CLOSED"
@@ -1904,7 +2175,7 @@
     },
     {
       "case": "ребро CLOSED → ACTIVE: недостижимо",
-      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому",
       "state": {
         "from": "CLOSED",
         "to": "ACTIVE"
@@ -1916,7 +2187,7 @@
     },
     {
       "case": "ребро CLOSED → EXIT_PENDING: недостижимо",
-      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому",
       "state": {
         "from": "CLOSED",
         "to": "EXIT_PENDING"
@@ -1928,7 +2199,7 @@
     },
     {
       "case": "ребро CLOSED → ERROR: недостижимо",
-      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому",
       "state": {
         "from": "CLOSED",
         "to": "ERROR"
@@ -1940,7 +2211,7 @@
     },
     {
       "case": "ребро CLOSED → EMERGENCY_CLOSED: недостижимо",
-      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому",
       "state": {
         "from": "CLOSED",
         "to": "EMERGENCY_CLOSED"
@@ -1952,7 +2223,7 @@
     },
     {
       "case": "ребро ERROR → ACTIVE: недостижимо",
-      "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (docs/lifecycles/Deal.md §«Инварианты переходов»)",
+      "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)",
       "state": {
         "from": "ERROR",
         "to": "ACTIVE"
@@ -1964,7 +2235,7 @@
     },
     {
       "case": "ребро ERROR → EXIT_PENDING: недостижимо",
-      "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (docs/lifecycles/Deal.md §«Инварианты переходов»)",
+      "unreachable": "возврата из ошибочного состояния в ведение нет: ERROR снимается только аварийной тропой (инвариант переходов сделки, дом — docs/lifecycles/Deal.md)",
       "state": {
         "from": "ERROR",
         "to": "EXIT_PENDING"
@@ -1976,7 +2247,7 @@
     },
     {
       "case": "ребро EMERGENCY_CLOSED → ACTIVE: недостижимо",
-      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому",
       "state": {
         "from": "EMERGENCY_CLOSED",
         "to": "ACTIVE"
@@ -1988,7 +2259,7 @@
     },
     {
       "case": "ребро EMERGENCY_CLOSED → EXIT_PENDING: недостижимо",
-      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому",
       "state": {
         "from": "EMERGENCY_CLOSED",
         "to": "EXIT_PENDING"
@@ -2000,7 +2271,7 @@
     },
     {
       "case": "ребро EMERGENCY_CLOSED → CLOSED: недостижимо",
-      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому",
       "state": {
         "from": "EMERGENCY_CLOSED",
         "to": "CLOSED"
@@ -2012,7 +2283,7 @@
     },
     {
       "case": "ребро EMERGENCY_CLOSED → ERROR: недостижимо",
-      "unreachable": "терминальные статусы обработчиков не имеют (docs/lifecycles/Deal.md §«Инварианты переходов»): затребовать ребро из терминала некому",
+      "unreachable": "терминальные статусы обработчиков не имеют (инвариант переходов сделки, дом — docs/lifecycles/Deal.md): затребовать ребро из терминала некому",
       "state": {
         "from": "EMERGENCY_CLOSED",
         "to": "ERROR"
@@ -2055,7 +2326,7 @@
     },
     {
       "case": "контрпример: у сделки со всеми терминальными траншами причины не несёт ни один",
-      "unreachable": "перечень значений причины у каждого терминального ребра транша закрыт и непуст (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша — обработчик терминального ребра»): клетку тропы «инициатора выхода нет» закрывает EXTERNAL_CLOSE, поэтому терминальный транш без причины не производится ничем",
+      "unreachable": "перечень значений причины у каждого терминального ребра транша закрыт и непуст (правило писателя причины закрытия транша, дом — docs/lifecycles/DealTranche.md): клетку тропы «инициатора выхода нет» закрывает EXTERNAL_CLOSE, поэтому терминальный транш без причины не производится ничем",
       "state": {
         "to": "EXIT_PENDING",
         "tranches": [

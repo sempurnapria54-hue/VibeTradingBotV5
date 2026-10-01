@@ -20,7 +20,7 @@ import java.util.List;
  * формы ({@link StrategyOverlayCopyContract}), здесь — только порты к своей
  * копии и своей строке-владельцу.
  *
- * <p>Кейсы — `U4`, `U5`, `U6`, `U10.1`, `U10.2`
+ * <p>Кейсы — `U4`, `U5`, `U6`, `U10.1`, `U10.2`, `U11.7`, `U13.2`
  * (.claude/tests/cases/jsonb-overlay-roundtrip.md).
  */
 class StrategyJsonConverterTest extends StrategyOverlayCopyContract {
@@ -128,5 +128,10 @@ class StrategyJsonConverterTest extends StrategyOverlayCopyContract {
     @Override
     protected String writePlacementOn(ObjectMapper source, StrategyPricePlacement placement) {
         return new StrategyJsonConverter(source).placementToJson(placement);
+    }
+
+    @Override
+    protected StrategyPricePlacement readPlacementOn(ObjectMapper source, String json) {
+        return new StrategyJsonConverter(source).jsonToPlacement(json);
     }
 }

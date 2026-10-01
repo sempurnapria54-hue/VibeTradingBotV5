@@ -5,12 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Кейсы навеса справочных правил инструмента: группа `U7` и клетка `U10.3`
- * документа `.claude/tests/cases/jsonb-overlay-roundtrip.md`.
+ * Кейсы навеса справочных правил инструмента: группа `U7`, клетки `U10.3`,
+ * `U11.7` и `U13.3` документа `.claude/tests/cases/jsonb-overlay-roundtrip.md`.
  *
  * <p><b>Правило изъятия у копий одно, и ожидание объявлено один раз.</b>
  * {@code InstrumentExternalRulesJsonConverter} живёт двумя экземплярами, и
@@ -19,14 +21,15 @@ import org.junit.jupiter.api.Test;
  * комиссии»). Наследник поэтому подаёт только порты к своей копии, а
  * тождество копий мерит дословная строка на объекте со всеми полями.
  *
- * <p><b>Ключ {@code live} есть у обеих, и он общий.</b> Его производит
- * предикат формы, а не поле; примесью он не изымается, а на обратном ходе
- * отбрасывается как неизвестное свойство — и проходит это только на маппере
- * сборки бина (§«Состав ключей строки задаёт не перечень полей»).
+ * <p><b>Ключа {@code live} нет ни у одной копии.</b> Его производил бы
+ * предикат формы, а не поле; примесь хранилищного слоя его не задевает, и
+ * изъят он на самой модели (§«Состав ключей строки задаёт не перечень
+ * полей»). Состав строки пинится литеральным перечнем (`U13.3`): перечень,
+ * выведенный из класса формы, уехал бы вместе с переименованием.
  */
 public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayProbe {
 
-    /** Ключ, которого в строке нет ни у одного поля формы: его даёт предикат. */
+    /** Ключ, который дал бы предикат формы, не будь он изъят на модели. */
     private static final String PREDICATE_KEY = "live";
 
     /** Изымаемые поля: у обеих копий одни и те же. */
@@ -37,8 +40,7 @@ public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayPro
     /** Строка `U7.3` и `U10.3`: объявлена один раз и сверяется каждой копией. */
     private static final String SHARED_JSON =
             "{\"instrumentType\":\"SWAP\",\"contractType\":\"LINEAR\",\"status\":\"LIVE\","
-                    + "\"externalInstrumentId\":\"BTC-USDT-SWAP\",\"externalTickSize\":\"0.1\","
-                    + "\"live\":true}";
+                    + "\"externalInstrumentId\":\"BTC-USDT-SWAP\",\"externalTickSize\":\"0.1\"}";
 
     // --- порты к своей копии конвертера ---------------------------------
 
@@ -46,17 +48,27 @@ public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayPro
 
     protected abstract InstrumentExternalRules readRules(String json);
 
+    /**
+     * Чтение той же копией, собранной на ЧУЖОМ маппере: клетка `U11.7`
+     * мерит, что терпимость к неизвестному свойству конструктор ставит
+     * безусловно.
+     */
+    protected abstract InstrumentExternalRules readRulesOn(ObjectMapper source, String json);
+
     // --- U7: изъятия примесью ---------------------------------------------
 
     @Test
-    @DisplayName("U7.1/U7.2 — примесь изымает оба поля, ключ предиката есть")
-    protected void u7_1_theMixinRemovesBothFieldsAndKeepsThePredicateKey() {
+    @DisplayName("U7.1/U7.2 — примесь изымает оба поля, ключа предиката нет")
+    protected void u7_1_theMixinRemovesBothFieldsAndThePredicateKeyIsAbsent() {
         InstrumentExternalRules rules = fullRules();
 
         String json = writeRules(rules);
 
         assertThat(keysOf(json)).doesNotContain(OWNER_ID_FIELD, FEE_RATE_FIELD);
-        assertThat(keysOf(json)).contains(PREDICATE_KEY);
+        assertThat(keysOf(json))
+                .as("предикат формы изъят на модели, а не примесью: он не данные ни у одного "
+                        + "сериализатора")
+                .doesNotContain(PREDICATE_KEY);
         InstrumentExternalRules read = readRules(json);
         assertThat(read).usingRecursiveComparison()
                 .ignoringFields(OWNER_ID_FIELD, FEE_RATE_FIELD).isEqualTo(rules);
@@ -76,7 +88,7 @@ public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayPro
         String json = writeRules(rules);
 
         assertThat(json).isEqualTo(SHARED_JSON);
-        assertThat(keysOf(json)).contains(PREDICATE_KEY);
+        assertThat(keysOf(json)).doesNotContain(PREDICATE_KEY);
     }
 
     @Test
@@ -129,6 +141,64 @@ public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayPro
         assertThat(json)
                 .as("изъятые поля строку не меняют: у копий одно правило изъятия")
                 .isEqualTo(SHARED_JSON);
+        assertThat(keysOf(json)).doesNotContain(PREDICATE_KEY);
+    }
+
+    // --- U11.7: терпимость к неизвестному свойству пинит конвертер -------
+
+    /**
+     * Копия, собранная на маппере со СТРОГОЙ охраной неизвестного свойства,
+     * читает свою строку с лишним ключом: терпимость пинит конструктор, и
+     * настройка источника её не сдвигает.
+     *
+     * <p>Лишний ключ — не {@code live} прежних строк: имя, изъятое
+     * {@code @JsonIgnore}, читатель пропускает как объявленно игнорируемое и
+     * на строгом маппере (прочитано по исходникам библиотеки), то есть пина
+     * конвертера оно не мерило бы.
+     */
+    @Test
+    @DisplayName("U11.7 — на строгом источнике лишний ключ своей строки отброшен, прочее тождественно")
+    protected void u11_7_onAStrictSourceAnUnknownKeyOfTheOwnRowIsDropped() {
+        ObjectMapper strict = beanAssemblyMapper()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        InstrumentExternalRules rules = sharedRules();
+        String withUnknown = writeRules(rules)
+                .replaceFirst("\\{", "{\"externalSettlementCurrency\":\"USDT\",");
+
+        assertThat(readRulesOn(strict, withUnknown))
+                .as("U11.7: вход %s, источник строгий — терпимость запинена конвертером", withUnknown)
+                .usingRecursiveComparison().isEqualTo(rules);
+    }
+
+    // --- U13.3: состав ключей строки — литеральным перечнем -------------
+
+    @Test
+    @DisplayName("U13.3 — объект со всеми полями: ключи строки равны литеральному перечню")
+    protected void u13_3_theRowKeysOfAFullObjectEqualTheLiteralList() {
+        String json = writeRules(everyFieldRules());
+
+        assertThat(keysOf(json))
+                .as("U13.3: поля данных формы за вычетом идентификатора владельца и ставки; "
+                        + "ключа предиката нет")
+                .containsExactlyInAnyOrder(
+                        "instrumentType",
+                        "contractType",
+                        "status",
+                        "externalInstrumentType",
+                        "externalInstrumentId",
+                        "externalContractType",
+                        "externalContractValue",
+                        "externalContractValueCurrency",
+                        "externalTickSize",
+                        "externalLotSize",
+                        "externalMinSize",
+                        "externalMaxLimitSize",
+                        "externalMaxMarketSize",
+                        "externalMaxTriggerSize",
+                        "externalMaxStopSize",
+                        "externalMaxLeverage",
+                        "externalState",
+                        "externalFeeGroupId");
     }
 
     // --- материал кейсов --------------------------------------------------
@@ -138,6 +208,25 @@ public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayPro
         InstrumentExternalRules rules = sharedRules();
         rules.setInstrumentId(77L);
         rules.setExternalTakerFeeRate("0.0005");
+        return rules;
+    }
+
+    /** Объект, у которого заполнено КАЖДОЕ поле формы, включая изымаемые. */
+    private static InstrumentExternalRules everyFieldRules() {
+        InstrumentExternalRules rules = fullRules();
+        rules.setExternalInstrumentType("SWAP");
+        rules.setExternalContractType("linear");
+        rules.setExternalContractValue("0.01");
+        rules.setExternalContractValueCurrency("BTC");
+        rules.setExternalLotSize("1");
+        rules.setExternalMinSize("1");
+        rules.setExternalMaxLimitSize("100000");
+        rules.setExternalMaxMarketSize("5000");
+        rules.setExternalMaxTriggerSize("100000");
+        rules.setExternalMaxStopSize("5000");
+        rules.setExternalMaxLeverage("100");
+        rules.setExternalState("live");
+        rules.setExternalFeeGroupId("1");
         return rules;
     }
 

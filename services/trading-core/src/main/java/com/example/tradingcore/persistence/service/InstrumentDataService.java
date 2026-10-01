@@ -44,7 +44,8 @@ public class InstrumentDataService {
      *
      * <p>Читается проекцией одного поля, а не загрузкой строки: у
      * вызывающего — лестницы курса — нужда ровно в валюте
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Transactional(readOnly = true)
     public Optional<String> findSettlementCurrency(String exchangeCode, String externalId) {
@@ -102,7 +103,8 @@ public class InstrumentDataService {
      *
      * <p>Здесь тянется строка целиком, а не поле: читателю — сборке
      * контекста прохода — нужна сама модель
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Transactional(readOnly = true)
     public Instrument getRequiredById(Long id) {

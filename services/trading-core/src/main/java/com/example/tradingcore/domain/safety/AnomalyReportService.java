@@ -79,9 +79,12 @@ public class AnomalyReportService {
      * уже стои́т.
      *
      * <p>Операнд дедупа — стоящее СОСТОЯНИЕ объекта, а не статус отчёта:
-     * журнальная тропа создаёт отчёт сразу завершённым, поэтому множество
-     * незавершённых пусто по построению и такой дедуп не срабатывал бы
-     * никогда (docs/rules/error-handling-policy.md).
+     * журнальная тропа создаёт отчёт сразу завершённым, а строка мягкой
+     * ступени закрывается, как только легло её ребро подъёма, поэтому у
+     * держащегося состояния множество незавершённых пусто в штатной работе,
+     * и такой дедуп пропускал бы вторую строку каждым проходом
+     * (docs/models/domain/other/AnomalyReport.md;
+     * docs/rules/error-handling-policy.md).
      */
     @Transactional
     public AnomalyReport journalState(DealContext dealContext, HoldSignal signal, String subjectExternalId) {

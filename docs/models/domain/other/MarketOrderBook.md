@@ -26,7 +26,7 @@
 `OrderBookSnapshot` — её граничная форма стала бы
 `OrderBookSnapshotExternalSnapshot`: маркер уровня перестал бы читаться,
 потому что то же слово уже стои́т в основе
-(`.claude/rules/naming.md` §«Разведение уровней абстракции» — способ
+(`.claude/rules/naming.md`, правило разведения уровней абстракции: способ
 разведения выбирается **до** имён).
 
 Отсюда семейство `Market*`: `MarketOrderBook`, `MarketTicker` рядом с
@@ -47,7 +47,7 @@
 **Две метки времени, и обе несущие.** Биржевая отвечает на вопрос «к
 какому моменту относится книга», наша — «когда мы её увидели»; их
 разность и есть задержка, по которой разбирают инцидент
-(`docs/architecture/market-data-collection.md` §«Невосполнимые срезы»,
+(невосполнимые срезы — `docs/architecture/market-data-collection.md`,
 `docs/rules/time-utc.md`). Одна метка на обе роли делает задержку
 неизмеримой.
 
@@ -75,11 +75,11 @@
 ## Персистентность
 
 - **Таблица** — `order_book_snapshots`, гипертаблица временного ряда по
-  `external_timestamp` (`docs/architecture/data-ownership.md`
-  §«Временные ряды»).
+  `external_timestamp` (временные ряды —
+  `docs/architecture/data-ownership.md`).
 - **Уровни — JSONB** в строке владельца, не отдельной таблицей: они
   навешаны на каркас и FK на них ниоткуда не ведёт
-  (`docs/rules/persistence-representation.md` §«Реляционно или JSONB»).
+  (выбор «реляционно или JSONB» — `docs/rules/persistence-representation.md`).
   Нормализация дала бы сорок строк на срез вместо одной — при проходе
   раз в минуту по всему листингу это разница на два порядка в объёме
   ряда, который **не чистится**.

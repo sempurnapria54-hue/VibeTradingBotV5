@@ -10,7 +10,9 @@
     "cycleExhausted": "цикл добычи пройден полностью",
     "currentCloseReason": "причина закрытия, уже стоящая на сущности",
     "cancelIntentReason": "причина, объявленная нашим намерением отмены",
-    "submissionConfirmed": "приём сущности площадкой подтверждён: статус дальше созданного, биржевой идентификатор есть. У позиции отправки нет, операнд не читается. ПУСТО неподтверждённым НЕ читается: неподтверждённость снимает биржевую ступень, и пустота вела бы в благоприятную сторону (docs/rules/absent-value-semantics.md)"
+    "submissionConfirmed": "приём сущности площадкой подтверждён: статус дальше созданного, биржевой идентификатор есть. У позиции отправки нет, операнд не читается. ПУСТО неподтверждённым НЕ читается: неподтверждённость снимает биржевую ступень, и пустота вела бы в благоприятную сторону (docs/rules/absent-value-semantics.md)",
+    "localTerminal": "сущность уже терминальна ЛОКАЛЬНО до добычи: исполнена, отменена либо в ошибочном состоянии (orderIsFinal — docs/spec/order-lifecycle.json; algoIsFinal — docs/spec/algo-order-lifecycle.json). У позиции операнд не читается. ПУСТО терминальной НЕ читается: терминальность снимает биржевую ступень у исчерпанного цикла, и пустота вела бы в благоприятную сторону (docs/rules/absent-value-semantics.md)",
+    "closeRecordFound": "запись закрытия эпизода добыта историей закрытых позиций по паре (externalId, externalCreatedAt) его строки (docs/components/RefreshPositionExecutor.md). Читается только у позиции. ПУСТО добытой НЕ читается: закрытие, объявленное без записи, снимает живой риск эпизода со счёта, и пустота вела бы в благоприятную сторону"
   },
 
   "values": [
@@ -25,9 +27,19 @@
       "expr": "if(in(rawStatus, 'live', 'pause'), 'ACTIVE', if(rawStatus == 'partially_effective', 'PARTIALLY_COMPLETED', if(rawStatus == 'effective', 'COMPLETED', if(rawStatus == 'canceled', 'CANCELED', 'REFUSED'))))"
     },
     {
+      "name": "localTerminalStands",
+      "note": "Локальный терминал стоит: рёбер из терминала матрицы жизненного цикла не содержат (orderTransitionAllowed, algoTransitionAllowed), и добыча его не двигает — ни наблюдением, ни отказом, ни исчерпанием цикла. Наблюдённый факт при этом не теряется: числа налива и сырой статус источника садятся на сущность данными. Позиции операнд не касается.",
+      "expr": "entity != 'POSITION' && notNull(?localTerminal) && localTerminal"
+    },
+    {
+      "name": "positionCloseCorroborated",
+      "note": "Закрытие позиции объявляется по ДВУМ фактам источника: живая нога позиции не дала, и история закрытых позиций отдала запись закрытия этого эпизода. Пустой ответ живой ноги один закрытия не доказывает: транзиентная пустота неотличима от закрытия, а ложное закрытие снимает живой риск эпизода со счёта — обнуляет нетто-размер, по которому закрытие уровня сделки приписывается траншам, и заводит второй строке того же эпизода новую ось. Запись закрытия — финализированный факт источника о ЭТОМ эпизоде: переоткрытая позиция несёт другую пару и за неё не сойдёт.",
+      "expr": "positionAbsenceIsNormal && notNull(?closeRecordFound) && closeRecordFound"
+    },
+    {
       "name": "resolvedStatus",
-      "note": "Резолв применяется только к полученному снапшоту. Ненайденность — не статус источника: сырого статуса нет, и трактовать его нечем.",
-      "expr": "if(!snapshotFound, if(entity == 'POSITION', 'CLOSED', 'ABSENT'), if(entity == 'ORDER', orderStatus, if(entity == 'ALGO_ORDER', algoStatus, 'ACTIVE')))"
+      "note": "Резолв применяется только к полученному снапшоту. Ненайденность — не статус источника: сырого статуса нет, и трактовать его нечем. У позиции без корроборации закрытия статус остаётся живым: пустота живой ноги ждёт записи закрытия, а не объявляет его.",
+      "expr": "if(!snapshotFound, if(entity == 'POSITION', if(positionCloseCorroborated, 'CLOSED', 'ACTIVE'), 'ABSENT'), if(entity == 'ORDER', orderStatus, if(entity == 'ALGO_ORDER', algoStatus, 'ACTIVE')))"
     },
     {
       "name": "refusesInsteadOfMapping",
@@ -41,13 +53,18 @@
     },
     {
       "name": "positionAbsenceIsNormal",
-      "note": "У позиции успешная пустота — нормальный факт закрытия на бирже, а не ненайденность.",
+      "note": "У позиции успешная пустота — не ненайденность: контролируемого исключения и биржевой ступени она не даёт. Закрытием она становится только с корроборацией (positionCloseCorroborated).",
       "expr": "entity == 'POSITION' && !snapshotFound"
     },
     {
       "name": "notFoundIsTerminal",
-      "note": "Ненайденность становится терминалом только после полного цикла добычи. Пустой ответ одного источника основанием не является.",
-      "expr": "!snapshotFound && !positionAbsenceIsNormal && cycleExhausted"
+      "note": "Ненайденность становится терминалом только после полного цикла добычи и только у сущности, которая терминальной ещё не была. Пустой ответ одного источника основанием не является.",
+      "expr": "!snapshotFound && !positionAbsenceIsNormal && cycleExhausted && !localTerminalStands"
+    },
+    {
+      "name": "notFoundPastLocalTerminal",
+      "note": "Запись локально терминальной сущности ушла за горизонт выдачи площадки: история обычных заявок держит семь дней, отменённые без исполнения — около двух часов (docs/integrations/okx/contracts/order.md). Её добывают ради живой встроенной защиты терминального родителя, и сделка, живущая дольше горизонта, упирается в это штатно. Факт терминала добыт раньше и стоит; ненайденность о поведении площадки не сообщает ничего: не пишется ничего, контролируемого исключения и биржевой ступени нет. Судьба встроенной защиты резолвится дальше по локальному терминалу родителя — её цикл добычи идёт по инструменту и записи родителя не требует (docs/components/RefreshOrderExecutor.md).",
+      "expr": "!snapshotFound && !positionAbsenceIsNormal && cycleExhausted && localTerminalStands"
     },
     {
       "name": "notFoundIsUnplaced",
@@ -62,16 +79,16 @@
     {
       "name": "closeReasonCandidate",
       "note": "Кандидат причины: у отмены он приходит из нашего намерения, а не из статуса источника. Намерения нет — причина всё равно непуста: UNKNOWN означает «отмена наблюдена, наше намерение не резолвится», и без неё отмена, инициированная не нами, упиралась бы в требование непустой причины на ребре в CANCELED (docs/spec/algo-order-lifecycle.json, reasonRequired). Отмена, инициированная нами, отличается от биржевой непустым намерением (CANCELED_BY_STRATEGY, REPLACED_BY_STRATEGY, KILL_SWITCH) и сырым статусом источника, сохранённым на сущности. Значения MANUAL_CANCEL в перечне нет: точечные ручки вне scope фазы 1 (docs/rules/manual-halt.md).",
-      "expr": "if(refusesInsteadOfMapping, refusalReason, if(notFoundIsTerminal, if(notFoundIsUnplaced, 'NOT_PLACED', 'MISSING_AFTER_REFRESH'), if(resolvedStatus == 'COMPLETED' && entity != 'POSITION', if(entity == 'ORDER', 'FILLED', 'TRIGGERED'), if(resolvedStatus == 'CANCELED', coalesce(cancelIntentReason, 'UNKNOWN'), if(positionAbsenceIsNormal, 'EXTERNAL_CLOSE', null)))))"
+      "expr": "if(refusesInsteadOfMapping, refusalReason, if(notFoundIsTerminal, if(notFoundIsUnplaced, 'NOT_PLACED', 'MISSING_AFTER_REFRESH'), if(resolvedStatus == 'COMPLETED' && entity != 'POSITION', if(entity == 'ORDER', 'FILLED', 'TRIGGERED'), if(resolvedStatus == 'CANCELED', coalesce(cancelIntentReason, 'UNKNOWN'), if(positionCloseCorroborated, 'EXTERNAL_CLOSE', null)))))"
     },
     {
       "name": "closeReasonApplied",
-      "note": "Причина write-once: ранее установленная не перетирается.",
+      "note": "Причина write-once: ранее установленная не перетирается. У локально терминальной сущности причина стоит всегда — терминальные переходы модели пишут её сами, — поэтому наблюдение исполнения ноги, помеченной ошибочной, оставляет ей причину ошибки, а исчерпанный цикл у терминальной кандидата не производит вовсе (notFoundPastLocalTerminal).",
       "expr": "if(notNull(currentCloseReason), currentCloseReason, closeReasonCandidate)"
     },
     {
       "name": "raisesExchangeStepTwo",
-      "note": "Оба исхода — «биржа повела себя неожиданно»: реакция одна, биржевая ступень сворачивания. Неотправленная сущность, не найденная циклом, ступени не поднимает: неожиданного о площадке она не сообщает.",
+      "note": "Оба исхода — «биржа повела себя неожиданно»: реакция одна, биржевая ступень сворачивания. Неотправленная сущность, не найденная циклом, ступени не поднимает: неожиданного о площадке она не сообщает. Локально терминальная, не найденная циклом, — тоже (notFoundPastLocalTerminal). Отказ резолва ступень поднимает и у терминальной: неизвестное слово — дефект словаря площадки, а не свойство сущности, и списочная нога роняется им целиком.",
       "expr": "refusesInsteadOfMapping || (notFoundIsTerminal && !notFoundIsUnplaced)"
     }
   ],
@@ -143,9 +160,20 @@
       "expect": { "resolvedStatus": "CANCELED", "closeReasonApplied": "UNKNOWN", "raisesExchangeStepTwo": false }
     },
     {
-      "case": "позиции нет на бирже — это нормальный факт закрытия, не ненайденность",
+      "case": "позиции нет на живой ноге, запись закрытия эпизода добыта — нормальный факт закрытия, не ненайденность",
+      "state": { "entity": "POSITION", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null, "closeRecordFound": true },
+      "expect": { "positionAbsenceIsNormal": true, "positionCloseCorroborated": true, "resolvedStatus": "CLOSED", "closeReasonApplied": "EXTERNAL_CLOSE", "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "позиции нет на живой ноге, записи закрытия эпизода нет — закрытие не объявляется, позиция остаётся живой",
+      "note": "Транзиентно пустой ответ живой ноги неотличим от закрытия. Прочитанный закрытием, он обнулял бы нетто-размер, по которому закрытие уровня сделки приписывается траншам, — на выходе сделки экспозиция траншей читалась бы нулевой, и защиту снимали бы с живой позиции. Пример падает на форме одного чтения (пустота = CLOSED).",
+      "state": { "entity": "POSITION", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null, "closeRecordFound": false },
+      "expect": { "positionAbsenceIsNormal": true, "positionCloseCorroborated": false, "resolvedStatus": "ACTIVE", "closeReasonApplied": null, "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "признак записи закрытия не добыт — пустота живой ноги закрытием не читается",
       "state": { "entity": "POSITION", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null },
-      "expect": { "positionAbsenceIsNormal": true, "resolvedStatus": "CLOSED", "closeReasonApplied": "EXTERNAL_CLOSE", "raisesExchangeStepTwo": false }
+      "expect": { "positionCloseCorroborated": false, "resolvedStatus": "ACTIVE" }
     },
     {
       "case": "заявка не найдена, цикл не исчерпан — факт не добыт, терминала нет",
@@ -154,8 +182,35 @@
     },
     {
       "case": "заявка не найдена после полного цикла — терминал и биржевая реакция",
-      "state": { "entity": "ORDER", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null, "submissionConfirmed": true },
-      "expect": { "notFoundIsTerminal": true, "notFoundIsUnplaced": false, "closeReasonApplied": "MISSING_AFTER_REFRESH", "raisesExchangeStepTwo": true }
+      "state": { "entity": "ORDER", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null, "submissionConfirmed": true, "localTerminal": false },
+      "expect": { "localTerminalStands": false, "notFoundIsTerminal": true, "notFoundPastLocalTerminal": false, "notFoundIsUnplaced": false, "closeReasonApplied": "MISSING_AFTER_REFRESH", "raisesExchangeStepTwo": true }
+    },
+    {
+      "case": "исполненный родитель с живой встроенной защитой не найден полным циклом — запись ушла за горизонт истории, тревоги нет",
+      "note": "Сделка живёт дольше горизонта истории обычных заявок, а родителя добывают ради его встроенной защиты. Пример падает на форме без операнда локальной терминальности: ненайденность там — терминал MISSING_AFTER_REFRESH на исполненной заявке, которого матрица не допускает, и биржевая ступень 2 со сворачиванием штатной сделки.",
+      "state": { "entity": "ORDER", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": "FILLED", "cancelIntentReason": null, "submissionConfirmed": true, "localTerminal": true },
+      "expect": { "localTerminalStands": true, "notFoundIsTerminal": false, "notFoundPastLocalTerminal": true, "notFoundIsUnplaced": false, "closeReasonApplied": "FILLED", "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "терминальная условная заявка не найдена полным циклом — та же тропа своей сущности",
+      "state": { "entity": "ALGO_ORDER", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": "TRIGGERED", "cancelIntentReason": null, "submissionConfirmed": true, "localTerminal": true },
+      "expect": { "notFoundPastLocalTerminal": true, "closeReasonApplied": "TRIGGERED", "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "нога в ошибочном состоянии, площадка показывает её исполненной — наблюдение резолвится, терминал ошибки стоит",
+      "note": "Ребра из ERROR матрица не содержит (docs/spec/order-lifecycle.json, orderTransitionAllowed): статус и причина ошибки остаются, налив садится на ногу данными. Судьба её встроенной защиты читается по наблюдённому терминалу (docs/spec/order-lifecycle.json, attachedParentStatus).",
+      "state": { "entity": "ORDER", "rawStatus": "filled", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": "MISSING_AFTER_REFRESH", "cancelIntentReason": null, "submissionConfirmed": true, "localTerminal": true },
+      "expect": { "localTerminalStands": true, "resolvedStatus": "COMPLETED", "closeReasonApplied": "MISSING_AFTER_REFRESH", "raisesExchangeStepTwo": false }
+    },
+    {
+      "case": "отказ резолва у терминальной сущности биржевую ступень поднимает — дефект словаря, а не свойство сущности",
+      "state": { "entity": "ORDER", "rawStatus": "something_new", "snapshotFound": true, "cycleExhausted": false, "currentCloseReason": "FILLED", "cancelIntentReason": null, "submissionConfirmed": true, "localTerminal": true },
+      "expect": { "refusesInsteadOfMapping": true, "closeReasonApplied": "FILLED", "raisesExchangeStepTwo": true }
+    },
+    {
+      "case": "позиции локальная терминальность не касается",
+      "state": { "entity": "POSITION", "rawStatus": null, "snapshotFound": false, "cycleExhausted": true, "currentCloseReason": null, "cancelIntentReason": null, "localTerminal": true, "closeRecordFound": true },
+      "expect": { "localTerminalStands": false, "notFoundPastLocalTerminal": false, "resolvedStatus": "CLOSED" }
     },
     {
       "case": "неотправленная заявка не найдена после полного цикла — не дошла до площадки, ступени нет",

@@ -38,8 +38,10 @@ class AbsentOutputsBoxTest extends SharedAuthBox {
 
         Answer registered = post(EXCHANGE_ACCOUNTS, identity.browserToken("user-b7-1"),
                 Bodies.registration(tenant).body());
+        Answer rotated = rotateKeys(registered, identity.browserToken("user-b7-1"));
 
         assertThat(registered.status()).isEqualTo(201);
+        assertThat(rotated.status()).isEqualTo(200);
         assertThat(rows.tableNames()).noneSatisfy(name -> assertThat(name).contains("outbox"));
         assertThatThrownBy(() -> Class.forName("org.springframework.kafka.core.KafkaTemplate"))
                 .isInstanceOf(ClassNotFoundException.class);
@@ -52,10 +54,12 @@ class AbsentOutputsBoxTest extends SharedAuthBox {
         String token = identity.browserToken("user-b7-2");
 
         Answer registered = post(EXCHANGE_ACCOUNTS, token, Bodies.registration(tenant).body());
+        Answer rotated = rotateKeys(registered, token);
         Answer registry = get(EXCHANGE_ACCOUNTS, token);
         Answer ofTenant = get(EXCHANGE_ACCOUNTS + "/tenant/" + tenant, token);
 
         assertThat(registered.status()).isEqualTo(201);
+        assertThat(rotated.status()).isEqualTo(200);
         assertThat(registry.status()).isEqualTo(200);
         assertThat(ofTenant.status()).isEqualTo(200);
         assertThat(configuration()).doesNotContain("neighbours");
@@ -68,9 +72,11 @@ class AbsentOutputsBoxTest extends SharedAuthBox {
         String token = identity.browserToken("user-b7-3");
 
         Answer registered = post(EXCHANGE_ACCOUNTS, token, Bodies.registration(tenant).body());
+        Answer rotated = rotateKeys(registered, token);
         Answer registry = get(EXCHANGE_ACCOUNTS, token);
 
         assertThat(registered.status()).isEqualTo(201);
+        assertThat(rotated.status()).isEqualTo(200);
         assertThat(registry.status()).isEqualTo(200);
         assertThat(configuration()).doesNotContain("second-datasource", "datasource-");
     }
@@ -84,15 +90,26 @@ class AbsentOutputsBoxTest extends SharedAuthBox {
         post(MEMBERSHIPS_SELF, token, "");
         Answer registered = post(EXCHANGE_ACCOUNTS, token,
                 Bodies.registration(tenant).with("label", "b7-4").body());
+        Answer rotated = rotateKeys(registered, token);
         get(EXCHANGE_ACCOUNTS, token);
         get(EXCHANGE_ACCOUNTS + "/tenant/" + tenant, token);
         get("/actuator/health");
 
         assertThat(registered.status()).isEqualTo(201);
+        assertThat(rotated.status()).isEqualTo(200);
         assertThat(rows.row("tenants", "internal_id", tenant).get("status")).isEqualTo("ACTIVE");
         assertThat(rows.rowsWhere("exchange_accounts", "tenant_id", tenant))
                 .isNotEmpty()
                 .allSatisfy(row -> assertThat(row.get("status")).isEqualTo("ACTIVE"));
+    }
+
+    /**
+     * Смена ключей только что зарегистрированного счёта — мутирующая тропа
+     * обхода наравне с регистрацией.
+     */
+    private Answer rotateKeys(Answer registered, String token) {
+        return put(keysOf(String.valueOf(registered.asObject().get("internalId"))), token,
+                Bodies.keyRotation().body());
     }
 
     private String configuration() {

@@ -3,8 +3,12 @@ package com.example.tradingbot.domain.model.core.algo_order;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
+import com.example.tradingbot.domain.resolve.ExternalStatusReason;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -24,6 +28,11 @@ import lombok.Setter;
  * facts (связанные ordinary order ids). Не действие стратегии: связь
  * StrategyAction ↔ AlgoOrder — через DealActionState. См.
  * docs/models/domain/core/AlgoOrder.md, docs/lifecycles/AlgoOrder.md.
+ *
+ * <p><b>Нульарные {@code is}-предикаты изъяты из сериализации</b>
+ * ({@code @JsonIgnore}): заявка едет телом команды к коннектору и ответом
+ * его чтения, а вычисленный ответ свойством формы не является — ключом без
+ * поля он ушёл бы к читателю на другой стороне провода.
  */
 @Getter
 @Setter
@@ -91,6 +100,21 @@ public class AlgoOrder extends Auditable {
     /** Сырой статус биржи (OKX state) — диагностика, FSM напрямую не использует. */
     private String externalStatus;
 
+    /**
+     * <b>Наблюдённая живость на площадке</b> — что показала ПОСЛЕДНЯЯ
+     * добыча: живой статус — истина; терминальный статус, в том числе
+     * известное слово отказа, либо полный цикл без записи — ложь; статус не
+     * разобран либо наблюдения не было — пусто, и пустота значаща («не
+     * наблюдалась»).
+     *
+     * <p>Читается только у заявки в {@code ERROR}: у прочих живость несёт
+     * сам статус, а пометка ошибки — наше safety-состояние, а не факт
+     * площадки (docs/lifecycles/AlgoOrder.md §«Заявка в {@code ERROR}:
+     * живость на площадке читается наблюдением»). Писатель — добыча заявки
+     * (docs/components/RefreshAlgoOrderExecutor.md).
+     */
+    private Boolean externalLive;
+
     /** Код ошибки биржи (OKX failCode). */
     private String failCode;
 
@@ -125,6 +149,7 @@ public class AlgoOrder extends Auditable {
             Status.PARTIALLY_COMPLETED, EnumSet.of(Status.COMPLETED, Status.CANCELED, Status.ERROR));
 
     /** Live: ещё существует / влияет на risk (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED). */
+    @JsonIgnore
     public Boolean isLive() {
         return LIVE_STATUSES.contains(status);
     }
@@ -136,8 +161,90 @@ public class AlgoOrder extends Auditable {
      * предикату, а не по живости (docs/spec/protection-coverage.json,
      * величина {@code isLive} носителя STANDALONE).
      */
+    @JsonIgnore
     public Boolean isExchangeLive() {
         return EXCHANGE_LIVE_STATUSES.contains(status);
+    }
+
+    /**
+     * Живость заявки на площадке НЕ ИСКЛЮЧЕНА (docs/lifecycles/AlgoOrder.md
+     * §«Заявка в {@code ERROR}: живость на площадке читается наблюдением»;
+     * исполнимая форма — docs/spec/algo-order-lifecycle.json, величина
+     * {@code algoMayBeLive}; агрегат у гейта терминала сделки —
+     * docs/spec/deal-lifecycle.json, величина
+     * {@code trancheHasMayBeLiveStandaloneProtection}). Множество
+     * шире {@link #isLive()} ровно на заявку в {@code ERROR}: пометка ошибки
+     * — наше safety-состояние, и осиротевшая живая запись под ней сработала
+     * бы по чужой позиции того же инструмента.
+     *
+     * <p><b>Нежилой такую заявку делает только наблюдение</b>
+     * ({@link #externalLive} ложь); пустое наблюдение нежилостью не
+     * читается. У прочих статусов наблюдение не читается вовсе.
+     *
+     * <p>Читатели — аварийные: снятие риска и доказанное отсутствие живого
+     * риска сделки. Штатные исполнители и покрытие читают {@link #isLive()}
+     * и {@link #isExchangeLive()}: у заявки в {@code ERROR} штатной работы
+     * нет, и покрытием она не считается.
+     */
+    @JsonIgnore
+    public Boolean mayBeLive() {
+        return isTrue(isLive()) || (isTrue(isError()) && isNotFalse(externalLive));
+    }
+
+    /**
+     * Заявка в ошибочном состоянии — нашем safety-состоянии, живости на
+     * площадке не исключающем: её живость несёт наблюдение
+     * {@code externalLive}, а не статус (docs/lifecycles/AlgoOrder.md).
+     */
+    @JsonIgnore
+    public Boolean isError() {
+        return Status.ERROR.equals(status);
+    }
+
+    /**
+     * Записывает наблюдённую живость по итогу полного цикла добычи: запись
+     * найдена живой — истина; найдена терминальной либо не найдена вовсе —
+     * ложь (docs/lifecycles/AlgoOrder.md §«Заявка в {@code ERROR}: живость
+     * на площадке читается наблюдением»). Отказ разбора статуса пишет
+     * {@link #observeRefusedStatus}.
+     *
+     * @param found запись, добытая циклом; пусто — полный цикл её не нашёл
+     */
+    public void observeOnVenue(AlgoOrder found) {
+        this.externalLive = nonNull(found) && isTrue(found.isLive());
+    }
+
+    /**
+     * Записывает наблюдённую живость по отказу разбора статуса.
+     *
+     * <p><b>Известное слово отказа — наблюдение нежилости</b>, хотя
+     * разбор его и отказывает: отказ постановки и частичный отказ — наш
+     * выбор уводить заявку в проблемный терминал, а не незнание слова, и оба
+     * состояния у площадки терминальны. Пустым наблюдение остаётся только у
+     * слова, которого словарь площадки не знает, — и у отказа без названной
+     * причины: пустота нежилостью не читается.
+     *
+     * @param reason причина отказа разбора, приехавшая с границы
+     */
+    public void observeRefusedStatus(ExternalStatusReason reason) {
+        this.externalLive = isNull(reason) || ExternalStatusReason.UNKNOWN_EXTERNAL_STATUS.equals(reason)
+                ? null
+                : Boolean.FALSE;
+    }
+
+    /**
+     * Заявка терминальна локально: сработала, отменена либо в ошибочном
+     * состоянии (docs/spec/external-status-resolution.json, операнд
+     * {@code localTerminal}). Пустой статус терминальным не читается:
+     * терминальность снимает биржевую ступень у исчерпанного цикла добычи,
+     * и пустота вела бы в благоприятную сторону.
+     *
+     * <p>Предикат изъят из сериализации: заявка уезжает телом команды к
+     * коннектору, а свойством формы вычисленный ответ не является.
+     */
+    @JsonIgnore
+    public Boolean isLocallyTerminal() {
+        return nonNull(status) && isFalse(isLive());
     }
 
     /**
@@ -222,6 +329,7 @@ public class AlgoOrder extends Auditable {
      * потерян. Биржевого идентификатора у такой заявки нет, и найти её можно
      * только по клиентскому (docs/lifecycles/AlgoOrder.md).
      */
+    @JsonIgnore
     public Boolean isNotSubmitted() {
         return Status.CREATED.equals(status);
     }
@@ -375,9 +483,6 @@ public class AlgoOrder extends Auditable {
 
         /** Неизвестный внешний статус. */
         UNKNOWN_EXTERNAL_STATUS,
-
-        /** Нарушение exchange-инварианта. */
-        EXCHANGE_INVARIANT_VIOLATION,
 
         /** Fallback. */
         UNKNOWN

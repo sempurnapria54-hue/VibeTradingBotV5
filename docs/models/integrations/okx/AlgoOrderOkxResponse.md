@@ -10,8 +10,7 @@
 
 | OKX field | Тип | Семантика |
 |---|---|---|
-| `instType` | string | тип инструмента (для сверки expected) |
-| `instId` | string | инструмент (для сверки) |
+| `instId` | string | инструмент — адрес записи в счёт-широком срезе (`externalInstrumentId`) |
 | `algoId` | string | биржевой algo id |
 | `algoClOrdId` | string | client id (stable, основной матчинг) |
 | `state` | string | сырой статус (`live`/`pause`/`effective`/`canceled`/`order_failed`/`partially_failed`/`partially_effective`) |
@@ -23,14 +22,16 @@
 | `triggerTime` | string-ms | время срабатывания |
 | `ordId` | string | связанный обычный ордер (может быть пустым) |
 | `ordIdList` | array<string> | список связанных `ordId` (split-сценарии) |
+| `side` | string | `buy`/`sell` — эхо стороны; операнд сверки с нашим направлением у отдельной условной заявки (`docs/models/mapping/AlgoOrder.md`) |
+| `reduceOnly` | string-bool | `true`/`false` — эхо признака «только уменьшать»; операнд сверки с намерением у отдельной условной заявки (`docs/integrations/okx/rules/reduce-only-invariant.md`). У материализованной встроенной защиты не используется — намерения у неё не объявлено |
 | `cTime` | string-ms | время создания |
 | `uTime` | string-ms | время обновления (есть в history) |
 | **TP/SL поля:** | | |
 | `tpTriggerPx` | string-decimal | TP trigger |
-| `tpTriggerPxType` | string | `last`/`index`/`mark` |
+| `tpTriggerPxType` | string | `last`/`index`/`mark` — эхо базы; операнд сверки объявленной базы у отдельной условной заявки |
 | `tpOrdPx` | string-decimal | TP order price (`-1` = market) |
 | `slTriggerPx` | string-decimal | SL trigger |
-| `slTriggerPxType` | string | `last`/`index`/`mark` |
+| `slTriggerPxType` | string | `last`/`index`/`mark` — эхо базы; операнд сверки объявленной базы у обеих форм защиты |
 | `slOrdPx` | string-decimal | SL order price (`-1` = market) |
 | **Trailing (`move_order_stop`):** | | |
 | `callbackRatio` | string-decimal | трейл в доле |
@@ -42,12 +43,13 @@
 | `triggerPxType` | string | `last`/`index`/`mark` |
 | `ordPx` | string-decimal | цена выставляемого ордера (`-1` = market) |
 
-### Не маппится в snapshot / используется adapter'ом для validation
+### Не используется
 
-`ordType` (резолвится по conditionType — adapter сверяет),
-`side`, `actualSide`, `tdMode` (=`isolated` константа),
-`posSide` (=`net` константа), `reduceOnly` (не сверяется — `docs/integrations/okx/rules/reduce-only-invariant.md`),
-`closeFraction`.
+`instType` и `ordType` (параметры запроса ног цикла, а не операнды
+ответа), `actualSide`, `tdMode` (константа нашего запроса), `posSide`
+(константа нашего запроса), `closeFraction` (механизм доли на первом этапе
+не используется). Почему не сверяются тип заявки, режим маржи и сторона
+позиции — `docs/models/mapping/AlgoOrder.md`, подраздел сверки эха.
 
 ### Диагностика / специфические режимы
 

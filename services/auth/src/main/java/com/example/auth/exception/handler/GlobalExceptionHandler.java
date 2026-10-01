@@ -3,6 +3,8 @@ package com.example.auth.exception.handler;
 import static java.util.Objects.isNull;
 
 import com.example.auth.exception.ContourNotAdmittedException;
+import com.example.auth.exception.ExchangeAccountClosedException;
+import com.example.auth.exception.ExchangeAccountNotFoundException;
 import com.example.tradingbot.api.model.ErrorApiResponse;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -50,6 +52,36 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ContourNotAdmittedException.class)
     public ResponseEntity<ErrorApiResponse> onContourNotAdmitted(ContourNotAdmittedException failure) {
         return response(HttpStatus.UNPROCESSABLE_CONTENT, "CONTOUR_NOT_ADMITTED", failure.getMessage());
+    }
+
+    /**
+     * Счёта с идентичностью из пути в реестре нет.
+     *
+     * <p><b>Класс — {@code INVALID_REQUEST}, число — {@code 404}.</b> Перечень
+     * классов поверхности закрыт, и «неизвестная идентичность» в нём уже
+     * названа этим классом
+     * (docs/rules/error-handling-policy.md §«Класс отказа»); число
+     * провизорно и различает то, что идентичность пришла ПУТЁМ, а не телом.
+     * Пояснение — текст нашего исключения, собранный из присланного
+     * вызывающим.
+     */
+    @ExceptionHandler(ExchangeAccountNotFoundException.class)
+    public ResponseEntity<ErrorApiResponse> onAccountNotFound(ExchangeAccountNotFoundException failure) {
+        log.info("Exchange account refused as unknown: accountInternalId={}", failure.getAccountInternalId());
+        return response(HttpStatus.NOT_FOUND, "INVALID_REQUEST", failure.getMessage());
+    }
+
+    /**
+     * Счёт отключён и ключей не принимает.
+     *
+     * <p><b>Класс — {@code INVALID_REQUEST} («невыполненное предусловие
+     * операции»), число — {@code 409}:</b> запрос понят и верен по форме,
+     * отвергнут он состоянием счёта.
+     */
+    @ExceptionHandler(ExchangeAccountClosedException.class)
+    public ResponseEntity<ErrorApiResponse> onAccountClosed(ExchangeAccountClosedException failure) {
+        log.info("Exchange account refused as closed: accountInternalId={}", failure.getAccountInternalId());
+        return response(HttpStatus.CONFLICT, "INVALID_REQUEST", failure.getMessage());
     }
 
     /**

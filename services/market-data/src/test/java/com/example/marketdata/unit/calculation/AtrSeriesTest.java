@@ -30,10 +30,10 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка:</b> параметры ATR с объявленным периодом; ряд
  * свечей, у которых максимум, минимум и закрытие различимы.
  *
- * <p><b>Арифметика дома не имеет</b> (M-1): клетки `U4.5`-`U4.7` — разрыв
- * вверх, краевой бар и выведенный прогрев — кода не получили, потому что
- * их ожидание живёт только в javadoc реализации. Прогоняемы состав поля,
- * область значений, граница ряда и свойство постоянного размаха.
+ * <p><b>Выведенный прогрев берётся из спеки</b>
+ * (docs/spec/indicator-calculation.json, величина `derivedWarmup`): у
+ * сглаживания Уайлдера он равен трём периодам (`U4.7`). Клетки `U4.5` и
+ * `U4.6` — разрыв вверх и краевой бар — кода пока не получили.
  */
 class AtrSeriesTest {
 
@@ -77,10 +77,29 @@ class AtrSeriesTest {
     @Test
     @DisplayName("U4.4 — у каждого бара размах 10, разрывов нет: все значения равны 10")
     void u4_4_aConstantTrueRangeSmoothesToThatVeryNumber() {
-        List<IndicatorValue> values = calculate(constantRangeSeries(12), atrParams(3, null));
+        List<IndicatorValue> values = calculate(constantRangeSeries(12), atrParams(3, 0));
 
-        assertThat(values).hasSize(6)
+        assertThat(values).hasSize(10)
                 .allSatisfy(value -> assertThat(((AtrValue) value).getAtr()).isEqualByComparingTo("10"));
+    }
+
+    /**
+     * Выведенный прогрев — три периода: сглаживание Уайлдера вдвое
+     * медленнее EMA, и остаток веса затравки требует двух периодов шагов
+     * после неё (docs/spec/indicator-calculation.json, величина
+     * `derivedWarmup`). Значение на баре {@code 2} посчитано — его
+     * предъявляет ряд с нулевым прогревом, — но в ряд не идёт.
+     */
+    @Test
+    @DisplayName("U4.7 — прогрев не переопределён, период 3: ряд начинается с бара 9, хотя значение есть с бара 2")
+    void u4_7_theDerivedWarmupIsThreePeriods() {
+        List<IndicatorValue> derived = calculate(risingSeries(20), atrParams(3, null));
+
+        assertThat(derived).hasSize(11);
+        assertThat(derived.getFirst().getCandleTimestamp()).isEqualTo(barAt(9));
+        assertThat(calculate(risingSeries(20), atrParams(3, 0)).getFirst().getCandleTimestamp())
+                .as("значение посчитано раньше границы прогрева")
+                .isEqualTo(barAt(2));
     }
 
     /** Ряд длиной ровно в период даёт единственное значение — если прогрев его не отсёк. */

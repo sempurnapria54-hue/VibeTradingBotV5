@@ -177,7 +177,12 @@ public class Position extends Auditable {
         /** Позиция закрыта. */
         CLOSED,
 
-        /** Проблемное состояние (нарушение exchange-инварианта). */
+        /**
+         * Проблемное состояние: факты биржи нельзя безопасно интерпретировать.
+         * Нарушение инварианта контракта в ответе сюда не уводит — это факт о
+         * чтении, и статус остаётся последним применённым фактом
+         * (docs/rules/controlled-exchange-exceptions.md).
+         */
         ERROR
     }
 
@@ -191,9 +196,6 @@ public class Position extends Auditable {
         KILL_SWITCH,
 
         /** Закрылась на стороне биржи без текущей команды close (SL/TP/trailing/liquidation/ADL). */
-        EXTERNAL_CLOSE,
-
-        /** Problem reason для ERROR: adapter обнаружил нарушение exchange-инварианта. */
-        EXCHANGE_INVARIANT_VIOLATION
+        EXTERNAL_CLOSE
     }
 }

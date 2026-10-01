@@ -23,7 +23,8 @@ public interface StrategyIndicatorSettingRepository extends JpaRepository<Strate
      *
      * <p>Проекция идентификаторов, а не строк: тику нужен перечень
      * стратегий, а дерево он грузит по одной
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Query("""
             select distinct s.strategy.id from StrategyIndicatorSettingEntity s

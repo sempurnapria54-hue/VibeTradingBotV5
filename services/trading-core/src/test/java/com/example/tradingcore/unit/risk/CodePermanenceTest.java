@@ -118,6 +118,12 @@ class CodePermanenceTest {
     }
 
     @Test
+    @DisplayName("U25.13 — режим счёта вне контура: бессрочный — режим меняет владелец счёта, а не проход")
+    void u25_13_theOutOfContourAccountModeIsPermanent() {
+        assertPermanent(RiskCheckCode.ACCOUNT_MODE_OUT_OF_CONTOUR);
+    }
+
+    @Test
     @DisplayName("U25.11 — второго носителя признака нет: он читается только у значения")
     void u25_11_thePermanenceFlagHasNoSecondCarrier() {
         assertThat(nonStaticFieldNames(RiskCheckCode.class))

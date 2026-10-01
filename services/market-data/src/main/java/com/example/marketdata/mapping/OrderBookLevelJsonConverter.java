@@ -6,6 +6,7 @@ import com.example.tradingbot.domain.model.trade.market_snapshot.OrderBookLevel;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -19,10 +20,14 @@ import org.springframework.stereotype.Component;
  * который не чистится (docs/models/domain/other/MarketOrderBook.md
  * §Персистентность).
  *
- * <p>Маппер берётся <b>копией</b> общего бина, и копии ставится политика
- * непустых полей: форма колонки от настроек чужого бина не зависит, а
- * пустое поле уровня в строку не пишется — лишний ключ платился бы объёмом
- * на каждом уровне каждого среза.
+ * <p>Маппер берётся <b>копией</b> общего бина, и копия пинит сама ДВЕ оси
+ * (docs/rules/persistence-representation.md §«Состав ключей строки
+ * навеса»). Политика непустых полей: пустое поле уровня в строку не
+ * пишется — лишний ключ платился бы объёмом на каждом уровне каждого среза.
+ * Терпимость к неизвестному свойству при чтении своей строки: срез,
+ * записанный прежней редакцией формы, читается, лишний ключ отбрасывается.
+ * Ни одна ось не наследуется умолчанием бина: настройка сериализатора
+ * сервиса сдвигала бы форму колонки либо делала её нечитаемой целиком.
  */
 @Component
 public class OrderBookLevelJsonConverter {
@@ -33,7 +38,8 @@ public class OrderBookLevelJsonConverter {
 
     public OrderBookLevelJsonConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy()
-                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
     /** Уровни в JSON навеса; пусто на входе — пустой массив, а не пустота. */

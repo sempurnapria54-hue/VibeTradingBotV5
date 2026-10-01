@@ -174,7 +174,7 @@ class StrategyActionPlanningTest {
     @Test
     void aRetriedRowWithACreatedLegResumesAtItsSubmission() {
         StrategyActionOrchestrator creating = new StrategyActionOrchestrator(
-                List.of(new CreateOrderActionExecutor(null, null, null, null)), dataService);
+                List.of(new CreateOrderActionExecutor(null, null, null, null, null)), dataService);
         StrategyAction action = createEntry(103L);
         DealActionState waiting = planned(103L);
         waiting.setStatus(DealActionStateStatus.RETRY_PENDING);

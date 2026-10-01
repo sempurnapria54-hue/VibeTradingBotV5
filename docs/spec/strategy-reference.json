@@ -336,7 +336,7 @@
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
       "where": "actionKind == 'ORDER' && in(?orderType, 'ENTRY', 'ENTRY_ATTACHED_STOP_LOSS') && isNull(?allocationPercents)",
-      "note": "Входное действие не объявило доли аллокации. Обязательность записана здесь, а не только аннотацией api-модели: без неё пустота проходила ОБЕ прежние проверки — фильтр диапазона исключал её условием notNull, а сумма объявленного нотинала читала её нулём через coalesce, — и опустить поле было ВЫГОДНЕЕ, чем объявить 100 %: тот же расклад со 100 давал реджект по превышению статического запаса. Молчаливая коррекция пустоты в благоприятную сторону запрещена docs/concept.md §П1. Код реджекта — STRATEGY_ACTION_ALLOCATION_NOT_DECLARED (docs/rules/strategy-validation.md)."
+      "note": "Входное действие не объявило доли аллокации. Обязательность записана здесь, а не только аннотацией api-модели: без неё пустота проходила бы ОБЕ проверки — фильтр диапазона исключает её условием notNull, а сумма объявленного нотинала читала бы её нулём, — и опустить поле было бы ВЫГОДНЕЕ, чем объявить 100 %: тот же расклад со 100 даёт реджект по превышению статического запаса. Молчаливая коррекция пустоты в благоприятную сторону запрещена docs/concept.md §П1. Код реджекта — STRATEGY_ACTION_ALLOCATION_NOT_DECLARED (docs/rules/strategy-validation.md)."
     },
     {
       "name": "reduceOnlyIntentNotDeclared",
@@ -351,6 +351,13 @@
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
       "where": "notNull(?allocationPercents) && (allocationPercents <= 0 || allocationPercents > 100)",
       "note": "Доля аллокации вне допустимого диапазона (0, 100]. Охрана пустоты в фильтре ОСТАВЛЕНА намеренно: предмет этой проверки — диапазон, а отсутствие доли мерит allocationNotDeclared; строгое чтение здесь давало бы отказ вычисления там, где уже есть свой реджект. Ноль ВХОДИТ в нарушение: нулевая аллокация — вход, которому не выделено ничего, а размер входа есть min(по риску, по аллокации), поэтому объявленный уровень не вошёл бы НИКОГДА и молча. Ноль отвергается реджектом STRATEGY_ACTION_ALLOCATION_NOT_POSITIVE у валидатора создания: именованный код объявлен домом правила и им же и эмитится, а Bean Validation отвечает до тела обработчика и кода не несёт."
+    },
+    {
+      "name": "closeFractionOutOfRange",
+      "op": "count",
+      "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
+      "where": "notNull(?closeFractionPercents) && (closeFractionPercents <= 0 || closeFractionPercents > 100)",
+      "note": "Доля закрытия защитного либо выходного действия вне допустимого диапазона (0, 100] — близнец allocationOutOfRange по форме и по доводу. Ноль ВХОДИТ в нарушение: нулевая доля — не действие нулевого размера, а отсутствие действия; дошедшая до расчёта размера, она оставляет остаток, равный всей экспозиции, и при экспозиции ниже минимума разбирается как полный выход (docs/spec/order-sizing.json, операнд exit.fraction). Охрана пустоты в фильтре ОСТАВЛЕНА намеренно, и пары-счётчика обязательности у доли закрытия нет: пустая доля законна у действия, которое доли не объявляет (перенос уровня безубытком, снятие), а у защитного создания и замещения пустоту читает проверка покрытия нулём (stepProtectiveCoverage) — в сторону отказа, а не допуска. Реджект создания — STRATEGY_ACTION_FRACTION_NOT_POSITIVE (docs/rules/strategy-validation.md): именованный код объявлен домом правила и им же эмитится."
     },
     {
       "name": "actionStopCalculationType",
@@ -371,7 +378,7 @@
     },
     {
       "name": "actionSetsLevel",
-      "note": "Действие СТАВИТ уровень защиты: защитное создание либо защитное замещение над условной заявкой. Снимающее (CANCEL_ACTION) и выходные действия уровня не ставят вовсе — дом области: docs/rules/risk-policy.md §«снятие и выходные действия уровня не ставят вовсе».",
+      "note": "Действие СТАВИТ уровень защиты: защитное создание либо защитное замещение над условной заявкой. Снимающее (CANCEL_ACTION) и выходные действия уровня не ставят вовсе — дом области: docs/rules/risk-policy.md.",
       "expr": "isProtectiveAction && in(actionType, 'CREATE_ACTION', 'REPLACE_ACTION')"
     },
     {
@@ -381,7 +388,7 @@
     },
     {
       "name": "actionLevelSource",
-      "note": "РЕЗОЛВ операнда levelSource: чем задан уровень действия. Читается по ОБЪЯВЛЕННОМУ БЛОКУ настроек, а не по отдельному полю: блок настроек трейлинга означает уровень, наблюдаемый после активации (OBSERVED); блок настроек стопа — уровень, объявленный способом расчёта (DECLARED). Прежде операнд не имел ни поля, ни писателя, ни правила резолва, а единственный правдоподобный вывод запрещала его же нота — то есть охрана клетки «вход × полоса» стояла на величине, которую нечем вычислить (D5 DOCS_CHECK_34). Собственного поля в дереве стратегии не заводится: значение выводимо из блока (.claude/rules/design-simplicity.md), а неоднозначность «объявлены оба блока» отвергается созданием (levelSourceAmbiguous).",
+      "note": "РЕЗОЛВ операнда levelSource: чем задан уровень действия. Читается по ОБЪЯВЛЕННОМУ БЛОКУ настроек, а не по отдельному полю: блок настроек трейлинга означает уровень, наблюдаемый после активации (OBSERVED); блок настроек стопа — уровень, объявленный способом расчёта (DECLARED). Собственного поля в дереве стратегии не заводится: значение выводимо из блока (.claude/rules/design-simplicity.md), а неоднозначность «объявлены оба блока» отвергается созданием (levelSourceAmbiguous).",
       "expr": "if(notNull(?trailingSettings), 'OBSERVED', 'DECLARED')"
     },
     {
@@ -393,7 +400,7 @@
     },
     {
       "name": "actionsSettingLevelWithoutSource",
-      "note": "Исполнимая форма клаузы создания docs/rules/strategy-validation.md §«защитное действие, СТАВЯЩЕЕ уровень, объявляет его источник». Считает нарушителей: ставящие уровень действия без объявленного источника. Область сужена до ставящих намеренно — безусловная редакция отвергала эталон репозитория (bull_oco_cancel / bear_oco_cancel защитны, а уровня не ставят), и исполнимой формы у неё не было вовсе, поэтому прогон её не мерил. Реджект создания — STRATEGY_LEVEL_SOURCE_NOT_DECLARED.",
+      "note": "Исполнимая форма клаузы создания из docs/rules/strategy-validation.md: защитное действие, СТАВЯЩЕЕ уровень, объявляет его источник. Считает нарушителей: ставящие уровень действия без объявленного источника. Область сужена до ставящих намеренно: безусловная клауза отвергала бы эталон репозитория (bull_oco_cancel / bear_oco_cancel защитны, а уровня не ставят). Реджект создания — STRATEGY_LEVEL_SOURCE_NOT_DECLARED.",
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].actions[]",
       "where": "actionSetsLevel && !actionDeclaresLevelSource"
@@ -406,18 +413,18 @@
       "where": "baseType == 'MARKET_PRICE' && in(priceSource, 'MARK_PRICE', 'INDEX_PRICE')"
     },
     {
-      "name": "conditionPriceSourceUnavailable",
-      "note": "То же ограничение на ВТОРОМ носителе источника цены — ценовом операнде условия (docs/models/domain/aggregate/Strategy.md). Перечень StrategyPriceSource у операнда и у размещения один, и отвергать их порознь нельзя: условие «цена ≥ марк-цена ± %» проходило бы создание, а калькулятор подставлял бы последнюю цену — та же подмена ценового домена, только другой тропой. Источник читается только у ценового операнда (sourceType = PRICE): у операнда иного типа поле не читает никто, и отказ по нему отвергал бы значение, которого расчёт не видит.",
+      "name": "conditionPriceSourceDeclared",
+      "note": "Правила условия шага, у которых операнд объявил источник цены. Поля источника у операнда условия нет вовсе: ценовой операнд — последняя цена сделки, и источник объявляет только размещение (дом — docs/rules/strategy-condition-contract.md, раздел о грамматике исполняемого). Объявленный источник отвергается при ЛЮБОМ значении и у операнда ЛЮБОГО типа — STRATEGY_CONDITION_FIELD_NOT_READ (docs/rules/strategy-validation.md): принятый, он исполнялся бы последней ценой молча. Единица счёта — правило: у правила, где источник объявили оба операнда, нарушение одно в счёте и два у валидатора, по одному на поле.",
       "op": "count",
       "over": "strategy.details[].tranches[].stepsByStatus{}[].condition.rules[]",
-      "where": "(?leftOperand.sourceType == 'PRICE' && in(?leftOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE')) || (?rightOperand.sourceType == 'PRICE' && in(?rightOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE'))"
+      "where": "notNull(?leftOperand.priceSource) || notNull(?rightOperand.priceSource)"
     },
     {
-      "name": "phaseConditionPriceSourceUnavailable",
-      "note": "То же ограничение на ТРЕТЬЕМ носителе источника цены — ценовом операнде правила классификации фазы (docs/models/domain/aggregate/Strategy.md): контекст классификации ценовой операнд допускает, и марк-цена в нём подменялась бы последней той же тропой. Код отказа тот же — STRATEGY_PRICE_SOURCE_UNAVAILABLE.",
+      "name": "phaseConditionPriceSourceDeclared",
+      "note": "То же у правил клаузы классификации фазы: контекст классификации ценовой операнд допускает, и источника цены у него нет так же, как у условия шага. Код отказа тот же — STRATEGY_CONDITION_FIELD_NOT_READ.",
       "op": "count",
       "over": "strategy.marketPhaseSetting.phaseRules[].condition.rules[]",
-      "where": "(?leftOperand.sourceType == 'PRICE' && in(?leftOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE')) || (?rightOperand.sourceType == 'PRICE' && in(?rightOperand.priceSource, 'MARK_PRICE', 'INDEX_PRICE'))"
+      "where": "notNull(?leftOperand.priceSource) || notNull(?rightOperand.priceSource)"
     },
     {
       "name": "stopSettingsMisdeclared",
@@ -1856,17 +1863,145 @@
       "expect": {
         "allocationOutOfRange": 1
       },
-      "note": "Граница (0, 100] со стороны нуля. Прежняя редакция предиката (allocationPercents < 0) ноль пропускала, и ни один пример её не трогал: контрпример подавал 140, то есть только верхнюю сторону. Пример падает при возврате прежней границы и потому фальсифицирует нижнюю."
+      "note": "Граница (0, 100] со стороны нуля. Пример падает на предикате allocationPercents < 0, пропускающем ноль, и потому фальсифицирует нижнюю сторону; контрпример со 140 трогает только верхнюю."
     },
     {
-      "case": "эталон источников, которых источник не отдаёт, не объявляет",
+      "case": "доли закрытия эталона структурно допустимы",
+      "stateFrom": {
+        "strategy": "services/strategies/src/test/resources/strategy-examples/trend-following-ema.json"
+      },
+      "expect": {
+        "closeFractionOutOfRange": 0
+      }
+    },
+    {
+      "case": "нулевая доля закрытия — нарушение диапазона, а не законный край",
+      "note": "Граница (0, 100] со стороны нуля. Пример падает на границе, ослабленной до «меньше нуля», и на нейтрализации счётчика нулём.",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerTradePercent": 1.0,
+              "tranches": [
+                {
+                  "key": "t1",
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "PARTIAL_TAKE_PROFIT",
+                            "closeFractionPercents": 0
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "closeFractionOutOfRange": 1
+      }
+    },
+    {
+      "case": "доля закрытия выше ста — нарушение с верхней стороны: закрыть больше, чем есть, объявлением нельзя",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerTradePercent": 1.0,
+              "tranches": [
+                {
+                  "key": "t1",
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "STOP_LOSS",
+                            "closeFractionPercents": 140
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "closeFractionOutOfRange": 1
+      }
+    },
+    {
+      "case": "доля закрытия сто — законный край, а действие без доли в счёт не идёт",
+      "note": "Вторая сторона пары: без неё счётчик удовлетворялся бы константой, а граница, сдвинутая на «не меньше ста», — молча. Действие без доли — перенос уровня безубытком: пустая доля у него законна, и охрана пустоты не даёт ей стать отказом вычисления.",
+      "state": {
+        "strategy": {
+          "details": [
+            {
+              "phaseEntryPolicy": "FOLLOW_PHASE",
+              "riskPerTradePercent": 1.0,
+              "tranches": [
+                {
+                  "key": "t1",
+                  "stepsByStatus": {
+                    "MANAGING": [
+                      {
+                        "stepType": "PROTECTION_ADJUSTMENT",
+                        "actions": [
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "CREATE_ACTION",
+                            "conditionType": "STOP_LOSS",
+                            "closeFractionPercents": 100
+                          },
+                          {
+                            "actionKind": "ALGO_ORDER",
+                            "actionType": "REPLACE_ACTION",
+                            "targetActionKey": "sl",
+                            "conditionType": "STOP_LOSS",
+                            "stopLossSettings": {
+                              "calculationType": "BREAKEVEN"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "closeFractionOutOfRange": 0
+      }
+    },
+    {
+      "case": "эталон не объявляет ни недоступного источника у размещения, ни источника цены у операнда условия",
       "stateFrom": {
         "strategy": "services/strategies/src/test/resources/strategy-examples/trend-following-ema.json"
       },
       "expect": {
         "priceSourceUnavailable": 0,
-        "conditionPriceSourceUnavailable": 0,
-        "phaseConditionPriceSourceUnavailable": 0
+        "conditionPriceSourceDeclared": 0,
+        "phaseConditionPriceSourceDeclared": 0
       }
     },
     {
@@ -1953,8 +2088,8 @@
       }
     },
     {
-      "case": "ценовой операнд условия по марк-цене отвергается тем же ограничением: перечень источников у операнда и у размещения один",
-      "note": "Второй носитель источника цены. Отвергать порознь нельзя: условие «цена ≥ марк-цена ± %» проходило бы создание, а калькулятор подставлял бы последнюю — та же подмена ценового домена, только другой тропой.",
+      "case": "источник цены у ценового операнда условия отвергается при любом значении — и марк-цена, и последняя цена",
+      "note": "Поля источника у операнда условия нет: объявленная последняя цена отвергается наравне с марк-ценой, хотя операнд и так берёт последнюю. Форма, отвергающая только недоступные источники, дала бы на этом входе 1.",
       "state": {
         "strategy": {
           "details": [
@@ -2001,7 +2136,7 @@
         }
       },
       "expect": {
-        "conditionPriceSourceUnavailable": 1,
+        "conditionPriceSourceDeclared": 2,
         "priceSourceUnavailable": 0
       }
     },
@@ -2275,7 +2410,7 @@
     },
     {
       "case": "действие объявило оба блока настроек уровня — источник неоднозначен",
-      "note": "Контрпример к резолву actionLevelSource: он читает источник по объявленному блоку, и на действии с обоими блоками вывод неоднозначен. Отвергается созданием, а не приоритетом блоков: приоритет отвечал бы за автора там, где он сам себе противоречит (D5 DOCS_CHECK_34).",
+      "note": "Контрпример к резолву actionLevelSource: он читает источник по объявленному блоку, и на действии с обоими блоками вывод неоднозначен. Отвергается созданием, а не приоритетом блоков: приоритет отвечал бы за автора там, где он сам себе противоречит.",
       "state": {
         "strategy": {
           "details": [
@@ -2340,8 +2475,8 @@
       }
     },
     {
-      "case": "ценовой операнд правила классификации фазы по индексной цене отвергается тем же ограничением",
-      "note": "Третий носитель источника цены: классификация допускает ценовой операнд, и отвергать его порознь с условием шага значило бы оставить ту же подмену ценового домена третьей тропой.",
+      "case": "источник цены у ценового операнда клаузы классификации фазы отвергается при любом значении",
+      "note": "Классификация допускает ценовой операнд, и источника у него нет так же, как у условия шага: индексная и последняя цена отвергаются обе. Форма, пропускающая источник у этого операнда, дала бы на этом входе 1.",
       "state": {
         "strategy": {
           "marketPhaseSetting": {
@@ -2381,14 +2516,14 @@
         }
       },
       "expect": {
-        "phaseConditionPriceSourceUnavailable": 1,
-        "conditionPriceSourceUnavailable": 0,
+        "phaseConditionPriceSourceDeclared": 2,
+        "conditionPriceSourceDeclared": 0,
         "priceSourceUnavailable": 0
       }
     },
     {
-      "case": "источник цены у операнда не ценового типа отказа не даёт: поле никто не читает",
-      "note": "Индикаторный операнд с объявленным источником марк-цены: расчёт источник не читает, и отказ по нему отвергал бы значение, которого расчёт не видит.",
+      "case": "источник цены у операнда не ценового типа тоже отвергается: у операнда определённого типа ровно его поля",
+      "note": "Индикаторный операнд с объявленным источником марк-цены. Оценка поле не читает — и именно поэтому оно не объявляется: набор полей операнда задан его типом источника точно. Форма, читающая источник только у ценового операнда, дала бы на этом входе 0.",
       "state": {
         "strategy": {
           "details": [
@@ -2424,7 +2559,69 @@
         }
       },
       "expect": {
-        "conditionPriceSourceUnavailable": 0
+        "conditionPriceSourceDeclared": 1
+      }
+    },
+    {
+      "case": "ценовой операнд без источника отказа не даёт: это его единственная форма",
+      "note": "Пара к примерам выше: различает их ровно объявленное поле источника.",
+      "state": {
+        "strategy": {
+          "marketPhaseSetting": {
+            "phaseRules": [
+              {
+                "type": "BULL_TREND",
+                "condition": {
+                  "rules": [
+                    {
+                      "level": 1,
+                      "ruleType": "PRICE_COMPARE",
+                      "leftOperand": {
+                        "sourceType": "PRICE"
+                      },
+                      "rightOperand": {
+                        "sourceType": "CONSTANT"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "details": [
+            {
+              "tranches": [
+                {
+                  "stepsByStatus": {
+                    "PRECHECK": [
+                      {
+                        "condition": {
+                          "rules": [
+                            {
+                              "level": 1,
+                              "ruleType": "PRICE_COMPARE",
+                              "leftOperand": {
+                                "sourceType": "PRICE"
+                              },
+                              "rightOperand": {
+                                "sourceType": "CONSTANT"
+                              }
+                            }
+                          ]
+                        },
+                        "actions": []
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "conditionPriceSourceDeclared": 0,
+        "phaseConditionPriceSourceDeclared": 0
       }
     },
     {
@@ -2583,7 +2780,7 @@
   "populations": [
     {
       "axis": "классы пары «фаза × политика входа»",
-      "note": "Матрица допустимости ЦЕЛИКОМ — полное произведение двух закрытых перечней, а не множество пар, встретившихся в примерах. Прежняя редакция перечисляла семь пар, совпадавших один в один с наличными примерами, и законная пара BEAR_TREND × FOLLOW_PHASE из эталонного артефакта репозитория роняла прогон как «клейм полноты ложен». Правило популяции — phaseEntryPolicyAllowed: член покрыт, только когда пример ожидает эту величину.",
+      "note": "Матрица допустимости ЦЕЛИКОМ — полное произведение двух закрытых перечней, а не множество пар, встретившихся в примерах. Перечень пар, выписанный по наличным примерам, уронил бы прогон на законной паре вне их — BEAR_TREND × FOLLOW_PHASE из эталонного артефакта репозитория — как «клейм полноты ложен». Правило популяции — phaseEntryPolicyAllowed: член покрыт, только когда пример ожидает эту величину.",
       "rule": [
         "phaseEntryPolicyAllowed"
       ],

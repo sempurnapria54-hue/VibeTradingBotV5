@@ -79,6 +79,14 @@ import org.springframework.stereotype.Component;
  * §«Реакция на устаревание данных»). Обратный порядок отдал бы снятие
  * риска закрывающим действиям, которые считаются по данным, которым
  * доверять уже нельзя.
+ *
+ * <p><b>Удаление не ждёт тихого прохода — работа каскада его не
+ * откладывает.</b> Проверка стои́т над работой каскада, после его просьб:
+ * шаг уровня сделки ждёт прохода, на котором каскад молчит, а удаление —
+ * нет (docs/components/DealActiveHandler.md §«Выходные проверки»).
+ *
+ * <p><b>Ступень каскада едет на каждом исходе прохода, на котором каскад
+ * прогонялся</b> (docs/components/DealActiveHandler.md §«Рабочая логика»).
  */
 @Slf4j
 @Component
@@ -113,23 +121,77 @@ public class DealActiveHandler implements DealHandler {
             return errorPath(dealContext);
         }
         TrancheCascadeResult cascade = trancheCascade.run(dealContext);
-        DealTransition afterCascade = cascadeReaction(dealContext, cascade);
-        if (nonNull(afterCascade)) {
-            return afterCascade.withTrancheEdges(cascade.getEdges());
+        DealTransition cascadeRequest = cascadeRequest(dealContext, cascade);
+        if (nonNull(cascadeRequest)) {
+            return cascadeRequest.withTrancheEdges(cascade.getEdges());
+        }
+        if (isTrue(dealContext.strategyDeleted())) {
+            return deletedDefinition(dealContext, cascade);
+        }
+        if (isTrue(cascade.acted())) {
+            return DealTransition.commands(cascade.passCommands())
+                    .withRung(cascade.getHoldSignal())
+                    .withTrancheEdges(cascade.getEdges());
         }
         DealTransition dealLevel = dealLevelWork(dealContext);
         if (nonNull(dealLevel)) {
-            return dealLevel.withTrancheEdges(cascade.getEdges());
-        }
-        if (isTrue(dealContext.strategyDeleted())) {
-            log.info("Deal collapses because its strategy definition is deleted dealId={}", deal.getId());
-            return DealTransition.collapse(Deal.ShutdownReason.STRATEGY_DELETED,
-                            Deal.CloseReason.STRATEGY_EXIT)
-                    .withTrancheEdges(cascade.getEdges());
+            return withCascadeRung(dealLevel, cascade).withTrancheEdges(cascade.getEdges());
         }
         return observeIfIdle(exitCheck(dealContext), cascade)
                 .withTrancheEdges(cascade.getEdges())
                 .withRung(cascade.getHoldSignal());
+    }
+
+    /**
+     * Проход, наблюдающий удаление определения: шаг уровня сделки отбирается
+     * ДАЖЕ ПРИ ЗАНЯТОМ каскаде, а работа каскада в переход не берётся
+     * (docs/components/DealActiveHandler.md §«Выходные проверки»).
+     *
+     * <p><b>Удаление не ждёт тихого прохода.</b> Пока каскад занят, шаги
+     * траншей исполнялись бы по определению, которое владелец с торговли
+     * уже снял, — включая входы сетки, то есть набор нового риска. Старше
+     * удаления остаётся исход уровня сделки — реакция на устаревание данных
+     * его шага либо сработавший шаг; иначе ребро в координированный выход
+     * с причиной {@code STRATEGY_DELETED}. Команды каскада этого прохода не
+     * отправляются — тем же ходом, что у сворачивания по просьбе каскада, —
+     * а рёбра траншей и ступень каскада едут с ребром сделки. Строка
+     * исполнения, заведённая траншем на этом проходе, доигрывается уже в
+     * окне сворачивания, где набор риска отвергает преконтроль.
+     */
+    private DealTransition deletedDefinition(DealContext dealContext, TrancheCascadeResult cascade) {
+        DealTransition dealLevel = dealLevelWork(dealContext);
+        if (nonNull(dealLevel)) {
+            return withCascadeRung(dealLevel, cascade).withTrancheEdges(cascade.getEdges());
+        }
+        log.info("Deal collapses because its strategy definition is deleted dealId={}",
+                dealContext.getDeal().getId());
+        return DealTransition.collapse(Deal.ShutdownReason.STRATEGY_DELETED, Deal.CloseReason.STRATEGY_EXIT)
+                .withRung(cascade.getHoldSignal())
+                .withTrancheEdges(cascade.getEdges());
+    }
+
+    /**
+     * Исход уровня сделки со ступенью каскада: ступень, затребованную
+     * каскадом, переход несёт на каждом исходе прохода, на котором каскад
+     * прогонялся (docs/components/DealActiveHandler.md §«Рабочая логика»).
+     * Исход, вернувший своё ребро без неё, ронял бы меру, снижающую риск, —
+     * и молча.
+     *
+     * <p><b>Когда ступень затребовал и сам уровень сделки</b> (аварийная
+     * реакция на устаревание данных его шага), в переходе остаётся более
+     * жёсткая из двух; из равных по жёсткости — ступень каскада, чей радиус
+     * бывает и счётным.
+     */
+    private DealTransition withCascadeRung(DealTransition dealLevel, TrancheCascadeResult cascade) {
+        HoldSignal own = dealLevel.getHoldSignal();
+        HoldSignal requested = cascade.getHoldSignal();
+        if (isNull(requested)) {
+            return dealLevel;
+        }
+        if (nonNull(own) && isTrue(own.tearsDownRisk()) && isFalse(requested.tearsDownRisk())) {
+            return dealLevel;
+        }
+        return dealLevel.withRung(requested);
     }
 
     /**
@@ -198,6 +260,7 @@ public class DealActiveHandler implements DealHandler {
 
     /**
      * Реакция на просьбы каскада; пусто — просьб нет и проход идёт дальше.
+     * Обе просьбы старше удаления определения и исхода уровня сделки.
      *
      * <p><b>Порядок реакций — по цене ошибки.</b> Просьба увести ошибочной
      * тропой старше управляемого сворачивания: закрывающие действия
@@ -205,16 +268,13 @@ public class DealActiveHandler implements DealHandler {
      * Затребованная ступень статуса не двигает вовсе — её поднимает петля,
      * и активные сделки радиуса уводит её же шаг энфорсмента.
      */
-    private DealTransition cascadeReaction(DealContext dealContext, TrancheCascadeResult cascade) {
+    private DealTransition cascadeRequest(DealContext dealContext, TrancheCascadeResult cascade) {
         if (isTrue(cascade.getDealErrorRequested())) {
             return errorPath(dealContext).withRung(cascade.getHoldSignal());
         }
         if (nonNull(cascade.getShutdownRequested())) {
             return DealTransition.collapse(cascade.getShutdownRequested(), Deal.CloseReason.RISK_CONTROL)
                     .withRung(cascade.getHoldSignal());
-        }
-        if (isTrue(cascade.acted())) {
-            return DealTransition.commands(cascade.passCommands()).withRung(cascade.getHoldSignal());
         }
         return null;
     }

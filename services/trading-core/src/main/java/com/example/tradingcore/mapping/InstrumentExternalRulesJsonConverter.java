@@ -6,6 +6,7 @@ import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRul
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
@@ -29,7 +30,18 @@ import org.springframework.stereotype.Component;
  *
  * <p>Знание о хранении выражено примесью, а не аннотацией на доменной
  * модели: форма лежит в общей библиотеке и о том, кто и как её хранит,
- * знать не должна.
+ * знать не должна. Предикат торгуемости примесью не изымается: он не поле,
+ * а вопрос к модели, и изъят на ней самой — у всякого сериализатора разом
+ * (.claude/rules/codestyle.md §«Предикат формы, пересекающей сериализацию,
+ * не является её свойством»).
+ *
+ * <p><b>Маппер — копия общего бина, и копия пинит сама ДВЕ оси</b>
+ * (docs/rules/persistence-representation.md §«Состав ключей строки
+ * навеса»): политику включения — пишутся только непустые значения — и
+ * терпимость к неизвестному свойству при чтении своей строки — строка,
+ * записанная прежней редакцией формы, читается, лишний ключ отбрасывается.
+ * Ни одна ось не наследуется умолчанием бина: настройка сериализатора
+ * сервиса сдвигала бы форму колонки либо делала её нечитаемой целиком.
  */
 @Component
 public class InstrumentExternalRulesJsonConverter {
@@ -39,6 +51,7 @@ public class InstrumentExternalRulesJsonConverter {
     public InstrumentExternalRulesJsonConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy()
                 .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .addMixIn(InstrumentExternalRules.class, InstrumentExternalRulesNavelMixin.class);
     }
 

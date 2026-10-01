@@ -11,9 +11,16 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Возраст наблюдения счёта проактивной детекцией — операнд гейта входа:
- * группа `U18` документа `.claude/tests/cases/trading-core-safety.md`
+ * группа `U21` документа `.claude/tests/cases/domain-model-predicates.md`
  * (дом — docs/components/EntryScannerJob.md §«Гейт входа»; величина —
  * docs/models/domain/core/ExchangeAccount.md, поле {@code observedPassAt}).
+ *
+ * <p><b>Метки — документа этого дерева.</b> Клетки заведены как
+ * `U18.1`-`U18.4` документа `.claude/tests/cases/trading-core-safety.md`, а
+ * пакет {@code unit.predicate} артефакта зеркалит документ
+ * `domain-model-predicates`, где `U18` — своя группа; клетки перенесены туда
+ * группой `U21`. Отбор входа той же группы safety (`U18.5`, `U18.6`) остался
+ * в дереве ядра.
  *
  * <p><b>Базовая сборка:</b> счёт с настоящим моментом последнего
  * наблюдённого прохода; момент вопроса и допуск подаются явно — часы процесса
@@ -26,27 +33,27 @@ class ExchangeAccountObservationTest {
 
     /** Наблюдения не было вовсе — молчание разрешением не является. */
     @Test
-    @DisplayName("U18.1 — наблюдения не было: вход закрыт")
-    void u18_1_aNeverObservedAccountIsNotObservedWithinAnyAge() {
+    @DisplayName("U21.1 — наблюдения не было: вход закрыт")
+    void u21_1_aNeverObservedAccountIsNotObservedWithinAnyAge() {
         assertThat(observedAt(null).observedWithin(MAX_AGE, NOW)).isFalse();
     }
 
     @Test
-    @DisplayName("U18.2 — наблюдение моложе допуска: вход открыт")
-    void u18_2_aFreshObservationPasses() {
+    @DisplayName("U21.2 — наблюдение моложе допуска: вход открыт")
+    void u21_2_aFreshObservationPasses() {
         assertThat(observedAt(NOW.minusSeconds(30)).observedWithin(MAX_AGE, NOW)).isTrue();
     }
 
     /** Граница включена: возраст, равный допуску, ещё допустим. */
     @Test
-    @DisplayName("U18.3 — возраст наблюдения равен допуску: вход открыт")
-    void u18_3_theToleranceItselfIsAdmitted() {
+    @DisplayName("U21.3 — возраст наблюдения равен допуску: вход открыт")
+    void u21_3_theToleranceItselfIsAdmitted() {
         assertThat(observedAt(NOW.minus(MAX_AGE)).observedWithin(MAX_AGE, NOW)).isTrue();
     }
 
     @Test
-    @DisplayName("U18.4 — наблюдение старше допуска на секунду: вход закрыт")
-    void u18_4_anObservationBeyondTheToleranceIsRefused() {
+    @DisplayName("U21.4 — наблюдение старше допуска на секунду: вход закрыт")
+    void u21_4_anObservationBeyondTheToleranceIsRefused() {
         assertThat(observedAt(NOW.minus(MAX_AGE).minusSeconds(1)).observedWithin(MAX_AGE, NOW)).isFalse();
     }
 

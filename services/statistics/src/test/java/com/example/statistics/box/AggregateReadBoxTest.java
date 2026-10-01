@@ -15,11 +15,11 @@ import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * Клетки {@code B10.1} — {@code B10.7} и {@code B10.11} — {@code B10.16},
- * {@code B10.18}: агрегатная выборка чтения на штатном положении осей
+ * {@code B10.18}, {@code B10.19}: агрегатная выборка чтения на штатном положении осей
  * (.claude/tests/cases/statistics.md §«B10 — Агрегатная выборка чтения»).
  *
  * <p><b>Класс равен КОНФИГУРАЦИИ КОНТЕКСТА, и делит группу ровно она.</b>
- * Четырнадцать клеток здесь берут штатное положение осей и расходятся только
+ * Пятнадцать клеток здесь берут штатное положение осей и расходятся только
  * тем, какие факты каждая себе кладёт и какой вопрос задаёт поверхности;
  * четыре клетки СТРАНИЦЫ ({@code B10.8} — {@code B10.10}, {@code B10.17})
  * живут своим классом, потому что входом им служит сама ось — размер
@@ -35,7 +35,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * <b>такт пересчёта подаёт сам кейс</b>: у события два следствия, разнесённые
  * во времени разными исполнителями, и предметом этой группы является второе
  * из них — выдача уже собранных строк. Подача фактов сообщением сделала бы
- * четырнадцать клеток зависящими от живости приёма, а тропу «слушатель кладёт
+ * пятнадцать клеток зависящими от живости приёма, а тропу «слушатель кладёт
  * факт» держат клетки {@code B1}.
  *
  * <p><b>Факты лежат в ПОЛНОЧЬ своих суток</b> ({@link #midnightDaysAgo}):
@@ -383,6 +383,45 @@ class AggregateReadBoxTest extends StatisticsBox {
         assertThat(allFourAtDeal.dealRows())
                 .as("и вопрос дошёл до выборки — перечень заполнен, а не отсутствует")
                 .isNotNull();
+    }
+
+    /**
+     * Позиция в остальном полна и указывает на существующую строку: отказ
+     * поводом «половина позиции» либо «чужое зерно» здесь невозможен, и
+     * пояснение различает только пустой компонент.
+     */
+    @Test
+    @DisplayName("B10.19 — Строковый компонент позиции назван пустым: вопрос не принят")
+    void aBlankStringCursorComponentIsNotAccepted() {
+        Facts.deal("E-10-19", TENANT, midnightDaysAgo(DAY));
+        recompute();
+
+        Answer blankAccount = page(DEAL_GRAIN, WINDOW, CURSOR_BUCKET, day(DAY), CURSOR_ACCOUNT, "",
+                CURSOR_STRATEGY, Facts.STRATEGY, CURSOR_CURRENCY, Bodies.CURRENCY);
+        Answer blankStrategy = page(DEAL_GRAIN, WINDOW, CURSOR_BUCKET, day(DAY), CURSOR_ACCOUNT, Facts.ACCOUNT,
+                CURSOR_STRATEGY, "", CURSOR_CURRENCY, Bodies.CURRENCY);
+        Answer spacedCurrency = page(DEAL_GRAIN, WINDOW, CURSOR_BUCKET, day(DAY), CURSOR_ACCOUNT, Facts.ACCOUNT,
+                CURSOR_STRATEGY, Facts.STRATEGY, CURSOR_CURRENCY, "  ");
+        Answer absentTail = page(DEAL_GRAIN, WINDOW, CURSOR_BUCKET, day(DAY), CURSOR_ACCOUNT, Facts.ACCOUNT);
+
+        List<Map.Entry<Answer, String>> named = List.of(
+                Map.entry(blankAccount, "Биржевой счёт позиции"),
+                Map.entry(blankStrategy, "Определение стратегии позиции"),
+                Map.entry(spacedCurrency, "Расчётная валюта позиции"));
+        for (Map.Entry<Answer, String> blank : named) {
+            assertThat(blank.getKey().asObject().get(CODE_FIELD))
+                    .as("пустая строка компонентом позиции не является").isEqualTo(QUERY_REJECTED);
+            assertThat(reason(blank.getKey()))
+                    .as("пояснение называет компонент, а не состав позиции")
+                    .contains(blank.getValue())
+                    .contains("пустым значением");
+            assertThat(blank.getKey().asObject())
+                    .as("страницы с молча выпавшим хвостом суток не отдано")
+                    .doesNotContainKey(DEAL_ROWS);
+        }
+        assertThat(absentTail.status())
+                .as("законная пустота ключа — ОТСУТСТВИЕ компонента: такой вопрос принят")
+                .isEqualTo(200);
     }
 
     @Test

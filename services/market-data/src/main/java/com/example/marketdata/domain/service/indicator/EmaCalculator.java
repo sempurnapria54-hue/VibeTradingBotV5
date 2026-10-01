@@ -14,9 +14,16 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-/** Вычислитель EMA (экспоненциальная скользящая средняя по close). warmup ≈ 2·period. */
+/**
+ * Вычислитель EMA. Затравка, шаг сглаживания и выведенный прогрев —
+ * docs/spec/indicator-calculation.json (`indicatorWindowAverage`,
+ * `emaNext`, `derivedWarmup`).
+ */
 @Component
 public class EmaCalculator implements IndicatorCalculator {
+
+    /** Кратность периода в выведенном прогреве EMA (`derivedWarmup`). */
+    private static final int EMA_WARMUP_PERIODS = 2;
 
     @Override
     public IndicatorValue.Type getType() {
@@ -28,7 +35,7 @@ public class EmaCalculator implements IndicatorCalculator {
                                           IndicatorParams params) {
         EmaParams emaParams = (EmaParams) params;
         int period = emaParams.getPeriod();
-        int warmup = effectiveWarmup(emaParams.getWarmup(), 2 * period);
+        int warmup = effectiveWarmup(emaParams.getWarmup(), EMA_WARMUP_PERIODS * period);
         List<BigDecimal> closes = closedCandles.stream().map(Candle::getClose).collect(toList());
         BigDecimal[] ema = IndicatorMath.emaSeries(closes, period);
         List<IndicatorValue> result = new ArrayList<>();

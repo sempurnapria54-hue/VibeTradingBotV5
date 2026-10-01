@@ -63,7 +63,10 @@ spec:
       serviceAccountName: audit
       containers:
         - name: audit
-          image: registry.invalid/vibetrading/audit
+          # Метка `unpromoted` — зарезервированная: сервис, чей тег в
+          # окружение не продвинут, не разворачивается
+          # (docs/architecture/platform.md §Развёртывание).
+          image: registry.invalid/vibetrading/audit:unpromoted
           # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
           # поэтому образ, уже лежащий на узле, — тот самый.
           imagePullPolicy: IfNotPresent
@@ -86,11 +89,20 @@ spec:
                 configMapKeyRef:
                   name: environment-axes
                   key: journalRetentionProfile
-            # Провайдер идентичности — сервис того же пространства имён:
-            # окружение и есть пространство имён, поэтому адрес не несёт
-            # его имени и одинаков во всех трёх.
+            # Провайдер идентичности. Издатель токена — имя хоста окружения
+            # (значение приезжает осью окружения, поэтому манифест одинаков
+            # во всех трёх), ключи подписи — внутренний адрес провайдера:
+            # наружу за ключами сервис не ходит (docs/architecture/platform.md
+            # §Безопасность).
+            - name: PLATFORM_INGRESS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: ingressHost
             - name: OIDC_ISSUER_URI
-              value: http://platform-identity-service:8080/realms/vibetrading
+              value: https://$(PLATFORM_INGRESS_HOST)/realms/vibetrading
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/certs
             # Брокер: группа журнала подписана на тему КАЖДОГО производителя
             # несомых классов (docs/components/AuditEventListener.md).
             # Слушатель открытый — названный выбор платформы, не умолчание.
@@ -177,13 +189,6 @@ spec:
 ---
 # Встречное разрешение на стороне брокера — тот же довод, что у базы:
 # запрет по умолчанию двусторонний.
-#
-# НАЗВАННОЕ ОГРАНИЧЕНИЕ ОБЛАСТИ: пара заведена у двух durable-потребителей —
-# здесь и у statistics (deploy/base/services/statistics.yaml). У построенных
-# соседей, ходящих к брокеру (реле ядра, реле strategies, поток периметра),
-# встречного правила нет ни одного — это их находка, а не доработка здесь
-# (.claude/work/backlog.md §«Тропа к брокеру у построенных соседей не
-# объявлена ни правилом, ни автоконфигурацией»).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -227,6 +232,28 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+---
+# Встречное разрешение на стороне провайдера идентичности: подпись токена
+# сервис проверяет локально, а ключи подписи забирает у провайдера.
+# Исходящего правила мало — запрет по умолчанию действует в обе стороны.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: identity-ingress-from-audit
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: audit
+      ports:
+        - protocol: TCP
+          port: 8080
 ---
 # СЪЁМ МЕТРИК: наблюдатель окружения приходит к службе за экспозицией
 # сервиса (docs/architecture/platform.md §Наблюдаемость). Первая уплата

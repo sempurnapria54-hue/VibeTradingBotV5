@@ -85,8 +85,19 @@ final class Bodies {
             case "ORDER_DECIDED" -> """
                     {"orderInternalId": "O-%1$s", "dealInternalId": "D-%1$s",
                      "dealTrancheInternalId": "DT-%1$s", "exchangeAccountInternalId": "EA-%1$s",
-                     "instrumentInternalId": "I-%1$s", "orderType": "LIMIT", "direction": "LONG",
+                     "instrumentInternalId": "I-%1$s", "replacesInternalId": "R-%1$s",
+                     "orderType": "LIMIT", "direction": "LONG",
                      "plannedSizeContracts": 3, "plannedEntryPrice": 101.5}""".formatted(mark);
+            case "ALGO_ORDER_DECIDED" -> """
+                    {"algoOrderInternalId": "AO-%1$s", "dealInternalId": "D-%1$s",
+                     "dealTrancheInternalId": "DT-%1$s", "exchangeAccountInternalId": "EA-%1$s",
+                     "instrumentInternalId": "I-%1$s", "replacesInternalId": "RA-%1$s",
+                     "conditionType": "OCO_FULL", "direction": "SELL", "sizeContracts": 3,
+                     "stopLossTriggerPrice": 95.5, "stopLossTriggerPriceType": "MARK",
+                     "takeProfitTriggerPrice": 120, "takeProfitTriggerPriceType": "LAST",
+                     "trailingPercents": 1.5, "trailingStepValue": 2,
+                     "trailingActivationPrice": 110, "trailingActivationPriceType": "INDEX"}"""
+                    .formatted(mark);
             case "DEAL_OPENED" -> """
                     {"dealInternalId": "D-%1$s", "exchangeAccountInternalId": "EA-%1$s",
                      "instrumentInternalId": "I-%1$s", "strategyInternalId": "S-%1$s",
@@ -110,6 +121,9 @@ final class Bodies {
                     {"exchangeAccountInternalId": "EA-%1$s", "instrumentInternalId": "I-%1$s",
                      "scope": "INSTRUMENT", "rung": "SOFT", "code": "STALE_DATA",
                      "actor": "system-%1$s"}""".formatted(mark);
+            case "HOLD_RELEASED" -> """
+                    {"exchangeAccountInternalId": "EA-%1$s", "instrumentInternalId": "I-%1$s",
+                     "scope": "INSTRUMENT", "rung": "HARD", "actor": "user-%1$s"}""".formatted(mark);
             case "ANOMALY_REPORTED" -> """
                     {"anomalyReportInternalId": "AR-%1$s", "exchangeAccountInternalId": "EA-%1$s",
                      "instrumentInternalId": "I-%1$s", "scope": "INSTRUMENT", "severity": "WARNING",

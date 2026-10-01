@@ -14,3 +14,17 @@ spec:
       count: 1
       config:
         node.store.allow_mmap: false
+      # Том объявлен явно: без шаблона оператор берёт умолчание 1 ГиБ, и
+      # приёмник логов переполнился бы первым из данных окружения.
+      # Число — непроизводственное, того же порядка, что у базы и брокера;
+      # назначение по наблюдаемому потреблению — задача
+      # .claude/work/backlog.md, пункт о размерах томов данных.
+      volumeClaimTemplates:
+        - metadata:
+            name: elasticsearch-data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi

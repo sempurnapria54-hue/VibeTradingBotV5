@@ -78,6 +78,12 @@ public class RefreshBalanceExecutor implements CommandExecutor {
      * Снимок счёта один и заводится при первом чтении: идентичность
      * прежней строки сохраняется, поля и набор валют берутся из ответа
      * площадки.
+     *
+     * <p><b>Режимы счёта и позиций приземляются той же записью, и пустота
+     * переносится как есть:</b> режим, которого ответ не нёс, прежним
+     * значением не подменяется — непроверенная посылка контура выполненной
+     * не читается, и преконтроль отвечает на неё отказом
+     * (docs/components/RefreshBalanceExecutor.md).
      */
     private BalanceContainer merge(Long exchangeAccountId, BalanceContainer observed) {
         BalanceContainer container = balanceContainerDataService.findByExchangeAccountId(exchangeAccountId)
@@ -87,6 +93,8 @@ public class RefreshBalanceExecutor implements CommandExecutor {
         container.setExternalTotalEquity(observed.getExternalTotalEquity());
         container.setExternalAdjustedEquity(observed.getExternalAdjustedEquity());
         container.setExternalAvailableEquity(observed.getExternalAvailableEquity());
+        container.setAccountMode(observed.getAccountMode());
+        container.setPositionMode(observed.getPositionMode());
         container.replaceBalances(observed.getBalances());
         return container;
     }

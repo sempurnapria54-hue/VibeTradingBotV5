@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,6 +19,10 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.Condition;
+import com.example.tradingbot.domain.model.core.algo_order.Trigger;
+import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
@@ -27,18 +32,23 @@ import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingcore.config.AnomalyReportProperties;
 import com.example.tradingcore.config.ExchangeContourProperties;
 import com.example.tradingcore.config.PnlReconciliationProperties;
+import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
+import com.example.tradingcore.domain.command.TargetEntityType;
 import com.example.tradingcore.domain.command.calc.DealReconciliationCalculator;
 import com.example.tradingcore.domain.command.calc.DealTerminalFeaturesWriter;
+import com.example.tradingcore.domain.command.executor.CreateAlgoOrderExecutor;
 import com.example.tradingcore.domain.command.executor.CreateOrderExecutor;
 import com.example.tradingcore.domain.command.executor.MarkDealClosedExecutor;
+import com.example.tradingcore.domain.command.payload.CreateAlgoOrderCommandPayload;
 import com.example.tradingcore.domain.command.payload.CreateOrderCommandPayload;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
+import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.deal.DealStatusEdgeService;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
@@ -50,6 +60,9 @@ import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.LossStreakCounter;
+import com.example.tradingcore.domain.safety.ManualHaltClass;
+import com.example.tradingcore.domain.safety.ManualHaltService;
+import com.example.tradingcore.domain.safety.PositionSliceReader;
 import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.integration.internal.event.CoreEventWriter;
@@ -57,6 +70,7 @@ import com.example.tradingcore.mapping.CoreEventMessageMapper;
 import com.example.tradingcore.mapping.CoreEventMessageMapperImpl;
 import com.example.tradingcore.persistence.model.OutboxEntity;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
+import com.example.tradingcore.persistence.service.AlgoOrderDataService;
 import com.example.tradingcore.persistence.service.AnomalyReportDataService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
@@ -100,8 +114,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * <b>правдоподобной</b>.
  *
  * <p><b>Тест собирает НАСТОЯЩИХ писателей</b> — исполнитель терминала,
- * создатель сделки, исполнитель заявки, ребро подъёма ступени (и точку
- * входа блокировки над ним) и сервис отчёта, — вместе с живым
+ * создатель сделки, исполнители заявки и условной заявки, ребро подъёма
+ * ступени (и точку входа блокировки над ним), тропу снятия ручной
+ * поверхности и сервис отчёта, — вместе с живым
  * сериализатором: предмет проверки лежит ровно на стыке, где содержимое
  * собирается одним звеном, а телом строки становится другим.
  *
@@ -267,8 +282,9 @@ class CoreEventFormTest {
         OutboxEntity row = writtenRow(CoreEventType.DEAL_CLOSED);
         assertThat(row.getEventType()).isEqualTo(CoreEventType.DEAL_CLOSED.name());
         assertThat(row.getVersion())
-                .as("составы всех форм ядра приехали одним ходом — версия поднята один раз на весь состав")
-                .isEqualTo(2);
+                .as("версия поднимается один раз на ход, а не на форму: третья принесла предшественника "
+                        + "и два новых класса")
+                .isEqualTo(3);
         assertThat(row.getTenantId()).isEqualTo(TENANT);
         assertThat(row.getTopic()).isEqualTo("trading-core.facts");
     }
@@ -345,6 +361,102 @@ class CoreEventFormTest {
                 .as("у рыночной заявки цены нет: литерал «null» завёл бы значение, которого нет в домене")
                 .isTrue();
         assertThat(content.path("plannedSizeContracts").decimalValue()).isEqualByComparingTo("3");
+        assertThat(content.path("replacesInternalId").isNull())
+                .as("исполнителя замещения нет: заявка заведена первичной постановкой, и пустота есть значение")
+                .isTrue();
+    }
+
+    /**
+     * Предшественник в цепочке замещений едет С ЗАЯВКИ, а не выводится:
+     * исполнителя замещения в ядре ещё нет, и значение предъявляется моделью
+     * напрямую — как его положит будущий писатель ремодела.
+     */
+    @Test
+    @DisplayName("Решение о заявке несёт предшественника в цепочке замещений")
+    void theOrderDecisionCarriesItsPredecessor() throws Exception {
+        Order order = new Order();
+        order.setInternalId("vtb-new");
+        order.setReplacesInternalId("vtb-old");
+
+        coreEventWriter.orderDecided(TENANT, order, DEAL_INTERNAL_ID, TRANCHE_INTERNAL_ID,
+                ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
+
+        JsonNode content = contentOfWrittenRow(CoreEventType.ORDER_DECIDED);
+        assertThat(content.path("replacesInternalId").textValue()).isEqualTo("vtb-old");
+        assertThat(content.path("orderInternalId").textValue()).isEqualTo("vtb-new");
+    }
+
+    // --- решение об отдельной условной заявке -----------------------------
+
+    /**
+     * Решение об условной заявке везёт идентичности верхним уровнем, тип
+     * условия, сторону, размер и параметры условия — ради них решение о
+     * защите и журналируется. Нога, которой у условия нет, и
+     * предшественник первичной постановки едут пустыми, а не текстом.
+     */
+    @Test
+    @DisplayName("Решение об условной заявке несёт радиус, условие и пустого предшественника")
+    void theAlgoOrderDecisionCarriesItsRadiusAndItsCondition() throws Exception {
+        Deal deal = enteredDeal();
+        DealContext context = context(deal, true, definition());
+        DealRiskNumbersService riskNumbers = mock(DealRiskNumbersService.class);
+        when(riskNumbers.recompute(any())).thenReturn(true);
+        AlgoOrderDataService algoOrders = mock(AlgoOrderDataService.class);
+        when(algoOrders.save(any())).thenAnswer(invocation -> {
+            AlgoOrder saved = invocation.getArgument(0);
+            saved.setId(88L);
+            return saved;
+        });
+        CreateAlgoOrderExecutor executor = new CreateAlgoOrderExecutor(algoOrders, actionStates, riskNumbers,
+                coreEventWriter);
+
+        executor.execute(createAlgoOrderCommand(), createAnchor(), context);
+
+        JsonNode content = contentOfWrittenRow(CoreEventType.ALGO_ORDER_DECIDED);
+        assertThat(content.path("algoOrderInternalId").textValue()).isNotBlank();
+        assertThat(content.path("dealInternalId").textValue()).isEqualTo(DEAL_INTERNAL_ID);
+        assertThat(content.path("dealTrancheInternalId").textValue()).isEqualTo(TRANCHE_INTERNAL_ID);
+        assertThat(content.path("exchangeAccountInternalId").textValue()).isEqualTo(ACCOUNT_INTERNAL_ID);
+        assertThat(content.path("instrumentInternalId").textValue()).isEqualTo(INSTRUMENT_INTERNAL_ID);
+        assertThat(content.path("conditionType").textValue()).isEqualTo(AlgoOrder.ConditionType.STOP_LOSS.name());
+        assertThat(content.path("direction").textValue()).isEqualTo(AlgoOrder.Direction.SELL.name());
+        assertThat(content.path("sizeContracts").decimalValue()).isEqualByComparingTo("3");
+        assertThat(content.path("stopLossTriggerPrice").decimalValue()).isEqualByComparingTo("95");
+        assertThat(content.path("stopLossTriggerPriceType").textValue())
+                .isEqualTo(AlgoOrder.TriggerPriceType.MARK.name());
+        assertThat(content.path("takeProfitTriggerPrice").isNull())
+                .as("ноги фиксации прибыли у стопа нет: пустота есть значение")
+                .isTrue();
+        assertThat(content.path("trailingPercents").isNull()).isTrue();
+        assertThat(content.path("replacesInternalId").isNull())
+                .as("первичная постановка: предшественника нет")
+                .isTrue();
+        assertThat(content.has("actor"))
+                .as("ручной тропы у класса нет — актора в содержимом нет")
+                .isFalse();
+    }
+
+    /** Повтор звена по уже заведённой строке события не производит: решение принято однажды. */
+    @Test
+    @DisplayName("Повтор создания условной заявки события не пишет")
+    void aRetriedAlgoOrderCreationWritesNoEvent() {
+        Deal deal = enteredDeal();
+        DealContext context = context(deal, true, definition());
+        DealRiskNumbersService riskNumbers = mock(DealRiskNumbersService.class);
+        when(riskNumbers.recompute(any())).thenReturn(true);
+        AlgoOrderDataService algoOrders = mock(AlgoOrderDataService.class);
+        AlgoOrder existing = new AlgoOrder();
+        existing.setId(88L);
+        existing.setDealTrancheId(TRANCHE_ID);
+        when(algoOrders.getRequiredById(88L)).thenReturn(existing);
+        DealActionState retried = createAnchor();
+        retried.targetAt(TargetEntityType.ALGO_ORDER, 88L);
+        CreateAlgoOrderExecutor executor = new CreateAlgoOrderExecutor(algoOrders, actionStates, riskNumbers,
+                coreEventWriter);
+
+        executor.execute(createAlgoOrderCommand(), retried, context);
+
+        verify(outboxDataService, never()).save(any());
     }
 
     // --- подъём ступени и отчёт о происшествии ----------------------------
@@ -445,6 +557,73 @@ class CoreEventFormTest {
                 .isEqualTo(Deal.ShutdownReason.EXCHANGE_HOLD.name());
     }
 
+    // --- снятие ступени --------------------------------------------------
+
+    /**
+     * Снятие везёт пару подъёма и актора — без кода причины: основание
+     * снятия одно, а код ручной тропы едет журнальной строкой той же
+     * транзакции. Мягкий класс счёта снимает МЯГКУЮ ступень, и инструмента у
+     * счётного радиуса нет.
+     */
+    @Test
+    @DisplayName("Снятие ступени несёт радиус, снятую ступень и актора, а кода причины не несёт")
+    void theHoldReleasedContentCarriesTheRadiusTheReleasedRungAndTheActor() throws Exception {
+        givenPresentedPrincipal();
+        when(accounts.getRequiredByInternalId(ACCOUNT_INTERNAL_ID)).thenReturn(account());
+        when(accounts.clearRung(any(), any(), any())).thenReturn(true);
+
+        manualHalt().clear(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
+
+        JsonNode content = contentOfWrittenRow(CoreEventType.HOLD_RELEASED);
+        assertThat(content.path("exchangeAccountInternalId").textValue()).isEqualTo(ACCOUNT_INTERNAL_ID);
+        assertThat(content.path("instrumentInternalId").isNull())
+                .as("счётный радиус инструмента не называет по построению")
+                .isTrue();
+        assertThat(content.path("scope").textValue()).isEqualTo(HoldScope.EXCHANGE_ACCOUNT.name());
+        assertThat(content.path("rung").textValue()).isEqualTo(HoldRung.SOFT.name());
+        assertThat(content.path("actor").textValue()).isEqualTo(PRESENTED_PRINCIPAL);
+        assertThat(content.has("code"))
+                .as("кода причины у снятия нет: направление несёт класс")
+                .isFalse();
+    }
+
+    /** Снятие сворачивания пары снимает ЖЁСТКУЮ ступень и называет инструмент радиуса. */
+    @Test
+    @DisplayName("Снятие сворачивания пары несёт жёсткую ступень и инструмент радиуса")
+    void thePairTeardownReleaseCarriesTheHardRungAndTheInstrument() throws Exception {
+        givenPresentedPrincipal();
+        AccountInstrumentStateDataService pairStates = mock(AccountInstrumentStateDataService.class);
+        AccountInstrumentState pair = new AccountInstrumentState();
+        pair.setExchangeAccountId(ACCOUNT_ID);
+        pair.setInstrumentId(INSTRUMENT_ID);
+        pair.setSafetyRung(Instrument.SafetyRung.TRADE_BLOCKED);
+        when(pairStates.getRequiredByPair(ACCOUNT_ID, INSTRUMENT_ID)).thenReturn(pair);
+        when(pairStates.clearRung(any(), any(), any(), any())).thenReturn(true);
+        when(accounts.getRequiredByInternalId(ACCOUNT_INTERNAL_ID)).thenReturn(account());
+        when(instruments.getRequiredByInternalId(INSTRUMENT_INTERNAL_ID)).thenReturn(instrument());
+        PositionSliceReader slices = mock(PositionSliceReader.class);
+        when(slices.livePositions(any(), any())).thenReturn(new ArrayList<>());
+
+        manualHalt(pairStates, slices).clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
+
+        JsonNode content = contentOfWrittenRow(CoreEventType.HOLD_RELEASED);
+        assertThat(content.path("instrumentInternalId").textValue()).isEqualTo(INSTRUMENT_INTERNAL_ID);
+        assertThat(content.path("scope").textValue()).isEqualTo(HoldScope.INSTRUMENT.name());
+        assertThat(content.path("rung").textValue()).isEqualTo(HoldRung.HARD.name());
+    }
+
+    /** Холостое снятие строки outbox не заводит: ступень не переставлена — ничего не произошло. */
+    @Test
+    @DisplayName("Холостое снятие события не пишет")
+    void aNoopClearanceWritesNoEvent() {
+        when(accounts.getRequiredByInternalId(ACCOUNT_INTERNAL_ID)).thenReturn(account());
+        when(accounts.clearRung(any(), any(), any())).thenReturn(false);
+
+        manualHalt().clear(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
+
+        verify(outboxDataService, never()).save(any());
+    }
+
     /** Отчёт о происшествии везёт актора по тому же признаку ручной тропы. */
     @Test
     @DisplayName("Отчёт о происшествии несёт актора хода")
@@ -514,6 +693,22 @@ class CoreEventFormTest {
     private DealOpeningService openingService() {
         return new DealOpeningService(dealDataService, mock(DealTrancheDataService.class),
                 strategies, coreEventWriter);
+    }
+
+    /** Ручная поверхность на счётном радиусе: к паре и площадке снятие мягкой ступени не ходит. */
+    private ManualHaltService manualHalt() {
+        return manualHalt(mock(AccountInstrumentStateDataService.class), mock(PositionSliceReader.class));
+    }
+
+    /**
+     * Ручная поверхность с НАСТОЯЩИМ писателем событий: предмет — состав
+     * того, что снятие кладёт в outbox. Сделок у радиуса нет — выборка
+     * службы сделок по умолчанию пуста.
+     */
+    private ManualHaltService manualHalt(AccountInstrumentStateDataService pairStates, PositionSliceReader slices) {
+        return new ManualHaltService(accounts, instruments, pairStates, dealDataService,
+                mock(DealContextService.class), new DealTerminalGate(), mock(SafetyHoldCoordinator.class),
+                mock(HoldService.class), reports, slices, actorProvider, coreEventWriter);
     }
 
     /** Строка, которую писатель отдал границе персистентности. */
@@ -646,6 +841,27 @@ class CoreEventFormTest {
                         .sizeContracts(new BigDecimal("3"))
                         .sendPriceToExchange(false)
                         .price(new BigDecimal("100"))
+                        .build())
+                .build();
+    }
+
+    /** Постановка стопа отдельной заявкой: одна нога — остановки убытка, по марк-цене. */
+    private static ServiceCommand createAlgoOrderCommand() {
+        TriggerPrice stopLoss = new TriggerPrice();
+        stopLoss.setType(AlgoOrder.TriggerPriceType.MARK);
+        stopLoss.setValue(new BigDecimal("95"));
+        return ServiceCommand.builder()
+                .type(ServiceCommandType.CREATE_ALGO_ORDER_COMMAND)
+                .dealId(DEAL_ID)
+                .dealActionStateId(ANCHOR_ID)
+                .payload(CreateAlgoOrderCommandPayload.builder()
+                        .dealTrancheId(TRANCHE_ID)
+                        .conditionType(AlgoOrder.ConditionType.STOP_LOSS)
+                        .direction(AlgoOrder.Direction.SELL)
+                        .positionReducingOnly(true)
+                        .sizeContracts(new BigDecimal("3"))
+                        .condition(new Condition(AlgoOrder.ConditionType.STOP_LOSS,
+                                new Trigger(stopLoss, null), null))
                         .build())
                 .build();
     }

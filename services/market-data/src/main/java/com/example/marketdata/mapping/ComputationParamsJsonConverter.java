@@ -39,13 +39,23 @@ import org.springframework.stereotype.Component;
  * (docs/rules/persistence-representation.md).
  *
  * <p><b>Разбор ЗАПРОСА строг к чужим полям, разбор СТРОКИ реестра — нет.</b>
- * Маппер контекста чужие поля молча пропускает, и тело {@code {"fastPeriod":
+ * Терпимый маппер чужие поля молча пропускает, и тело {@code {"fastPeriod":
  * 12}} под заявленный {@code ATR} разобралось бы в параметры с пустым
  * периодом: идентичность завелась бы «наполовину», а отказ пришёл бы у тика
  * расчёта, то есть у того, кто её не заказывал. Поэтому тело требования,
  * которое не разбирается под заявленный тип, отказывает на входе. Строку
  * реестра писали мы сами, и строгость там отказывала бы на собственной
  * истории после всякого сужения формы.
+ *
+ * <p><b>Копии маппера пинят свои оси сами, ни одна не наследуется
+ * умолчанием бина</b> (docs/rules/persistence-representation.md §«Состав
+ * ключей строки навеса»): настройка сериализатора сервиса иначе сдвигала бы
+ * форму колонки либо делала её нечитаемой целиком. Копия хранимой строки
+ * пинит ДВЕ оси — политику включения пустых полей и терпимость к
+ * неизвестному свойству при чтении. Копия запроса пинит строгость. Копия
+ * канонической формы пинит политику включения и порядок свойств; оси
+ * чтения у неё нет — она ничего не разбирает, и настройка без операнда
+ * читалась бы клеймом «по этой оси кто-то ветвится».
  */
 @Component
 public class ComputationParamsJsonConverter {
@@ -56,7 +66,8 @@ public class ComputationParamsJsonConverter {
 
     public ComputationParamsJsonConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy()
-                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.requestMapper = objectMapper.copy()
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.canonicalMapper = buildCanonicalMapper(objectMapper);

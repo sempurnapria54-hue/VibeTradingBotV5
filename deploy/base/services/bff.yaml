@@ -8,7 +8,8 @@
 #
 # ИНГРЕСС И СЕРТИФИКАТ ПРИЕЗЖАЮТ ЗДЕСЬ, а не шагом платформы: маршрут в
 # никуда и сертификат ни на что заводить незачем
-# (docs/architecture/platform.md §Безопасность).
+# (docs/architecture/platform.md §Безопасность). Исполнитель у него —
+# контроллер кластерного слоя (deploy/base/platform/ingress-controller.yaml).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -51,7 +52,10 @@ spec:
       serviceAccountName: bff
       containers:
         - name: bff
-          image: registry.invalid/vibetrading/bff
+          # Метка `unpromoted` — зарезервированная: сервис, чей тег в
+          # окружение не продвинут, не разворачивается
+          # (docs/architecture/platform.md §Развёртывание).
+          image: registry.invalid/vibetrading/bff:unpromoted
           # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
           # поэтому образ, уже лежащий на узле, — тот самый.
           imagePullPolicy: IfNotPresent
@@ -64,9 +68,19 @@ spec:
                 configMapKeyRef:
                   name: environment-axes
                   key: environment
-            # Провайдер идентичности — сервис того же пространства имён.
+            # Провайдер идентичности. Издатель токена — имя хоста окружения,
+            # ключи подписи — внутренний адрес провайдера в том же
+            # пространстве имён (docs/architecture/platform.md
+            # §Безопасность): наружу за ключами сервис не ходит.
+            - name: PLATFORM_INGRESS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: ingressHost
             - name: OIDC_ISSUER_URI
-              value: http://platform-identity-service:8080/realms/vibetrading
+              value: https://$(PLATFORM_INGRESS_HOST)/realms/vibetrading
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/certs
             # Брокер: периметр — потребитель тем, у которых есть
             # производитель. Тем `auth` здесь нет намеренно
             # (.claude/work/backlog.md §«События `auth` — производителя и
@@ -110,8 +124,8 @@ spec:
 # периметра, у которого базы нет (docs/rules/api-access-policy.md §«След
 # отказа пишет тот, у кого есть база»); вторая половина — строка лога.
 #
-# СНАРУЖИ КЛАСТЕРА ЭТОЙ ТОЧКИ НЕТ: ингресс ниже ведёт только префикс
-# внешней поверхности, а путь съёма лежит вне него. Тропу в сети заводить
+# СНАРУЖИ КЛАСТЕРА ЭТОЙ ТОЧКИ НЕТ: ингресс ниже ведёт к периметру только
+# префикс внешней поверхности, а путь съёма лежит вне него. Тропу в сети заводить
 # не надо — вход из пространства наблюдателя разрешён всем подам общим
 # правилом яруса (deploy/base/network-platform-allowances.yaml).
 #
@@ -201,6 +215,10 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # Брокер — не строка таблицы синхронных вызовов, а тропа к инстансу
+    # данных: периметр потребляет темы фактов для потока в браузер. Порт —
+    # открытого слушателя кластера Kafka (deploy/base/data/kafka-cluster.yaml),
+    # того же, что называет адрес в переменной окружения выше.
     - to:
         - podSelector:
             matchLabels:
@@ -325,14 +343,110 @@ spec:
         - protocol: TCP
           port: 8080
 ---
+# Встречное разрешение на стороне брокера — тот же довод, что у владельцев:
+# запрет по умолчанию двусторонний, и одного исходящего правила периметра
+# мало.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-ingress-from-bff
+spec:
+  podSelector:
+    matchExpressions:
+      - key: strimzi.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: bff
+      ports:
+        - protocol: TCP
+          port: 9092
+---
+# Встречное разрешение на стороне провайдера: подпись токена периметр
+# проверяет локально, а ключи подписи забирает у провайдера. Исходящего
+# правила выше мало — запрет по умолчанию действует в обе стороны.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: identity-ingress-from-bff
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: bff
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Вход от контроллера ингресса — к периметру и к провайдеру, ровно по тем
+# маршрутам, которые объявляет Ingress ниже. Контроллер живёт своим
+# пространством имён (deploy/base/platform/ingress-controller.yaml), а запрет
+# по умолчанию закрывает вход ко всем подам окружения: без этих двух правил
+# маршрут доезжал бы до контроллера и обрывался на нём.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bff-ingress-from-controller
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: bff
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: identity-ingress-from-controller
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress
+      ports:
+        - protocol: TCP
+          port: 8080
+---
 # Ингресс окружения: снаружи трафик приходит по TLS, его терминирует он,
 # а сертификат выдаётся автоматически по имени хоста окружения
 # (docs/architecture/platform.md §Безопасность). Имя хоста — ось
 # различия окружений, и здесь стои́т значение `dev`: наложение окружения
 # подменяет его своим.
 #
+# ХОСТ ОДИН — И СЕРТИФИКАТ ОДИН, поэтому маршрутов у объекта два: поверхность
+# периметра и точка выдачи токена провайдера. Второй не принадлежит
+# периметру, но без него токен человеку снаружи взять неоткуда; отдельный
+# объект с тем же хостом потребовал бы второго сертификата на то же имя.
+# Наружу ведёт только реалм окружения — ни консоли администратора, ни
+# служебного реалма провайдера снаружи нет (docs/architecture/platform.md
+# §Безопасность).
+#
 # ФРОНТ ОТДАЁТСЯ ИНГРЕССОМ, А НЕ ПЕРИМЕТРОМ (docs/architecture/services.md,
-# строка `web`), поэтому маршрут статики приедет вместе с ним — шагом 12.
+# строка `web`), поэтому маршрут статики приедет вместе с ним — шагом 13.
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -355,6 +469,7 @@ metadata:
   annotations:
     cert-manager.io/issuer: perimeter-issuer
 spec:
+  ingressClassName: traefik
   tls:
     - hosts:
         - dev.vibetrading.invalid
@@ -370,3 +485,10 @@ spec:
                 name: bff
                 port:
                   name: http
+          - path: /realms/vibetrading
+            pathType: Prefix
+            backend:
+              service:
+                name: platform-identity-service
+                port:
+                  number: 8080

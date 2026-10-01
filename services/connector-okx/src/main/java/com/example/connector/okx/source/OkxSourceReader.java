@@ -22,8 +22,10 @@ import com.example.connector.okx.integration.external.api.model.okx.request.Plac
 import com.example.connector.okx.integration.external.api.model.okx.request.PlaceOrderOkxRequest;
 import com.example.connector.okx.integration.external.api.model.okx.request.SetLeverageOkxRequest;
 import com.example.connector.okx.integration.external.api.model.okx.response.AccountBillOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.AccountConfigOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.AlgoOrderAckOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.AlgoOrderOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.BalanceDetailOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.BalanceOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.CandleOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.IndexTickerOkxResponse;
@@ -34,6 +36,7 @@ import com.example.connector.okx.integration.external.api.model.okx.response.Ord
 import com.example.connector.okx.integration.external.api.model.okx.response.OrderBookOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.OrderOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.PositionOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.PositionTierOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.PositionsHistoryOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.ServerTimeOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.SetLeverageOkxResponse;
@@ -224,6 +227,22 @@ public class OkxSourceReader {
                 .collect(toList());
     }
 
+    /**
+     * Справочные правила инструмента вместе с его позиционными тирами.
+     *
+     * <p><b>Тиры читаются по СЕМЬЕ инструмента, взятой из того же ответа
+     * спецификации</b> (docs/integrations/okx/contracts/position-tiers.md):
+     * у SWAP площадка отдаёт их только по {@code instFamily}. Вызов на
+     * правила инструмента поэтому стоит два запроса — спецификации и тиров,
+     * — и второй идёт по своему лимиту публичного эндпоинта
+     * (docs/models/mapping/InstrumentExternalRules.md). Семьи в ответе нет —
+     * тиры не читаются, и правила уезжают без них: оценка ликвидации тогда
+     * не вычисляется, а не подставляется.
+     *
+     * <p>Отказ чтения тиров роняет всё чтение правил: частичные правила
+     * перезаписали бы навес читателя, стерев прежние тиры, а прежний навес
+     * со старыми тирами честнее — его несвежесть измерима.
+     */
     public InstrumentExternalRulesExternalSnapshot getInstrumentRules(String externalInstrumentId,
                                                                       String externalInstrumentType) {
         OkxApiResponse<InstrumentOkxResponse> response = execute(
@@ -233,7 +252,54 @@ public class OkxSourceReader {
         if (isEmpty(response.getData())) {
             return null;
         }
-        return instrumentExternalRulesMapper.integrationToSnapshot(response.getData().getFirst());
+        InstrumentOkxResponse instrument = response.getData().getFirst();
+        List<PositionTierOkxResponse> tiers = isBlank(instrument.getInstFamily())
+                ? null
+                : getPositionTiers(externalInstrumentType, instrument.getInstFamily());
+        return instrumentExternalRulesMapper.integrationToSnapshot(instrument, tiers);
+    }
+
+    /**
+     * Позиционные тиры изолированной маржи одной семьи инструмента.
+     *
+     * <p>Пустой ответ — пустота, а не пустой перечень: «тиров не прочли» и
+     * «тиров нет» оценке ликвидации неразличимы, и обе значат «не измерено».
+     */
+    private List<PositionTierOkxResponse> getPositionTiers(String externalInstrumentType, String instFamily) {
+        String context = "instType=" + externalInstrumentType + " instFamily=" + instFamily;
+        OkxApiResponse<PositionTierOkxResponse> response = execute(
+                () -> okxRestClient.getPositionTiers(externalInstrumentType, instFamily),
+                "position-tiers", context);
+        verifyCode(response, "position-tiers", context);
+        if (isEmpty(response.getData())) {
+            return null;
+        }
+        return response.getData().stream()
+                .map(tier -> verifyPositionTierContract(tier, instFamily))
+                .collect(toList());
+    }
+
+    /**
+     * Структурная валидация тира — до маппинга
+     * (docs/models/mapping/InstrumentExternalRules.md): запись принадлежит
+     * запрошенной семье, границы размера и ставка поддерживающей маржи
+     * непусты. Тир без ставки выпал бы из оценки молча, а чужая запись
+     * подставила бы ставку другой семьи. Неразбираемое число отвергает сеть
+     * разбора шлюза.
+     */
+    private PositionTierOkxResponse verifyPositionTierContract(PositionTierOkxResponse tier, String instFamily) {
+        if (isNull(tier) || isFalse(Objects.equals(instFamily, tier.getInstFamily()))) {
+            throw new ExternalInvariantViolationException(
+                    "position-tiers: запись чужой семьи: ожидалась " + instFamily
+                            + ", пришла " + (isNull(tier) ? null : tier.getInstFamily()));
+        }
+        if (isBlank(tier.getMinSz()) || isBlank(tier.getMaxSz()) || isBlank(tier.getMmr())) {
+            throw new ExternalInvariantViolationException(
+                    "position-tiers: пусто обязательное поле тира instFamily=" + instFamily
+                            + " tier=" + tier.getTier() + " minSz=" + tier.getMinSz()
+                            + " maxSz=" + tier.getMaxSz() + " mmr=" + tier.getMmr());
+        }
+        return tier;
     }
     public List<TradeFeeRateExternalSnapshot> getTradeFeeRates(ExchangeCredentials credentials,
                                                                String externalInstrumentType) {
@@ -501,8 +567,32 @@ public class OkxSourceReader {
             throw new ExchangeIntegrationException("OKX empty balance [account-balance] ccy=" + settleCurrency);
         }
         BalanceOkxResponse account = response.getData().getFirst();
-        verifySettleCurrencyRow(account, settleCurrency);
-        return balanceContainerMapper.integrationToSnapshot(account);
+        BalanceDetailOkxResponse settleRow = verifySettleCurrencyRow(account, settleCurrency);
+        verifyAccountFields(account, settleCurrency);
+        verifySettleRowFields(settleRow, settleCurrency);
+        return balanceContainerMapper.integrationToSnapshot(account, getAccountConfig(credentials));
+    }
+
+    /**
+     * Конфигурация счёта — режим счёта и режим позиций, посылки контура
+     * (docs/integrations/okx/contracts/account-config.md). Читается ВМЕСТЕ
+     * со снимком средств: преконтроль меряет режимы на том же свежем
+     * снимке, что и средства (docs/models/mapping/Balance.md).
+     *
+     * <p>Пустой {@code data} — отказ класса {@code EXCHANGE_ERROR}, как у
+     * самого баланса: ответа о счёте нет вовсе, и повтор осмыслен. Значение
+     * режима вне словаря отказом не является — его переводит в пустоту
+     * граница при сборке контейнера.
+     */
+    private AccountConfigOkxResponse getAccountConfig(ExchangeCredentials credentials) {
+        OkxApiResponse<AccountConfigOkxResponse> response = execute(
+                () -> okxRestClient.getAccountConfig(credentials), "account-config", "");
+        verifyCode(response, "account-config", "");
+        if (isEmpty(response.getData())) {
+            log.error("OKX empty account config [account-config]");
+            throw new ExchangeIntegrationException("OKX empty account config [account-config]");
+        }
+        return response.getData().getFirst();
     }
 
     /**
@@ -519,14 +609,97 @@ public class OkxSourceReader {
      * поля). Пустой {@code data} остаётся своей ветвью выше — там ответа о
      * счёте нет вовсе.
      */
-    private void verifySettleCurrencyRow(BalanceOkxResponse account, String settleCurrency) {
-        Boolean present = nonNull(account) && emptyIfNull(account.getDetails()).stream()
-                .anyMatch(detail -> nonNull(detail) && Objects.equals(settleCurrency, detail.getCcy()));
-        if (isFalse(present)) {
+    private BalanceDetailOkxResponse verifySettleCurrencyRow(BalanceOkxResponse account, String settleCurrency) {
+        BalanceDetailOkxResponse row = isNull(account) ? null : emptyIfNull(account.getDetails()).stream()
+                .filter(detail -> nonNull(detail) && Objects.equals(settleCurrency, detail.getCcy()))
+                .findFirst()
+                .orElse(null);
+        if (isNull(row)) {
             log.error("OKX balance without settle currency row [account-balance] ccy={}", settleCurrency);
             throw new ExternalInvariantViolationException(
                     "account-balance: в ответе нет строки расчётной валюты ccy=" + settleCurrency);
         }
+        return row;
+    }
+
+    /**
+     * Поля уровня счёта — та же структурная валидация
+     * (docs/models/mapping/Balance.md §«Validation (структурная, до
+     * маппинга)»): момент снимка и общий капитал заполнены и разбираются;
+     * скорректированный и свободный капитал разбираются, когда заполнены.
+     *
+     * <p><b>Пустота двух последних законна, и отвергать её нельзя.</b>
+     * Площадка ведёт их не во всяком режиме счёта
+     * (docs/models/mapping/Balance.md §«OKX validation notes»); отказ на пустоте ронял бы каждый рефреш баланса такого счёта в
+     * аварийный контур. Риск-контур их не читает
+     * (docs/models/domain/core/BalanceContainer.md).
+     */
+    private void verifyAccountFields(BalanceOkxResponse account, String settleCurrency) {
+        if (isBlank(account.getuTime())) {
+            throw balanceViolation("пусто обязательное поле uTime", settleCurrency);
+        }
+        try {
+            OkxParse.epochMillis(account.getuTime());
+        } catch (NumberFormatException e) {
+            throw balanceViolation("не разбирается поле uTime=" + account.getuTime(), settleCurrency, e);
+        }
+        requiredBalanceDecimal(account.getTotalEq(), "totalEq", settleCurrency);
+        balanceDecimal(account.getAdjEq(), "adjEq", settleCurrency);
+        balanceDecimal(account.getAvailEq(), "availEq", settleCurrency);
+    }
+
+    /**
+     * Поля строки расчётной валюты — та же структурная валидация
+     * (docs/models/mapping/Balance.md §«Validation (структурная, до
+     * маппинга)»): капитал, денежный и свободный остаток заполнены и
+     * разбираются, замороженный разбирается, когда заполнен; свободный и
+     * замороженный остаток не отрицательны.
+     *
+     * <p><b>Отрицательные капитал и денежный остаток граница пропускает</b> —
+     * это признак обязательства, и читает его преконтроль ядра (там же).
+     */
+    private void verifySettleRowFields(BalanceDetailOkxResponse row, String settleCurrency) {
+        requiredBalanceDecimal(row.getEq(), "eq", settleCurrency);
+        requiredBalanceDecimal(row.getCashBal(), "cashBal", settleCurrency);
+        BigDecimal available = requiredBalanceDecimal(row.getAvailBal(), "availBal", settleCurrency);
+        BigDecimal frozen = balanceDecimal(row.getFrozenBal(), "frozenBal", settleCurrency);
+        verifyNotNegative(available, "availBal", settleCurrency);
+        verifyNotNegative(frozen, "frozenBal", settleCurrency);
+    }
+
+    /** Обязательное число ответа баланса: пустота — нарушение инварианта, как и неразбираемость. */
+    private BigDecimal requiredBalanceDecimal(String value, String field, String settleCurrency) {
+        if (isBlank(value)) {
+            throw balanceViolation("пусто обязательное поле " + field, settleCurrency);
+        }
+        return balanceDecimal(value, field, settleCurrency);
+    }
+
+    /** Число ответа баланса: пусто — {@code null}, неразбираемое — нарушение инварианта. */
+    private BigDecimal balanceDecimal(String value, String field, String settleCurrency) {
+        try {
+            return OkxParse.decimal(value);
+        } catch (NumberFormatException e) {
+            throw balanceViolation("не разбирается поле " + field + "=" + value, settleCurrency, e);
+        }
+    }
+
+    private void verifyNotNegative(BigDecimal value, String field, String settleCurrency) {
+        if (nonNull(value) && value.signum() < 0) {
+            throw balanceViolation("отрицательно поле " + field + "=" + value.toPlainString(), settleCurrency);
+        }
+    }
+
+    private ExternalInvariantViolationException balanceViolation(String reason, String settleCurrency) {
+        log.error("OKX balance invariant violated [account-balance] ccy={}: {}", settleCurrency, reason);
+        return new ExternalInvariantViolationException("account-balance: " + reason + " ccy=" + settleCurrency);
+    }
+
+    private ExternalInvariantViolationException balanceViolation(String reason, String settleCurrency,
+                                                                 NumberFormatException cause) {
+        log.error("OKX balance invariant violated [account-balance] ccy={}: {}", settleCurrency, reason, cause);
+        return new ExternalInvariantViolationException("account-balance: " + reason + " ccy=" + settleCurrency,
+                cause);
     }
 
     /**

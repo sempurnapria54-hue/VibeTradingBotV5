@@ -21,7 +21,7 @@ public class BalanceDetailOkxResponse {
     /** Валюта. */
     private String ccy;
 
-    /** Время обновления currency snapshot (epoch ms). */
+    /** Время последнего изменения остатка валюты (epoch ms); базой свежести не служит. */
     @JsonProperty("uTime")
     private String uTime;
 

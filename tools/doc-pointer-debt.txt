@@ -1,0 +1,46 @@
+# Объявленный долг битых файловых указателей — пары, битые на момент
+# ввода md-области tools/doc-pointer-check.py (области и формы — его шапка).
+# Формат: <файл>\t<указатель>. Номеров строк нет намеренно: номер дрейфует
+# от любой правки. Погашенная пара обязана уйти отсюда — прогон падает на
+# устаревшей строке. Пересборка: py tools/doc-pointer-check.py --emit-debt
+.claude/notes/2026-09-21-step-12-pace-analysis.md	.claude/snapshots/snapshot-v401.md
+.claude/skills/integration-okx.md	docs/endpointFunctionList.md
+.claude/tests/cases/trading-core-calc.md	docs/rules/codestyle.md
+.claude/work/backlog.md	tools/history-date-check.py
+.claude/work/decision-digest.md	.claude/decisions/closure-completeness-by-population.md
+.claude/work/decision-digest.md	.claude/decisions/closure-mechanism-amendments.md
+.claude/work/decision-digest.md	.claude/decisions/code-contact-as-gate.md
+.claude/work/decision-digest.md	.claude/decisions/edit-self-description-pass.md
+.claude/work/decision-digest.md	.claude/decisions/insertion-neighborhood-pass.md
+.claude/work/decision-digest.md	.claude/decisions/mini-loop-verification-ceiling.md
+.claude/work/decision-digest.md	.claude/decisions/proof-method-change.md
+.claude/work/decision-digest.md	.claude/decisions/step-11-holder-direct-order.md
+.claude/work/decision-digest.md	.claude/rules/concept-doc.md
+.claude/work/decision-digest.md	.claude/rules/docs-loop-limits.md
+.claude/work/decision-digest.md	.claude/rules/session-loop-stop.md
+.claude/work/decision-digest.md	.claude/rules/stopped-node-disposition.md
+.claude/work/decision-digest.md	.claude/skills/classify-code-blocking.md
+.claude/work/decision-digest.md	.claude/skills/classify-gap-level.md
+.claude/work/decision-digest.md	.claude/skills/closure-population.md
+.claude/work/decision-digest.md	.claude/skills/stagnation-detection.md
+.claude/work/decision-digest.md	.claude/templates/docs/gap-report.md
+.claude/work/decision-digest.md	.claude/work/progress/phase-2-step-8-chronicle.md
+.claude/work/decision-digest.md	docs/architecture/testing.md
+.claude/work/decision-digest.md	docs/components/AccessDenialWriter.md
+.claude/work/decision-digest.md	docs/models/domain/other/ReceptionState.md
+.claude/work/decision-digest.md	docs/spec/owner-role-grants.json
+.claude/work/decision-digest.md	libs/README.md
+.claude/work/decision-digest.md	tools/_tmp_rw5.py
+.claude/work/decision-digest.md	tools/backlog-debt.txt
+.claude/work/decision-digest.md	tools/edit-kind-check.py
+.claude/work/decision-digest.md	tools/insertion-neighborhood-check.py
+.claude/work/decision-digest.md	tools/scheduler-capacity-check.py
+.claude/work/decision-digest.md	tools/trap-index-debt.txt
+.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-conventions.md
+.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-disaster.md
+.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-divergence.md
+.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-performance.md
+.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-security.md
+.claude/work/progress/phase-2-step-12-fix-test-auth-12.md	.claude/snapshots/snapshot-v305.md
+.claude/work/progress/phase-2-step-12-fix-test-auth-5.md	.claude/snapshots/snapshot-v291.md
+.claude/work/progress/phase-2-step-12-hand-test-trading-core-calc.md	docs/rules/codestyle.md

@@ -5,16 +5,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.example.audit.config.EnvironmentProperties;
 import com.example.audit.config.JournalCleanupProperties;
-import com.example.audit.config.ReceptionProperties;
 import com.example.audit.domain.jobs.JournalCleanupJob;
 import com.example.audit.domain.model.JournalRetentionProfile;
 import com.example.audit.domain.service.JournalCleanupService;
@@ -27,11 +26,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 
 /**
- * Проход чистки журнала: применимость, глубина, порционность и снятие
- * момента разрыва (docs/components/JournalCleanupJob.md).
+ * Проход чистки журнала: применимость, глубина и порционность
+ * (docs/components/JournalCleanupJob.md).
  *
  * <p><b>Что здесь проверяется по существу.</b> Удаление необратимо, и обе
  * ошибки применимости дороги по-разному: чистка в {@code prod} уносит
@@ -40,46 +38,47 @@ import org.mockito.InOrder;
  * полноты без писателя. Поэтому все три состояния оси проверяются
  * поимённо, включая пустое — «ось не доехала».
  *
- * <p>Семантику самих записей (что удаляется по моменту ПРИЁМА, что момент
- * разрыва внутри границы не гаснет, что чужая группа не тронута) держит
- * SQL, и проверена она живым прогоном —
+ * <p>Семантику самой записи (что удаляется по моменту ПРИЁМА) держит SQL, и
+ * проверена она живым прогоном —
  * .claude/work/history/2026-09-11-phase-2-step-10-audit-statistics/phase-2-step-10-code-pass-k5.md.
+ *
+ * <p><b>Второго хода у прохода нет.</b> Строк состояния приёма он не пишет
+ * вовсе, включая момент разрыва: разрыв, вынесенный удалением за нижнюю
+ * границу, перестаёт давать дыру сравнением при чтении
+ * (docs/rules/durable-consumer-reception.md §«Писатели величин — по роли, а
+ * не по имени класса»).
  */
 class JournalCleanupTest {
 
-    private static final String GROUP = "audit.journal";
     private static final Integer DEPTH_DAYS = 14;
 
     private final JobExecutionGuard executionGuard = mock(JobExecutionGuard.class);
     private final JournalCleanupService cleanupService = mock(JournalCleanupService.class);
     private final JournalCleanupProperties properties = properties();
     private final EnvironmentProperties environmentProperties = new EnvironmentProperties();
-    private final ReceptionProperties receptionProperties = new ReceptionProperties();
     private final JournalCleanupJob job = new JournalCleanupJob(properties,
             environmentProperties,
-            receptionProperties,
             executionGuard,
             cleanupService);
 
     @BeforeEach
     void setUp() {
-        receptionProperties.setGroupId(GROUP);
         environmentProperties.setJournalRetentionProfile(JournalRetentionProfile.REDUCED);
         when(cleanupService.deleteBatchRecordedBefore(any(OffsetDateTime.class), anyInt())).thenReturn(0);
         letTheGuardThrough();
     }
 
     @Test
-    @DisplayName("Профиль REDUCED — проход удаляет старое и гасит момент разрыва")
-    void theReducedProfileDeletesAndClearsGaps() {
+    @DisplayName("Профиль REDUCED — проход удаляет старое, и других ходов у него нет")
+    void theReducedProfileDeletesAndDoesNothingElse() {
         job.tick();
 
         verify(cleanupService).deleteBatchRecordedBefore(any(OffsetDateTime.class), anyInt());
-        verify(cleanupService).clearGapsOutsideLowerBound(GROUP);
+        verifyNoMoreInteractions(cleanupService);
     }
 
     @Test
-    @DisplayName("Профиль UNBOUNDED — предмета у прохода нет: не удаляется и не гасится ничего")
+    @DisplayName("Профиль UNBOUNDED — предмета у прохода нет: не удаляется ничего")
     void theUnboundedProfileMakesNoPass() {
         environmentProperties.setJournalRetentionProfile(JournalRetentionProfile.UNBOUNDED);
 
@@ -151,19 +150,8 @@ class JournalCleanupTest {
         verify(cleanupService, times(3)).deleteBatchRecordedBefore(any(OffsetDateTime.class), anyInt());
     }
 
-    @Test
-    @DisplayName("Момент разрыва гасится ПОСЛЕ удаления: граница считается по уцелевшим строкам")
-    void theGapsAreClearedAfterTheDeletion() {
-        job.tick();
-
-        InOrder order = inOrder(cleanupService);
-        order.verify(cleanupService).deleteBatchRecordedBefore(any(OffsetDateTime.class), anyInt());
-        order.verify(cleanupService).clearGapsOutsideLowerBound(GROUP);
-    }
-
     private void verifyNothingWritten() {
         verify(cleanupService, never()).deleteBatchRecordedBefore(any(OffsetDateTime.class), anyInt());
-        verify(cleanupService, never()).clearGapsOutsideLowerBound(anyString());
     }
 
     /** Охрана свободна: тело прохода исполняется. */

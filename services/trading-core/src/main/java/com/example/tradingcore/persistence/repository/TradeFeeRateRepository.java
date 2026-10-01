@@ -11,7 +11,8 @@ public interface TradeFeeRateRepository extends JpaRepository<TradeFeeRateEntity
      * Актуальная строка группы — последняя по идентификатору: правило
      * истории заводит новую строку при смене значения, и прежние
      * остаются. Окно ограничивается пейджингом, а не отдаётся целиком
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     List<TradeFeeRateEntity> findByExchangeAccountIdAndExternalInstrumentTypeAndExternalFeeGroupIdOrderByIdDesc(
             Long exchangeAccountId, String externalInstrumentType, String externalFeeGroupId, Pageable pageable);

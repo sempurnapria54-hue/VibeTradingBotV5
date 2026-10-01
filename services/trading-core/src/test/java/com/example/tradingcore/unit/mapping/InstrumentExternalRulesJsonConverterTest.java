@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.testsupport.InstrumentRulesOverlayCopyContract;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingcore.mapping.InstrumentExternalRulesJsonConverter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +14,7 @@ import org.junit.jupiter.api.Test;
  * идентификатор владельца и ставку комиссии — то же правило, что у копии
  * рыночных данных.
  *
- * <p>Кейсы — `U7`, `U10.3` (.claude/tests/cases/jsonb-overlay-roundtrip.md);
+ * <p>Кейсы — `U7`, `U10.3`, `U11.7`, `U13.3` (.claude/tests/cases/jsonb-overlay-roundtrip.md);
  * клетка `U7.4` живёт здесь, потому что адресует именно эту копию.
  */
 class InstrumentExternalRulesJsonConverterTest extends InstrumentRulesOverlayCopyContract {
@@ -29,6 +30,11 @@ class InstrumentExternalRulesJsonConverterTest extends InstrumentRulesOverlayCop
     @Override
     protected InstrumentExternalRules readRules(String json) {
         return converter.jsonToRules(json);
+    }
+
+    @Override
+    protected InstrumentExternalRules readRulesOn(ObjectMapper source, String json) {
+        return new InstrumentExternalRulesJsonConverter(source).jsonToRules(json);
     }
 
     /**

@@ -17,6 +17,7 @@ import com.example.platform.jobs.JobExecutionGuard;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -118,12 +119,30 @@ public class IndicatorJob {
             if (isEmpty(candles)) {
                 return;
             }
-            List<IndicatorValue> values = calculator.calculate(
-                    group.getInstrumentId(), config.getId(), candles, config.getParams());
+            List<IndicatorValue> values = calculator.calculate(group.getInstrumentId(), config.getId(), candles,
+                    config.getParams(), lastStoredOf(calculator, config, group, candles));
             indicatorDataService.saveValues(group.getInstrumentId(), config.getId(), values);
         } catch (RuntimeException e) {
             log.error("Indicator calculation failed for instrument {} indicator {}",
                     group.getInstrumentId(), config.getIndicatorType(), e);
         }
+    }
+
+    /**
+     * Последнее записанное значение идентичности по инструменту, чей бар
+     * лежит в окне свечей: от него кумулятивный тип продолжает сумму
+     * (docs/components/IndicatorJob.md §«Кумулятивный тип продолжает
+     * записанный ряд»). Прочим типам оно не нужно, и чтения нет. Кумулятивный
+     * тип в каталоге один — OBV.
+     */
+    private IndicatorValue lastStoredOf(IndicatorCalculator calculator, IndicatorConfig config, CandleGroup group,
+                                        List<Candle> candles) {
+        if (isFalse(calculator.isCumulative())) {
+            return null;
+        }
+        OffsetDateTime windowStart = calculator.candleTimestamp(candles.getFirst());
+        OffsetDateTime windowEnd = calculator.candleTimestamp(candles.getLast());
+        return indicatorDataService.findLastObvWithin(group.getInstrumentId(), config.getId(), windowStart, windowEnd)
+                .orElse(null);
     }
 }

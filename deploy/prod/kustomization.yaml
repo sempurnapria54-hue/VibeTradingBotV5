@@ -50,6 +50,16 @@ patches:
       - op: replace
         path: /spec/realm/clients/0/webOrigins/0
         value: https://prod.vibetrading.invalid
+  # Тот же хост — адрес провайдера идентичности, а с ним издатель токенов
+  # окружения (docs/architecture/platform.md §Безопасность): издатель,
+  # расходящийся с ингрессом, закрыл бы тропу токена человека.
+  - target:
+      kind: Keycloak
+      name: platform-identity
+    patch: |-
+      - op: replace
+        path: /spec/hostname/hostname
+        value: https://prod.vibetrading.invalid
   - target:
       kind: Namespace
       name: placeholder

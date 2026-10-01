@@ -125,6 +125,29 @@ final class Wire {
     }
 
     /**
+     * Кладёт в ту же тему сообщение, у которого поле конверта есть
+     * заголовком, но БЕЗ ЗНАЧЕНИЯ: вход клетки о заголовке без значения.
+     *
+     * <p><b>Отдельный метод, а не пустое значение в карте заголовков.</b>
+     * Преобразование значения в байты остаётся строгим у всех прочих
+     * публикаций: пустое значение, проскочившее туда случайно, дало бы
+     * запись неполного конверта там, где кейс собирал полный.
+     *
+     * @param topic     тема владельца определений у этого читателя
+     * @param headers   заголовки конверта со значением
+     * @param valueless имя заголовка, который кладётся без значения
+     * @param payload   содержимое дословно
+     */
+    static void publishStrategyFact(String topic, Map<String, String> headers, String valueless,
+                                    String payload) {
+        ProducerRecord<String, String> record =
+                new ProducerRecord<>(topic, TradingCoreBox.TENANT, payload);
+        headers.forEach((name, value) -> record.headers().add(new RecordHeader(name, bytes(value))));
+        record.headers().add(new RecordHeader(valueless, null));
+        send(record);
+    }
+
+    /**
      * Отметка конца темы ядра: с неё клетка читает опубликованное.
      *
      * <p>Тема заводится этим же ходом, если её ещё нет: раскладку

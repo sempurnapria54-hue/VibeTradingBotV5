@@ -5,6 +5,7 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.time.LocalDate;
 import lombok.Builder;
@@ -43,6 +44,11 @@ import lombok.Value;
  * строку с пустым ключом. Отсюда «половина курсора» мерится по двум
  * <b>обязательным</b> компонентам — сутки зерна и биржевой счёт, — а не по
  * всем четырём.
+ *
+ * <p><b>Пустота-значение есть ОТСУТСТВИЕ компонента, а не пустая
+ * строка.</b> Строковый компонент, названный пустым, отвергается своим
+ * предикатом и в состав позиции не читается вовсе
+ * (.claude/decisions/aggregate-cursor-empty-string.md).
  */
 @Value
 @Builder
@@ -125,6 +131,46 @@ public class AggregateQuery {
         return DAYS.between(from, to) + 1 > maxWindowDays;
     }
 
+    /**
+     * Биржевой счёт позиции назван пустым значением либо одними пробельными
+     * символами.
+     *
+     * <p><b>Пустая строка — не компонент, а отказ.</b> Счёта с пустым именем
+     * в ключе зерна нет, и позиция с ним указывала бы на строку, которой не
+     * существует: хвост суток выпал бы из страницы молча, а обязательный
+     * компонент при этом считался бы названным
+     * (docs/rules/statistics-aggregates.md §«Что это за числа и кто их
+     * читает»).
+     */
+    public Boolean isCursorAccountBlank() {
+        return isNamedBlank(cursorExchangeAccountInternalId);
+    }
+
+    /**
+     * Определение стратегии позиции названо пустым значением либо одними
+     * пробельными символами.
+     *
+     * <p><b>Законная пустота этого компонента — ОТСУТСТВИЕ, а не пустая
+     * строка.</b> Прочитанная значением, пустая строка не совпала бы ни с
+     * одной строкой суток и счёта позиции; прочитанная пустым ключом, она
+     * стала бы вторым написанием той же позиции
+     * (.claude/decisions/aggregate-cursor-empty-string.md).
+     */
+    public Boolean isCursorStrategyBlank() {
+        return isNamedBlank(cursorStrategyInternalId);
+    }
+
+    /**
+     * Расчётная валюта позиции названа пустым значением либо одними
+     * пробельными символами.
+     *
+     * <p>Довод тот же, что у определения стратегии: законная пустота
+     * компонента выражается его отсутствием.
+     */
+    public Boolean isCursorCurrencyBlank() {
+        return isNamedBlank(cursorResultCurrency);
+    }
+
     /** Позиция продолжения названа обоими обязательными компонентами. */
     public Boolean hasCursor() {
         return nonNull(cursorBucketDate) && nonNull(cursorExchangeAccountInternalId);
@@ -166,5 +212,13 @@ public class AggregateQuery {
             return Boolean.FALSE;
         }
         return nonNull(cursorStrategyInternalId) || nonNull(cursorResultCurrency);
+    }
+
+    /**
+     * Компонент назван, но пуст: отсутствие компонента сюда не попадает —
+     * оно у позиции законно и разбирается предикатами её состава.
+     */
+    private static Boolean isNamedBlank(String component) {
+        return nonNull(component) && isBlank(component);
     }
 }

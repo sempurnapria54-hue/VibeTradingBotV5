@@ -6,7 +6,8 @@ import lombok.Value;
 /**
  * Снапшот условия срабатывания algo-order: trigger и/или trailing
  * (как пришло с биржи). Раздел AlgoOrderExternalSnapshot. См.
- * docs/models/domain/core/AlgoOrder.md (§External snapshots).
+ * docs/models/mapping/AlgoOrder.md (§«AlgoOrderExternalSnapshot →
+ * AlgoOrder»).
  */
 @Value
 @Builder

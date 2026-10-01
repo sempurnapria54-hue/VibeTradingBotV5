@@ -47,7 +47,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <pre>
  * цикл 1 — заявка: по идентификатору → ожидающие → история
  *          исчерпан ⇒ терминал «не найдена после добычи»; у неотправленной
- *          ноги — «не дошла до площадки»
+ *          ноги — «не дошла до площадки»; у локально терминальной — ничего:
+ *          запись ушла за горизонт выдачи
  * цикл 2 — материализованная встроенная защита, только у ТЕРМИНАЛЬНОГО
  *          родителя: живые условные по инструменту → разбор истории
  * </pre>
@@ -73,9 +74,13 @@ import org.springframework.transaction.annotation.Transactional;
  * ({@code DealTranche.observedOrders()}, подтверждение снятия риска), и
  * матрица жизненного цикла рёбер из терминала не содержит
  * (docs/spec/order-lifecycle.json, {@code orderTransitionAllowed}): его
- * статус не двигается ни наблюдением, ни отказом добычи — отказ уходит
- * дальше, но терминала не перетирает, а судьба защиты по добытому
- * родителю резолвится по его ЛОКАЛЬНОМУ терминалу.
+ * статус не двигается ни наблюдением, ни отказом, ни исчерпанием цикла.
+ * Отказ разбора уходит дальше, терминала не перетирая; исчерпанный цикл
+ * у него — горизонт выдачи площадки, а не пропажа, и броска не даёт.
+ * Судьба защиты резолвится по его локальному терминалу, а у родителя в
+ * {@code ERROR} — по терминалу, который площадка показала этой добычей:
+ * пометка ошибки — наше safety-состояние, а не факт площадки
+ * (docs/spec/order-lifecycle.json, {@code attachedParentStatus}).
  *
  * <p><b>Отметку исхода транзакция сохраняет, хотя звено и бросает:</b>
  * контролируемое исключение изъято из отката, иначе обработчик прохода
@@ -106,11 +111,13 @@ public class RefreshOrderExecutor implements CommandExecutor {
         Order order = target(payload.getOrderId(), dealContext);
         Order fetched = fetchOrFail(order, dealContext);
         HoldSignal requestedRung = null;
-        if (isNull(fetched)) {
+        if (isNull(fetched) && isTrue(order.isNotSubmitted())) {
             order.toNotPlaced();
         } else {
-            orderMapper.updateFromFetched(fetched, order);
-            applyStatus(order, fetched);
+            if (nonNull(fetched)) {
+                orderMapper.updateFromFetched(fetched, order);
+                applyStatus(order, fetched);
+            }
             requestedRung = resolveAttached(order, fetched, dealContext);
         }
         orderDataService.save(order);
@@ -139,43 +146,62 @@ public class RefreshOrderExecutor implements CommandExecutor {
     }
 
     /**
-     * Цикл 1; исчерпан без находки — терминал и бросок. Пустой ответ
-     * одного источника основанием не является
+     * Цикл 1; у живой ноги исчерпан без находки — терминал и бросок. Пустой
+     * ответ одного источника основанием не является
      * (docs/rules/controlled-exchange-exceptions.md).
      *
-     * <p><b>Пусто — только у неотправленной ноги.</b> Исчерпанный цикл
-     * доказывает, что на площадке её нет, а пропавшей сущностью нога без
-     * подтверждённой отправки не является: терминал ей ставит вызывающий,
-     * биржевая ступень не поднимается (docs/lifecycles/Order.md
-     * §«Неотправленная нога, не найденная добычей»).
+     * <p><b>Пусто — у неотправленной ноги.</b> Исчерпанный цикл доказывает,
+     * что на площадке её нет, а пропавшей сущностью нога без подтверждённой
+     * отправки не является: терминал ей ставит вызывающий, биржевая ступень
+     * не поднимается (docs/lifecycles/Order.md §«Неотправленная нога, не
+     * найденная добычей»).
      *
-     * <p><b>Терминальному родителю ошибочное состояние не ставится</b> —
-     * рёбер из терминала матрица не содержит, — но отказ добычи уходит
-     * дальше тем же броском: исход отказа объявляет спека резолва
-     * (docs/spec/external-status-resolution.json), и локальной
-     * терминальности среди её операндов нет.
+     * <p><b>Пусто — и у локально терминальной ноги, без броска.</b> Её
+     * запись ушла за горизонт выдачи площадки: сделка, живущая дольше
+     * истории обычных заявок, упирается в это штатно, а факт терминала добыт
+     * раньше и стоит. Ненайденность о поведении площадки не говорит ничего —
+     * ни терминала, ни исключения, ни биржевой ступени; судьба встроенной
+     * защиты резолвится дальше по локальному терминалу
+     * (docs/spec/external-status-resolution.json, величина
+     * {@code notFoundPastLocalTerminal}).
+     *
+     * <p><b>Отказ разбора статуса бросок сохраняет и у терминальной</b> —
+     * неизвестное слово есть дефект словаря площадки, а не свойство ноги, —
+     * но ошибочного состояния ей не ставит: рёбер из терминала матрица не
+     * содержит.
+     *
+     * <p><b>Каждая добыча пишет наблюдённую живость ноги</b>
+     * ({@code Order.externalLive}), в том числе у ноги, чей статус матрица
+     * уже не двигает: запись найдена живой — истина; найдена терминальной
+     * либо полный цикл её не нашёл (обе ветви — {@code MISSING_AFTER_REFRESH}
+     * и {@code notFoundPastLocalTerminal}) — ложь; отказ разбора статуса —
+     * пусто, и пометка сохраняется тем же ходом, что и бросок. Ноге в
+     * {@code ERROR} это единственный носитель живости: его читают снятие
+     * риска и гейт доказанного отсутствия риска сделки
+     * (docs/lifecycles/Order.md §«Нога в {@code ERROR}: живость на площадке
+     * читается наблюдением»).
      */
     private Order fetchOrFail(Order order, DealContext dealContext) {
         Order fetched;
         try {
             fetched = findFetched(order, dealContext);
         } catch (ExternalStatusException e) {
+            order.setExternalLive(null);
             if (isTrue(order.isLive())) {
-                failWith(order, toCloseReason(e.getReasonCode()));
+                order.toError(toCloseReason(e.getReasonCode()));
             }
+            orderDataService.save(order);
             throw e;
         }
-        if (isNull(fetched) && isTrue(order.isNotSubmitted())) {
-            return null;
+        order.observeOnVenue(fetched);
+        if (nonNull(fetched) || isTrue(order.isNotSubmitted()) || isTrue(order.isLocallyTerminal())) {
+            return fetched;
         }
-        if (isNull(fetched)) {
-            if (isTrue(order.isLive())) {
-                failWith(order, Order.CloseReason.MISSING_AFTER_REFRESH);
-            }
-            throw new ExternalNotFoundException(
-                    "Order not found after full evidence cycle: " + order.getInternalId());
+        if (isTrue(order.isLive())) {
+            failWith(order, Order.CloseReason.MISSING_AFTER_REFRESH);
         }
-        return fetched;
+        throw new ExternalNotFoundException(
+                "Order not found after full evidence cycle: " + order.getInternalId());
     }
 
     /** По идентификатору → ожидающие → история; обрыв на первом нашедшем. */
@@ -259,6 +285,30 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * цикла 2 (живая запись, нога разбора) добываются здесь же, но
      * <b>только у терминального родителя</b>: у живого защита ещё в его
      * теле, и лишние вызовы источника были бы платой ни за что.
+     *
+     * <p><b>Снапшот родителя может быть пуст</b> — у локально терминального
+     * родителя за горизонтом выдачи. Тогда тела родителя нет, наблюдённого
+     * статуса нет, и класс читается по локальному терминалу: второй цикл
+     * идёт по инструменту, и запись родителя ему не нужна.
+     *
+     * <p><b>Наблюдённая живость родителя — операнд класса</b>
+     * (docs/spec/order-lifecycle.json, операнд {@code parentExternalLive}):
+     * её пишет цикл 1 этой же добычей, раньше резолва. Родитель в
+     * {@code ERROR}, которого полный цикл не нашёл, читается терминальным по
+     * наливу — его защиту при непустом либо недобытом наливе ищет цикл 2, при
+     * нулевом она уходит с ним; родитель, о котором площадка не показала
+     * ничего, защиту не двигает.
+     *
+     * <p><b>Терминальная защита не резолвится вовсе</b> — рёбер из терминала
+     * матрица не содержит (docs/spec/order-lifecycle.json,
+     * {@code attachedTransitionAllowed}): исход на ней модель отказала бы
+     * броском, откатив всю добычу вместе с наблюдённой живостью родителя, а
+     * пустой разбор поднимал бы сигнал о защите, чья судьба уже стоит.
+     * Достижимо это у родителя, которого добывают ради него самого, а не ради
+     * живой защиты: нога в {@code ERROR}, чья живость не исключена, несёт и
+     * защиту, ушедшую в терминал раньше (отказ постановки).
+     *
+     * @param fetched снапшот родителя этой добычей; пусто — не получен
      */
     private HoldSignal resolveAttached(Order order, Order fetched, DealContext dealContext) {
         if (isEmpty(order.getAttachedAlgoOrders())) {
@@ -267,6 +317,9 @@ public class RefreshOrderExecutor implements CommandExecutor {
         DealTranche tranche = trancheOf(order, dealContext);
         HoldSignal requested = null;
         for (AttachedAlgoOrder attached : order.getAttachedAlgoOrders()) {
+            if (isTrue(attached.isTerminal())) {
+                continue;
+            }
             HoldSignal signal = resolveOne(attached, order, fetched, tranche, dealContext);
             if (nonNull(signal)) {
                 requested = signal;
@@ -279,9 +332,12 @@ public class RefreshOrderExecutor implements CommandExecutor {
                                   DealContext dealContext) {
         String accountInternalId = dealContext.getExchangeAccount().getInternalId();
         String externalInstrumentId = dealContext.getInstrument().getExternalId();
-        AttachedAlgoOrder parentBody = matchProtection(fetched.getAttachedAlgoOrders(), attached.getInternalId());
+        AttachedAlgoOrder parentBody = isNull(fetched)
+                ? null
+                : matchProtection(fetched.getAttachedAlgoOrders(), attached.getInternalId());
+        Order.Status parentObservedStatus = isNull(fetched) ? null : fetched.getStatus();
         boolean searchCycle = isTrue(attachedStateResolver.runsSearchCycle(order.getStatus(),
-                order.getAccumulatedFillSize()));
+                parentObservedStatus, order.getExternalLive(), order.getAccumulatedFillSize()));
         AttachedAlgoOrder live = searchCycle
                 ? matchProtection(exchangeOperationsClient.getPendingMaterializedProtections(accountInternalId,
                         externalInstrumentId), attached.getInternalId())
@@ -295,6 +351,8 @@ public class RefreshOrderExecutor implements CommandExecutor {
         AttachedProtectionFacts facts = AttachedProtectionFacts.builder()
                 .observed(isNull(live) ? parentBody : live)
                 .parentStatus(order.getStatus())
+                .parentObservedStatus(parentObservedStatus)
+                .parentExternalLive(order.getExternalLive())
                 .parentAccumulatedFillSize(order.getAccumulatedFillSize())
                 .standaloneRecordFound(nonNull(live))
                 .trancheExposure(trancheExposure)

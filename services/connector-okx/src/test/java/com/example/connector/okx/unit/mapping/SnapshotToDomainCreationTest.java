@@ -303,7 +303,7 @@ class SnapshotToDomainCreationTest {
     @DisplayName("U21.15 — доменный контейнер: три равновесные величины числами, счёт пуст")
     void u21_15_theDomainContainerParsesTheEquities() {
         BalanceContainer container = balanceMapper.snapshotToDomain(
-                balanceMapper.integrationToSnapshot(OkxFixture.balance()));
+                balanceMapper.integrationToSnapshot(OkxFixture.balance(), OkxFixture.accountConfig()));
 
         assertThat(container.getExternalTotalEquity()).isEqualByComparingTo("1000");
         assertThat(container.getExternalAdjustedEquity()).isEqualByComparingTo("1000");
@@ -319,7 +319,7 @@ class SnapshotToDomainCreationTest {
     @DisplayName("U21.16 — пустая строка равновесной величины даёт пустоту")
     void u21_16_anEmptyEquityStringBecomesEmptiness() {
         BalanceContainerExternalSnapshot snapshot =
-                balanceMapper.integrationToSnapshot(OkxFixture.balance());
+                balanceMapper.integrationToSnapshot(OkxFixture.balance(), OkxFixture.accountConfig());
         BalanceContainerExternalSnapshot blanked = BalanceContainerExternalSnapshot.builder()
                 .externalUpdatedAt(snapshot.getExternalUpdatedAt())
                 .externalTotalEquity("")

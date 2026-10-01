@@ -19,6 +19,13 @@ import java.math.BigDecimal;
  * docs/architecture/contracts.md §«Решение о заявке несёт идентичность
  * транша».
  *
+ * <p><b>Предшественник в цепочке замещений различает перестановку ноги и
+ * первичную постановку:</b> ремодел выражается новой заявкой плюс отменой
+ * старой, и каждая новая даёт своё решение. Пустота — значение «первичная
+ * постановка», а не пробел; пока исполнителя замещения в ядре нет, компонент
+ * пуст на каждом решении, и пустота эта верна (docs/architecture/contracts.md
+ * §«Решение о заявке несёт предшественника в цепочке замещений»).
+ *
  * <p><b>Числа едут числами.</b> Цена рыночной заявки пуста законно, и
  * пустота кладётся <b>отсутствующей</b>: строка {@code "null"} завела бы
  * значение, которого в домене нет
@@ -42,7 +49,9 @@ import java.math.BigDecimal;
  *                                  она относится
  * @param exchangeAccountInternalId биржевой счёт заявки
  * @param instrumentInternalId      инструмент заявки
- * @param orderType                 бизнес-тип заявки — имя значения
+ * @param replacesInternalId        предшественник в цепочке замещений;
+ *                                  пусто — первичная постановка
+ * @param orderType                бизнес-тип заявки — имя значения
  *                                  {@code Order.Type}; область значений
  *                                  домовая
  *                                  (docs/models/domain/core/Order.md), и
@@ -59,6 +68,7 @@ public record OrderDecidedMessage(String orderInternalId,
                                   String dealTrancheInternalId,
                                   String exchangeAccountInternalId,
                                   String instrumentInternalId,
+                                  String replacesInternalId,
                                   String orderType,
                                   String direction,
                                   BigDecimal plannedSizeContracts,

@@ -18,7 +18,8 @@ public interface DealCashFlowRepository extends JpaRepository<DealCashFlowEntity
      * Идентификаторы записей счёта из НАЗВАННЫХ, уже приземлённые, —
      * отсечка объёма прохода, а не механизм дедупа: дедуп держит ключ
      * вставки ниже. Проекция колонки, а не строки
-     * (.claude/rules/codestyle.md §«Выборка данных»); мощность ответа
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»); мощность ответа
      * ограничена перечнем, который проход уже держит в памяти.
      */
     @Query("""
@@ -99,7 +100,8 @@ public interface DealCashFlowRepository extends JpaRepository<DealCashFlowEntity
      * <p>Окно обязательно, и это единственная коллекция контекста, чья
      * мощность не задана конструкцией сделки: у долгой сделки с частым
      * начислением финансирования она растёт со временем жизни
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     List<DealCashFlowEntity> findByDealIdOrderByExternalCreatedAtDesc(Long dealId, Pageable pageable);
 

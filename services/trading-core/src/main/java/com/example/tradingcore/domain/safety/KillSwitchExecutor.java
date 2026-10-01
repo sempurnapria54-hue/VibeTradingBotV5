@@ -85,6 +85,7 @@ public class KillSwitchExecutor {
     private final ClosePositionExecutor closePositionExecutor;
     private final CancelAlgoOrderExecutor cancelAlgoOrderExecutor;
     private final CancelAttachedProtectionExecutor cancelAttachedProtectionExecutor;
+    private final PositionSliceReader positionSliceReader;
 
     /**
      * Снять живой риск сделки и подтвердить снятие фактами.
@@ -122,7 +123,8 @@ public class KillSwitchExecutor {
      * <p><b>Подтверждает радиус ЛЮБАЯ живая позиция</b>, а не только
      * закрываемая: остаток на инструменте сделки значит, что ход сделки
      * риска не снял, как бы он о себе ни отчитался. Не добытые позиции
-     * подтверждением не считаются.
+     * подтверждением не считаются. Срез читает общий читатель радиуса —
+     * тот же, которым снятие жёсткой ступени читает своё предусловие.
      *
      * @param externalInstrumentId инструмент радиуса пары; пусто — радиус
      *                             счёта целиком
@@ -135,7 +137,7 @@ public class KillSwitchExecutor {
                 .map(Deal::getInstrumentId)
                 .collect(Collectors.toSet()));
         Integer maxAttempts = teardownAttempts();
-        List<Position> live = livePositionsOnScope(account, externalInstrumentId);
+        List<Position> live = positionSliceReader.livePositions(account, externalInstrumentId);
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             if (nonNull(live) && isEmpty(live)) {
                 return true;
@@ -145,30 +147,11 @@ public class KillSwitchExecutor {
                         .filter(position -> isFalse(dealInstruments.contains(position.getExternalInstrumentId())))
                         .forEach(position -> closeOutsideDeal(account, position));
             }
-            live = livePositionsOnScope(account, externalInstrumentId);
+            live = positionSliceReader.livePositions(account, externalInstrumentId);
             log.warn("Kill-switch scope is not confirmed flat by positions exchangeAccountId={} instId={}"
                     + " attempt={}/{}", exchangeAccountId, externalInstrumentId, attempt, maxAttempts);
         }
         return nonNull(live) && isEmpty(live);
-    }
-
-    /**
-     * Позиции радиуса с ненулевым размером; пусто — позиции этой попыткой
-     * не добыты. Читается срез счёта целиком и сужается инструментом: одно
-     * чтение на оба радиуса.
-     */
-    private List<Position> livePositionsOnScope(ExchangeAccount account, String externalInstrumentId) {
-        try {
-            return emptyIfNull(exchangeOperationsClient.getPositions(account.getInternalId())).stream()
-                    .filter(position -> isTrue(position.hasLiveSize()))
-                    .filter(position -> isNull(externalInstrumentId)
-                            || Objects.equals(externalInstrumentId, position.getExternalInstrumentId()))
-                    .collect(Collectors.toList());
-        } catch (RuntimeException e) {
-            log.warn("Kill-switch positions read failed exchangeAccountId={}: {}", account.getId(),
-                    e.getMessage());
-            return null;
-        }
     }
 
     /**
@@ -214,6 +197,13 @@ public class KillSwitchExecutor {
      * Живые ноги траншей — первыми. Ноги берутся обходом траншей:
      * донорского поля агрегата ядро не читает
      * (docs/models/domain/aggregate/Deal.md §Структура).
+     *
+     * <p><b>Нога в {@code ERROR} отменяется в той же очереди, пока её
+     * живость не исключена наблюдением</b> (docs/spec/order-lifecycle.json,
+     * {@code orderMayBeLive}): пометка ошибки — наше safety-состояние, а не
+     * факт площадки. Статус такой ноги отмена не двигает — проблемный
+     * терминал запечатан, а причина ошибки write-once, — и подтверждает
+     * снятие наблюдённая нежилость, а не статус.
      */
     private void cancelLiveLegs(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
@@ -241,6 +231,15 @@ public class KillSwitchExecutor {
      * Защита обеих форм — последней. Ход выполняется только на
      * подтверждённом отсутствии живой экспозиции: снятая раньше, защита
      * оставила бы позицию без покрытия на время её закрытия.
+     *
+     * <p><b>Отдельная условная заявка в {@code ERROR} снимается в этой же
+     * очереди, пока её живость не исключена наблюдением</b>
+     * (docs/lifecycles/AlgoOrder.md §«Заявка в {@code ERROR}: живость на
+     * площадке читается наблюдением»): осиротевшая живая запись сработала бы
+     * по чужой позиции того же инструмента. Статуса такой заявки отмена не
+     * двигает, и подтверждает снятие наблюдённая нежилость. Встроенная защита
+     * в {@code ERROR} в очередь не входит: каждая её тропа в {@code ERROR}
+     * сама есть наблюдение нежилости (docs/lifecycles/Order.md).
      */
     private void cancelProtection(DealContext dealContext) {
         Deal deal = dealContext.getDeal();
@@ -317,15 +316,27 @@ public class KillSwitchExecutor {
                 && isEmpty(liveAttachedProtections(deal));
     }
 
+    /**
+     * Ноги, чья живость на площадке не исключена: одно множество на отмену,
+     * перечень добычи подтверждения и flat. Снятие, объявленное при ноге,
+     * которой никто не видел нежилой, объявляло бы риск снятым по догадке
+     * (docs/components/KillSwitchExecutor.md §Подтверждение).
+     */
     private static List<Order> liveLegs(Deal deal) {
         return emptyIfNull(deal.getTranches()).stream()
-                .flatMap(tranche -> tranche.liveOrders().stream())
+                .flatMap(tranche -> tranche.mayBeLiveOrders().stream())
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Отдельные условные заявки, чья живость на площадке не исключена: одно
+     * множество на снятие, перечень добычи подтверждения и flat — тем же
+     * доводом, что у ног (docs/components/KillSwitchExecutor.md
+     * §Подтверждение).
+     */
     private static List<AlgoOrder> liveAlgoOrders(Deal deal) {
         return emptyIfNull(deal.getTranches()).stream()
-                .flatMap(tranche -> tranche.liveAlgoOrders().stream())
+                .flatMap(tranche -> tranche.mayBeLiveAlgoOrders().stream())
                 .collect(Collectors.toList());
     }
 

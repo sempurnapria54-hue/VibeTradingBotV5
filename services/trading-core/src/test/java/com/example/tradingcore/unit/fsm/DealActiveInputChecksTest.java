@@ -153,8 +153,15 @@ class DealActiveInputChecksTest {
         assertThat(transition.movesStatus()).isFalse();
     }
 
+    /**
+     * Закреплённая деталь входной проверкой прохода не является: её наличие
+     * держит писатель, а пустота у восстановленной сделки даёт пустой набор
+     * шагов, а не отказ (docs/components/DealActiveHandler.md §«Закреплённая
+     * деталь стратегии входной проверкой прохода не является — её наличие
+     * держит писатель»).
+     */
     @Test
-    @DisplayName("U7.7 — сделка без закреплённой детали: деталь требуется у той, у которой обязана быть")
+    @DisplayName("U7.7 — сделка без закреплённой детали: деталь входной проверкой прохода не является, проверки пройдены")
     void u7_7_aRecoveredDealPassesTheInputChecks() {
         DealTranche managed = exposedTranche("2");
         Deal recovered = deal(Deal.Status.ACTIVE, managed);

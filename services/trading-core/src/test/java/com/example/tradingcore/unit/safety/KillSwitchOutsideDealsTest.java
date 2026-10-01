@@ -27,6 +27,7 @@ import com.example.tradingcore.domain.command.executor.ClosePositionExecutor;
 import com.example.tradingcore.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.safety.KillSwitchExecutor;
+import com.example.tradingcore.domain.safety.PositionSliceReader;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
@@ -67,7 +68,8 @@ class KillSwitchOutsideDealsTest {
         executor = new KillSwitchExecutor(exchange, mock(ServiceCommandExecutor.class),
                 mock(DealContextService.class), accounts, instruments, properties,
                 mock(CancelOrderExecutor.class), mock(ClosePositionExecutor.class),
-                mock(CancelAlgoOrderExecutor.class), mock(CancelAttachedProtectionExecutor.class));
+                mock(CancelAlgoOrderExecutor.class), mock(CancelAttachedProtectionExecutor.class),
+                new PositionSliceReader(exchange));
         properties.setMaxTeardownAttempts(2);
         when(accounts.getRequiredById(ACCOUNT_ID)).thenReturn(account());
         when(instruments.findExternalIdsByIds(any())).thenReturn(new HashSet<>());

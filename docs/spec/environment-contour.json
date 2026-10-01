@@ -4,8 +4,8 @@
   "home": "docs/architecture/platform.md",
 
   "operands": {
-    "environment": "окружение платформы — dev, stage либо prod (docs/architecture/platform.md, §«Чем различаются окружения»)",
-    "contour": "контур площадки биржевого счёта — LIVE (боевая площадка) либо DEMO (демо-контур). Атрибут СЧЁТА, лежащий рядом с его ключами (docs/architecture/tenant-and-exchange.md, §Ключи), а не атрибут развёртывания"
+    "environment": "окружение платформы — dev, stage либо prod (чем различаются окружения — docs/architecture/platform.md)",
+    "contour": "контур площадки биржевого счёта — LIVE (боевая площадка) либо DEMO (демо-контур). Атрибут СЧЁТА, лежащий рядом с его ключами (ключи счёта — docs/architecture/tenant-and-exchange.md), а не атрибут развёртывания"
   },
 
   "values": [

@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.Map;
@@ -19,7 +20,7 @@ import lombok.Setter;
  * parent Order (OKX attachAlgoOrds). На первом этапе — embedded-часть
  * Order, не standalone AlgoOrder; в standalone автоматически не
  * материализуется (даже если биржа вернула algo identifiers). См.
- * docs/models/domain/core/Order.md (§AttachedAlgoOrder),
+ * docs/models/domain/core/Order.md (§«Встроенная защита (AttachedAlgoOrder)»),
  * docs/lifecycles/Order.md.
  */
 @Getter
@@ -83,14 +84,36 @@ public class AttachedAlgoOrder extends Auditable {
 
     private static final Set<Status> ACTIVE_LIKE_STATUSES = EnumSet.of(Status.PENDING, Status.ACTIVE);
 
+    private static final Set<Status> TERMINAL_STATUSES = EnumSet.of(Status.COMPLETED, Status.CANCELED, Status.ERROR);
+
     private static final Map<Status, Set<Status>> ALLOWED_TRANSITIONS = Map.of(
             Status.CREATED, EnumSet.of(Status.PENDING, Status.CANCELED, Status.ERROR),
             Status.PENDING, EnumSet.of(Status.ACTIVE, Status.CANCELED, Status.ERROR),
             Status.ACTIVE, EnumSet.of(Status.COMPLETED, Status.CANCELED, Status.ERROR));
 
-    /** Active-like (PENDING/ACTIVE): ещё существует, влияет на защиту. */
+    /**
+     * Active-like (PENDING/ACTIVE): ещё существует, влияет на защиту.
+     * Изъят из сериализации: форма едет полем заявки, телом команды и ответом
+     * коннектора, а предикат — не её данные (.claude/rules/codestyle.md
+     * §«Предикат формы, пересекающей сериализацию, не является её свойством»).
+     */
+    @JsonIgnore
     public Boolean isActiveLike() {
         return ACTIVE_LIKE_STATUSES.contains(status);
+    }
+
+    /**
+     * Защита терминальна: сработала, снята либо в ошибочном состоянии —
+     * рёбер из этих статусов матрица не содержит
+     * (docs/spec/order-lifecycle.json, величина {@code attachedTransitionAllowed}).
+     * Резолв по фактам родителя такую защиту не двигает: терминал запечатан, и
+     * исход резолва на ней переписывал бы стоящий факт задним числом.
+     *
+     * <p>Изъят из сериализации тем же доводом, что {@link #isActiveLike()}.
+     */
+    @JsonIgnore
+    public Boolean isTerminal() {
+        return TERMINAL_STATUSES.contains(status);
     }
 
     /** Допустим ли переход в target по матрице. */

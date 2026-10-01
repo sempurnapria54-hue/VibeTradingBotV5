@@ -103,6 +103,28 @@ abstract class AuthBox {
                 .POST(HttpRequest.BodyPublishers.ofString(body)));
     }
 
+    /** Замещающий запрос без предъявленного принципала. */
+    protected Answer put(String path, String body) {
+        return send(request(path).header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(body)));
+    }
+
+    /** Замещающий запрос под предъявленным токеном. */
+    protected Answer put(String path, String token, String body) {
+        return send(authorized(request(path), token).header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(body)));
+    }
+
+    /**
+     * Тропа смены ключей счёта.
+     *
+     * @param accountInternalId идентичность счёта
+     * @return путь операции
+     */
+    protected static String keysOf(String accountInternalId) {
+        return EXCHANGE_ACCOUNTS + "/" + accountInternalId + "/keys";
+    }
+
     /**
      * Запрос с дословным значением заголовка предъявления: им подаются
      * оси резолвера заголовка, которых форма {@code Bearer <токен>} не

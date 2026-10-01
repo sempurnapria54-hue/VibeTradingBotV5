@@ -348,7 +348,7 @@
         "direction": "LONG",
         "livePosition": {
           "id": 1,
-          "externalSize": 0
+          "externalSize": 1
         },
         "legs": [
           {

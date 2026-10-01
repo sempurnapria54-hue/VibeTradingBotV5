@@ -82,10 +82,12 @@ public class ReceptionStateDataService {
 
     /**
      * Сколько подписанных пар не утверждают непрерывность: ноль означает,
-     * что дыры нет ни на одной.
+     * что дыры нет ни на одной; разрыв раньше нижней границы дыры не даёт.
      */
-    public Long countSubscribedPairsWithBreak(String consumerGroup, OffsetDateTime staleBefore) {
-        return repository.countSubscribedPairsWithBreak(consumerGroup, staleBefore);
+    public Long countSubscribedPairsWithBreak(String consumerGroup,
+                                              OffsetDateTime staleBefore,
+                                              OffsetDateTime lowerBound) {
+        return repository.countSubscribedPairsWithBreak(consumerGroup, staleBefore, lowerBound);
     }
 
     /**
@@ -95,13 +97,5 @@ public class ReceptionStateDataService {
      */
     public List<ReceptionPairMomentRow> subscribedPairMoments(String consumerGroup) {
         return repository.subscribedPairMoments(consumerGroup);
-    }
-
-    /**
-     * Чистка вынесла разрыв за нижнюю границу полноты: момент разрыва
-     * гаснет. Иных величин строки ход не трогает.
-     */
-    public void clearGapsBefore(String consumerGroup, OffsetDateTime lowerBound) {
-        repository.clearGapsBefore(consumerGroup, lowerBound);
     }
 }

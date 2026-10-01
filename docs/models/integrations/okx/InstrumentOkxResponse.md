@@ -52,7 +52,8 @@ Rules-поля (sizing/rounding/ограничители), питающие rule
 | `maxMktSz` | string (decimal) | макс. размер market-ордера | есть |
 | `maxTriggerSz` | string (decimal) | макс. размер trigger-ордера | есть |
 | `maxStopSz` | string (decimal) | макс. размер stop-ордера | есть |
-| `groupId` | string | id комиссионной группы инструмента; **ключ резолва ставки** — пара (`instType`, `groupId`) | **целевое: в коде поля нет** — ни в DTO, ни в rules-снапшоте, ни в модели навеса |
+| `groupId` | string | id комиссионной группы инструмента; **ключ резолва ставки** — пара (`instType`, `groupId`) | есть — в DTO, в rules-снапшоте и в модели навеса поле `externalFeeGroupId` (`docs/models/mapping/InstrumentExternalRules.md`) |
+| `instFamily` | string | семья инструмента — **операнд запроса позиционных тиров**: у SWAP площадка отдаёт тиры по семье, а не по инструменту (`docs/integrations/okx/contracts/position-tiers.md`). В снапшот и навес не переносится; поля нет в ответе — тиры не читаются (`docs/models/mapping/InstrumentExternalRules.md`) | есть |
 
 **`groupId` — целевая дельта `CODE`, и она внесена в перечень**. Поле живёт в JSONB-навесе, собственной колонки не имеет
 ⇒ в schema-дельту шага не попадает **по построению**, и ни один

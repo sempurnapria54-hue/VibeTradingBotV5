@@ -58,10 +58,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return response(HttpStatus.BAD_GATEWAY, "EXCHANGE_READ_FAILED", failure.getMessage());
     }
 
-    /** Неизвестный инструмент, неизвестная идентичность и прочий негодный вход. */
+    /**
+     * Неизвестный инструмент, неизвестная идентичность, параметры, не
+     * разобравшиеся под заявленный тип, и прочий негодный вход.
+     *
+     * <p><b>Пояснение — постоянный текст ветви, а не текст исключения</b>
+     * (docs/rules/error-handling-policy.md §«Пояснение отказа пишет наша
+     * сторона, а не платформа»). Класс платформенный, и по нему автор текста
+     * не различается: тот же класс бросает и наш сервис («инструмент не
+     * найден»), и разбор тела сериализатором, кладущий в текст полное имя
+     * класса параметров. Текст исключения уходит в лог — причина отказа не
+     * теряется, но и во внешний контракт не попадает.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorApiResponse> onIllegalArgument(IllegalArgumentException failure) {
-        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", failure.getMessage());
+        log.info("Invalid request refused on the market-data surface: {}", failure.getMessage());
+        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Запрос содержит недопустимое значение");
     }
 
     /**

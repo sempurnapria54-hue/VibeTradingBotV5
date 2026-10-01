@@ -54,7 +54,10 @@ spec:
       serviceAccountName: trading-core
       containers:
         - name: trading-core
-          image: registry.invalid/vibetrading/trading-core
+          # Метка `unpromoted` — зарезервированная: сервис, чей тег в
+          # окружение не продвинут, не разворачивается
+          # (docs/architecture/platform.md §Развёртывание).
+          image: registry.invalid/vibetrading/trading-core:unpromoted
           # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
           # поэтому образ, уже лежащий на узле, — тот самый: ходить за ним
           # в реестр незачем. Умолчание здесь опасно ещё и тем, что при
@@ -65,8 +68,20 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            # Провайдер идентичности. Издатель токена — имя хоста окружения
+            # (значение приезжает осью окружения, поэтому манифест одинаков
+            # во всех трёх), ключи подписи — внутренний адрес провайдера:
+            # наружу за ключами сервис не ходит (docs/architecture/platform.md
+            # §Безопасность).
+            - name: PLATFORM_INGRESS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: ingressHost
             - name: OIDC_ISSUER_URI
-              value: http://platform-identity-service:8080/realms/vibetrading
+              value: https://$(PLATFORM_INGRESS_HOST)/realms/vibetrading
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/certs
             - name: OIDC_TOKEN_URI
               value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/token
             - name: SERVICE_CLIENT_ID
@@ -126,7 +141,8 @@ spec:
 # Исходящее: три строки таблицы docs/architecture/contracts.md
 # §«Синхронные вызовы» — к коннектору, к auth за реестром счетов, к
 # market-data за фичами и каталогом. Плюс провайдер идентичности за
-# ключами подписи и токеном исходящего вызова.
+# ключами подписи и токеном исходящего вызова, плюс тропы к инстансам
+# данных — своя база и брокер.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -165,6 +181,18 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # Брокер: у ядра стороны две — реле outbox публикует в тему
+    # trading-core.facts, слушатель читает тему владельца определений
+    # (CoreKafkaConfig). Порт — открытого слушателя кластера Kafka
+    # (deploy/base/data/kafka-cluster.yaml), того же, что называет адрес в
+    # переменной окружения выше.
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: platform-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
 ---
 # Встречные разрешения на стороне соседей: запрет по умолчанию
 # двусторонний, поэтому исходящего правила у ядра мало.
@@ -187,6 +215,26 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-ingress-from-trading-core
+spec:
+  podSelector:
+    matchExpressions:
+      - key: strimzi.io/cluster
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trading-core
+      ports:
+        - protocol: TCP
+          port: 9092
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

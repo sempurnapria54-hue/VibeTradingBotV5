@@ -22,11 +22,14 @@ import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.algo_order.Condition;
 import com.example.tradingbot.domain.model.core.algo_order.Trigger;
 import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
+import com.example.tradingbot.domain.model.core.balance.AccountMode;
 import com.example.tradingbot.domain.model.core.balance.Balance;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
+import com.example.tradingbot.domain.model.core.balance.PositionMode;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingbot.domain.model.core.instrument.PositionTier;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
@@ -65,7 +68,10 @@ import java.util.List;
  * риск акта — {@code 92.955 × 10 × 0.1 = 92.955}, нотинал акта —
  * {@code 10 × 0.1 × 3000 = 3000}; поактный потолок
  * {@code 1 % × 10000 = 100} их накрывает. Маржа акта при плече 10 —
- * {@code 3000 / 10 + 0.0005 × 3000 = 301.5}.
+ * {@code 3000 / 10 + 0.0005 × 3000 = 301.5}. Оценка ликвидации позиции
+ * после входа при плече 10 и ставке поддержания единственного тира 0.004 —
+ * {@code 3000 × (1 − 0.1 + 0.0005) / (1 − 0.004 − 0.0005) ≈ 2713.7}, то есть
+ * далеко за стопом 2910; снимок средств — в контурном режиме счёта.
  */
 final class RiskFixture {
 
@@ -138,7 +144,31 @@ final class RiskFixture {
         rules.setExternalMaxMarketSize("50000");
         rules.setExternalMaxLeverage("125");
         rules.setExternalTickSize("0.1");
+        rules.setPositionTiers(workingTiers());
         return rules;
+    }
+
+    /**
+     * Позиционные тиры рабочего инструмента: один тир, покрывающий всякий
+     * размер, со ставкой поддержания 0.004 — оценка ликвидации любой клетки
+     * не своей группы лежит далеко за её стопом.
+     */
+    static List<PositionTier> workingTiers() {
+        return new ArrayList<>(List.of(tier("0", "1000000000", "0.004")));
+    }
+
+    /**
+     * Тиры примеров спеки (docs/spec/risk-limits.json, цепочка
+     * {@code postActContracts} … {@code entryStopBeforeLiquidation}): до 1000
+     * контрактов — 0.004, от 1000 до 5000 — 0.006.
+     */
+    static List<PositionTier> specTiers() {
+        return new ArrayList<>(List.of(tier("0", "1000", "0.004"), tier("1000", "5000", "0.006")));
+    }
+
+    /** Позиционный тир с названными границами размера и ставкой поддержания. */
+    static PositionTier tier(String minSize, String maxSize, String maintenanceMarginRate) {
+        return new PositionTier(decimal(minSize), decimal(maxSize), decimal(maintenanceMarginRate));
     }
 
     /** Строка пары «счёт, инструмент»: изолированная маржа, плечо назначено, ступени не стои́т. */
@@ -154,6 +184,13 @@ final class RiskFixture {
         state.setSafetyRung(rung);
         state.setMarginMode(Instrument.MarginMode.ISOLATED);
         state.setLeverage(LEVERAGE);
+        return state;
+    }
+
+    /** Строка пары без ступени с названным рабочим плечом; пусто — не назначено. */
+    static AccountInstrumentState pairStateWithLeverage(Integer leverage) {
+        AccountInstrumentState state = pairState(Instrument.SafetyRung.ACTIVE);
+        state.setLeverage(leverage);
         return state;
     }
 
@@ -221,7 +258,10 @@ final class RiskFixture {
         return balanceSnapshot(at, SETTLEMENT_CURRENCY, cash, equity, available);
     }
 
-    /** Снимок средств счёта с одной строкой названной валюты. */
+    /**
+     * Снимок средств счёта с одной строкой названной валюты; режим счёта и
+     * режим позиций — те, что держит контур.
+     */
     static BalanceContainer balanceSnapshot(OffsetDateTime at, String currency, String cash, String equity,
                                             String available) {
         Balance row = new Balance();
@@ -234,6 +274,8 @@ final class RiskFixture {
         BalanceContainer container = new BalanceContainer();
         container.setExchangeAccountId(ACCOUNT_ID);
         container.setExternalUpdatedAt(at);
+        container.setAccountMode(AccountMode.FUTURES);
+        container.setPositionMode(PositionMode.NET);
         container.setBalances(new ArrayList<>(List.of(row)));
         return container;
     }

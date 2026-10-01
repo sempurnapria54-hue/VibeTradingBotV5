@@ -20,25 +20,32 @@
 #
 # Код возврата: 0 — примеры сошлись; 1 — есть расхождения; 2 — ПРОГОН НЕ
 # СОСТОЯЛСЯ (нет каталога, нет спецификаций, файл не разобран, состояние
-# примера не собрано, раннер не собрался, JVM не запустила раннер). Третий
-# код заведён затем, чтобы «прогонять было нечего» не читалось как
-# «расхождений нет»; незапуск JVM («Could not find or load main class»)
-# маппится в него же — прежде он приезжал кодом 1 «есть расхождения»
-# (E1 `DOCS_CHECK_33`).
+# примера не собрано, раннер не собрался, JVM не довела раннер до вердикта).
+# Третий код заведён затем, чтобы «прогонять было нечего» не читалось как
+# «расхождений нет».
+#
+# СИСТЕМНЫЙ ОТКАЗ JVM ОТДЕЛЁН ОТ РАСХОЖДЕНИЯ ПО ВЕРДИКТУ, а не по строке
+# отказа: код 0 и 1 засчитываются, только когда раннер напечатал вердикт
+# своего кода последней строкой stdout; всякий иной исход процесса — код 2
+# (нет java, несобранный classpath, UnsupportedClassVersionError,
+# NoClassDefFoundError, OutOfMemoryError, убитая JVM, молчаливый выход).
+# Прежний маппинг узнавал одну строку («Could not find or load main class»),
+# и прочие отказы приезжали кодом 1, 127 или даже 0. Маппинг и его батарея —
+# tools/spec-runner-env.sh (spec_run_jvm, spec_verdict_battery); батарея
+# исполняется этой же командой до прогона, недоказанная ось => код 2.
 set -euo pipefail
 
 # shellcheck source=tools/spec-runner-env.sh
 source "$(dirname "$0")/spec-runner-env.sh"
 
 cd "$SPEC_ROOT"
-err_log="$SPEC_CLASSES/stderr.log"
-set +e
-"${JAVA[@]}" com.example.tradingbot.spec.Spec "${SPEC_DIR:-docs/spec}" 2>"$err_log"
-rc=$?
-set -e
-cat "$err_log" >&2
-if [ "$rc" -ne 0 ] && grep -q 'Could not find or load main class' "$err_log"; then
-  echo "ПРОГОН НЕ СОСТОЯЛСЯ: JVM не запустила раннер (системный отказ, не расхождение)" >&2
+# Вердикты раннера — Spec.main: последняя строка stdout при коде 0 и 1.
+OK_VERDICT='ВСЕ ПРИМЕРЫ СОШЛИСЬ'
+FAIL_VERDICT='РАСХОЖДЕНИЙ: '
+spec_verdict_battery "$OK_VERDICT" "$FAIL_VERDICT" || {
+  echo "ПРОГОН НЕ СОСТОЯЛСЯ: батарея маппинга исхода не доказана — код прогона ничего не удостоверял бы" >&2
   exit 2
-fi
-exit "$rc"
+}
+spec_run_jvm "ПРОГОН НЕ СОСТОЯЛСЯ" "$OK_VERDICT" "$FAIL_VERDICT" \
+  "${JAVA[@]}" com.example.tradingbot.spec.Spec "${SPEC_DIR:-docs/spec}"
+exit "$SPEC_RC"

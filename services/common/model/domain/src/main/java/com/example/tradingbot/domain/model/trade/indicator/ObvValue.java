@@ -7,7 +7,8 @@ import lombok.Setter;
 
 /**
  * Значение индикатора OBV (On-Balance Volume) — кумулятивная бегущая
- * сумма знакового объёма от старта расчёта. Абсолютный уровень
+ * сумма знакового объёма; ряд продолжается от записанного значения
+ * (docs/spec/indicator-calculation.json, {@code obvSeed}, {@code obvNext}). Абсолютный уровень
  * нестабилен (зависит от глубины истории и масштаба объёма): операнд OBV
  * ограничен относительными формами (docs/models/domain/other/IndicatorValue.md).
  * См. docs/models/domain/other/IndicatorValue.md (§Наследники).

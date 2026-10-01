@@ -21,6 +21,7 @@ import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRul
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.util.RiskMath;
+import com.example.tradingcore.config.DealContextProperties;
 import com.example.tradingcore.domain.calc.CalculationContextFactory;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
@@ -43,7 +44,8 @@ import org.springframework.stereotype.Component;
  * (docs/components/CreateOrderActionExecutor.md).
  *
  * <pre>
- * PLANNED   → расчёт → исход округления выхода → преконтроль (риск-создающему) → CREATE_ORDER_COMMAND
+ * PLANNED   → свежесть снимка средств (риск-создающему) → расчёт → исход округления выхода
+ *             → преконтроль (риск-создающему) → CREATE_ORDER_COMMAND
  * CREATED   → SUBMIT_ORDER_COMMAND
  * SUBMITTED → REFRESH_ORDER_COMMAND
  * </pre>
@@ -64,6 +66,7 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
     private final StrategyActionCalculator calculator;
     private final ActionRiskGate riskGate;
     private final ExitRoundingReader exitRoundingReader;
+    private final DealContextProperties properties;
 
     @Override
     public Boolean supports(StrategyAction action) {
@@ -105,6 +108,15 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
      * Строка остаётся запланированной и решается следующим проходом, чей
      * граф ногу первого уже несёт (docs/rules/risk-policy.md §«Живое
      * меряется от живой экспозиции»).
+     *
+     * <p><b>Акт, создающий риск, на несвежем снимке средств этим проходом не
+     * решается — на всякой стадии транша, а не только на входе.</b> Строка
+     * остаётся запланированной и бюджета не тратит, а план несёт отсрочку до
+     * свежего снимка, по которой обработчик заказывает добычу. Предикат и
+     * толерантность — те же, по которым добычу заказывает предвходовая
+     * проверка, поэтому на входе снимок к этому моменту уже добыт ею.
+     * Reduce-only нога свежести не ждёт — она риск снимает
+     * (docs/components/RiskValidator.md §«Проверки средств счёта»).
      */
     private ActionPlan planCreation(StrategyOrderAction action, DealActionState state,
                                     DealContext dealContext, DealTranche tranche) {
@@ -113,6 +125,11 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
             log.debug("Risk-creating entry already decided this pass, deferred dealActionStateId={}",
                     state.getId());
             return ActionPlan.nothing();
+        }
+        if (riskCreating && isFalse(dealContext.balanceFresh(properties.getBalanceFreshness()))) {
+            log.debug("Balance snapshot is not fresh, risk-creating act deferred dealActionStateId={}",
+                    state.getId());
+            return ActionPlan.awaitingBalance();
         }
         CalculationContext context = contextFactory.build(dealContext, action, tranche);
         StrategyActionCalculationResult result = calculator.calculate(context);
@@ -164,7 +181,8 @@ public class CreateOrderActionExecutor implements StrategyActionExecutor {
      * риска.
      *
      * <p><b>Шесть чисел планового риска едут вместе или не едут вовсе</b>
-     * (docs/models/domain/core/Order.md §«Шесть чисел планового риска»):
+     * (docs/models/domain/core/Order.md §«Шесть чисел планового риска:
+     * инвариант «шесть или ни одного»»):
      * у reduce-only ноги их нет по построению — она риска не создаёт.
      */
     private CreateOrderCommandPayload payload(StrategyOrderAction action, CalculatedStrategyAction calculated,

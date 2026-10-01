@@ -22,9 +22,15 @@
   1. дословный термин снятой редакции в живом носителе;
   2. тот же термин, разорванный переносом строки (свип идёт по плоскому
      тексту: построчный проход фразу через перенос не видит);
-  3. вхождение в РАБОЧЕМ файле (`backlog.md`, `open-questions.md`, roadmap) —
-     оно опаснее докового: рабочий файл адресован исполнителю следующего
-     под-шага;
+  3. вхождение в РАБОЧЕМ файле (`backlog.md`, `open-questions.md`, roadmap):
+     рабочие файлы стоят в области свипа, и ось 29 батареи сверяет, что каждый
+     из трёх достижим фактической областью (шаблоны минус `SKIP`). Прежняя
+     редакция формы клеймила ещё и «вхождение в рабочем файле опаснее
+     докового» — этот клейм СНЯТ как неизмеряемый: детектор находок не
+     ранжирует, дефект в рабочем файле и в доке печатается одинаково, и
+     падающей пробы у ранга нет. «Опаснее» остаётся доводом, почему рабочие
+     файлы в области, а не свойством выдачи
+     (`.claude/rules/edit-kind-obligations.md` §«Свип снятой редакции»);
   4. носитель ПОПУЛЯЦИИ, не предъявивший пришедшей редакции, — включая
      носитель, выражающий снятое другими словами (встречная форма);
   5. строка популяции, указывающая на носитель, которого в корпусе нет;
@@ -46,11 +52,45 @@
      прогон падает на новой записи с прозой и на строке долга, которой в
      реестре больше нет. Механика долга — та же, что у `tools/anchor-debt.txt`.
      Дом формы — `.claude/rules/self-description-form.md`.
+  9. термин, разорванный разметкой выделения: звёздочки или подчёркивания
+     внутри слова (`пре**жн**яя`) либо вокруг части фразы (`**снятая**
+     редакция`). Шаблон идёт по плоскому тексту, и маркер между буквами или
+     между словом и пробелом рвёт совпадение так же, как рвал его перенос
+     строки до формы 2. Свип идёт по ДВУМ представлениям носителя —
+     плоскому и плоскому без маркеров выделения (`demark`), — и совпадение
+     второго, перекрывающее совпадение первого, не удваивается. Разметкой
+     маркер считается не всегда: `*` между двумя пробелами (пункт списка,
+     умножение) и `_` между двумя буквами или цифрами (идентификатор
+     `REDUCE_ONLY`, `snake_case`) остаются на месте. Второе представление
+     ДОБАВЛЯЕТ совпадения и не отнимает ни одного: шаблоны реестра, сами
+     несущие экранированные звёздочки, совпадают по первому. Шаблон ПРИШЕДШЕЙ
+     редакции берётся по тем же двум представлениям: выделение внутри
+     пришедшей редакции дефектом носителя популяции не делает. Оси — 28a-c
+     и контроли 28 (удвоение, пункт списка, идентификатор, пришедшая
+     редакция).
 Чего детектор НЕ мерит: носитель, который выражает снятую редакцию другими
 словами и в популяции НЕ НАЗВАН. Против этого класса стои́т предмет 2 свипа
 закрытия («свип идёт по конструкции, а не только по снимаемым терминам») и
 построение популяции до правки (`.claude/rules/edit-kind-obligations.md`), а не
 эта команда: перечислить то, о чём закрытие не знает, механически нельзя.
+
+ГРАНИЦА ОБЛАСТИ: `.claude/work/progress/` ВНЕ свипа — названо, а не упущено.
+Процесс называет `progress/` живым носителем предписаний
+(`.claude/rules/edit-kind-obligations.md` §«Свип снятой редакции»), и
+исключение поэтому требует довода, а не умолчания. Довод — замер 2026-09-30:
+прогон по 70 отчётам `progress/` дал 9 вхождений в 7 файлах по 4 записям, и
+все 9 — цитаты: находки ревью и перепроверок, пересказывающие дефект, строка
+таблицы разбора, записи хроники о том, что висело на свой заход и что было
+снято. Действующих предписаний среди них ноль. Отчёт `progress/` пишется затем, чтобы назвать найденное, и снятая
+редакция в нём — его предмет, а не рецидив; включённый в область, каждый
+отчёт с находкой требовал бы строки `allowed`, то есть allow-лист работал бы
+подавителем, против чего и заведена форма 7, и рос бы с каждым прогоном.
+Остаток назван: предписание, стоящее в `progress/` (перечень работ для
+чужого захода, указание следующему заходу), этой командой не свипается;
+против него стои́т ручной свип снятой редакции, в чью область `progress/`
+входит (тот же дом), и перенос живого из `progress/` в рабочие файлы при
+закрытии (`.claude/rules/closed-work-transfer.md`). Пересматривается, если
+отчёты `progress/` получат маркер, отделяющий цитату от предписания.
 
 РЕЕСТР. Одна запись — одна снятая редакция: опознавательный шаблон снятой
 редакции, шаблон ПРИШЕДШЕЙ, дата снятия, решение-источник, перечень мест, где
@@ -80,7 +120,7 @@
 `services/*`, — манифесты `deploy/**` (yml, yaml, json),
 `tools/**` (py, sh, txt) и `.claude/**` (md) за вычетом архива, истории,
 библиотеки и отчётов прогонов (`progress/` цитирует снятые редакции как
-находки — это их предмет, а не рецидив). РАБОЧИЕ РЕЕСТРЫ `.claude/work/*.json`
+находки — это их предмет, а не рецидив; граница названа выше). РАБОЧИЕ РЕЕСТРЫ `.claude/work/*.json`
 в области ЕСТЬ: реестр компонентов и цитирует снятые редакции как закрытые
 находки, и несёт живые клеймы. Первое объявляется у своих записей ключом
 `allowed` — так же, как объявляется дом решения; второе свипается. Исключить
@@ -160,6 +200,11 @@ DEPLOY_SUFFIXES = ('yml', 'yaml', 'json')
 # сегмент глубже, и без шаблонов их `pom.xml` выпали бы из свипа молча.
 BUILD_FILES = ('pom.xml', '*/pom.xml', '*/*/pom.xml', '*/*/*/pom.xml',
                '*/*/*/*/pom.xml')
+
+# РАБОЧИЕ ФАЙЛЫ формы 3: их достижимость фактической областью мерит ось 29.
+WORK_FILES = ('.claude/work/backlog.md',
+              '.claude/work/questions/open-questions.md',
+              '.claude/work/roadmap/roadmap.md')
 
 # ДЕРЕВО ИНСТРУМЕНТОВ — СЕМЬ РАСШИРЕНИЙ.
 # Шаблоны выписаны литералами, а не собраны из перечня суффиксов: их читает не
@@ -442,7 +487,6 @@ RETIRED = [
              r'Состав\s+своей\s+формы\s+периметр\s+объявляет\s+сам'),
             ('services/bff/src/main/java/com/example/bff/mapping/'
              'StreamEventMapper.java', r'Состав\s+формы\s+задаёт\s+сама\s+форма'),
-            ('.claude/work/backlog.md', r'КРИТЕРИЙ\s+состава\s+из\s+позиции\s+выведен'),
         ),
     },
     {
@@ -1521,7 +1565,16 @@ RETIRED = [
         # разбирается вручную (та же цена, что у записей «двух ног»,
         # суррогата и гейта повтора, — популяция носителей важнее
         # точности шаблона).
-        'pattern': r'защитн\w+\s+заявк\w+\s+после\s+входа'
+        # Разбор ложного срабатывания 2026-09-30: форма 9 (термин,
+        # разорванный разметкой) открыла `docs/processes/risk-evaluation.md`,
+        # где «**первичная защитная заявка** после входа» — ветвь карв-аута
+        # реджекта `STOP_DISTANCE_BELOW_FLOOR` (жива встроенная защита входа),
+        # то есть законный текст о ДРУГОМ предмете. Первая альтернация сужена
+        # до формы самого клейма: фраза стоит объектом «охраняет» либо
+        # предикатом «популяция —»; все формы снятого клейма, встреченные в
+        # `history/`, сужение берёт.
+        'pattern': r'\b(?:охраня\w+|популяци\w+)\W+(?:первичн\w+\s+)?'
+                   r'защитн\w+\s+заявк\w+\s+после\s+входа'
                    r'|охраня\w+\s+РАЗНЫЕ\s+популяции'
                    r'|разные\s+популяции\s+действий',
         'arrived': r'вход\w*\s+включая|включает\s+\**вход|полос\w+\s+(между|у)\s+якор'
@@ -1955,18 +2008,41 @@ RETIRED = [
         # назван и припаркован; ложным клейм не объявляется — durable-носитель
         # у исполнения есть.
         'pattern': r'попадает\s+в\s+историю',
-        'arrived': r'верен\s+и\s+.{0,20}не\s+обеспечен'
-                   r'|класса\s+события\s+на\s+переход\s+строки',
+        'arrived': r'класса\s+события\s+на\s+переход\s+строки'
+                   r'|переход\s+строки\s+исполнения\s+не\s+заводится',
         'date': '2026-09-06',
         'source': 'GAPS_CLOSE_1 шага 10 фазы 2, часть 2, серия 9 (B13)',
         'allowed': ('.claude/work/decision-digest.md',
                     'tools/retired-check.py',
                     '.claude/work/progress/'),
+        # Пришедшая редакция сменилась доковой пачкой 2026-09-30: «верен и не
+        # обеспечен» снято сужением решением (запись ниже), и носители
+        # популяции несут теперь неделание класса строки исполнения.
         'population': (
             ('docs/rules/audit-not-runtime-source.md',
-             r'верен\s+и\s+.{0,20}не\s+обеспечен'),
-            ('docs/components/RefreshBalanceExecutor.md',
              r'класса\s+события\s+на\s+переход\s+строки'),
+            ('docs/components/RefreshBalanceExecutor.md',
+             r'переход\s+строки\s+исполнения\s+не\s+заводится'),
+        ),
+    },
+    {
+        'name': 'рефреш баланса в истории: клейм верен и не обеспечен',
+        # Снято доковой пачкой шага 12 фазы 2 (2026-09-30). Прежняя редакция
+        # держала пункт «исполнение рефреша объясняется историей» верным и
+        # необеспеченным, то есть ждущим класса события на переход строки
+        # исполнения. Что действует теперь — объявляет ключ `arrived`.
+        'pattern': r'верен\s+и\s+.{0,20}не\s+обеспечен',
+        'arrived': r'не\s+заводится',
+        'date': '2026-09-30',
+        'source': 'доковая пачка шага 12 фазы 2 (.claude/decisions/execution-row-event-class-declined.md)',
+        'allowed': ('.claude/work/decision-digest.md',
+                    'tools/retired-check.py',
+                    '.claude/decisions/execution-row-event-class-declined.md',
+                    '.claude/work/progress/',
+                    '.claude/work/history/'),
+        'population': (
+            ('docs/rules/audit-not-runtime-source.md', None),
+            ('docs/components/RefreshBalanceExecutor.md', None),
         ),
     },
     {
@@ -2354,7 +2430,6 @@ RETIRED = [
             ('docs/models/domain/other/Auditable.md',
              r'ручная\s+тропа\s+\*\*построена\*\*'),
             ('docs/models/domain/other/AuditRecord.md', None),
-            ('.claude/work/backlog.md', r'уже\s+построенную\*\*\s+поверхность'),
             ('docs/architecture/contracts.md',
              r'поверхность\s+ручных\s+операций\s+ядра\s+построена'),
         ),
@@ -2685,8 +2760,13 @@ RETIRED = [
         'date': '2026-09-08',
         'source': 'приземление узла 2 GAPS_CLOSE_4 шага 10 фазы 2, находка W1',
         'allowed': (),
+        # У контракт-дока свой шаблон: адресное перекрёстье продуктового
+        # корпуса сведено к смысловой ссылке на дом (`docs/concept.md`
+        # §Ссылки, 2026-09-30), и имени пассажа там больше нет.
         'population': (
-            ('docs/architecture/contracts.md', None),
+            ('docs/architecture/contracts.md',
+             r'агрегатной\s+—\s+правило\s+чтения\s+агрегатов\s+статистики\s+'
+             r'.?docs/rules/statistics-aggregates\.md'),
             ('docs/architecture/services.md',
              r'ограничения\s+отбора\s+агрегатной\s+вместе\s+с'),
             ('.claude/work/backlog.md', None),
@@ -2974,7 +3054,12 @@ RETIRED = [
             ('docs/components/HoldService.md', r'в\s+дереве\s+его\s+нет'),
             ('docs/rules/exchange-hold.md',
              r'Построенный\s+писатель\s+подъёма\s+сегодня\s+один'),
-            ('docs/rules/manual-halt.md', r'в\s+дереве\s+его\s+нет'),
+            # У правила ручной остановки адрес пассажа дома сведён к смысловой
+            # ссылке на дом (`docs/concept.md` §Ссылки, 2026-09-30): имя
+            # пассажа уехало вместе с адресом, ссылка на правило осталась.
+            ('docs/rules/manual-halt.md',
+             r'в\s+дереве\s+его\s+нет'
+             r'|правил\w*\s+о\s+писател\w*\s+статуса\s+вне\s+ребра'),
         ),
     },
     {
@@ -3402,6 +3487,75 @@ RETIRED = [
             ('docs/spec/deal-tranche-lifecycle.json', None),
         ),
     },
+    {
+        'name': 'эхо условной заявки сверяет адаптер по пяти полям',
+        # Снято доковой пачкой узла 1e шага 12 фазы 2
+        # (.claude/decisions/standalone-algo-echo-check.md): маппинг велел
+        # сверять пять полей эха, дом признака объявлял сверки нет, а в коде
+        # не было ни одной. Что действует теперь — объявляет ключ `arrived`
+        # у каждого носителя популяции.
+        'pattern': r"проверяются\s+adapter'ом\s+как\s+invariant"
+                   r'|Exchange\s+invariant\s+checks',
+        'arrived': r'Сверка\s+эха',
+        'date': '2026-10-01',
+        'source': '.claude/decisions/standalone-algo-echo-check.md (узел 1e шага 12 фазы 2)',
+        'allowed': ('.claude/work/decision-digest.md',),
+        'population': (
+            ('docs/models/mapping/AlgoOrder.md', None),
+            ('docs/models/integrations/okx/AlgoOrderOkxResponse.md',
+             r'подраздел\s+сверки\s+эха'),
+        ),
+    },
+    {
+        'name': 'ответ заявки и позиции сверяет адаптер',
+        # Снято второй волной доковой пачки узла 1e шага 12 фазы 2: инвентари
+        # ответа и маппинг позиции объявляли сверку режима, стороны позиции,
+        # плеча и инструмента на чтении, а коннектор её не делает ни на одной
+        # тропе чтения заявки и живой позиции. Что действует теперь —
+        # объявляет ключ `arrived` у каждого носителя популяции.
+        'pattern': r'adapter\s+сверяет|response\s+validation\s+\(adapter-layer\)',
+        'arrived': r'не\s+сверя[а-яё]+',
+        'date': '2026-10-01',
+        'source': '.claude/decisions/standalone-algo-echo-check.md; '
+                  '.claude/decisions/account-mode-contour-check.md (узел 1e шага 12 фазы 2)',
+        'allowed': ('.claude/work/decision-digest.md',),
+        'population': (
+            ('docs/models/integrations/okx/OrderOkxResponse.md',
+             r'константы\s+нашего\s+запроса;\s+не\s+сверяются'),
+            ('docs/models/integrations/okx/PositionOkxResponse.md',
+             r'не\s+читаются\s+и\s+не\s+сверяются'),
+            ('docs/models/integrations/okx/AlgoOrderOkxResponse.md',
+             r'подраздел\s+сверки\s+эха'),
+            ('docs/models/mapping/Position.md',
+             r'Ответ\s+чтения\s+живой\s+позиции\s+с\s+ожиданием\s+не\s+сверяется'),
+        ),
+    },
+    {
+        'name': 'autoCxl отменяет все активные заявки инструмента',
+        # Снято второй волной доковой пачки узла 1e шага 12 фазы 2 по сверке
+        # офдока close-position (.claude/decisions/kill-switch-teardown-cancel-first.md):
+        # корпус интеграции читал флаг шире, чем его объявляет площадка. Что
+        # действует теперь — объявляет ключ `arrived` у каждого носителя
+        # популяции. Файл кода в разрешённых местах — остаток кодового
+        # захода: javadoc тела запроса правится им, и строка `allowed`
+        # снимается той же правкой.
+        'pattern': r'отменить\s+все\s+активные\s+ордера'
+                   r'|autoCxl\s+снимает\s+активные'
+                   r'|Снять\s+активные\s+ордера\s+при\s+закрытии'
+                   r'|активный\s+ордер\s+снова\s+откроет'
+                   r'|отмен[а-яё]*\s+всех\s+активных\s+(?:заявок|ордеров)',
+        'arrived': r'заявки\s+на\s+закрытие',
+        'date': '2026-10-01',
+        'source': '.claude/decisions/kill-switch-teardown-cancel-first.md (ORCH-Q2, узел 1e шага 12 фазы 2)',
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/decisions/kill-switch-teardown-cancel-first.md',
+                    'services/connector-okx/src/main/java/com/example/connector/okx/integration/'
+                    'external/api/model/okx/request/ClosePositionOkxRequest.java'),
+        'population': (
+            ('docs/integrations/okx/contracts/position.md', None),
+            ('docs/models/mapping/Position.md', None),
+        ),
+    },
 ]
 
 
@@ -3432,11 +3586,70 @@ def flat_text(path):
         return flatten(handle.read(), os.path.splitext(path)[1])
 
 
-def carriers(roots):
+# РАЗМЕТКА ВЫДЕЛЕНИЯ (форма 9): серия из одной-трёх звёздочек либо одного-трёх
+# подчёркиваний. Разметкой серия НЕ считается в двух случаях, и оба —
+# признак, а не осторожность: `*` между двумя пробелами — пункт списка или
+# знак умножения, `_` между двумя буквами или цифрами — идентификатор
+# (`REDUCE_ONLY`). Область — все расширения, а не только markdown: жирный
+# выделитель стои́т и в javadoc, и в комментариях `.py`/`.sh`, а потерь
+# второе представление не даёт по построению — оно только добавляет.
+MARKUP_RUN = re.compile(r'(?<!\*)\*{1,3}(?!\*)|(?<!_)_{1,3}(?!_)')
+
+
+def demark(text):
+    """Плоский текст без маркеров выделения и карта сдвигов к исходному.
+
+    Карта — список пар «позиция в новом тексте, сколько символов снято до
+    неё»: по ней совпадение второго представления переводится в позиции
+    первого, чтобы не удвоить совпадение, которое первое уже взяло, и
+    напечатать вхождение в том виде, в каком оно стои́т в носителе."""
+    pieces = []
+    cuts = []
+    last = 0
+    kept = 0
+    removed = 0
+    for match in MARKUP_RUN.finditer(text):
+        before = text[match.start() - 1] if match.start() > 0 else ' '
+        after = text[match.end()] if match.end() < len(text) else ' '
+        if before.isspace() and after.isspace():
+            continue
+        if match.group(0)[0] == '_' and before.isalnum() and after.isalnum():
+            continue
+        piece = text[last:match.start()]
+        pieces.append(piece)
+        kept += len(piece)
+        removed += match.end() - match.start()
+        cuts.append((kept, removed))
+        last = match.end()
+    if not cuts:
+        return text, cuts
+    pieces.append(text[last:])
+    return ''.join(pieces), cuts
+
+
+MARKUP_KIND = 'снятая редакция жива, разорвана разметкой'
+
+
+def origin(cuts, position):
+    """Позиция второго представления → позиция в плоском тексте."""
+    shift = 0
+    low, high = 0, len(cuts)
+    while low < high:
+        middle = (low + high) // 2
+        if cuts[middle][0] <= position:
+            shift = cuts[middle][1]
+            low = middle + 1
+        else:
+            high = middle
+    return position + shift
+
+
+def carriers(roots, skip_list=None):
+    skip_list = SKIP if skip_list is None else skip_list
     found = []
     for pattern in roots:
         for path in glob.glob(pattern, recursive=True):
-            if any(skip in '/' + path.replace(os.sep, '/') for skip in SKIP):
+            if any(skip in '/' + path.replace(os.sep, '/') for skip in skip_list):
                 continue
             found.append(path)
     return sorted(set(found))
@@ -3615,11 +3828,16 @@ def scan(registry, roots):
             # держать одно и то же знание в N местах.
             continue
         text = flat_text(path)
+        demarked, cuts = demark(text)
         for entry in registry:
             if normalized in entry.get('allowed', ()):
                 continue
             unless = entry.get('unless')
+            # Спаны ВСЕХ совпадений первого представления, включая погашенные
+            # отрицанием: решение о них принято, и второе его не переигрывает.
+            plain_spans = []
             for match in re.finditer(entry['pattern'], text, re.I):
+                plain_spans.append(match.span())
                 if unless:
                     window = text[max(0, match.start() - 160):match.end() + 160]
                     if re.search(unless, window, re.I):
@@ -3627,6 +3845,20 @@ def scan(registry, roots):
                         continue
                 hits.append((path, entry['name'], 'снятая редакция жива',
                              match.group(0)[:60], entry['date'], entry['source']))
+            if not cuts:
+                continue
+            # --- форма 9: термин, разорванный разметкой выделения
+            for match in re.finditer(entry['pattern'], demarked, re.I):
+                start = origin(cuts, match.start())
+                end = origin(cuts, max(match.start(), match.end() - 1)) + 1
+                if any(s < end and start < e for s, e in plain_spans):
+                    continue
+                if unless:
+                    window = demarked[max(0, match.start() - 160):match.end() + 160]
+                    if re.search(unless, window, re.I):
+                        continue
+                hits.append((path, entry['name'], MARKUP_KIND,
+                             text[start:end][:60], entry['date'], entry['source']))
     # --- оси 4-5: популяция носителей предъявляет пришедшую редакцию
     population_checked = 0
     for entry in registry:
@@ -3639,7 +3871,8 @@ def scan(registry, roots):
                              '', entry['date'], entry['source']))
                 continue
             text = flat_text(member)
-            if not re.search(expected, text, re.I):
+            if (not re.search(expected, text, re.I)
+                    and not re.search(expected, demark(text)[0], re.I)):
                 hits.append((member, entry['name'],
                              'пришедшая редакция не дошла до носителя популяции',
                              expected[:40], entry['date'], entry['source']))
@@ -3747,6 +3980,42 @@ def battery():
                      any(k == 'снятая редакция жива' for _, _, k, _, _, _ in result[2]),
                      'дефектов: %d' % len(result[2])))
         os.remove(os.path.join(work, 'отрицание.md'))
+
+        # --- ось 28: форма 9, термин, разорванный разметкой выделения. Все три
+        # мутации дают дефект ТОЛЬКО этой формы: первое представление их не
+        # берёт (контроль в той же оси), то есть на коде без `demark` ось была
+        # бы красной.
+        for title, body in (
+                ('28a. маркер внутри слова (сня**та**я)',
+                 '# Р\n\nЗдесь сня**та**я редакция живёт до сих пор.\n'),
+                ('28b. маркер вокруг слова фразы (**снятая** редакция)',
+                 '# Р\n\nЗдесь **снятая** редакция живёт до сих пор.\n'),
+                ('28c. подчёркивание вокруг слова фразы (снятая _редакция_)',
+                 '# Р\n\nЗдесь снятая _редакция_ живёт до сих пор.\n')):
+            page('разметка.md', body)
+            result, _ = scan(probe(ok_population), [os.path.join(work, '*.md')])
+            kinds = [k for _, _, k, _, _, _ in result[2]]
+            axes.append(('%s — дефект формы 9, и только её' % title,
+                         kinds == [MARKUP_KIND],
+                         'находки: %s' % (kinds,)))
+            os.remove(os.path.join(work, 'разметка.md'))
+
+        page('разметка.md', '# Р\n\nЗдесь снятая редакция живёт, а **рядом** — жирное.\n')
+        result, _ = scan(probe(ok_population), [os.path.join(work, '*.md')])
+        kinds = [k for _, _, k, _, _, _ in result[2]]
+        axes.append(('28-контроль: совпадение первого представления вторым не удваивается',
+                     kinds == ['снятая редакция жива'], 'находки: %s' % (kinds,)))
+        page('разметка.md', '# Р\n\n* снятая\n* редакция живёт\n')
+        result, _ = scan(probe(ok_population), [os.path.join(work, '*.md')])
+        axes.append(('28-контроль: пункты списка разметкой не считаются',
+                     not result[2], 'дефектов: %d' % len(result[2])))
+        os.remove(os.path.join(work, 'разметка.md'))
+
+        page('пришедшая-жирно.md', '# ПЖ\n\nЗдесь **пришедшая** редакция стои́т.\n')
+        result, _ = scan(probe(((path_of('пришедшая-жирно.md'), None),)), [roots])
+        axes.append(('28-контроль: пришедшая редакция, разорванная разметкой, — не дефект',
+                     not result[2], 'дефектов: %d' % len(result[2])))
+        os.remove(os.path.join(work, 'пришедшая-жирно.md'))
 
         # --- отказы
         _, refusal = scan([], [roots])
@@ -3864,6 +4133,30 @@ def battery():
     axes.append(('27. контроль: пункты markdown-списка не склеиваются',
                  not re.search(pattern, flatten(bullet, '.md'), re.I),
                  'плоский текст: %r' % (flatten(bullet, '.md').strip(),)))
+
+    # Контроль формы 9 на уровне представления: подчёркивание между буквами —
+    # идентификатор, и снятие его склеило бы `REDUCE_ONLY` в `REDUCEONLY`,
+    # заводя совпадения, которых в носителе нет.
+    identifier = "отбор по type == 'REDUCE_ONLY' и snake_case"
+    axes.append(('28-контроль: подчёркивание внутри идентификатора разметкой не считается',
+                 demark(identifier)[0] == identifier,
+                 'второе представление: %r' % (demark(identifier)[0],)))
+
+    # --- ось 29: форма 3, РАБОЧИЕ файлы стоят в области. Мерится на
+    # ФАКТИЧЕСКОЙ области (шаблоны минус `SKIP`), а не на пробной: предмет оси
+    # — что правка шаблонов или `SKIP` не вывела рабочий файл из свипа молча.
+    # Файла нет — ось красна: перечень формы 3 разошёлся с корпусом.
+    reached = set(path.replace(os.sep, '/') for path in carriers(
+        tuple(pattern for pattern in ROOTS if pattern.startswith('.claude/'))))
+    missing = [name for name in WORK_FILES if name not in reached]
+    axes.append(('29. рабочие файлы достижимы фактической областью свипа',
+                 not missing, 'не достигнуты: %s' % (missing or 'нет',)))
+    narrowed = set(path.replace(os.sep, '/') for path in carriers(
+        ('.claude/**/*.md',), SKIP + ('/.claude/work/',)))
+    axes.append(('29-контроль: `SKIP`, снявший `work/`, рабочие файлы теряет',
+                 not any(name in narrowed for name in WORK_FILES),
+                 'достигнуты при суженной области: %s'
+                 % ([name for name in WORK_FILES if name in narrowed] or 'нет',)))
 
     return axes
 

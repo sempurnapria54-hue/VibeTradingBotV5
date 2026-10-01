@@ -65,17 +65,26 @@ class CloseReasonSeniorityTest {
         assertThat(subject.closeReasonBySeniority()).isNull();
     }
 
-    /** Значение вне перечня старшинства даёт замыкающий ранг и не выигрывает. */
+    /**
+     * Значения вне перечня старшинства у причины транша нет: запасное
+     * значение снято, и пустая наследуемая причина терминала не даёт
+     * (docs/lifecycles/DealTranche.md §«Писатель причины закрытия транша —
+     * обработчик терминального ребра»).
+     */
     @Test
-    @DisplayName("U8.6 — у транша стои́т значение вне перечня старшинства")
-    void u8_6_anOutOfListReasonNeverWins() {
-        assertThat(dealOf(DealTranche.CloseReason.UNKNOWN).closeReasonBySeniority()).isNull();
-        assertThat(dealOf(DealTranche.CloseReason.UNKNOWN, DealTranche.CloseReason.TAKE_PROFIT)
-                .closeReasonBySeniority()).isEqualTo(Deal.CloseReason.TAKE_PROFIT);
+    @DisplayName("U8.6 — перечень причин транша совпадает с перечнем старшинства")
+    void u8_6_theTrancheReasonListEqualsTheRankedList() {
+        assertThat(DealTranche.CloseReason.values()).containsExactlyInAnyOrder(
+                DealTranche.CloseReason.EXTERNAL_CLOSE,
+                DealTranche.CloseReason.RISK_CONTROL,
+                DealTranche.CloseReason.STOP_LOSS,
+                DealTranche.CloseReason.STRATEGY_EXIT,
+                DealTranche.CloseReason.TAKE_PROFIT,
+                DealTranche.CloseReason.ENTRY_CONDITION_EXPIRED);
     }
 
     @ParameterizedTest
-    @EnumSource(value = DealTranche.CloseReason.class, names = "UNKNOWN", mode = EnumSource.Mode.EXCLUDE)
+    @EnumSource(DealTranche.CloseReason.class)
     @DisplayName("U8.7 — каждое из шести значений перечня старшинства порознь")
     void u8_7_theRankedSetMapsOneToOne(DealTranche.CloseReason reason) {
         assertThat(dealOf(reason).closeReasonBySeniority()).isEqualTo(Deal.CloseReason.valueOf(reason.name()));

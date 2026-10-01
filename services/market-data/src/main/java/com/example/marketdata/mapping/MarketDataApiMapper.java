@@ -17,11 +17,13 @@ import com.example.marketdata.api.model.MarketStructureApiResponse;
 import com.example.marketdata.api.model.MarketStructureConfigApiResponse;
 import com.example.marketdata.api.model.MarketTickerApiResponse;
 import com.example.marketdata.api.model.OrderBookLevelApiResponse;
+import com.example.marketdata.api.model.PositionTierApiResponse;
 import com.example.marketdata.domain.model.IndicatorConfig;
 import com.example.marketdata.domain.model.MarketFeatureBundle;
 import com.example.marketdata.domain.model.MarketStructureConfig;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingbot.domain.model.core.instrument.PositionTier;
 import com.example.tradingbot.domain.model.trade.candle.Candle;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
 import com.example.tradingbot.domain.model.trade.indicator.AtrValue;
@@ -137,6 +139,8 @@ public interface MarketDataApiMapper {
     MarketTickerApiResponse domainToApi(MarketTicker ticker);
 
     InstrumentExternalRulesApiResponse domainToApi(InstrumentExternalRules rules);
+
+    PositionTierApiResponse domainToApi(PositionTier tier);
 
     MarketPriceDataApiResponse domainToApi(MarketPriceData prices);
 

@@ -5,9 +5,11 @@ import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isNotFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
@@ -25,6 +27,11 @@ import lombok.Setter;
  * связь StrategyAction ↔ Order — через DealActionState, поэтому не
  * хранит strategyActionId / role / level. См.
  * docs/models/domain/core/Order.md, docs/lifecycles/Order.md.
+ *
+ * <p><b>Нульарные {@code is}-предикаты изъяты из сериализации</b>
+ * ({@code @JsonIgnore}): заявка едет телом команды к коннектору и ответом
+ * его чтения, а вычисленный ответ свойством формы не является — ключом без
+ * поля он ушёл бы к читателю на другой стороне провода.
  */
 @Getter
 @Setter
@@ -87,6 +94,20 @@ public class Order extends Auditable {
     /** Сырой статус биржи (OKX state) — диагностический факт, FSM напрямую не использует. */
     private String externalStatus;
 
+    /**
+     * <b>Наблюдённая живость на площадке</b> — что показала ПОСЛЕДНЯЯ
+     * добыча: живой статус — истина; терминальный статус либо полный цикл
+     * без записи — ложь; статус не разобран либо наблюдения не было —
+     * пусто, и пустота значаща («не наблюдалась»).
+     *
+     * <p>Читается только у ноги в {@code ERROR}: у прочих живость несёт сам
+     * статус, а пометка ошибки — наше safety-состояние, а не факт площадки
+     * (docs/lifecycles/Order.md §«Нога в {@code ERROR}: живость на площадке
+     * читается наблюдением»). Писатель — добыча заявки
+     * (docs/components/RefreshOrderExecutor.md).
+     */
+    private Boolean externalLive;
+
     /** Цена (для market-like может быть null). */
     private BigDecimal price;
 
@@ -145,8 +166,8 @@ public class Order extends Auditable {
     /**
      * <b>Наблюдаемый запас до ликвидации на момент постановки</b> —
      * измеритель, не операнд: в инвариант «шесть или ни одного» не входит
-     * (docs/models/domain/core/Order.md §«Шесть чисел планового риска
-     * ноги»). Write-once; <b>пуст, когда цена ликвидации не
+     * (docs/models/domain/core/Order.md §«Шесть чисел планового риска:
+     * инвариант «шесть или ни одного»»). Write-once; <b>пуст, когда цена ликвидации не
      * наблюдалась</b> — у открывающего входа позиции ещё нет, и мерить
      * не от чего.
      */
@@ -174,8 +195,55 @@ public class Order extends Auditable {
             Status.PARTIALLY_COMPLETED, EnumSet.of(Status.COMPLETED, Status.CANCELED, Status.ERROR));
 
     /** Live: ещё существует на бирже / влияет на risk (CREATED/PENDING/ACTIVE/PARTIALLY_COMPLETED). */
+    @JsonIgnore
     public Boolean isLive() {
         return LIVE_STATUSES.contains(status);
+    }
+
+    /**
+     * Живость заявки на площадке НЕ ИСКЛЮЧЕНА (docs/spec/order-lifecycle.json,
+     * величина {@code orderMayBeLive}). Множество шире {@link #isLive()}
+     * ровно на ногу в {@code ERROR}: пометка ошибки — наше safety-состояние,
+     * и нога под ней может стоять на площадке живой.
+     *
+     * <p><b>Нежилой такую ногу делает только наблюдение</b>
+     * ({@link #externalLive} ложь); пустое наблюдение нежилостью не
+     * читается — иначе снятие риска и гейт терминала объявляли бы снятым то,
+     * чего никто не видел. У прочих статусов наблюдение не читается вовсе.
+     *
+     * <p>Читатели — аварийные: снятие риска и доказанное отсутствие живого
+     * риска сделки. Штатные исполнители читают {@link #isLive()}.
+     */
+    public Boolean mayBeLive() {
+        return isTrue(isLive()) || (Status.ERROR.equals(status) && isNotFalse(externalLive));
+    }
+
+    /**
+     * Нога терминальна локально: исполнена, отменена либо в ошибочном
+     * состоянии (docs/spec/external-status-resolution.json, операнд
+     * {@code localTerminal}). Пустой статус терминальным не читается:
+     * терминальность снимает биржевую ступень у исчерпанного цикла добычи,
+     * и пустота вела бы в благоприятную сторону.
+     *
+     * <p>Предикат изъят из сериализации: заявка уезжает телом команды к
+     * коннектору, а свойством формы вычисленный ответ не является.
+     */
+    @JsonIgnore
+    public Boolean isLocallyTerminal() {
+        return nonNull(status) && isFalse(isLive());
+    }
+
+    /**
+     * Записывает наблюдённую живость по итогу полного цикла добычи: запись
+     * найдена живой — истина; найдена терминальной либо не найдена вовсе —
+     * ложь (docs/lifecycles/Order.md §«Нога в {@code ERROR}: живость на
+     * площадке читается наблюдением»). Отказ разбора статуса наблюдением
+     * не является: его вызывающий записывает пустотой.
+     *
+     * @param found запись, добытая циклом; пусто — полный цикл её не нашёл
+     */
+    public void observeOnVenue(Order found) {
+        this.externalLive = nonNull(found) && isTrue(found.isLive());
     }
 
     /**
@@ -188,16 +256,19 @@ public class Order extends Auditable {
      * ноги его объявляют, и пустота есть несогласованное состояние, а не
      * третий вид ноги.
      */
+    @JsonIgnore
     public Boolean isEntryLeg() {
         return isFalse(positionReducingOnly);
     }
 
     /** Нога, объявившая, что только уменьшает позицию; пустое намерение — не она (см. {@link #isEntryLeg()}). */
+    @JsonIgnore
     public Boolean isReducingLeg() {
         return isTrue(positionReducingOnly);
     }
 
     /** Нога налита целиком: завершена с причиной налива. */
+    @JsonIgnore
     public Boolean isFilled() {
         return Status.COMPLETED.equals(status) && CloseReason.FILLED.equals(closeReason);
     }
@@ -229,6 +300,7 @@ public class Order extends Auditable {
      * потерян. Биржевого идентификатора у такой ноги нет, и найти её можно
      * только по клиентскому (docs/lifecycles/Order.md).
      */
+    @JsonIgnore
     public Boolean isNotSubmitted() {
         return Status.CREATED.equals(status);
     }
@@ -414,9 +486,6 @@ public class Order extends Auditable {
 
         /** Неизвестный внешний статус. */
         UNKNOWN_EXTERNAL_STATUS,
-
-        /** Нарушение exchange-инварианта. */
-        EXCHANGE_INVARIANT_VIOLATION,
 
         /** Fallback. */
         UNKNOWN

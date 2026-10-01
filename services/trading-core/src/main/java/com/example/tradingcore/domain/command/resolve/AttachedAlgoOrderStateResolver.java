@@ -10,14 +10,16 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
  * Выводит статус встроенной защиты и кандидата причины закрытия ПО НАБОРУ
  * ФАКТОВ: полноценного статуса источник ей не отдаёт. Дом матриц —
  * docs/lifecycles/Order.md, форма и примеры — docs/spec/order-lifecycle.json
- * ({@code attachedParentClass}, {@code attachedOutcomeByParent},
+ * ({@code attachedParentStatus}, {@code attachedParentClass}, {@code attachedOutcomeByParent},
  * {@code attachedBecomesActive}, {@code searchExhaustedOutcome},
  * {@code attachedHistoryStatus}, {@code attachedHistoryCloseReason}).
  *
@@ -39,6 +41,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class AttachedAlgoOrderStateResolver {
 
+    /**
+     * Наблюдённые статусы родителя в {@code ERROR}, которые класс читает
+     * вместо пометки ({@code attachedParentStatus}).
+     */
+    private static final Set<Order.Status> OBSERVABLE_PARENT_STATUSES = EnumSet.of(Order.Status.ACTIVE,
+            Order.Status.PARTIALLY_COMPLETED, Order.Status.COMPLETED, Order.Status.CANCELED);
+
     /** Класс состояния родителя, различимый политикой встроенной защиты. */
     private enum ParentClass {
         UNCONFIRMED, LIVE, PROBLEM, TERMINAL_FILLED, TERMINAL_EMPTY, TERMINAL_FILL_UNKNOWN
@@ -50,12 +59,57 @@ public class AttachedAlgoOrderStateResolver {
      * заводил СВОЮ копию гейта: гейт один, и живёт он здесь — иначе
      * добытчик ходил бы к источнику там, где решение на ответ не смотрит,
      * либо молчал бы там, где ответ решению нужен.
+     *
+     * <p>Класс читается по тому же статусу, что и в резолве
+     * ({@code attachedParentStatus}): нога в {@code ERROR}, наблюдённая
+     * исполненной, свою защиту материализовала, и цикл её ищет; наблюдённая
+     * живой — класс живого родителя, и цикл не запускается. Нога в
+     * {@code ERROR}, которую полный цикл не нашёл, читается терминальной по
+     * наливу: при непустом либо недобытом наливе цикл её защиту ищет.
+     *
+     * @param parentObservedStatus статус снапшота родителя этой добычей;
+     *                             пусто — снапшот не получен
+     * @param parentExternalLive   наблюдённая живость родителя; ложь у
+     *                             родителя в {@code ERROR} без наблюдённого
+     *                             статуса — полный цикл его не нашёл
      */
-    public Boolean runsSearchCycle(Order.Status parentStatus, BigDecimal parentAccumulatedFillSize) {
+    public Boolean runsSearchCycle(Order.Status parentStatus, Order.Status parentObservedStatus,
+                                   Boolean parentExternalLive, BigDecimal parentAccumulatedFillSize) {
         if (isNull(parentStatus)) {
             return false;
         }
-        return runsSearchCycle(parentClass(parentStatus, parentAccumulatedFillSize));
+        return runsSearchCycle(parentClass(attachedParentStatus(parentStatus, parentObservedStatus),
+                parentExternalLive, parentAccumulatedFillSize));
+    }
+
+    /**
+     * Статус, по которому читается класс родителя
+     * (docs/spec/order-lifecycle.json, {@code attachedParentStatus}).
+     *
+     * <p><b>У родителя в {@code ERROR} — статус, который добыча показала на
+     * площадке</b>: живой, частично исполненный, исполненный либо снятый.
+     * Пометка ошибки — наше safety-состояние, поставленное невозможностью
+     * интерпретировать факт, а не факт площадки, и судьбы защиты она не
+     * несёт: площадка, показавшая налив помеченной ноги, материализовала
+     * защиту самостоятельной живой заявкой, а класс проблемного увёл бы её в
+     * неживые — и снятие риска её бы не сняло. Статус самого родителя при
+     * этом не меняется: рёбер из {@code ERROR} матрица не содержит.
+     *
+     * <p><b>Наблюдённый живой статус читается тем же правилом</b> — класс
+     * живого родителя: защита остаётся в его теле и наблюдается дальше, а не
+     * уходит в {@code ERROR}. Иначе, когда снятие риска отменит помеченную
+     * ногу с наливом, площадка материализует защиту живой заявкой, а модель
+     * держала бы её неживой.
+     *
+     * <p>Без наблюдённого статуса пометка остаётся, и класс по ней выводит
+     * наблюдённая живость родителя (класс родителя ниже). Прочим родителям —
+     * локальный статус: у них он и есть последний применённый факт.
+     */
+    private Order.Status attachedParentStatus(Order.Status parentStatus, Order.Status parentObservedStatus) {
+        if (Order.Status.ERROR.equals(parentStatus) && OBSERVABLE_PARENT_STATUSES.contains(parentObservedStatus)) {
+            return parentObservedStatus;
+        }
+        return parentStatus;
     }
 
     /**
@@ -93,6 +147,15 @@ public class AttachedAlgoOrderStateResolver {
      * (docs/components/AttachedAlgoOrderStateResolver.md §Границы). Отказ
      * постановки проверяется раньше — это свой факт, и статус родителя его
      * не отменяет.
+     *
+     * <p><b>Родитель без наблюдения защиту не двигает</b> — исход «ждать»
+     * (docs/spec/order-lifecycle.json, {@code attachedOutcomeByParent}): о
+     * родителе площадка не показала ничего, судьба защиты не выводится ни из
+     * чего, и защита остаётся в прежнем состоянии — в множестве живых, где
+     * снятие риска её держит. Ошибочный исход увёл бы в неживые защиту, чья
+     * живость на площадке не исключена, а поля наблюдения у встроенной
+     * защиты нет (docs/lifecycles/Order.md §«Судьба встроенной защиты по
+     * фактам родителя»).
      */
     public AttachedProtectionResolution resolve(AttachedProtectionFacts facts) {
         if (isTrue(failsToPlace(facts.getObserved()))) {
@@ -104,8 +167,7 @@ public class AttachedAlgoOrderStateResolver {
         }
         ParentClass parentClass = parentClass(facts);
         if (Objects.equals(ParentClass.PROBLEM, parentClass)) {
-            return AttachedProtectionResolution.of(AttachedAlgoOrder.Status.ERROR,
-                    AttachedAlgoOrder.CloseReason.UNKNOWN);
+            return AttachedProtectionResolution.waiting();
         }
         if (Objects.equals(ParentClass.TERMINAL_EMPTY, parentClass)) {
             return AttachedProtectionResolution.of(AttachedAlgoOrder.Status.CANCELED,
@@ -129,17 +191,36 @@ public class AttachedAlgoOrderStateResolver {
     /**
      * Различает не статус сам по себе, а ПАРУ «терминален ли родитель» +
      * «каков налив»: до терминала налив исхода не меняет, на терминале он
-     * его и определяет. Пустой налив нулём НЕ подменяется.
+     * его и определяет. Пустой налив нулём НЕ подменяется. Статус — тот,
+     * по которому класс читается ({@code attachedParentStatus}), а не
+     * локальный статус родителя.
      */
     private ParentClass parentClass(AttachedProtectionFacts facts) {
-        return parentClass(facts.getParentStatus(), facts.getParentAccumulatedFillSize());
+        return parentClass(attachedParentStatus(facts.getParentStatus(), facts.getParentObservedStatus()),
+                facts.getParentExternalLive(), facts.getParentAccumulatedFillSize());
     }
 
-    private ParentClass parentClass(Order.Status parentStatus, BigDecimal parentAccumulatedFillSize) {
+    /**
+     * Класс по статусу, в котором он читается
+     * (docs/spec/order-lifecycle.json, {@code attachedParentClass}).
+     *
+     * <p><b>Родитель в {@code ERROR}, которого полный цикл добычи НЕ НАШЁЛ,
+     * читается терминальным классом по наливу</b>: на площадке его нет, и
+     * налива он больше не наберёт — та же посылка, что у неотправленной ноги
+     * (принятая площадкой заявка видна поиску). Прочитанный проблемным, он
+     * уводил бы защиту, возможно материализованную площадкой живой записью,
+     * мимо поиска. Класс {@code PROBLEM} остаётся за родителем, о котором
+     * площадка не показала ничего: наблюдённая живость пуста либо истинна —
+     * пустота нежилостью не читается.
+     */
+    private ParentClass parentClass(Order.Status parentStatus, Boolean parentExternalLive,
+                                    BigDecimal parentAccumulatedFillSize) {
         return switch (parentStatus) {
             case CREATED, PENDING -> ParentClass.UNCONFIRMED;
             case ACTIVE, PARTIALLY_COMPLETED -> ParentClass.LIVE;
-            case ERROR -> ParentClass.PROBLEM;
+            case ERROR -> isFalse(parentExternalLive)
+                    ? terminalClass(parentAccumulatedFillSize)
+                    : ParentClass.PROBLEM;
             case COMPLETED, CANCELED -> terminalClass(parentAccumulatedFillSize);
         };
     }

@@ -39,8 +39,15 @@
 # Код возврата: 0 — все величины доказательны; 1 — есть недоказательные
 # (перечень в stdout); 2 — ЗАМЕР НЕ ПРОВОДИЛСЯ (ось не доказана, базовый
 # гейт не пройден, корпус отказал под мутацией, раннер не собрался, JVM не
-# запустила раннер — прежде незапуск приезжал кодом 1 «есть недоказательные»,
-# G-7 `DOCS_CHECK_33`).
+# довела раннер до вердикта).
+#
+# Системный отказ JVM отделён от недоказательности ПО ВЕРДИКТУ: код 0 и 1
+# засчитываются, только когда раннер напечатал вердикт своего кода последней
+# строкой stdout; иной исход процесса — код 2. Прежний маппинг узнавал одну
+# строку отказа («Could not find or load main class»), и прочие (несобранный
+# classpath, версия класса, нехватка памяти, нет java, молчаливый выход)
+# приезжали кодом 1, 127 или 0. Маппинг и его батарея (оси маппинга, та же
+# команда, до замера) — tools/spec-runner-env.sh.
 set -euo pipefail
 
 # shellcheck source=tools/spec-runner-env.sh
@@ -58,14 +65,13 @@ fi
 # Та же конвертация, что у SPEC_CLASSES в оснастке: POSIX-форма mktemp
 # в аргументе Windows-Java не читается (G-7 `DOCS_CHECK_33`).
 command -v cygpath >/dev/null && WORK="$(cygpath -m "$WORK")"
-err_log="$SPEC_CLASSES/stderr.log"
-set +e
-"${JAVA[@]}" com.example.tradingbot.spec.SpecMutation "${1:-docs/spec}" "$WORK" 2>"$err_log"
-rc=$?
-set -e
-cat "$err_log" >&2
-if [ "$rc" -ne 0 ] && grep -q 'Could not find or load main class' "$err_log"; then
-  echo "ЗАМЕР НЕ ПРОВОДИЛСЯ: JVM не запустила раннер (системный отказ, не недоказательность)" >&2
+# Вердикты раннера — SpecMutation.main: последняя строка stdout при коде 0 и 1.
+OK_VERDICT='ВСЕ ВЕЛИЧИНЫ ДОКАЗАТЕЛЬНЫ'
+FAIL_VERDICT='НЕДОКАЗАТЕЛЬНЫХ ВЕЛИЧИН: '
+spec_verdict_battery "$OK_VERDICT" "$FAIL_VERDICT" || {
+  echo "ЗАМЕР НЕ ПРОВОДИЛСЯ: батарея маппинга исхода не доказана — код замера ничего не удостоверял бы" >&2
   exit 2
-fi
-exit "$rc"
+}
+spec_run_jvm "ЗАМЕР НЕ ПРОВОДИЛСЯ" "$OK_VERDICT" "$FAIL_VERDICT" \
+  "${JAVA[@]}" com.example.tradingbot.spec.SpecMutation "${1:-docs/spec}" "$WORK"
+exit "$SPEC_RC"

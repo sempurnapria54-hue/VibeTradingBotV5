@@ -1,5 +1,9 @@
 package com.example.marketdata.unit.mapping;
 
+import static com.example.testsupport.StrategyOverlayCopyContract.INDICATOR_PARAMS_KEYS;
+import static com.example.testsupport.StrategyOverlayCopyContract.MARKET_STRUCTURE_PARAMS_KEYS;
+import static com.example.testsupport.StrategyOverlayCopyContract.indicatorParamsOfEverySubtype;
+import static com.example.testsupport.StrategyOverlayCopyContract.marketStructureParamsWithEveryField;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -11,7 +15,10 @@ import com.example.tradingbot.domain.model.aggregate.strategy.setting.MacdParams
 import com.example.tradingbot.domain.model.aggregate.strategy.setting.MarketStructureParams;
 import com.example.tradingbot.domain.model.trade.candle.TimeFrame;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,11 +26,16 @@ import org.junit.jupiter.api.Test;
 /**
  * Параметры вычисления: каноническая форма против хранимой.
  *
- * <p>Кейсы — группа `U9`
+ * <p>Кейсы — группа `U9` и клетки `U11.7`, `U13.5`
  * (.claude/tests/cases/jsonb-overlay-roundtrip.md). Каноническая форма —
  * операнд ключа уникальности реестра идентичностей, и сравнивается она
  * ДОСЛОВНО, строка со строкой: разойдись она с собой, одна идентичность
  * завела бы в реестре две строки.
+ *
+ * <p><b>Литеральные перечни ключей `U13.5` берутся у формы, а не
+ * переписываются здесь:</b> параметры индикатора и структуры рынка пишет и
+ * конвертер дерева стратегии, и у перечня одной формы один носитель —
+ * {@code StrategyOverlayCopyContract} (.claude/rules/carrier-levels.md).
  */
 class ComputationParamsJsonConverterTest extends JsonbOverlayProbe {
 
@@ -184,6 +196,50 @@ class ComputationParamsJsonConverterTest extends JsonbOverlayProbe {
                 .as("хранимая форма оставляет порядок объявления — это и есть единственный "
                         + "наблюдаемый операнд канонического маппера")
                 .isNotEqualTo(keysOf(converter.paramsToCanonical(params)));
+    }
+
+    @Test
+    @DisplayName("U11.7 — на строгом источнике строка реестра терпима к лишнему ключу, сырая форма строга")
+    void u11_7_onAStrictSourceTheRegistryRowIsTolerantAndTheRawShapeStaysStrict() {
+        ObjectMapper strict = beanAssemblyMapper()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        ComputationParamsJsonConverter onStrict = new ComputationParamsJsonConverter(strict);
+        String withUnknown = converter.paramsToJson(atrParams())
+                .replaceFirst("\\{", "{\"smoothing\":\"wilder\",");
+
+        assertThat(onStrict.jsonToIndicatorParams(withUnknown, IndicatorValue.Type.ATR))
+                .as("U11.7: вход %s, источник строгий — терпимость строки реестра запинена "
+                        + "конвертером", withUnknown)
+                .usingRecursiveComparison().isEqualTo(atrParams());
+
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("period", 14);
+        raw.put("smoothing", "wilder");
+        assertThatThrownBy(() -> onStrict.toIndicatorParams(raw, IndicatorValue.Type.ATR))
+                .as("U11.7: разбор сырой формы запроса остаётся строгим (U9.7)")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("AtrParams");
+    }
+
+    @Test
+    @DisplayName("U13.5 — хранимая и каноническая формы: множество ключей одно и равно литеральному перечню")
+    void u13_5_bothFormsCarryTheSameLiteralKeySet() {
+        for (IndicatorParams params : indicatorParamsOfEverySubtype()) {
+            List<String> expected = INDICATOR_PARAMS_KEYS.get(params.getClass());
+            assertThat(keysOf(converter.paramsToJson(params)))
+                    .as("U13.5: хранимая форма, подтип %s", params.getClass().getSimpleName())
+                    .containsExactlyInAnyOrderElementsOf(expected);
+            assertThat(keysOf(converter.paramsToCanonical(params)))
+                    .as("U13.5: каноническая форма, подтип %s", params.getClass().getSimpleName())
+                    .containsExactlyInAnyOrderElementsOf(expected);
+        }
+        MarketStructureParams structure = marketStructureParamsWithEveryField();
+        assertThat(keysOf(converter.paramsToJson(structure)))
+                .as("U13.5: хранимая форма параметров структуры рынка")
+                .containsExactlyInAnyOrderElementsOf(MARKET_STRUCTURE_PARAMS_KEYS);
+        assertThat(keysOf(converter.paramsToCanonical(structure)))
+                .as("U13.5: каноническая форма параметров структуры рынка")
+                .containsExactlyInAnyOrderElementsOf(MARKET_STRUCTURE_PARAMS_KEYS);
     }
 
     private static AtrParams atrParams() {

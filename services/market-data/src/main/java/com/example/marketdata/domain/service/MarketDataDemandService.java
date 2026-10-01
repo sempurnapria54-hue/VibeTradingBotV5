@@ -1,9 +1,9 @@
 package com.example.marketdata.domain.service;
 
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.marketdata.domain.model.IndicatorConfig;
 import com.example.marketdata.domain.model.MarketStructureConfig;
@@ -40,6 +40,13 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class MarketDataDemandService {
+
+    /**
+     * Сколько раз приём требования перечитывает группу, переписанную шагом
+     * цикла между чтением и записью. Шаг пишет группу раз за тик, поэтому
+     * повтор, упёршийся в предел, означает не гонку, а отказ записи.
+     */
+    private static final int DEEPENING_ATTEMPTS = 3;
 
     private final InstrumentDataService instrumentDataService;
     private final CandleGroupDataService candleGroupDataService;
@@ -99,32 +106,58 @@ public class MarketDataDemandService {
      * Расширяет горизонт группы, если требование глубже уже стоящего.
      *
      * <p>Мельче стоящего — не сужение: собранное не выбрасывается, потому
-     * что его заказал кто-то другой.
+     * что его заказал кто-то другой (docs/models/domain/other/CandleGroup.md
+     * §«Горизонт бэкфилла принадлежит группе»).
      *
      * <p><b>Углублённый горизонт возвращает к бэкфиллу группу в ЛЮБОМ
-     * живом статусе, а не только готовую.</b> Дотягивание нижней границы
-     * до планового горизонта — забота одного лишь {@code BACKFILL}
-     * (docs/models/domain/other/CandleGroup.md §«Целостность по count»),
-     * и остальные статусы цикла к нему сами не возвращаются: группа,
-     * которую застали в {@code SYNC}/{@code CHECK}/{@code REPAIR}, дошла бы до
-     * {@code ACTIVE} с непокрытым горизонтом, и требование потерялось бы
-     * молча. Окно это не редкое: докачка хвоста уводит группу из
-     * {@code ACTIVE} на каждом новом закрытом баре. Терминальные статусы
-     * требованием не оживляются ({@code CandleGroup.isTerminal()}).
+     * живом статусе, а не только готовую</b>; терминальные статусы
+     * требованием не оживляются, а горизонт у них всё равно расширяется
+     * (docs/lifecycles/CandleGroup.md §«Возврат к `BACKFILL` по углублённому
+     * требованию»).
+     *
+     * <p><b>Пишутся только горизонт и статус — точечной записью под гардом
+     * застанного.</b> Шаг цикла загрузки пишет ту же строку в любой момент,
+     * и запись группы целиком вернула бы его итог к снимку, прочитанному
+     * требованием: группа в {@code ERROR} оживала бы как {@code BACKFILL},
+     * счёт и границы устаревали бы до следующего шага. Шаг, успевший
+     * записать итог между чтением и записью, роняет гард; тогда группа
+     * перечитывается, и решение принимается заново по тому, что шаг
+     * записал.
      */
-    private CandleGroup deepenHorizon(CandleGroup group, Long horizon) {
-        if (isNull(horizon)) {
-            return group;
+    private CandleGroup deepenHorizon(CandleGroup loaded, Long horizon) {
+        CandleGroup group = loaded;
+        for (int attempt = 0; attempt < DEEPENING_ATTEMPTS; attempt++) {
+            if (isFalse(isDeeper(horizon, group.getPlannedFirstUtcMillis()))) {
+                return group;
+            }
+            CandleGroup.Status loadedStatus = group.getStatus();
+            Long loadedHorizon = group.getPlannedFirstUtcMillis();
+            group.setPlannedFirstUtcMillis(horizon);
+            if (isFalse(group.isTerminal())) {
+                group.setStatus(CandleGroup.Status.BACKFILL);
+            }
+            if (isTrue(candleGroupDataService.saveDeepenedHorizon(group, loadedStatus, loadedHorizon))) {
+                return group;
+            }
+            log.info("CandleGroup {} was rewritten while a deeper requirement was being accepted; re-reading",
+                    group.getId());
+            group = candleGroupDataService.getRequiredById(group.getId());
         }
-        Long standing = group.getPlannedFirstUtcMillis();
-        if (nonNull(standing) && standing <= horizon) {
-            return group;
+        throw new IllegalStateException("CandleGroup " + loaded.getId()
+                + " kept being rewritten while a deeper requirement was being accepted");
+    }
+
+    /**
+     * Глубже ли требуемый горизонт стоящего. Пустой горизонт — вся история
+     * площадки (docs/lifecycles/CandleGroup.md §«Глубина и покрытие
+     * (`BACKFILL`)»), и глубже него не бывает ничего; требование всей
+     * истории глубже всякого названного горизонта.
+     */
+    private Boolean isDeeper(Long requested, Long standing) {
+        if (isNull(standing)) {
+            return false;
         }
-        group.setPlannedFirstUtcMillis(horizon);
-        if (isFalse(group.isTerminal())) {
-            group.setStatus(CandleGroup.Status.BACKFILL);
-        }
-        return candleGroupDataService.save(group);
+        return isNull(requested) || requested < standing;
     }
 
     private CandleGroup newGroup(Instrument instrument, TimeFrame timeframe, Long horizon) {

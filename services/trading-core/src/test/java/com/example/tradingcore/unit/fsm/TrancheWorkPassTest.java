@@ -31,6 +31,7 @@ import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
+import com.example.tradingcore.domain.command.payload.RefreshBalanceCommandPayload;
 import com.example.tradingcore.domain.command.risk.RiskBlockAction;
 import com.example.tradingcore.domain.command.strategy.ActionPlan;
 import com.example.tradingcore.domain.command.strategy.StrategyActionOrchestrator;
@@ -176,18 +177,6 @@ class TrancheWorkPassTest {
     }
 
     @Test
-    @DisplayName("U22.9 — реакция «затребовать обновление»: команда добычи снимка средств через звено")
-    void u22_9_theRequestRefreshReactionFetchesTheBalanceSnapshot() {
-        when(systemActionExecutor.next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
-                eq(ServiceCommandType.REFRESH_BALANCE_COMMAND), any()))
-                .thenReturn(Optional.of(command(ServiceCommandType.REFRESH_BALANCE_COMMAND)));
-
-        TrancheTransition transition = dispose(blocked(RiskBlockAction.Type.REQUEST_REFRESH));
-
-        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_BALANCE_COMMAND);
-    }
-
-    @Test
     @DisplayName("U22.10 — реакция «пропустить действие»: переход пустой")
     void u22_10_theSkipActionReactionLeavesThePassEmpty() {
         assertEmpty(dispose(blocked(RiskBlockAction.Type.SKIP_ACTION)));
@@ -195,9 +184,8 @@ class TrancheWorkPassTest {
 
     @Test
     @DisplayName("U22.11 — разрешающая реакция: её исход — молчание, а не команда")
-    void u22_11_theAllowingReactionsAreSilent() {
+    void u22_11_theAllowingReactionIsSilent() {
         assertEmpty(dispose(blocked(RiskBlockAction.Type.CONTINUE)));
-        assertEmpty(dispose(blocked(RiskBlockAction.Type.CONTINUE_WITH_WARNING)));
     }
 
     @Test
@@ -274,6 +262,37 @@ class TrancheWorkPassTest {
         assertThat(rung.getRung()).isEqualTo(HoldRung.HARD);
         assertThat(rung.getCode()).isEqualTo(Constants.Hold.INSTRUMENT_MARKET_DATA_EXPIRED);
         assertThat(transition.getShutdownRequested()).isNull();
+    }
+
+    /**
+     * Отсрочка акта, создающего риск, до свежего снимка: заказ добычи снимка
+     * звеном системного действия, с расчётной валютой инструмента
+     * (docs/components/models/ActionPlan.md).
+     */
+    @Test
+    @DisplayName("U22.22 — план отсрочки до свежего снимка: команда добычи снимка средств, ребра и просьб нет")
+    void u22_22_anAwaitingBalancePlanOrdersTheBalanceFetch() {
+        when(systemActionExecutor.next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
+                eq(ServiceCommandType.REFRESH_BALANCE_COMMAND), any()))
+                .thenReturn(Optional.of(command(ServiceCommandType.REFRESH_BALANCE_COMMAND)));
+
+        TrancheTransition transition = dispose(ActionPlan.awaitingBalance());
+
+        assertThat(commandTypes(transition)).containsExactly(ServiceCommandType.REFRESH_BALANCE_COMMAND);
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.getDealErrorRequested()).isFalse();
+        assertThat(transition.getShutdownRequested()).isNull();
+        assertThat(transition.getHoldSignal()).isNull();
+        verify(systemActionExecutor).next(eq(SystemActionType.REFRESH_DEAL_CONTEXT_ACTION), any(), isNull(),
+                eq(ServiceCommandType.REFRESH_BALANCE_COMMAND),
+                eq(new RefreshBalanceCommandPayload("USDT")));
+    }
+
+    /** Повтор заказа ограничивает строка системного действия: пока она ждёт отката, переход пуст. */
+    @Test
+    @DisplayName("U22.23 — план отсрочки, звено добычи ждёт отката: переход пустой")
+    void u22_23_anAwaitingBalancePlanWithAWaitingLinkIsSilent() {
+        assertEmpty(dispose(ActionPlan.awaitingBalance()));
     }
 
     // --- сборка ------------------------------------------------------------

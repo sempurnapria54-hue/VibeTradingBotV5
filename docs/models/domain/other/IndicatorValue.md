@@ -29,8 +29,8 @@
   (`docs/architecture/data-ownership.md`);
 - **у фич по всему листингу владельца нет вовсе.** Детекторам советника
   нужны фичи «по всему листингу, а не только по торгуемым инструментам»
-  (`docs/architecture/market-data-collection.md` §«Пригодность для
-  детекторов»); стратегии, которая их заказала, не существует, и привязка
+  (дом — требования к сбору, `docs/architecture/market-data-collection.md`:
+  пригодность для детекторов); стратегии, которая их заказала, не существует, и привязка
   к настройке не даёт такой строке места в таблице.
 
 **Что смена НЕ отменяет.** Срок свежести по-прежнему задаёт стратегия
@@ -60,7 +60,7 @@ Java abstract-класс, наследует `Auditable`.
 |---|---|---|
 | `id` | `Long` | Технический ID значения. |
 | `instrumentId` | `Long` | Внутренний ID инструмента. |
-| `indicatorConfigId` | `Long` | FK на идентичность вычисления (`indicator_configs.id`): тип, таймфрейм, канонические параметры. См. §«Ключевание — идентичностью вычисления». |
+| `indicatorConfigId` | `Long` | FK на идентичность вычисления (`indicator_configs.id`): тип, таймфрейм, канонические параметры; ею значение и ключуется. |
 | `candleTimestamp` | `OffsetDateTime` | Время свечи, на которой рассчитан индикатор. |
 
 Конкретное значение лежит в наследнике (по типу индикатора).
@@ -71,7 +71,8 @@ Java abstract-класс, наследует `Auditable`.
 `EFFICIENCY_RATIO`.
 
 `EFFICIENCY_RATIO` — мера эффективности/шума (Kaufman efficiency ratio):
-скаляр ∈ [0,1] по окну (`= |чистый ход| / Σ|побарных ходов|`), ER→1 —
+скаляр ∈ [0,1] по окну (форма — `docs/spec/indicator-calculation.json`
+(`efficiencyRatio`)), ER→1 —
 тренд, ER→0 — шум/боковик. Авторски-адресуемый операнд каталога (введён
 fork A — `docs/rules/condition-ruletype-granularity.md`): на
 него ссылаются условия (классификации фазы и входа) через
@@ -80,8 +81,20 @@ fork A — `docs/rules/condition-ruletype-granularity.md`): на
 внутреннего пересчёта.
 
 `OBV` — кумулятивный объёмный индикатор (On-Balance Volume): бегущая
-сумма знакового объёма от старта расчёта. Абсолютный уровень нестабилен
-(зависит от глубины загруженной истории и от масштаба/режима объёма),
+сумма знакового объёма **по ряду идентичности**. Проход продолжает сумму от
+последнего записанного значения ряда, а не начинает её заново со своего
+окна; ряд начинается нулём там, где записанного значения в окне прохода нет
+(затравка и шаг — `docs/spec/indicator-calculation.json` (`obvSeed`,
+`obvNext`)). Продолженный ряд прогрев прошёл до затравки, и бары окна после
+неё прогревом не отсекаются (граница сохранения —
+`docs/spec/indicator-calculation.json` (`indicatorValueStored`)). Поэтому внутри ряда разность значения и предыдущего записанного есть
+знаковый объём его бара — на ней и стоят относительные формы операнда. Бар
+с непроставленным объёмом при изменившемся закрытии значения не имеет, и
+сумма продолжается через него без его вклада: «объём не добыт» не
+сливается с «сделок не было» (`docs/rules/absent-value-semantics.md`);
+реакция на недобытый объём — предмет добычи свечи, а не вычислителя
+(`docs/rules/error-handling-policy.md`). Абсолютный уровень нестабилен
+(зависит от момента, с которого ряд начат, и от масштаба/режима объёма),
 поэтому **OBV-операнд условия ограничен относительными формами**
 (`CROSSED_ABOVE`/`CROSSED_BELOW` против серии/своей скользящей,
 направление/динамика); **абсолютный compare OBV с `CONSTANT` не
@@ -92,19 +105,38 @@ OBV; сейчас не заведён (каталог расширяем по п
 
 ## Наследники (значения по типу)
 
-| Класс | Поля значения |
-|---|---|
-| `AtrValue` | `atr` |
-| `EmaValue` | `ema` |
-| `RsiValue` | `rsi` |
-| `MacdValue` | `macdLine`, `signalLine`, `histogram` |
-| `BollingerBandsValue` | `upperBand`, `middleBand`, `lowerBand`, `bandwidth`, `percentB` |
-| `StochasticValue` | `k`, `d` |
-| `ObvValue` | `obv` |
-| `EfficiencyRatioValue` | `efficiencyRatio` |
+| Класс | Поля значения | Дом формулы |
+|---|---|---|
+| `AtrValue` | `atr` | `docs/spec/indicator-calculation.json` (`trueRange`, `wilderNext`, `indicatorWindowAverage`) |
+| `EmaValue` | `ema` | `docs/spec/indicator-calculation.json` (`emaAlpha`, `emaNext`, `indicatorWindowAverage`) |
+| `RsiValue` | `rsi` | `docs/spec/indicator-calculation.json` (`rsiGain`, `rsiLoss`, `wilderNext`, `rsiValue`) |
+| `MacdValue` | `macdLine`, `signalLine`, `histogram` | `docs/spec/indicator-calculation.json` (`emaNext`, `macdLine`, `macdHistogram`) |
+| `BollingerBandsValue` | `upperBand`, `middleBand`, `lowerBand`, `bandwidth`, `percentB` | `docs/spec/indicator-calculation.json` (`indicatorWindowAverage`, `bollingerVariance`, `bollingerUpperBand`, `bollingerLowerBand`, `bollingerBandwidth`, `bollingerPercentB`) |
+| `StochasticValue` | `k`, `d` | `docs/spec/indicator-calculation.json` (`stochasticHighest`, `stochasticLowest`, `stochasticRawK`, `indicatorWindowAverage`) |
+| `ObvValue` | `obv` | `docs/spec/indicator-calculation.json` (`obvNext`) |
+| `EfficiencyRatioValue` | `efficiencyRatio` | `docs/spec/indicator-calculation.json` (`efficiencySignedMoveSum`, `efficiencyTotalMove`, `efficiencyRatio`) |
 
 Все числовые поля — `BigDecimal`. Волатильность отдельной сущностью не
 моделируется — через `AtrValue` / `BollingerBandsValue.bandwidth`.
+
+**Формула поля, вид сглаживания и вид отклонения живут в спеке, а не
+здесь.** Колонка выше называет величины, из которых поле собрано; развилки
+формы — сглаживание Уайлдера у ATR и RSI, популяционное отклонение у полос
+— закрыты нотами тех же величин.
+
+**Вырожденное окно — штатное состояние, и значение на нём не производит
+сигнала.** Плоский ряд и нулевой знаменатель встречаются на живом рынке
+(стоящий инструмент, пауза торгов), поэтому вычислитель отвечает на них
+объявленным значением, а не отказом и не пропуском бара. Значение выбирается
+так, чтобы ни одно условие не прочло в нём движения: у центрированного
+осциллятора — середина шкалы (RSI, стохастик, положение цены в полосах), у
+меры тренда — ноль (эффективность хода). Константа у каждой величины своя —
+ноты `docs/spec/indicator-calculation.json` (`rsiValue`, `stochasticRawK`,
+`bollingerPercentB`, `efficiencyRatio`).
+
+**Прогрев выводится по типу** — `docs/spec/indicator-calculation.json`
+(`derivedWarmup`, `effectiveWarmup`, `indicatorValueStored`); кто пропускает
+зону прогрева — `docs/components/IndicatorJob.md`.
 
 **Адресный компонент в условии (D1).** Значение многокомпонентного типа
 операнд условия адресует компонентом
@@ -131,8 +163,8 @@ OBV; сейчас не заведён (каталог расширяем по п
   `indicator_config_id` (`bigint`), `candle_timestamp` (`timestamptz`).
   Суррогатный ключ `id` — `bigserial`.
 - **Ключ уникальности** — `uk_indicator_value_identity`
-  `(instrument_id, indicator_config_id, candle_timestamp)`: тот же ключ,
-  что объявляет §«Ключевание — идентичностью вычисления».
+  `(instrument_id, indicator_config_id, candle_timestamp)`: тот же ключ —
+  идентичность вычисления, которой значение ключуется.
 - **Индекс чтения** — `ix_indicator_value_latest`
   `(instrument_id, indicator_config_id, candle_timestamp desc)`: обе
   тропы чтения берут последнее значение либо окно назад от последнего.
@@ -147,8 +179,8 @@ OBV; сейчас не заведён (каталог расширяем по п
   `docs/components/IndicatorJob.md`).
 - Индикаторы считаются только по закрытым свечам (без look-ahead).
 - Уникальность: `UNIQUE(instrument_id, indicator_config_id,
-  candle_timestamp)` — ключ по идентичности вычисления (см. §«Ключевание
-  — идентичностью вычисления»).
+  candle_timestamp)` — ключ по идентичности вычисления, которой значение
+  ключуется.
 - Свежесть оценивает **потребитель** по `expirationDuration` своей
   настройки: строка результата срока не несёт и о стратегии не знает
   (правило — `docs/rules/market-data-freshness.md`).

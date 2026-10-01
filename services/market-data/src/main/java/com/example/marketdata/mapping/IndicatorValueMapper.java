@@ -9,6 +9,7 @@ import com.example.marketdata.persistence.model.MacdValueEntity;
 import com.example.marketdata.persistence.model.ObvValueEntity;
 import com.example.marketdata.persistence.model.RsiValueEntity;
 import com.example.marketdata.persistence.model.StochasticValueEntity;
+import com.example.marketdata.persistence.repository.ObvSeedRow;
 import com.example.tradingbot.domain.model.trade.indicator.AtrValue;
 import com.example.tradingbot.domain.model.trade.indicator.BollingerBandsValue;
 import com.example.tradingbot.domain.model.trade.indicator.EfficiencyRatioValue;
@@ -51,4 +52,7 @@ public interface IndicatorValueMapper {
     @SubclassMapping(source = ObvValueEntity.class, target = ObvValue.class)
     @SubclassMapping(source = EfficiencyRatioValueEntity.class, target = EfficiencyRatioValue.class)
     IndicatorValue persistenceToDomain(IndicatorValueEntity entity);
+
+    /** Затравка продолжения ряда OBV из проекции момента и значения: идентичности не несёт. */
+    ObvValue persistenceToDomain(ObvSeedRow row);
 }

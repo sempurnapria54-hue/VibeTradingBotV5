@@ -23,7 +23,7 @@ import org.springframework.stereotype.Service;
  * её носитель разошёлся бы с первым молча.
  *
  * <p><b>Собственной транзакции методы не открывают:</b> границу называет
- * вызывающий — у чистки она общая со снятием момента разрыва.
+ * вызывающий.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,7 +44,9 @@ public class JournalCompletenessSource {
         return receptionStateDataService.countSubscribedPairs(consumerGroup);
     }
 
-    public Long countSubscribedPairsWithBreak(String consumerGroup, OffsetDateTime staleBefore) {
-        return receptionStateDataService.countSubscribedPairsWithBreak(consumerGroup, staleBefore);
+    public Long countSubscribedPairsWithBreak(String consumerGroup,
+                                              OffsetDateTime staleBefore,
+                                              OffsetDateTime lowerBound) {
+        return receptionStateDataService.countSubscribedPairsWithBreak(consumerGroup, staleBefore, lowerBound);
     }
 }

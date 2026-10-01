@@ -162,6 +162,20 @@ class TrancheExitPendingPassTest {
     }
 
     @Test
+    @DisplayName("U21.20 — сворачивание, терминал, наследуемой причины нет: ошибочная тропа, ребра и причины нет")
+    void u21_20_aCollapsingDealWithoutAnInheritableReasonEscalates() {
+        DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.EXIT_PENDING), "5", "5");
+        subject.getOrders().add(filledReduceOnlyLeg(31L, TRANCHE_ID, "5"));
+
+        TrancheTransition transition = handle(contextOf(Deal.Status.EXIT_PENDING, subject));
+
+        assertThat(transition.getDealErrorRequested()).isTrue();
+        assertThat(transition.getNextStatus()).isNull();
+        assertThat(transition.getCloseReason()).isNull();
+        assertThat(transition.hasCommands()).isFalse();
+    }
+
+    @Test
     @DisplayName("U21.10 — экспозиция ноль, живая встроенная защита: её снятие и добыча родителя")
     void u21_10_aLiveAttachedProtectionIsCancelledAndItsParentObserved() {
         harness.givenFetch(ServiceCommandType.REFRESH_ORDER_COMMAND);
@@ -199,8 +213,15 @@ class TrancheExitPendingPassTest {
         assertThat(transition.movesStatus()).isFalse();
     }
 
+    /**
+     * Закреплённые объявление транша и деталь стратегии входными проверками
+     * выхода не являются: восстановленный транш доходит сюда штатно, и дочистка
+     * стои́т на его собственных фактах (docs/components/TrancheExitPendingHandler.md
+     * §«Закреплённые объявление транша и деталь стратегии входными проверками
+     * выхода не являются, и восстановленный транш сюда доходит штатно»).
+     */
     @Test
-    @DisplayName("U21.12 — транш без объявления и без детали: обе пустоты проверку не заваливают")
+    @DisplayName("U21.12 — транш без объявления и без детали: входными проверками выхода они не являются, терминал «закрыто извне»")
     void u21_12_aRecoveredTrancheStillReachesItsTerminal() {
         DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.EXIT_PENDING), "5", "5");
         subject.setStrategyTrancheId(null);

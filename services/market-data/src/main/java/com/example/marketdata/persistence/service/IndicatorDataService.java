@@ -8,6 +8,7 @@ import com.example.marketdata.mapping.IndicatorValueMapper;
 import com.example.marketdata.persistence.model.IndicatorValueEntity;
 import com.example.marketdata.persistence.repository.IndicatorValueRepository;
 import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
+import com.example.tradingbot.domain.model.trade.indicator.ObvValue;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class IndicatorDataService {
+
+    /** Страница из одной строки: нужна только последняя по времени свечи. */
+    private static final PageRequest LATEST_ONLY = PageRequest.of(0, 1);
 
     private final IndicatorValueRepository repository;
     private final IndicatorValueMapper mapper;
@@ -55,6 +60,20 @@ public class IndicatorDataService {
                 .collect(toList());
         repository.saveAll(toInsert);
         return toInsert.size();
+    }
+
+    /**
+     * Последнее записанное значение OBV идентичности, чей бар лежит в окне
+     * {@code [from, to]}, — затравка продолжения ряда
+     * (docs/components/IndicatorJob.md §«Кумулятивный тип продолжает
+     * записанный ряд»). Читается проекцией момента и значения.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ObvValue> findLastObvWithin(Long instrumentId, Long indicatorConfigId, OffsetDateTime from,
+                                                OffsetDateTime to) {
+        return repository.findObvSeedsInRange(instrumentId, indicatorConfigId, from, to, LATEST_ONLY).stream()
+                .findFirst()
+                .map(mapper::persistenceToDomain);
     }
 
     /** Последнее по времени свечи значение идентичности. */

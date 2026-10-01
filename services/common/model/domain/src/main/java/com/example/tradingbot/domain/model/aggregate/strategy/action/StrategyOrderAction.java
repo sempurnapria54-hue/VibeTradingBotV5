@@ -11,7 +11,7 @@ import lombok.Setter;
  * Ожидаемое действие над ordinary order (вход / ремодел / отмена).
  * Доменное намерение positionReducingOnly остаётся в strategy-layer;
  * OKX reduceOnly — только client/adapter-поле. См.
- * docs/models/domain/aggregate/Strategy.md (§StrategyOrderAction).
+ * docs/models/domain/aggregate/Strategy.md (§Действия).
  */
 @Getter
 @Setter

@@ -192,6 +192,12 @@ class OutboxRelayBoxTest extends SharedTradingCoreBox {
     @DisplayName("B9.10 — поглощённая реакция факта подъёма не производит")
     void anAbsorbedReactionProducesNoRaisedFact() {
         provisionAccounts(ACCOUNT);
+        // Срез позиций счёта пуст: живого риска на радиусе нет, и повторный
+        // полный вызов держателя поглощается анкером, а не доводит снятие
+        // риска — недобытый срез риск доказанным не читается
+        // (docs/rules/manual-halt.md §«Выборка и производитель предусловия
+        // названы»).
+        connector.answers("/api/v1/accounts/" + ACCOUNT + "/positions", Feed.emptyArray());
         fullHalt(ACCOUNT);
         tick(Tick.OUTBOX_RELAY);
         assertThat(rungOf(ACCOUNT)).isEqualTo("TRADE_BLOCKED");

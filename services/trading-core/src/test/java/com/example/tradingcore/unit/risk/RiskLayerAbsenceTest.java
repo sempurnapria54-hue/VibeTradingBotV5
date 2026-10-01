@@ -23,8 +23,10 @@ import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
 import com.example.tradingcore.domain.command.risk.RiskBlockAction;
 import com.example.tradingcore.domain.command.risk.RiskBlockResolver;
+import com.example.tradingcore.domain.command.risk.RiskCheckResult;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
+import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
 import com.example.tradingcore.domain.command.risk.RiskValidator;
 import com.example.tradingcore.domain.command.strategy.ActionRiskGate;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
@@ -41,7 +43,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -52,11 +53,11 @@ import org.junit.jupiter.api.Test;
  * docs/components/ActionRiskGate.md §Границы).
  *
  * <p><b>Клейм отсутствия читается ДВУМЯ способами.</b> Утверждение о
- * ЧИСЛЕ или МНОЖЕСТВЕ коллабораторов — рефлексией по нестатическим
- * полям: «коллабораторов границы нет» есть утверждение о множестве
- * типов, и текстом оно не читается. Утверждение об отсутствии ИМЕНИ
- * (код, который никто не производит; статус, которого не ставит ни одна
- * фабрика) — исполняемым телом исходника, за вычетом комментариев.
+ * ЧИСЛЕ или МНОЖЕСТВЕ коллабораторов, полей и значений перечней —
+ * рефлексией: «коллабораторов границы нет» есть утверждение о множестве
+ * типов, и текстом оно не читается. Утверждение об отсутствии ИМЕНИ в
+ * чужом теле (код, который никто не производит) — исполняемым телом
+ * исходника, за вычетом комментариев.
  */
 class RiskLayerAbsenceTest {
 
@@ -192,20 +193,21 @@ class RiskLayerAbsenceTest {
     }
 
     @Test
-    @DisplayName("U29.13 — предупредительного статуса не ставит ни одна фабрика результата")
-    void u29_13_noFactoryEverProducesTheWarningStatus() {
-        assertThat(executableBodyOf("domain/command/risk/RiskCheckResult.java"))
-                .as("единственная фабрика ставит блокирующий статус")
-                .contains("RiskCheckStatus.BLOCKED");
-        assertThat(riskPackageBodies())
-                .as("выражения, ставящего предупредительный статус, в пакете нет")
-                .noneMatch(body -> body.contains(".status(RiskCheckStatus.WARNING")
-                        || body.contains(".status(RiskCheckStatus.PASSED"));
+    @DisplayName("U29.13 — предупредительного исхода нет ни у члена перечня, ни у решения, ни у реакции")
+    void u29_13_thereIsNoWarningOutcomeAnywhere() {
+        assertThat(Arrays.stream(RiskCheckResult.class.getDeclaredFields()).map(Field::getName))
+                .as("статуса у члена перечня нет: перечень несёт только отказы")
+                .doesNotContain("status");
+        assertThat(RiskDecision.values())
+                .as("третьего решения нет")
+                .containsExactly(RiskDecision.ALLOWED, RiskDecision.BLOCKED);
+        assertThat(Arrays.stream(RiskBlockAction.Type.values()).map(Enum::name))
+                .as("разрешающая реакция одна")
+                .noneMatch(name -> name.contains("WARNING"));
     }
 
     @Test
-    @Tag("debt")
-    @DisplayName("U29.14 — у каждого значения перечня есть производитель (R-1)")
+    @DisplayName("U29.14 — у каждого значения перечня есть производитель")
     void u29_14_everyCodeHasAProducer() {
         String producers = producingSources();
 
@@ -243,21 +245,6 @@ class RiskLayerAbsenceTest {
             throw new IllegalStateException("исходник не найден: " + source.toAbsolutePath());
         }
         return stripComments(read(source));
-    }
-
-    /** Исполняемые тела всех исходников пакета риска. */
-    private static List<String> riskPackageBodies() {
-        Path packageDir = MAIN_SOURCES.resolve("com/example/tradingcore/domain/command/risk");
-        if (!Files.isDirectory(packageDir)) {
-            throw new IllegalStateException("пакет риска не найден: " + packageDir.toAbsolutePath());
-        }
-        try (Stream<Path> sources = Files.list(packageDir)) {
-            return sources.filter(path -> path.toString().endsWith(".java"))
-                    .map(path -> stripComments(read(path)))
-                    .toList();
-        } catch (IOException failure) {
-            throw new UncheckedIOException(failure);
-        }
     }
 
     /**

@@ -19,7 +19,7 @@ import lombok.Setter;
 @Setter
 public class BalanceOkxResponse {
 
-    /** Время обновления account snapshot (epoch ms). */
+    /** Момент, на который площадка собрала сведения о счёте (epoch ms). */
     @JsonProperty("uTime")
     private String uTime;
 

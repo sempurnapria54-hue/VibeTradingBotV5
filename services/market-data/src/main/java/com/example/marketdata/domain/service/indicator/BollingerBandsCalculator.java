@@ -15,14 +15,20 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
- * Вычислитель полос Боллинджера: средняя = SMA(period) по close, границы
- * = средняя ± multiplier·σ (популяционное СКО окна); bandwidth =
- * (upper − lower)/middle; %B = (close − lower)/(upper − lower).
- * warmup ≈ period.
+ * Вычислитель полос Боллинджера. Полосы, вид отклонения, ширина, положение
+ * цены с исходом вырожденного окна и выведенный прогрев —
+ * docs/spec/indicator-calculation.json (`bollingerVariance`,
+ * `bollingerUpperBand`, `bollingerLowerBand`, `bollingerBandwidth`,
+ * `bollingerPercentB`, `derivedWarmup`).
+ *
+ * <p>Ширина при нулевой средней отдаётся нулём, не деля: цена закрытия
+ * торгуемого инструмента положительна, и исхода на таком окне спека не
+ * объявляет.
  */
 @Component
 public class BollingerBandsCalculator implements IndicatorCalculator {
 
+    /** Середина шкалы — положение цены на слившихся полосах (`bollingerPercentB`). */
     private static final BigDecimal HALF = BigDecimal.valueOf(5L, 1);
 
     @Override

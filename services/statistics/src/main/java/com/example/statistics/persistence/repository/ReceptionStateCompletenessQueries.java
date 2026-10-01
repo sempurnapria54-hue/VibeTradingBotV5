@@ -105,6 +105,18 @@ public interface ReceptionStateCompletenessQueries {
      * бы непрерывность в состоянии, о котором ничего не известно
      * (docs/rules/durable-consumer-reception.md §«Предикат непрерывности»).
      *
+     * <p><b>Момент разрыва дыру даёт, только лежа НЕ РАНЬШЕ нижней
+     * границы</b> — той же, что отдаётся рядом с предикатом
+     * (docs/spec/durable-reception.json, {@code lagExceededRetention}).
+     * Разрыв раньше неё дыры внутри обещаемого ряда не образует: всё, что он
+     * унёс, произведено до момента обнаружения, то есть до границы. Снятия у
+     * момента нет ни у одного писателя — сравнение делает чтение, и ему
+     * безразлично, какой ход границу двинул
+     * (docs/rules/durable-consumer-reception.md §«Писатели величин — по
+     * роли, а не по имени класса»). Момент, равный границе, дыру даёт:
+     * «не раньше» объявлено нестрогим, и ошибка на совпадении направлена в
+     * запретительную сторону.
+     *
      * <p><b>Сравнение с моментом устаревания нестрогое, и это ровно
      * отрицание строгого.</b> Свежесть объявлена как «возраст МЕНЬШЕ
      * допустимого», значит строка возрастом ровно в допустимый свежей уже
@@ -113,6 +125,8 @@ public interface ReceptionStateCompletenessQueries {
      * @param staleBefore момент, раньше которого обновлённая строка
      *                    состояния считается устаревшей: момент выдачи за
      *                    вычетом допустимого возраста
+     * @param lowerBound  нижняя граница полноты группы: разрыв раньше неё
+     *                    дыры не даёт
      */
     @Query("""
             select count(state)
@@ -120,9 +134,10 @@ public interface ReceptionStateCompletenessQueries {
              where state.consumerGroup = :consumerGroup
                and state.subscribed = true
                and (state.receptionHalted = true
-                     or state.lagGapAt is not null
+                     or (state.lagGapAt is not null and state.lagGapAt >= :lowerBound)
                      or state.updatedAt <= :staleBefore)
             """)
     Long countSubscribedPairsWithBreak(@Param("consumerGroup") String consumerGroup,
-                                       @Param("staleBefore") OffsetDateTime staleBefore);
+                                       @Param("staleBefore") OffsetDateTime staleBefore,
+                                       @Param("lowerBound") OffsetDateTime lowerBound);
 }

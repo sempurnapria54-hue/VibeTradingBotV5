@@ -18,6 +18,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,6 +33,11 @@ import org.springframework.stereotype.Component;
  * instrumentId/marketStructureConfigId проставляет MarketStructureJob. См.
  * docs/components/MarketStructureResolver.md,
  * docs/models/domain/other/MarketStructure.md (§Семантика классификации).
+ *
+ * <p>Граничный уровень выдаётся только подтверждённым, пробой считается на
+ * выданном граничном уровне по хвосту окна и ломает структуру — дом
+ * docs/models/domain/other/MarketStructure.md §«Семантика классификации
+ * (как считается)» и §«Валидный уровень».
  */
 @Component
 public class MarketStructureResolver {
@@ -78,15 +84,23 @@ public class MarketStructureResolver {
         List<MarketPriceLevel> levels = new ArrayList<>();
         levels.addAll(swingHighs);
         levels.addAll(swingLows);
+        structure.setLevels(levels);
 
         MarketStructure.Type type = classify(swingHighs, swingLows, resistance, support, efficiency, atr, params);
-        List<MarketPriceLevel> boundaries = boundaryLevels(type, swingHighs, swingLows, resistance, support,
+        MarketPriceLevel ceiling = confirmedBoundary(boundaryTypeOf(type, true), resistance, swingHighs,
                 atr, params);
-        levels.addAll(boundaries);
+        MarketPriceLevel floor = confirmedBoundary(boundaryTypeOf(type, false), support, swingLows, atr, params);
+        MarketBreakoutEvent breakout = detectBreakout(windowCandles, ceiling, floor, params);
+        // Подтверждённый пробой ломает структуру окна: граничных уровней нет,
+        // свинги остаются, а момент подтверждения несёт событие, не каркас.
+        if (nonNull(breakout)) {
+            structure.setType(MarketStructure.Type.UNKNOWN);
+            structure.setBreakoutEvent(breakout);
+            return structure;
+        }
+        Stream.of(ceiling, floor).filter(Objects::nonNull).forEach(levels::add);
         structure.setType(type);
-        structure.setConfirmedAt(structureConfirmedAt(type, swingHighs, swingLows, boundaries));
-        structure.setLevels(levels);
-        structure.setBreakoutEvent(detectBreakout(windowCandles, resistance, support, params));
+        structure.setConfirmedAt(structureConfirmedAt(type, swingHighs, swingLows, ceiling, floor));
         return structure;
     }
 
@@ -146,22 +160,23 @@ public class MarketStructureResolver {
     }
 
     /**
-     * Граничные уровни типа: у диапазона — его границы, у тренда —
-     * сопротивление и поддержка; у консервативного исхода их нет.
+     * Тип граничного уровня стороны у типа структуры: у диапазона — его
+     * границы, у тренда — сопротивление и поддержка; у консервативного
+     * исхода границ нет, и типа тоже.
      */
-    private List<MarketPriceLevel> boundaryLevels(MarketStructure.Type type, List<MarketPriceLevel> swingHighs,
-                                                  List<MarketPriceLevel> swingLows, BigDecimal resistance,
-                                                  BigDecimal support, BigDecimal atr, MarketStructureParams params) {
-        List<MarketPriceLevel> boundaries = new ArrayList<>();
+    private MarketPriceLevel.Type boundaryTypeOf(MarketStructure.Type type, boolean ceiling) {
         if (Objects.equals(type, MarketStructure.Type.RANGE)) {
-            boundaries.add(boundaryLevel(MarketPriceLevel.Type.RANGE_HIGH, resistance, swingHighs, atr, params));
-            boundaries.add(boundaryLevel(MarketPriceLevel.Type.RANGE_LOW, support, swingLows, atr, params));
-        } else if (Objects.equals(type, MarketStructure.Type.UPTREND)
-                || Objects.equals(type, MarketStructure.Type.DOWNTREND)) {
-            boundaries.add(boundaryLevel(MarketPriceLevel.Type.RESISTANCE, resistance, swingHighs, atr, params));
-            boundaries.add(boundaryLevel(MarketPriceLevel.Type.SUPPORT, support, swingLows, atr, params));
+            return ceiling ? MarketPriceLevel.Type.RANGE_HIGH : MarketPriceLevel.Type.RANGE_LOW;
         }
-        return boundaries;
+        if (isTrend(type)) {
+            return ceiling ? MarketPriceLevel.Type.RESISTANCE : MarketPriceLevel.Type.SUPPORT;
+        }
+        return null;
+    }
+
+    private boolean isTrend(MarketStructure.Type type) {
+        return Objects.equals(type, MarketStructure.Type.UPTREND)
+                || Objects.equals(type, MarketStructure.Type.DOWNTREND);
     }
 
     /**
@@ -169,18 +184,18 @@ public class MarketStructureResolver {
      * свидетельство его типа, а не конец окна (дом —
      * docs/models/domain/other/MarketStructure.md §«Семантика
      * классификации (как считается)», пункт о моменте подтверждения).
-     * Диапазон подтверждён, когда подтверждены обе границы; тренд — когда
+     * Диапазон подтверждён, когда подтверждены обе границы — у диапазона
+     * они выданы всегда: его предикат требует тех же касаний; тренд — когда
      * известны последние свинг-максимум и свинг-минимум, на которых стои́т
      * его пара; у консервативного исхода подтверждать нечего.
      */
     private OffsetDateTime structureConfirmedAt(MarketStructure.Type type, List<MarketPriceLevel> swingHighs,
-                                                List<MarketPriceLevel> swingLows,
-                                                List<MarketPriceLevel> boundaries) {
+                                                List<MarketPriceLevel> swingLows, MarketPriceLevel ceiling,
+                                                MarketPriceLevel floor) {
         if (Objects.equals(type, MarketStructure.Type.RANGE)) {
-            return later(boundaries.get(0).getConfirmedAt(), boundaries.get(1).getConfirmedAt());
+            return later(ceiling.getConfirmedAt(), floor.getConfirmedAt());
         }
-        if (Objects.equals(type, MarketStructure.Type.UPTREND)
-                || Objects.equals(type, MarketStructure.Type.DOWNTREND)) {
+        if (isTrend(type)) {
             return later(swingHighs.get(swingHighs.size() - 1).getConfirmedAt(),
                     swingLows.get(swingLows.size() - 1).getConfirmedAt());
         }
@@ -196,32 +211,38 @@ public class MarketStructureResolver {
     }
 
     /**
-     * Детекция читает хвост окна, а момент события берётся из последнего
-     * бара удержания: свидетельство называет себя само, и с концом окна
-     * момент совпадает по построению хвоста, а не по присваиванию. Поиск
-     * удержания по всему окну — отдельное расхождение с домом, и эта правка
-     * его не адресует.
+     * Пробит бывает выданный граничный уровень: нет его у стороны — ломать
+     * там нечего. Детекция читает хвост окна — событие мерит удержание на
+     * хвосте, — а момент события берётся из последнего бара удержания:
+     * свидетельство называет себя само, и с концом окна момент совпадает по
+     * построению хвоста, а не по присваиванию. Тип сломанного уровня — тип
+     * выданного уровня.
      */
-    private MarketBreakoutEvent detectBreakout(List<Candle> candles, BigDecimal resistance, BigDecimal support,
-                                               MarketStructureParams params) {
+    private MarketBreakoutEvent detectBreakout(List<Candle> candles, MarketPriceLevel ceiling,
+                                               MarketPriceLevel floor, MarketStructureParams params) {
         int confirmationBars = params.getBreakoutConfirmationBars();
-        if (isNull(resistance) || isNull(support) || candles.size() < confirmationBars || confirmationBars < 1) {
+        if ((isNull(ceiling) && isNull(floor)) || candles.size() < confirmationBars || confirmationBars < 1) {
             return null;
         }
         BigDecimal buffer = params.getBreakoutBufferPercents().divide(HUNDRED, DomainMath.CONTEXT);
-        BigDecimal upThreshold = resistance.add(resistance.multiply(buffer));
-        BigDecimal downThreshold = support.subtract(support.multiply(buffer));
         List<Candle> tail = candles.subList(candles.size() - confirmationBars, candles.size());
         OffsetDateTime lastHoldBarAt = timestampOf(tail.get(tail.size() - 1));
-        if (tail.stream().allMatch(candle -> candle.getClose().compareTo(upThreshold) > 0)) {
-            return breakoutEvent(MarketPriceLevel.Type.RESISTANCE, MarketBreakoutEvent.Direction.UP,
-                    resistance, lastHoldBarAt);
+        if (nonNull(ceiling) && isHeldBeyond(tail, ceiling.getPrice().add(ceiling.getPrice().multiply(buffer)),
+                true)) {
+            return breakoutEvent(ceiling, MarketBreakoutEvent.Direction.UP, lastHoldBarAt);
         }
-        if (tail.stream().allMatch(candle -> candle.getClose().compareTo(downThreshold) < 0)) {
-            return breakoutEvent(MarketPriceLevel.Type.SUPPORT, MarketBreakoutEvent.Direction.DOWN,
-                    support, lastHoldBarAt);
+        if (nonNull(floor) && isHeldBeyond(tail, floor.getPrice().subtract(floor.getPrice().multiply(buffer)),
+                false)) {
+            return breakoutEvent(floor, MarketBreakoutEvent.Direction.DOWN, lastHoldBarAt);
         }
         return null;
+    }
+
+    /** Каждый бар хвоста закрыт за порогом: выше — у потолка, ниже — у пола. */
+    private boolean isHeldBeyond(List<Candle> tail, BigDecimal threshold, boolean above) {
+        return tail.stream().allMatch(candle -> above
+                ? candle.getClose().compareTo(threshold) > 0
+                : candle.getClose().compareTo(threshold) < 0);
     }
 
     private List<MarketPriceLevel> swings(List<Candle> candles, int lookback, boolean high) {
@@ -315,37 +336,44 @@ public class MarketStructureResolver {
     }
 
     /**
-     * Граничный уровень со своими моментами. Найден — на баре самого
-     * раннего пивота, касающегося его цены; подтверждён — в момент касания
-     * номер {@code minTouches}, а момент касания есть бар подтверждения его
+     * Граничный уровень стороны — только подтверждённый. Строится от
+     * крайнего пивота стороны: его цена — цена уровня, а пивоты стороны в
+     * пределах толеранса от неё — его касания. Найден — на баре самого
+     * раннего касания; подтверждён — в момент касания номер
+     * {@code minTouches}, а момент касания есть бар подтверждения его
      * пивота: раньше пивот не отличим от продолжения движения. Касаний
-     * меньше требуемого — момента подтверждения нет, и он остаётся пустым.
+     * меньше требуемого — уровня нет вовсе, и пустого момента подтверждения
+     * у выданного граничного уровня поэтому не бывает. Типа нет —
+     * у исхода границ нет, и уровня тоже.
      *
-     * <p>Касание есть всегда хотя бы одно: цена границы — цена одного из
-     * пивотов, и его отстояние от себя нулевое.
+     * <p>Касание есть всегда хотя бы одно: цена границы — цена крайнего
+     * пивота, и его отстояние от себя нулевое.
      */
-    private MarketPriceLevel boundaryLevel(MarketPriceLevel.Type type, BigDecimal price,
-                                           List<MarketPriceLevel> pivots, BigDecimal atr,
-                                           MarketStructureParams params) {
+    private MarketPriceLevel confirmedBoundary(MarketPriceLevel.Type type, BigDecimal price,
+                                               List<MarketPriceLevel> pivots, BigDecimal atr,
+                                               MarketStructureParams params) {
+        if (isNull(type)) {
+            return null;
+        }
         List<MarketPriceLevel> touches = touchesOf(pivots, price, atr, params);
         int requiredTouches = Math.max(params.getMinTouches(), 1);
+        if (touches.size() < requiredTouches) {
+            return null;
+        }
         MarketPriceLevel level = new MarketPriceLevel();
         level.setType(type);
         level.setPrice(price);
         level.setDetectedAt(touches.get(0).getDetectedAt());
-        if (touches.size() >= requiredTouches) {
-            level.setConfirmedAt(touches.get(requiredTouches - 1).getConfirmedAt());
-        }
+        level.setConfirmedAt(touches.get(requiredTouches - 1).getConfirmedAt());
         return level;
     }
 
-    private MarketBreakoutEvent breakoutEvent(MarketPriceLevel.Type brokenLevelType,
-                                              MarketBreakoutEvent.Direction direction, BigDecimal levelPrice,
+    private MarketBreakoutEvent breakoutEvent(MarketPriceLevel brokenLevel, MarketBreakoutEvent.Direction direction,
                                               OffsetDateTime confirmedAt) {
         MarketBreakoutEvent event = new MarketBreakoutEvent();
-        event.setBrokenLevelType(brokenLevelType);
+        event.setBrokenLevelType(brokenLevel.getType());
         event.setDirection(direction);
-        event.setLevelPrice(levelPrice);
+        event.setLevelPrice(brokenLevel.getPrice());
         event.setConfirmedAt(confirmedAt);
         return event;
     }

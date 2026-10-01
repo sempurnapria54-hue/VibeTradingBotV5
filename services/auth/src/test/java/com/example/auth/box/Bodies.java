@@ -28,12 +28,29 @@ final class Bodies {
     /** Узнаваемое значение passphrase ключа. */
     static final String PASSPHRASE_MARKER = "pass-MARKER";
 
+    /**
+     * Узнаваемые значения НОВЫХ ключей смены: отличны от ключей регистрации,
+     * иначе «новые легли» было бы неотличимо от «старые остались».
+     */
+    static final String ROTATED_API_KEY_MARKER = "api-KEY-ROTATED";
+
+    /** Узнаваемое значение нового секрета ключа. */
+    static final String ROTATED_SECRET_MARKER = "secret-ROTATED";
+
+    /** Узнаваемое значение нового passphrase ключа. */
+    static final String ROTATED_PASSPHRASE_MARKER = "pass-ROTATED";
+
     private Bodies() {
     }
 
     /** Базовая сборка запроса регистрации счёта. */
     static Registration registration(String tenantInternalId) {
         return new Registration(tenantInternalId);
+    }
+
+    /** Базовая сборка запроса смены ключей счёта. */
+    static KeyRotation keyRotation() {
+        return new KeyRotation();
     }
 
     /** Запрос регистрации счёта: семь полей, каждое обязательно. */
@@ -59,19 +76,50 @@ final class Bodies {
 
         /** Тело запроса. */
         String body() {
-            StringBuilder text = new StringBuilder("{");
-            fields.forEach((name, value) -> {
-                if (text.length() > 1) {
-                    text.append(',');
-                }
-                text.append('"').append(name).append("\":");
-                if (Objects.isNull(value)) {
-                    text.append("null");
-                } else {
-                    text.append('"').append(value).append('"');
-                }
-            });
-            return text.append('}').toString();
+            return json(fields);
         }
+    }
+
+    /**
+     * Запрос смены ключей: три поля, каждое обязательно. Контура в базовой
+     * сборке нет — операция его не принимает, и лишнее поле кейс добавляет
+     * сдвигом оси сам.
+     */
+    static final class KeyRotation {
+
+        private final Map<String, String> fields = new LinkedHashMap<>();
+
+        private KeyRotation() {
+            fields.put("apiKey", ROTATED_API_KEY_MARKER);
+            fields.put("secret", ROTATED_SECRET_MARKER);
+            fields.put("passphrase", ROTATED_PASSPHRASE_MARKER);
+        }
+
+        /** Сдвигает одну ось запроса. */
+        KeyRotation with(String field, String value) {
+            fields.put(field, value);
+            return this;
+        }
+
+        /** Тело запроса. */
+        String body() {
+            return json(fields);
+        }
+    }
+
+    private static String json(Map<String, String> fields) {
+        StringBuilder text = new StringBuilder("{");
+        fields.forEach((name, value) -> {
+            if (text.length() > 1) {
+                text.append(',');
+            }
+            text.append('"').append(name).append("\":");
+            if (Objects.isNull(value)) {
+                text.append("null");
+            } else {
+                text.append('"').append(value).append('"');
+            }
+        });
+        return text.append('}').toString();
     }
 }

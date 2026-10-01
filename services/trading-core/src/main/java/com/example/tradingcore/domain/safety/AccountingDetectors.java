@@ -65,7 +65,8 @@ public class AccountingDetectors {
      * недоделанного у автоматического сигнала нет, — поэтому находка
      * заводит только строку журнала, и она некритична: kill-switch ЭТОЙ
      * реакцией не гоняется
-     * (docs/components/SafetyHoldCoordinator.md §«Поглощённый сигнал»).
+     * (docs/components/SafetyHoldCoordinator.md §«Поглощённый сигнал
+     * наблюдаем»).
      */
     private void rungNotEnforced(AnomalyScan scan, ExchangeAccount account, Instrument instrument,
                                  Boolean accountHardRung, Set<Long> hardRungPairs) {

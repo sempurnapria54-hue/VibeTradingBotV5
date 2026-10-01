@@ -145,6 +145,19 @@ class StructureSettingsTest {
     }
 
     @Test
+    @DisplayName("U25.19 — срок годности настройки структуры нулевой: нарушение диапазона тем же правилом")
+    void u25_19_aZeroStructureDurationIsRejected() {
+        CreateStrategyApiRequest request = reference();
+        structure(request, REFERENCE_KEY).setExpirationDuration("PT0S");
+
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains("strategy.marketStructureSettings[0].expirationDuration "
+                        + "STRATEGY_MARKET_DATA_EXPIRATION_NOT_POSITIVE");
+    }
+
+    @Test
     @DisplayName("U25.9 — окно расчёта структуры опущено: нарушение обязательности, диапазона нет")
     void u25_9_anUndeclaredLookbackWindowIsRejected() {
         CreateStrategyApiRequest request = reference();

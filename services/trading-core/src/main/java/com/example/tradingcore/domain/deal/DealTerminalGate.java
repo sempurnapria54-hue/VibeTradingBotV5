@@ -79,11 +79,28 @@ public class DealTerminalGate {
                 .anyMatch(tranche -> isTrue(tranche.isRiskBearing()));
     }
 
-    /** У сделки есть живая заявка любого рода — в любом её транше. */
+    /**
+     * У сделки есть заявка любого рода, чья живость на площадке не
+     * исключена, — в любом её транше (docs/spec/deal-lifecycle.json,
+     * {@code anyLiveOrder}).
+     *
+     * <p><b>Нога в {@code ERROR} гейт держит, пока наблюдение не показало её
+     * нежилой</b> ({@code orderMayBeLive}): пометка ошибки — наше
+     * safety-состояние, а не факт площадки, и нога под ней может стоять
+     * живой. Статусное прочтение объявляло бы риск снятым, пока помеченная
+     * нога может исполниться, — и аварийный терминал сделки, и ручное
+     * снятие ступени проходили бы поверх неё.
+     *
+     * <p><b>Отдельная условная заявка в {@code ERROR} держит гейт тем же
+     * правилом</b> (docs/spec/deal-lifecycle.json,
+     * {@code trancheHasMayBeLiveStandaloneProtection}): осиротевшая живая
+     * запись защиты сработала бы по чужой позиции того же инструмента.
+     * Встроенная защита сюда не входит — её живые несёт живой риск транша.
+     */
     public Boolean anyLiveOrder(List<DealTranche> tranches) {
         return emptyIfNull(tranches).stream()
-                .anyMatch(tranche -> isNotEmpty(tranche.liveOrders())
-                        || isNotEmpty(tranche.liveAlgoOrders()));
+                .anyMatch(tranche -> isNotEmpty(tranche.mayBeLiveOrders())
+                        || isNotEmpty(tranche.mayBeLiveAlgoOrders()));
     }
 
     /**

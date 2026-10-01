@@ -37,9 +37,12 @@ class DisabledPassHaltBoxTest extends TradingCoreBox {
     /** Биржевой идентификатор найденного эпизода. */
     private static final String POSITION_EXTERNAL_ID = "ex-live-1";
 
+    /** Биржевой момент открытия найденного эпизода: вторая половина его адреса. */
+    private static final String POSITION_CREATED_AT = "2026-09-20T10:00:05Z";
+
     /** Живой эпизод по инструменту контура, не объяснённый ни одной сделкой. */
     private static final String LIVE_POSITION = Feed.livePosition(POSITION_EXTERNAL_ID, EXTERNAL_INSTRUMENT,
-            "5", "100", "2026-09-20T10:00:05Z");
+            "5", "100", POSITION_CREATED_AT);
 
     @DynamicPropertySource
     static void substrate(DynamicPropertyRegistry registry) {
@@ -57,13 +60,16 @@ class DisabledPassHaltBoxTest extends TradingCoreBox {
     @DisplayName("B5.15 — kill-switch петле не подчинён")
     void theKillSwitchDoesNotDependOnTheLoop() {
         openRecoveredLiveDeal();
-        // Позиция живёт до закрытия и исчезает с чтения, следующего за ним:
-        // снятие риска подтверждается фактами, и подтверждение — тоже
-        // предмет клетки.
+        // Позиция живёт до закрытия и исчезает с чтения, следующего за ним,
+        // а история закрытых эпизодов отдаёт запись закрытия ТОГО ЖЕ эпизода:
+        // пустой ответ живой ноги один эпизода не закрывает
+        // (docs/components/RefreshPositionExecutor.md). Снятие риска
+        // подтверждается фактами, и подтверждение — тоже предмет клетки.
         connector.answersInTurn(accountPath() + "/positions/instrument", LIVE_POSITION, LIVE_POSITION,
                 Feed.absent());
         connector.answers(accountPath() + "/positions/closures", Feed.ack("ex-close-1", "close-1"));
-        connector.answers(accountPath() + "/positions/closed", Feed.emptyArray());
+        connector.answers(accountPath() + "/positions/closed", Feed.array(Feed.closedPosition(
+                POSITION_EXTERNAL_ID, POSITION_CREATED_AT, "2026-09-20T11:00:00Z", "-5")));
         connector.answers(accountPath() + "/positions", Feed.emptyArray());
         PeerStub.all().forEach(PeerStub::forgetRequests);
 

@@ -1,5 +1,6 @@
 package com.example.connector.okx.snapshot;
 
+import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
@@ -64,4 +65,10 @@ public class InstrumentExternalRulesExternalSnapshot {
      * резолва ставки; сама ставка на навесе не живёт.
      */
     String externalFeeGroupId;
+
+    /**
+     * Позиционные тиры изолированной маржи семьи инструмента (OKX
+     * public/position-tiers); пусто — тиры не читались.
+     */
+    List<PositionTierExternalSnapshot> externalPositionTiers;
 }

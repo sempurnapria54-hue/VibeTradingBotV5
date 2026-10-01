@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.connector.okx.util.OkxConstants;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -67,6 +68,86 @@ class PublicReadsBoxTest extends SharedConnectorBox {
         assertThat(exchange.requests(OkxConstants.INSTRUMENTS_PATH)).hasSize(2);
         exchange.requests(OkxConstants.INSTRUMENTS_PATH).forEach(request ->
                 assertThat(request.getUrl()).contains("instId=" + INSTRUMENT));
+    }
+
+    /**
+     * Ожидание взято из дома: тиры читаются по семье инструмента из ответа
+     * спецификации, публично и одним запросом, и едут в правилах числами
+     * ({@code docs/models/mapping/InstrumentExternalRules.md}
+     * §«`PositionTierOkxResponse` → snapshot»). Инструмент без семьи тиров
+     * не читает — правила уезжают без них.
+     */
+    @Test
+    @DisplayName("B6.11 — правила несут позиционные тиры семьи инструмента")
+    void b6_11_theRulesCarryThePositionTiersOfTheInstrumentFamily() {
+        exchange.answers(OkxConstants.INSTRUMENTS_PATH, Okx.ok(
+                Okx.instrument(INSTRUMENT).with("instFamily", INDEX_INSTRUMENT).text()));
+        exchange.answers(OkxConstants.POSITION_TIERS_PATH, Okx.ok(
+                Okx.positionTier(INDEX_INSTRUMENT, "1", "0", "1000", "0.004").text(),
+                Okx.positionTier(INDEX_INSTRUMENT, "2", "1000", "5000", "0.006").text()));
+        Integer readsBefore = secrets.reads();
+
+        Answer rules = get(market("/instruments/" + INSTRUMENT + "/rules?externalInstrumentType=SWAP"));
+
+        assertThat(rules.status()).isEqualTo(200);
+        List<Map<String, Object>> tiers = tiersOf(rules);
+        assertThat(tiers).hasSize(2);
+        assertThat(new BigDecimal(String.valueOf(tiers.get(0).get("maintenanceMarginRate"))))
+                .isEqualByComparingTo("0.004");
+        assertThat(new BigDecimal(String.valueOf(tiers.get(1).get("minSize")))).isEqualByComparingTo("1000");
+        assertThat(new BigDecimal(String.valueOf(tiers.get(1).get("maxSize")))).isEqualByComparingTo("5000");
+        assertThat(new BigDecimal(String.valueOf(tiers.get(1).get("maintenanceMarginRate"))))
+                .isEqualByComparingTo("0.006");
+        assertThat(rules.body()).doesNotContain("imr", "maxLever", "\"mmr\"", "instFamily");
+
+        LoggedRequest sent = exchange.single(OkxConstants.POSITION_TIERS_PATH);
+        assertThat(sent.getUrl()).contains("instType=SWAP", "tdMode=isolated", "instFamily=" + INDEX_INSTRUMENT);
+        assertThat(sent.getUrl()).doesNotContain("instId=");
+        assertThat(sent.containsHeader(OkxConstants.ACCESS_SIGN_HEADER)).isFalse();
+        assertThat(secrets.reads() - readsBefore).isEqualTo(0);
+
+        exchange.reset();
+        exchange.answers(OkxConstants.INSTRUMENTS_PATH, Okx.ok(Okx.instrument(INSTRUMENT).text()));
+
+        Answer withoutFamily = get(market("/instruments/" + INSTRUMENT + "/rules?externalInstrumentType=SWAP"));
+
+        assertThat(withoutFamily.status()).isEqualTo(200);
+        assertThat(withoutFamily.asObject().get("positionTiers")).isNull();
+        assertThat(exchange.requests(OkxConstants.POSITION_TIERS_PATH)).isEmpty();
+    }
+
+    /**
+     * Ожидание взято из дома: запись чужой семьи, пустое обязательное поле
+     * тира и неразбираемое число — нарушение инварианта контракта, и правила
+     * наружу не уезжают вовсе, а не уезжают без тиров
+     * ({@code docs/models/mapping/InstrumentExternalRules.md}
+     * §«`PositionTierOkxResponse` → snapshot»).
+     */
+    @Test
+    @DisplayName("B6.12 — тир чужой семьи, без обязательного поля или с неразбираемым числом отвергается")
+    void b6_12_aForeignOrIncompleteTierIsRejected() {
+        List<String> violations = List.of(
+                Okx.positionTier("ETH-USDT", "1", "0", "1000", "0.004").text(),
+                Okx.positionTier(INDEX_INSTRUMENT, "1", "0", "1000", "").text(),
+                Okx.positionTier(INDEX_INSTRUMENT, "1", "0", "1000", "0.004").without("maxSz").text(),
+                Okx.positionTier(INDEX_INSTRUMENT, "1", "0", "1000", "n/a").text());
+        for (String violation : violations) {
+            exchange.reset();
+            exchange.answers(OkxConstants.INSTRUMENTS_PATH, Okx.ok(
+                    Okx.instrument(INSTRUMENT).with("instFamily", INDEX_INSTRUMENT).text()));
+            exchange.answers(OkxConstants.POSITION_TIERS_PATH, Okx.ok(violation));
+
+            Answer answer = get(market("/instruments/" + INSTRUMENT + "/rules?externalInstrumentType=SWAP"));
+
+            assertThat(answer.carriesErrorDto()).as(violation).isTrue();
+            assertThat(answer.errorCode()).as(violation).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+            assertThat(answer.body()).as(violation).doesNotContain("externalTickSize");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> tiersOf(Answer rules) {
+        return (List<Map<String, Object>>) rules.asObject().get("positionTiers");
     }
 
     @Test

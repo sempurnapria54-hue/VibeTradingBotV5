@@ -14,7 +14,7 @@
 | Поле | Тип | Назначение |
 |---|---|---|
 | `commands` | `List<ServiceCommand>` | Команды работы всех траншей прохода, в порядке обхода. |
-| `observations` | `List<ServiceCommand>` | Команды добычи фактов всех траншей прохода, в порядке обхода — наблюдение, а не работа (`docs/processes/fsm-execution-layering.md` §«Добыча не занимает проход»). |
+| `observations` | `List<ServiceCommand>` | Команды добычи фактов всех траншей прохода, в порядке обхода — наблюдение, а не работа (`docs/processes/fsm-execution-layering.md`). |
 | `edges` | `List<TrancheEdge>` | Одобренные рёбра траншей. |
 | `dealErrorRequested` | `Boolean` | Хоть один транш попросил увести сделку в ошибку. |
 | `shutdownRequested` | `Deal.ShutdownReason` | Причина, с которой просят. |

@@ -1,14 +1,19 @@
 package com.example.tradingcore.mapping;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingbot.message.AlgoOrderDecidedMessage;
 import com.example.tradingbot.message.AnomalyReportedMessage;
 import com.example.tradingbot.message.DealClosedMessage;
 import com.example.tradingbot.message.DealOpenedMessage;
 import com.example.tradingbot.message.DealShutdownInitiatedMessage;
 import com.example.tradingbot.message.HoldRaisedMessage;
+import com.example.tradingbot.message.HoldReleasedMessage;
 import com.example.tradingbot.message.OrderDecidedMessage;
 import com.example.tradingcore.domain.safety.AnomalyReport;
+import com.example.tradingcore.domain.safety.HoldRung;
+import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -45,7 +50,8 @@ public interface CoreEventMessageMapper {
     /**
      * Решение о заявке. Идентичности сделки, транша, счёта и инструмента
      * приходят операндами: заявка несёт числовые ключи, а провод
-     * пересекает только {@code internalId}.
+     * пересекает только {@code internalId}. Предшественник в цепочке
+     * замещений переносится по имени и пуст у первичной постановки.
      */
     @Mapping(target = "orderInternalId", source = "order.internalId")
     @Mapping(target = "orderType", source = "order.type")
@@ -57,6 +63,33 @@ public interface CoreEventMessageMapper {
                                                     String dealTrancheInternalId,
                                                     String exchangeAccountInternalId,
                                                     String instrumentInternalId);
+
+    /**
+     * Решение об отдельной условной заявке. Идентичности сделки, транша,
+     * счёта и инструмента приходят операндами — тем же доводом, что у
+     * решения о заявке; предшественник, тип условия и сторона переносятся по
+     * имени.
+     *
+     * <p><b>Параметры условия раскладываются из его механизма</b> — ноги
+     * триггера и трейлинг, — и берутся ВНУТРЕННИЕ значения, а не биржевые:
+     * на момент решения биржевых нет. Отсутствующий механизм даёт пустые
+     * компоненты: охрана пустоты у вложенного источника сгенерирована.
+     */
+    @Mapping(target = "algoOrderInternalId", source = "algoOrder.internalId")
+    @Mapping(target = "sizeContracts", source = "algoOrder.size")
+    @Mapping(target = "stopLossTriggerPrice", source = "algoOrder.condition.trigger.stopLoss.value")
+    @Mapping(target = "stopLossTriggerPriceType", source = "algoOrder.condition.trigger.stopLoss.type")
+    @Mapping(target = "takeProfitTriggerPrice", source = "algoOrder.condition.trigger.takeProfit.value")
+    @Mapping(target = "takeProfitTriggerPriceType", source = "algoOrder.condition.trigger.takeProfit.type")
+    @Mapping(target = "trailingPercents", source = "algoOrder.condition.trailing.trailingPercents")
+    @Mapping(target = "trailingStepValue", source = "algoOrder.condition.trailing.trailingStepValue")
+    @Mapping(target = "trailingActivationPrice", source = "algoOrder.condition.trailing.activationPrice.value")
+    @Mapping(target = "trailingActivationPriceType", source = "algoOrder.condition.trailing.activationPrice.type")
+    AlgoOrderDecidedMessage domainToAlgoOrderDecidedMessage(AlgoOrder algoOrder,
+                                                            String dealInternalId,
+                                                            String dealTrancheInternalId,
+                                                            String exchangeAccountInternalId,
+                                                            String instrumentInternalId);
 
     /** Создание сделки: идентичности радиуса плюс контекст входа. */
     @Mapping(target = "dealInternalId", source = "deal.internalId")
@@ -117,6 +150,17 @@ public interface CoreEventMessageMapper {
                                                 String exchangeAccountInternalId,
                                                 String instrumentInternalId,
                                                 String actor);
+
+    /**
+     * Снятие ступени радиуса: пара подъёма и актор. Радиус и СНЯТАЯ ступень
+     * приходят доменными значениями и едут именами; инструмент пуст у
+     * счётного радиуса — по построению радиуса, а не по пропуску.
+     */
+    HoldReleasedMessage domainToHoldReleasedMessage(HoldScope scope,
+                                                    HoldRung rung,
+                                                    String exchangeAccountInternalId,
+                                                    String instrumentInternalId,
+                                                    String actor);
 
     /** Отчёт о происшествии; актор различает детекцию и ручную тропу. */
     @Mapping(target = "anomalyReportInternalId", source = "report.internalId")

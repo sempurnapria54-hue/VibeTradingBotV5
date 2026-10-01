@@ -1,5 +1,7 @@
 package com.example.marketdata.box;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -10,6 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.json.JsonParserFactory;
@@ -312,6 +317,64 @@ abstract class MarketDataBox {
         post(tick.path(), "");
         post(tick.path(), "");
         awaitFinished(tick, mark, 2);
+    }
+
+    /**
+     * Подаёт тик и исполняет ход кейса ПОСРЕДИ его шага: пока ответ
+     * площадки удержан ({@link ConnectorStub#answersHeld}), тик стоит
+     * между загрузкой предмета и записью итога. После хода ответ
+     * отпускается, и ждётся конец тика.
+     *
+     * @param tick    какой из пяти проходов подаётся
+     * @param midStep ход кейса внутри шага
+     */
+    protected void tickWithMidStep(Tick tick, Runnable midStep) {
+        Integer mark = AppLog.mark();
+        post(tick.path(), "");
+        try {
+            if (isFalse(HeldAnswer.awaitArrival(TICK_TIMEOUT.toSeconds()))) {
+                throw new AssertionError("Тик " + tick + " не дошёл до удержанного ответа площадки");
+            }
+            midStep.run();
+        } finally {
+            HeldAnswer.release();
+        }
+        awaitFinished(tick, mark, 1);
+    }
+
+    /**
+     * Подаёт тик, чья запись итога встаёт в очередь замка строк таблицы, и
+     * исполняет запрос кейса, пока она там стоит: запрос читает строку ДО
+     * итога тика, а его запись встаёт в очередь вслед за записью тика
+     * ({@link RowLock}). Затем замок отпускается: сперва ложится итог тика,
+     * за ним — запись запроса.
+     *
+     * <p>Так подаётся вход «шаг цикла записал итог между чтением и записью
+     * команды» у команды, которая к стабу не ходит и потому удержанным
+     * ответом ({@link #tickWithMidStep}) внутрь себя не ставится.
+     *
+     * @param tick    какой из пяти проходов подаётся
+     * @param table   таблица, чью строку пишут и тик, и запрос
+     * @param request запрос кейса; исполняется своим потоком, потому что
+     *                стоит в очереди замка до его отпускания
+     * @return ответ на запрос кейса
+     */
+    protected Answer tickWithQueuedWrite(Tick tick, String table, Supplier<Answer> request) {
+        Integer mark = AppLog.mark();
+        CompletableFuture<Answer> answer;
+        try (RowLock ignored = rows.lockForWrites(table)) {
+            post(tick.path(), "");
+            awaitQueuedWrites(table, 1L);
+            answer = CompletableFuture.supplyAsync(request);
+            awaitQueuedWrites(table, 2L);
+        }
+        awaitFinished(tick, mark, 1);
+        return answer.orTimeout(TICK_TIMEOUT.toSeconds(), TimeUnit.SECONDS).join();
+    }
+
+    private void awaitQueuedWrites(String table, Long writes) {
+        Awaitility.await().atMost(TICK_TIMEOUT).pollInterval(Duration.ofMillis(50))
+                .until(() -> rows.writesQueuedOn(table), queued -> queued >= writes);
     }
 
     private void awaitFinished(Tick tick, Integer mark, Integer times) {

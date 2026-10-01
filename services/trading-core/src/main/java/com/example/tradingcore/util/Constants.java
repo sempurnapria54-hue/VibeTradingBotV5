@@ -18,8 +18,8 @@ public class Constants {
      * приходит от правила, которое ступень запросило, и дом каждого
      * значения — дом его тропы
      * (docs/components/models/HoldSignal.md §«Значения `code` заводят
-     * тропы-производители»). Класс держит только те, что уже названы
-     * своими домами.
+     * тропы-производители, каждое — в своём доме»). Класс держит только
+     * те, что уже названы своими домами.
      */
     @UtilityClass
     public class Hold {
@@ -164,6 +164,18 @@ public class Constants {
          */
         public static final String RISK_POLICY_BREACH_UNDER_PROTECTION =
                 "RISK_POLICY_BREACH_UNDER_PROTECTION";
+
+        /**
+         * Действующий уровень остановки убытка удерживаемой позиции не лежит
+         * между ценой и ценой ликвидации, которую площадка называет у живого
+         * эпизода: выходом позиции станет ликвидация, а не стоп. Ступень
+         * жёсткая, радиус — пара: принятый риск стопом больше не ограничен,
+         * а наш учёт цел — ликвидацию сдвинули операнды площадки. Дом кода и
+         * реакции — docs/rules/instrument-hold.md §Триггеры; признак —
+         * docs/components/AnomalyJob.md, строка A13.
+         */
+        public static final String INSTRUMENT_LIQUIDATION_BEFORE_STOP =
+                "INSTRUMENT_LIQUIDATION_BEFORE_STOP";
 
         /**
          * Ставка комиссионной группы инструмента не подтверждалась

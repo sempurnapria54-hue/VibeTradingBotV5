@@ -61,7 +61,7 @@ class JournalCleanupBoxTest extends SharedAuditBox {
     /** Тема первого производителя: в неё ходят все клетки класса. */
     private static final String CORE = AuditSubstrate.CORE_TOPIC;
 
-    /** Тема второго производителя: ею наблюдается радиус снятия разрыва. */
+    /** Тема второго производителя: её строка — соседняя пара без разрыва. */
     private static final String STRATEGY = AuditSubstrate.STRATEGY_TOPIC;
 
     /** Возраст события, с которым клетки ходят в тему. */
@@ -77,7 +77,8 @@ class JournalCleanupBoxTest extends SharedAuditBox {
     private static final Duration OBSERVED_AGO = Duration.ofHours(2);
 
     /**
-     * Возраст разрыва, который проход выносит ЗА новую границу.
+     * Возраст разрыва, который проход выносит ЗА новую границу, не трогая
+     * его момента.
      *
      * <p>Лежит между двумя границами: позже той, что была до прохода
      * (момент наблюдения, {@link #OBSERVED_AGO}), и раньше той, которую
@@ -136,10 +137,13 @@ class JournalCleanupBoxTest extends SharedAuditBox {
     /** Методы, которыми перебираются пути ручного триггера. */
     private static final List<String> METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE");
 
-    /** Колонки строки пары, которых проход не касается ни одной. */
+    /**
+     * Колонки строки пары, которых проход не касается ни одной — включая
+     * момент разрыва: снятия у того нет ни у одного писателя.
+     */
     private static final List<String> UNTOUCHED_COLUMNS = List.of(
             GROUP_COLUMN, TOPIC_COLUMN, OBSERVED_COLUMN, SUBSCRIBED_COLUMN,
-            HALTED_COLUMN, LAST_ACCEPTED_COLUMN, UPDATED_COLUMN);
+            HALTED_COLUMN, GAP_COLUMN, LAST_ACCEPTED_COLUMN, UPDATED_COLUMN);
 
     /** Вставка накопленных строк журнала: обе оси времени у них одинаковы. */
     private static final String INSERT_AGED_RECORDS = """
@@ -241,8 +245,8 @@ class JournalCleanupBoxTest extends SharedAuditBox {
     }
 
     @Test
-    @DisplayName("B7.7 — Момент разрыва гаснет по НОВОЙ границе, и порядок ходов несущий")
-    void theGapMomentIsClearedAgainstTheBoundThisPassItselfCreated() {
+    @DisplayName("B7.7 — Граница, подвинутая проходом, выносит разрыв из обещаемого ряда")
+    void theBoundMovedByThePassTakesTheGapOutOfThePromisedSeries() {
         OffsetDateTime gapAt = givenAgedJournalAndPairs(momentsAgo(GAP_OUTSIDE_NEW_BOUND));
         OffsetDateTime boundBefore = lowerBoundMoment();
 
@@ -254,17 +258,17 @@ class JournalCleanupBoxTest extends SharedAuditBox {
 
         cleanup();
 
-        assertThat(pair(CORE).get(GAP_COLUMN))
-                .as("разрыв погашен: снятие мерит границу, подвинутую ЭТИМ же проходом")
-                .isNull();
+        assertThat(instant(pair(CORE), GAP_COLUMN))
+                .as("момент разрыва цел: чистка строк состояния не пишет, снятия у величины нет")
+                .isEqualTo(gapAt.toInstant());
         assertThat(lowerBoundMoment().toInstant())
-                .as("и граница эта — момент приёма самой ранней уцелевшей строки")
+                .as("граница после прохода — момент приёма самой ранней уцелевшей строки")
                 .isEqualTo(instant(record(), RECORDED_COLUMN));
         assertThat(lowerBoundMoment().toInstant())
-                .as("то есть та, которой до прохода не существовало")
+                .as("то есть та, которой до прохода не существовало, и разрыв лежит раньше неё")
                 .isAfter(gapAt.toInstant());
         assertThat(continuityClaimable())
-                .as("предикат снова утверждаем ТЕМ ЖЕ ходом, а не следующим тактом")
+                .as("предикат утверждаем сразу после прохода: разрыв сравнивается с НОВОЙ границей")
                 .isEqualTo(Boolean.TRUE);
     }
 
@@ -334,29 +338,36 @@ class JournalCleanupBoxTest extends SharedAuditBox {
     }
 
     @Test
-    @DisplayName("B7.11 — Проход не трогает строк состояния, кроме момента разрыва")
-    void thePassTouchesNoReceptionColumnOtherThanTheGapMoment() {
+    @DisplayName("B7.11 — Проход не трогает строк состояния, включая момент разрыва")
+    void thePassTouchesNoReceptionColumnIncludingTheGapMoment() {
         givenAgedJournal();
-        givenPair(CORE, momentsAgo(OBSERVED_AGO), Boolean.TRUE, Boolean.TRUE,
+        givenPair(CORE, momentsAgo(OBSERVED_AGO), Boolean.TRUE, Boolean.FALSE,
                 momentsAgo(GAP_OUTSIDE_NEW_BOUND), momentsAgo(EVENT_AGE));
-        givenPair(STRATEGY, momentsAgo(OBSERVED_AGO.plusMinutes(1)), Boolean.FALSE, Boolean.FALSE,
+        givenPair(STRATEGY, momentsAgo(OBSERVED_AGO.plusMinutes(1)), Boolean.FALSE, Boolean.TRUE,
                 null, null);
         Map<String, Object> coreBefore = pair(CORE);
         Map<String, Object> strategyBefore = pair(STRATEGY);
+        String coreVersion = pairVersion(CORE);
         String strategyVersion = pairVersion(STRATEGY);
 
         assertThat(coreBefore.get(GAP_COLUMN))
-                .as("вход поставлен: гасить было что").isNotNull();
+                .as("вход поставлен: у пары есть разрыв, который проход вынесет за границу").isNotNull();
 
         cleanup();
 
-        assertThat(pair(CORE).get(GAP_COLUMN))
-                .as("изменилась колонка момента разрыва").isNull();
+        assertThat(lowerBoundMoment().toInstant())
+                .as("проход вынес разрыв за новую границу")
+                .isAfter(instant(coreBefore, GAP_COLUMN));
         for (String column : UNTOUCHED_COLUMNS) {
             assertThat(pair(CORE).get(column))
-                    .as("и только она: колонка " + column + " не тронута")
+                    .as("колонка " + column + " пары с разрывом не тронута")
                     .isEqualTo(coreBefore.get(column));
         }
+        assertThat(pairVersion(CORE))
+                .as("строка пары с разрывом не переписана даже тем же значением").isEqualTo(coreVersion);
+        assertThat(continuityClaimable())
+                .as("а её предикат утверждаем сравнением при чтении, а не правкой строки")
+                .isEqualTo(Boolean.TRUE);
         assertThat(pair(STRATEGY))
                 .as("у пары без разрыва не тронуто вовсе ничего").isEqualTo(strategyBefore);
         assertThat(pairVersion(STRATEGY))
@@ -439,7 +450,7 @@ class JournalCleanupBoxTest extends SharedAuditBox {
     }
 
     /**
-     * Ставит общий вход трёх клеток о границе: журнал с одной строкой за
+     * Ставит общий вход двух клеток о границе: журнал с одной строкой за
      * глубиной и одной внутри неё плюс две строки пар, из которых первая
      * несёт названный момент разрыва.
      *

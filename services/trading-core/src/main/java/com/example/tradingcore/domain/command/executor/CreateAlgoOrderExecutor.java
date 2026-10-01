@@ -16,6 +16,7 @@ import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.TargetEntityType;
 import com.example.tradingcore.domain.command.payload.CreateAlgoOrderCommandPayload;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
+import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.AlgoOrderDataService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import java.util.ArrayList;
@@ -36,6 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>Четвёрку чисел риска пересчитывает.</b> Постановка защиты меняет
  * операнд четвёртого числа — уровень действующей защиты, — а числа
  * пересчитываются целиком тем, кто меняет любой их операнд.
+ *
+ * <p><b>Писатель класса {@code ALGO_ORDER_DECIDED}:</b> решение о защите,
+ * стоящей отдельной заявкой, иначе журналу не видно вовсе.
  */
 @Component
 @RequiredArgsConstructor
@@ -44,6 +48,7 @@ public class CreateAlgoOrderExecutor implements CommandExecutor {
     private final AlgoOrderDataService algoOrderDataService;
     private final DealActionStateDataService dealActionStateDataService;
     private final DealRiskNumbersService dealRiskNumbersService;
+    private final CoreEventWriter coreEventWriter;
 
     @Override
     public ServiceCommandType supportedType() {
@@ -55,7 +60,7 @@ public class CreateAlgoOrderExecutor implements CommandExecutor {
     public ServiceCommandExecutionResult execute(ServiceCommand command, DealActionState actionState,
                                                  DealContext dealContext) {
         CreateAlgoOrderCommandPayload payload = (CreateAlgoOrderCommandPayload) command.getPayload();
-        AlgoOrder algoOrder = resolveTarget(actionState, payload, dealContext.getDeal().getId());
+        AlgoOrder algoOrder = resolveTarget(actionState, payload, dealContext);
         actionState.targetAt(TargetEntityType.ALGO_ORDER, algoOrder.getId());
         actionState.setStatus(DealActionStateStatus.CREATED);
         dealActionStateDataService.save(actionState);
@@ -73,12 +78,35 @@ public class CreateAlgoOrderExecutor implements CommandExecutor {
      * повтора и есть цель строки исполнения.
      */
     private AlgoOrder resolveTarget(DealActionState actionState, CreateAlgoOrderCommandPayload payload,
-                                    Long dealId) {
+                                    DealContext dealContext) {
         if (nonNull(actionState.getTargetEntityId())
                 && TargetEntityType.ALGO_ORDER.equals(actionState.getTargetEntityType())) {
             return algoOrderDataService.getRequiredById(actionState.getTargetEntityId());
         }
-        return algoOrderDataService.save(buildAlgoOrder(payload, dealId));
+        AlgoOrder saved = algoOrderDataService.save(buildAlgoOrder(payload, dealContext.getDeal().getId()));
+        publishDecided(dealContext, saved);
+        return saved;
+    }
+
+    /**
+     * Событие решения об условной заявке — <b>той же транзакцией</b>, что
+     * заводит её строку и присваивает клиентский идентификатор
+     * (docs/architecture/contracts.md §«У каждого класса события назван
+     * писатель, и он же писатель решения»).
+     *
+     * <p><b>Повтор звена события не производит:</b> строка уже заведена, и
+     * решение принято однажды — тем же правилом, что у решения о заявке.
+     *
+     * <p><b>Идентичность транша читается из графа прохода</b>: транши в нём
+     * уже загружены, и чтение строки транша ради одного поля было бы
+     * запросом по прочитанному.
+     */
+    private void publishDecided(DealContext dealContext, AlgoOrder algoOrder) {
+        Deal deal = dealContext.getDeal();
+        coreEventWriter.algoOrderDecided(dealContext.getExchangeAccount().getTenantId(), algoOrder,
+                deal.getInternalId(), deal.trancheInternalId(algoOrder.getDealTrancheId()),
+                dealContext.getExchangeAccount().getInternalId(),
+                dealContext.getInstrument().getInternalId());
     }
 
     /**

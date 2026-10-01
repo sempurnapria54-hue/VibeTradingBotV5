@@ -3,8 +3,12 @@ package com.example.connector.okx.mapping;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingbot.domain.model.core.instrument.PositionTier;
 import com.example.connector.okx.snapshot.InstrumentExternalRulesExternalSnapshot;
+import com.example.connector.okx.snapshot.PositionTierExternalSnapshot;
 import com.example.connector.okx.integration.external.api.model.okx.response.InstrumentOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.PositionTierOkxResponse;
+import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -17,26 +21,38 @@ import org.mapstruct.ReportingPolicy;
  * {@link InstrumentExternalRules} из снапшота с резолвом доменных проекций
  * (тип инструмента/контракта, статус торгуемости). Неизвестное сырое
  * значение нормализуется в {@code UNKNOWN} соответствующего enum.
+ *
+ * <p><b>Правила собираются из ДВУХ ответов площадки:</b> спецификации
+ * инструмента и позиционных тиров его семьи. Тиры едут в снапшот сырыми
+ * строками и разбираются в числа при материализации.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface InstrumentExternalRulesMapper {
 
-    @Mapping(target = "externalInstrumentId", source = "instId")
-    @Mapping(target = "externalInstrumentType", source = "instType")
-    @Mapping(target = "externalContractType", source = "ctType")
-    @Mapping(target = "externalContractValue", source = "ctVal")
-    @Mapping(target = "externalContractValueCurrency", source = "ctValCcy")
-    @Mapping(target = "externalTickSize", source = "tickSz")
-    @Mapping(target = "externalLotSize", source = "lotSz")
+    @Mapping(target = "externalInstrumentId", source = "response.instId")
+    @Mapping(target = "externalInstrumentType", source = "response.instType")
+    @Mapping(target = "externalContractType", source = "response.ctType")
+    @Mapping(target = "externalContractValue", source = "response.ctVal")
+    @Mapping(target = "externalContractValueCurrency", source = "response.ctValCcy")
+    @Mapping(target = "externalTickSize", source = "response.tickSz")
+    @Mapping(target = "externalLotSize", source = "response.lotSz")
+    @Mapping(target = "externalMinSize", source = "response.minSz")
+    @Mapping(target = "externalMaxLimitSize", source = "response.maxLmtSz")
+    @Mapping(target = "externalMaxMarketSize", source = "response.maxMktSz")
+    @Mapping(target = "externalMaxTriggerSize", source = "response.maxTriggerSz")
+    @Mapping(target = "externalMaxStopSize", source = "response.maxStopSz")
+    @Mapping(target = "externalMaxLeverage", source = "response.lever")
+    @Mapping(target = "externalState", source = "response.state")
+    @Mapping(target = "externalFeeGroupId", source = "response.groupId")
+    @Mapping(target = "externalPositionTiers", source = "tiers")
+    InstrumentExternalRulesExternalSnapshot integrationToSnapshot(InstrumentOkxResponse response,
+                                                                  List<PositionTierOkxResponse> tiers);
+
+    /** Позиционный тир площадки → граничный снапшот тира: сырые строки один к одному. */
     @Mapping(target = "externalMinSize", source = "minSz")
-    @Mapping(target = "externalMaxLimitSize", source = "maxLmtSz")
-    @Mapping(target = "externalMaxMarketSize", source = "maxMktSz")
-    @Mapping(target = "externalMaxTriggerSize", source = "maxTriggerSz")
-    @Mapping(target = "externalMaxStopSize", source = "maxStopSz")
-    @Mapping(target = "externalMaxLeverage", source = "lever")
-    @Mapping(target = "externalState", source = "state")
-    @Mapping(target = "externalFeeGroupId", source = "groupId")
-    InstrumentExternalRulesExternalSnapshot integrationToSnapshot(InstrumentOkxResponse response);
+    @Mapping(target = "externalMaxSize", source = "maxSz")
+    @Mapping(target = "externalMaintenanceMarginRate", source = "mmr")
+    PositionTierExternalSnapshot integrationToSnapshot(PositionTierOkxResponse tier);
 
     /**
      * Материализация правил из снапшота: external*-поля переносятся по
@@ -49,7 +65,18 @@ public interface InstrumentExternalRulesMapper {
     @Mapping(target = "contractType", source = "snapshot.externalContractType",
             qualifiedByName = "resolveContractType")
     @Mapping(target = "status", source = "snapshot.externalState", qualifiedByName = "resolveStatus")
+    @Mapping(target = "positionTiers", source = "snapshot.externalPositionTiers")
     InstrumentExternalRules snapshotToDomain(InstrumentExternalRulesExternalSnapshot snapshot, Long instrumentId);
+
+    /**
+     * Снапшот тира → доменный тир: строки площадки разбираются в числа.
+     * Непустоту гарантирует валидация читателя; неразбираемое число
+     * отвергает сеть разбора шлюза как нарушение контракта.
+     */
+    @Mapping(target = "minSize", source = "externalMinSize")
+    @Mapping(target = "maxSize", source = "externalMaxSize")
+    @Mapping(target = "maintenanceMarginRate", source = "externalMaintenanceMarginRate")
+    PositionTier snapshotToDomain(PositionTierExternalSnapshot tier);
 
     /**
      * Перевод без ключа навеса.

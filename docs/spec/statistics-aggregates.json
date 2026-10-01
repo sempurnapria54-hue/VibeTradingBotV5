@@ -2,14 +2,18 @@
   "subject": "statistics-aggregates",
   "question": "Что считает строка агрегата статистики",
   "home": "docs/rules/statistics-aggregates.md",
+  "includes": [
+    "loss-streak-halt"
+  ],
   "operands": {
     "tookRisk": "сделка приняла риск: у неё была живая позиция. Ложь — тропа закрытия без входа (docs/rules/deal-without-operations.md): кандидат дошёл до терминала, не торгуя",
-    "priceResult": "результат сделки ДО накопленного финансирования — значение величины priceResult дома docs/spec/loss-streak-halt.json; форма здесь не переписывается. Комиссии обеих ног и штраф ликвидации в него УЖЕ ВХОДЯТ вычтенными: слагаемое приходит биржевым net эпизода (docs/spec/deal-result.json, операнд externalRealizedProfit). Пусто — результат недоступен: не добыта запись закрытия эпизода, не предъявлена разбивка движений, движение вне расчётной валюты ждёт курса либо признак полноты графа сделки на момент терминала ложен. Операнд СОДЕРЖИМЫМ СОБЫТИЯ не приезжает готовым числом: своего поля у величины не заводится (docs/rules/loss-streak-halt.md, раздел о сборке операнда на терминале), и складывает его сам пересчёт — ПО ФОРМЕ ДОМА, из трёх приезжающих операндов: итога, накопленного финансирования и признака полноты графа сделки на момент терминала (docs/architecture/contracts.md, состав терминального события). Поэтому форма здесь и не переписывается: конъюнкт полноты графа остаётся у дома, и своей ветви доступности ни у слагаемого, ни у итога не появляется. Второй величиной операнд не объявляется: имя уже объявлено величиной в доме, а копия формулы под другим именем — дефект конвенции docs/spec/, а не согласованное дублирование. Маршрут includes отвергнут ценой: он потребовал бы свести операнды этой спеки к операндам дома по всем её примерам",
-    "resultProfit": "итог сделки — Deal.resultProfit, дом формы docs/spec/deal-result.json; накопленное финансирование в него ВХОДИТ, как и комиссии со штрафом ликвидации. Пусто — числа на сделке нет: терминал прошёл, а итог записан не был («неисчислимо» аварийного терминала); дом доступности — docs/spec/deal-result.json, величина resultAvailable, и форма здесь не переписывается. С пустотой результата ДО финансирования множество НЕ СОВПАДАЕТ: у того есть СВОЯ причина — ложный признак полноты графа на момент терминала, — и состояние «итог непуст, ценовой результат пуст» достижимо: число законно записала финализация выхода на полном графе, а аварийный терминал пришёл на усечённом (docs/spec/deal-lifecycle.json, величина emergencyTerminalContract, третий дизъюнкт)",
+    "priceResult": "результат сделки ДО накопленного финансирования — величина priceResult дома docs/spec/loss-streak-halt.json, подключённого сюда через includes; форма здесь не переписывается и ИСПОЛНЯЕТСЯ на каждой строке сделки примеров. Состояние примера числа не несёт — несёт три операнда формы: итог (resultProfit), накопленное финансирование (fundingCost) и признак полноты графа сделки на момент терминала (graphComplete). Поэтому тождество «результат до финансирования есть итог плюс финансирование под конъюнктом полноты графа» проверяется примерами этой спеки, а не обещается нотой. Комиссии обеих ног и штраф ликвидации в него УЖЕ ВХОДЯТ вычтенными: слагаемое приходит биржевым net эпизода (docs/spec/deal-result.json, операнд externalRealizedProfit). Пусто — результат недоступен: итог пуст либо признак полноты графа ложен. Операнд СОДЕРЖИМЫМ СОБЫТИЯ не приезжает готовым числом: своего поля у величины не заводится (docs/rules/loss-streak-halt.md, раздел о сборке операнда на терминале), и складывает его сам пересчёт из трёх приезжающих операндов (docs/architecture/contracts.md, состав терминального события). Имя стоит в этом перечне описанием, а не объявлением: величиной оно объявлено в доме, и вторая запись формы была бы дефектом конвенции docs/spec/. Строка сделки, несущая priceResult СВОИМ числом, обходит форму дома — такое состояние предъявляет только контрпример охранного инварианта разложения",
+    "resultProfit": "итог сделки — Deal.resultProfit, дом формы docs/spec/deal-result.json; накопленное финансирование в него ВХОДИТ, как и комиссии со штрафом ликвидации. Пусто — числа на сделке нет: терминал прошёл, а итог записан не был («неисчислимо» аварийного терминала); дом доступности — docs/spec/deal-result.json, величина resultAvailable, и форма здесь не переписывается. С пустотой результата ДО финансирования множество НЕ СОВПАДАЕТ: у того есть СВОЯ причина — ложный признак полноты графа на момент терминала, — и состояние «итог непуст, ценовой результат пуст» достижимо: число законно записала финализация выхода на полном графе, а аварийный терминал пришёл на усечённом (docs/spec/deal-lifecycle.json, величина emergencyTerminalContract, третий дизъюнкт). Он же первый операнд формы priceResult дома docs/spec/loss-streak-halt.json: подключённая форма читает его со строки сделки под тем же именем",
     "fee": "комиссии обеих ног сделки, издержкой ПОЛОЖИТЕЛЬНЫЕ: величина rightTradeFee дома docs/spec/pnl-reconciliation.json с обратным знаком — там конвенция сырая. Сторона выбрана правая (сумма Position.externalFee по эпизодам), а не левая (сумма по строкам разбивки), потому что из ЭТОГО же носителя посчитан публикуемый результат: разложение сходится тождеством, а не обещанием. При несошедшейся сверке показанная комиссия расходится с разбивкой — это состояние видно счётчиком reconciliationMismatchedDeals",
-    "funding": "накопленное финансирование сделки — значение величины fundingCost дома docs/spec/loss-streak-halt.json; знак нормализован издержкой, поэтому carry-доход отрицателен",
+    "fundingCost": "накопленное финансирование сделки — второй операнд формы priceResult дома docs/spec/loss-streak-halt.json, и имя у него общее с домом потому, что подключённая форма читает его со строки сделки; знак нормализован издержкой, поэтому carry-доход отрицателен. Приходит той же записью закрытия эпизода, что и итог, и потому пуст ровно тогда, когда пуст итог",
+    "graphComplete": "признак полноты графа сделки на момент терминала — третий операнд формы priceResult дома docs/spec/loss-streak-halt.json; значение — величина graphComplete дома docs/spec/deal-context-load.json, форма здесь не переписывается. Приезжает содержимым терминального события (docs/architecture/contracts.md) и лежит колонкой факта как есть. Ложь при непустом итоге делает результат до финансирования недоступным: сделка выпадает из ОБЕИХ денежных сумм строки — отбор у них общий — и видна счётчиком resultUnavailableDeals",
     "liqPenalty": "штраф ликвидации сделки, издержкой ПОЛОЖИТЕЛЬНЫЙ: величина rightLiquidationPenalty дома docs/spec/pnl-reconciliation.json с обратным знаком. Ноль у сделки, которую биржа не закрывала принудительно. У принудительного сокращения штраф НЕ ИСКЛЮЧЁН: наблюдения нет, и обе развязки держат фикстуры дома (docs/spec/pnl-reconciliation.json)",
-    "plannedRisk": "плановый риск сделки — Deal.plannedRiskAmount, знаменатель R-мультипликатора; форма — docs/spec/deal-risk-numbers.json, величина dealPlannedRisk. Величина НИКОГДА не пуста: её дом — сумма по входным ногам, и на пустом множестве сумма даёт НОЛЬ. Ноль означает «сайзинга на тропе сделки не было» — так закрывается восстановительная сделка, заведённая вокруг живого риска",
+    "plannedRisk": "плановый риск сделки — Deal.plannedRiskAmount, знаменатель R-мультипликатора; форма — docs/spec/deal-risk-numbers.json, величина dealPlannedRisk. Форма тотальна: сумма по входным ногам на пустом множестве даёт НОЛЬ, и ноль означает «сайзинга на тропе сделки не было» — так закрывается восстановительная сделка, заведённая вокруг живого риска. ПОЛЕ же пишут только писатели четвёрки чисел риска, и пишут на полном графе (docs/models/domain/aggregate/Deal.md, раздел о писателях четвёрки): пока ни один из них не завершился, поле пусто, и содержимое терминального события везёт его пустым. У принявшей риск сделки пустота значит «знаменатель НЕ ПОСЧИТАН», а не «сайзинга не было»: нулём она не читается (docs/rules/absent-value-semantics.md). Из знаменателя R такая сделка выпадает (rDenominatorPresent), и счётчик у неё есть — riskBenchmarkMissingDeals: писатель признака доступности знаменателя ставит MISSING ровно принявшей риск сделке без положительного планового риска, и связь держит охранный инвариант missingBenchmarkMarksAbsentDenominator",
     "currency": "расчётная валюта результата сделки — Deal.resultProfitCurrency, дом формы docs/spec/deal-result.json. Пусто достижимо: расчётная валюта инструмента не резолвилась, и у числа нет единицы измерения",
     "closeOutcome": "торговый исход закрытия — Deal.closeOutcome, тип CloseOutcome: NORMAL_EXIT, LIQUIDATION, FORCED_REDUCTION, UNDETERMINED. Состав стоит здесь ВТОРОЙ СТОРОНОЙ СВЕРКИ, а не копией: команда вывода популяции (tools/derive/deal-selection-feature-values.sh) читает эту прозу и роняет прогон при расхождении с объявлением перечня; дом состава — docs/models/domain/aggregate/Deal.md. Пусто у сделки, закрытой без входа: признак неприменим",
     "reconciliationStatus": "исход сверки разбивки движений с биржевым итогом — Deal.reconciliationStatus, тип ReconciliationStatus: NOT_RUN, MATCHED, MISMATCHED. Состав стоит здесь второй стороной сверки, а не копией — тем же выводом, что у closeOutcome; дом состава — docs/models/domain/aggregate/Deal.md. Пусто у сделки, закрытой без входа",
@@ -96,8 +100,13 @@
     },
     {
       "name": "countsAsUnsized",
-      "note": "Сделка приняла риск, а знаменателя R у неё нет: сайзинга на её тропе не было. Признак — НОЛЬ, а не пустота: дом величины (docs/spec/deal-risk-numbers.json, dealPlannedRisk) есть сумма по входным ногам, и на пустом множестве она даёт ноль. Мера по пустоте была бы ложна тождественно: счётчик, заведённый против молчаливого выпадения, молчал бы сам.",
+      "note": "Сделка приняла риск, а сайзинга на её тропе не было: плановый риск — НОЛЬ. Признак — ноль, а не пустота, и пустоту он не берёт намеренно: у пустоты другая природа — знаменатель не посчитан, — и счёт её здесь выдал бы недобытое за исход «сайзинга не было» (docs/rules/absent-value-semantics.md). Пустоту несёт riskBenchmarkMissingDeals вместе с нулём (инвариант missingBenchmarkMarksAbsentDenominator), и число пустых выводится разностью двух счётчиков, а вторым носителем не заводится.",
       "expr": "countsInShares && plannedRisk == 0"
+    },
+    {
+      "name": "rDenominatorPresent",
+      "note": "У сделки ЕСТЬ знаменатель R: плановый риск непуст и положителен. Отбор всех сумм отношения к риску стоит на этой величине, а не на сравнении с нулём: сравнение с пустым значением не определено, и пустой плановый риск (знаменатель не посчитан) обязан выпадать из знаменателя так же, как нулевой, — по той же причине, по которой выпадает и в трёхзначной логике запроса пересчёта. Выпадает он не молча: счётчик у него riskBenchmarkMissingDeals.",
+      "expr": "notNull(plannedRisk) && plannedRisk > 0"
     },
     {
       "name": "countsAsLiquidated",
@@ -278,7 +287,7 @@
       "name": "fundingSum",
       "over": "deals",
       "op": "sum",
-      "of": "funding",
+      "of": "fundingCost",
       "where": "entersRowSums",
       "note": "Накопленное финансирование сделок, вошедших в суммы; отрицательное значение — carry-доход. Единственная издержка, на величину которой две денежные суммы строки различаются."
     },
@@ -311,7 +320,7 @@
       "over": "deals",
       "op": "sum",
       "of": "plannedRisk",
-      "where": "entersRowSums && plannedRisk > 0",
+      "where": "entersRowSums && rDenominatorPresent",
       "note": "Знаменатель отношения «результат на единицу риска» — по ТОЙ ЖЕ популяции, что и числитель. Отбор без конъюнкта entersRowSums держал бы в знаменателе сделки, которых нет в числителе: отношение занижается по модулю, и на убыточном периоде — в разрешающую сторону."
     },
     {
@@ -319,7 +328,7 @@
       "over": "deals",
       "op": "sum",
       "of": "plannedRisk",
-      "where": "countsInShares && plannedRisk > 0 && !entersRowSums && currencyResolved",
+      "where": "countsInShares && rDenominatorPresent && !entersRowSums && currencyResolved",
       "note": "Плановый риск, выведенный из знаменателя. Счётчика мало: читателю нужна ВЕЛИЧИНА непокрытого риска, чтобы судить, насколько отношение опирается на полную картину. Конъюнкт currencyResolved несущий, и довод его — не тождество двух валют, а ключ зерна: единицу строке даёт он, несёт он валюту РЕЗУЛЬТАТА, и второй валютной колонки у строки нет. На строке с пустым ключом сумма планового риска единицы не имеет ни при каком исходе резолва валюты риска — и складывала бы величины разных инструментов, то есть ровно ту операцию, ради запрета которой валюта вынесена в ключ. Мощность той популяции показывает currencyUnresolvedDeals, а величины у неё нет по той же причине, по которой её нет у результата."
     },
     {
@@ -327,14 +336,14 @@
       "over": "deals",
       "op": "sum",
       "of": "priceResult / plannedRisk",
-      "where": "entersRowSums && plannedRisk > 0",
+      "where": "entersRowSums && rDenominatorPresent",
       "note": "Сумма R-мультипликаторов сделок. Хранится отдельно, потому что частное сумм равно среднему R только при равном риске сделок, а база риска следует за свободным остатком в обе стороны (docs/concept.md, о сжатии в просадке): после просадки сделки берут меньший риск и получают меньший вес, то есть убытки после просадки взвешены ниже — смещение направленное и благоприятное."
     },
     {
       "name": "rDenominatorDeals",
       "over": "deals",
       "op": "count",
-      "where": "entersRowSums && plannedRisk > 0",
+      "where": "entersRowSums && rDenominatorPresent",
       "note": "Сколько сделок вошло в сумму R-мультипликаторов. Без неё rSum не делится ни на что: riskBearingDeals шире (в него входят и невошедшие), а winRateDenominator считает другую популяцию. Средний R есть rSum / rDenominatorDeals, и обе половины обязаны храниться, иначе клейм выводимости снова ложен.",
       "$comment": "пара к rSum"
     },
@@ -355,7 +364,7 @@
     },
     {
       "name": "fundingDecompositionHolds",
-      "note": "ОХРАННЫЙ ИНВАРИАНТ РАЗЛОЖЕНИЯ: две денежные суммы строки различаются ровно на накопленное финансирование. Клейм жил в доке клеткой таблицы и не считался ни одной величиной — то есть не проверялся ни одним примером и не мерился мутационной пробой. Держится тем, что все три суммы считаются по одной популяции entersRowSums.",
+      "note": "ОХРАННЫЙ ИНВАРИАНТ РАЗЛОЖЕНИЯ: две денежные суммы строки различаются ровно на накопленное финансирование. Держится двумя опорами, и обе исполнимы: на строке сделки результат до финансирования складывается формой дома (priceResult, docs/spec/loss-streak-halt.json, подключён через includes) из итога и финансирования той же строки, а все три суммы считаются по одной популяции entersRowSums. Нарушить его может только строка, несущая результат до финансирования СВОИМ числом мимо формы, — второй носитель производного (docs/concept.md, П4), и ровно это состояние предъявляет контрпример.",
       "expr": "abs(resultBeforeFundingSum - netResultSum - fundingSum) < 0.000001"
     },
     {
@@ -371,6 +380,11 @@
       "expr": "!(countsInShares && breakdownIncomplete == 'NOT_ASSESSED') || countsAsUnavailable"
     },
     {
+      "name": "missingBenchmarkMarksAbsentDenominator",
+      "note": "ОХРАННЫЙ ИНВАРИАНТ признака доступности знаменателя: у принявшей риск сделки признак равен MISSING ровно тогда, когда знаменателя R нет — плановый риск пуст либо нулевой. Связь выводит писатель признака на терминале: вход был — AVAILABLE при положительном плановом риске, иначе MISSING (docs/models/domain/aggregate/Deal.md, RiskBenchmarkAvailability; docs/spec/deal-lifecycle.json, величина benchmarkAvailabilityOnTerminal). На ней стоит счёт пустого планового риска: выпавшая из знаменателя R сделка с непосчитанным знаменателем видна счётчиком riskBenchmarkMissingDeals, а её число есть разность riskBenchmarkMissingDeals и riskUnsizedDeals. Нарушенный, инвариант молча вернул бы эту популяцию в выпавшие без счётчика.",
+      "expr": "!countsInShares || (riskBenchmarkAvailability == 'MISSING') != rDenominatorPresent"
+    },
+    {
       "name": "openedDeals",
       "note": "Счётчик происшествий суток: заведённых сделок. Живёт в строке ВТОРОГО зерна: расчётной валюты событие заведения сделки не несёт — результата у него ещё нет, — а ключ сделочного зерна несёт валюту результата. Идентичность определения это событие несёт по объявлению, и в зерно происшествий она всё равно не входит: зерно одно на все его счётчики. Довод целиком и его названная цена — docs/rules/statistics-aggregates.md; ключи обоих зёрен здесь не переписываются.",
       "over": "records",
@@ -379,14 +393,14 @@
     },
     {
       "name": "orderDecisions",
-      "note": "Счётчик происшествий суток: решений о создании ОБЫЧНОЙ заявки. Популяция названа, потому что она у́же имени: ремодел выражается новой сущностью плюс отменой старой (docs/rules/replace-not-amend.md) и даёт своё решение, а решение об отдельной условной заявке не выражено классом события вовсе — производителя у него нет, и в разность объявленных и построенных классов оно не попадает (docs/models/domain/other/AuditRecord.md).",
+      "note": "Счётчик происшествий суток: решений о создании ОБЫЧНОЙ заявки. Популяция названа, потому что она у́же имени: ремодел выражается новой сущностью плюс отменой старой (docs/rules/replace-not-amend.md) и даёт своё решение, а решение об отдельной условной заявке объявлено своим классом (docs/architecture/contracts.md) и статистикой не несётся — зерна с его операндом не объявлено, поэтому в рядах фактов его строк не бывает и отбор по классу его не видит.",
       "over": "records",
       "op": "count",
       "where": "eventType == 'ORDER_DECIDED'"
     },
     {
       "name": "raisedHolds",
-      "note": "Счётчик происшествий суток: поднятых ступеней, обе тропы вместе. Само по себе это число ни на какой вопрос не отвечает и потому идёт в паре с разрезами ниже. Считает ПОДЪЁМЫ, а не объекты под ступенью: эскалация мягкой ступени в жёсткую на том же объекте есть второе решение, а не дубль первого. Полнота числа условна — факт подъёма пишет только ребро, и тропа, поставившая ступень мимо него, в число не попала бы; дом условия и его оживитель — docs/components/HoldService.md §«Писатель статуса вне этого перечня законен, но в дереве его нет», где популяция такой тропы объявлена пустой в дереве.",
+      "note": "Счётчик происшествий суток: поднятых ступеней, обе тропы вместе. Само по себе это число ни на какой вопрос не отвечает и потому идёт в паре с разрезами ниже. Считает ПОДЪЁМЫ, а не объекты под ступенью: эскалация мягкой ступени в жёсткую на том же объекте есть второе решение, а не дубль первого. Полнота числа условна — факт подъёма пишет только ребро, и тропа, поставившая ступень мимо него, в число не попала бы; дом условия и его оживитель — docs/components/HoldService.md, где писатель статуса вне этого перечня объявлен законным, а популяция такой тропы — пустой в дереве.",
       "over": "records",
       "op": "count",
       "where": "eventType == 'HOLD_RAISED'"
@@ -407,7 +421,7 @@
     },
     {
       "name": "anomalyReports",
-      "note": "Счётчик происшествий суток: отчётов о происшествиях, обе тропы вместе. Само по себе это число ни на какой вопрос не отвечает и потому идёт в паре с разрезами ниже — как и raisedHolds. Полнота числа условна тоже, но условие у него другое: ручная тропа отказ записи отчёта сегодня ПОГЛОЩАЕТ логом, и дом этого ограничения — docs/rules/manual-halt.md §«Наблюдаемость: ручное отличимо и от автоматики, и друг от друга».",
+      "note": "Счётчик происшествий суток: отчётов о происшествиях, обе тропы вместе. Само по себе это число ни на какой вопрос не отвечает и потому идёт в паре с разрезами ниже — как и raisedHolds. Полнота числа условна тоже, но условие у него другое: ручная тропа отказ записи отчёта сегодня ПОГЛОЩАЕТ логом, и дом этого ограничения — наблюдаемость ручной тропы в docs/rules/manual-halt.md.",
       "over": "records",
       "op": "count",
       "where": "eventType == 'ANOMALY_REPORTED'"
@@ -456,7 +470,7 @@
     },
     {
       "axis": "классы закрытой сделки для агрегата — приняла ли риск × класс результата",
-      "note": "Перечень выводится полным произведением ДВУХ осей дока-дома (§«Классы закрытой сделки для агрегата»), а не из множества классов, встреченных в примерах: множество встреченного молчит ровно о том классе, которого в нём нет. Три класса из восьми недостижимы и предъявляют контрпример с названной причиной: сделка без входа результат имеет всегда, и он ноль по расчёту.",
+      "note": "Перечень выводится полным произведением ДВУХ осей классов закрытой сделки в доке-доме, а не из множества классов, встреченных в примерах: множество встреченного молчит ровно о том классе, которого в нём нет. Три класса из восьми недостижимы и предъявляют контрпример с названной причиной: сделка без входа результат имеет всегда, и он ноль по расчёту.",
       "rule": [
         "countsInShares",
         "countsAsWinning",
@@ -511,7 +525,7 @@
             "false",
             "POSITIVE"
           ],
-          "unreachable": "сделка, не принявшая риск, не торговала: результат её — ноль по расчёту, а не по исходу (docs/models/domain/aggregate/Deal.md §«Итоговый результат сделки»); положительным он стать не может, потому что складывать нечего"
+          "unreachable": "сделка, не принявшая риск, не торговала: результат её — ноль по расчёту, а не по исходу (итоговый результат сделки — docs/models/domain/aggregate/Deal.md); положительным он стать не может, потому что складывать нечего"
         },
         {
           "member": [
@@ -751,7 +765,9 @@
       "case": "торговавшая сделка с положительным результатом до финансирования",
       "state": {
         "tookRisk": true,
-        "priceResult": 12.5,
+        "graphComplete": true,
+        "resultProfit": 10.0,
+        "fundingCost": 2.5,
         "plannedRisk": 50,
         "currency": "USDT",
         "closeOutcome": "NORMAL_EXIT",
@@ -760,6 +776,7 @@
         "riskBenchmarkAvailability": "AVAILABLE"
       },
       "expect": {
+        "priceResult": 12.5,
         "resultClass": "POSITIVE",
         "countsInShares": true,
         "countsAsWinning": true,
@@ -781,7 +798,9 @@
       "case": "торговавшая сделка с отрицательным результатом до финансирования",
       "state": {
         "tookRisk": true,
-        "priceResult": -8,
+        "graphComplete": true,
+        "resultProfit": -9,
+        "fundingCost": 1.0,
         "plannedRisk": 40,
         "currency": "USDT",
         "closeOutcome": "NORMAL_EXIT",
@@ -790,6 +809,7 @@
         "riskBenchmarkAvailability": "AVAILABLE"
       },
       "expect": {
+        "priceResult": -8,
         "resultClass": "NEGATIVE",
         "countsInShares": true,
         "countsAsWinning": false,
@@ -804,7 +824,9 @@
       "case": "торговавшая сделка с нулевым результатом до финансирования",
       "state": {
         "tookRisk": true,
-        "priceResult": 0,
+        "graphComplete": true,
+        "resultProfit": 0,
+        "fundingCost": 0,
         "plannedRisk": 10,
         "currency": "USDT",
         "closeOutcome": "NORMAL_EXIT",
@@ -827,7 +849,9 @@
       "case": "торговавшая сделка с недоступным результатом",
       "state": {
         "tookRisk": true,
-        "priceResult": null,
+        "graphComplete": true,
+        "resultProfit": null,
+        "fundingCost": null,
         "plannedRisk": 30,
         "currency": "USDT",
         "closeOutcome": "NORMAL_EXIT",
@@ -849,10 +873,34 @@
       }
     },
     {
+      "case": "торговавшая сделка: итог непуст, граф на момент терминала неполон — результат до финансирования недоступен",
+      "state": {
+        "tookRisk": true,
+        "graphComplete": false,
+        "resultProfit": 5,
+        "fundingCost": -3,
+        "plannedRisk": 30,
+        "currency": "USDT",
+        "closeOutcome": "UNDETERMINED",
+        "reconciliationStatus": "NOT_RUN",
+        "breakdownIncomplete": "COMPLETE",
+        "riskBenchmarkAvailability": "AVAILABLE"
+      },
+      "expect": {
+        "priceResult": null,
+        "resultClass": "UNAVAILABLE",
+        "countsAsUnavailable": true,
+        "entersMoneySums": false,
+        "entersRowSums": false
+      }
+    },
+    {
       "case": "сделка, закрытая без входа: результат ноль по расчёту",
       "state": {
         "tookRisk": false,
-        "priceResult": 0,
+        "graphComplete": true,
+        "resultProfit": 0,
+        "fundingCost": 0,
         "plannedRisk": 0,
         "currency": "USDT",
         "closeOutcome": null,
@@ -878,7 +926,9 @@
       "unreachable": "складывать нечего — операций на бирже не было",
       "state": {
         "tookRisk": false,
-        "priceResult": 5,
+        "graphComplete": true,
+        "resultProfit": 5,
+        "fundingCost": 0,
         "plannedRisk": 0,
         "currency": "USDT"
       },
@@ -897,7 +947,9 @@
       "unreachable": "ни ценового движения, ни комиссии второй ноги на этой тропе не возникает",
       "state": {
         "tookRisk": false,
-        "priceResult": -5,
+        "graphComplete": true,
+        "resultProfit": -5,
+        "fundingCost": 0,
         "plannedRisk": 0,
         "currency": "USDT"
       },
@@ -916,7 +968,9 @@
       "unreachable": "добывать нечего — записи закрытия эпизода не существует",
       "state": {
         "tookRisk": false,
-        "priceResult": null,
+        "graphComplete": true,
+        "resultProfit": null,
+        "fundingCost": null,
         "plannedRisk": 0,
         "currency": "USDT"
       },
@@ -934,8 +988,10 @@
       "case": "признаки отбора: ликвидация, несошедшаяся сверка, неполная разбивка, потерянная база риска",
       "state": {
         "tookRisk": true,
-        "priceResult": -50,
-        "plannedRisk": 20,
+        "graphComplete": true,
+        "resultProfit": -50,
+        "fundingCost": 0,
+        "plannedRisk": null,
         "currency": "USDT",
         "closeOutcome": "LIQUIDATION",
         "reconciliationStatus": "MISMATCHED",
@@ -949,14 +1005,18 @@
         "countsAsLiquidated": true,
         "countsAsMismatched": true,
         "countsAsBreakdownIncomplete": true,
-        "countsAsRiskBenchmarkMissing": true
+        "countsAsRiskBenchmarkMissing": true,
+        "rDenominatorPresent": false,
+        "missingBenchmarkMarksAbsentDenominator": true
       }
     },
     {
       "case": "валюта результата не резолвилась: число есть, единицы нет",
       "state": {
         "tookRisk": true,
-        "priceResult": 3,
+        "graphComplete": true,
+        "resultProfit": 3,
+        "fundingCost": 0,
         "plannedRisk": 15,
         "currency": null,
         "closeOutcome": "NORMAL_EXIT",
@@ -978,32 +1038,65 @@
       "case": "восстановительная сделка: риск принят, сайзинга не было — плановый риск НОЛЬ",
       "state": {
         "tookRisk": true,
-        "priceResult": 7,
+        "graphComplete": true,
+        "resultProfit": 7,
+        "fundingCost": 0,
         "plannedRisk": 0,
         "currency": "USDT",
         "closeOutcome": "NORMAL_EXIT",
         "reconciliationStatus": "MATCHED",
         "breakdownIncomplete": "COMPLETE",
-        "riskBenchmarkAvailability": "AVAILABLE"
+        "riskBenchmarkAvailability": "MISSING"
       },
       "expect": {
         "countsInShares": true,
         "entersRowSums": true,
-        "countsAsUnsized": true
+        "countsAsUnsized": true,
+        "rDenominatorPresent": false,
+        "countsAsRiskBenchmarkMissing": true,
+        "missingBenchmarkMarksAbsentDenominator": true
       }
     },
     {
-      "case": "контрпример: плановый риск сделки пуст",
-      "unreachable": "дом величины — сумма по входным ногам (docs/spec/deal-risk-numbers.json, dealPlannedRisk); на пустом множестве сумма даёт НОЛЬ, а не пустоту, поэтому пустое значение операнда недостижимо",
+      "case": "плановый риск принявшей риск сделки пуст: знаменатель не посчитан — это не ноль и не «сайзинга не было»",
+      "note": "Поле пишут только писатели четвёрки чисел риска, и на сделке, у которой ни один из них не завершился на полном графе, оно пусто. Сделка входит в денежные суммы (результат доступен), из знаменателя R выпадает, в счётчик нулевого сайзинга не идёт — и видна счётчиком потерянной базы риска.",
       "state": {
         "tookRisk": true,
-        "priceResult": 7,
+        "graphComplete": true,
+        "resultProfit": 7,
+        "fundingCost": 0,
         "plannedRisk": null,
-        "currency": "USDT"
+        "currency": "USDT",
+        "closeOutcome": "NORMAL_EXIT",
+        "reconciliationStatus": "MATCHED",
+        "breakdownIncomplete": "COMPLETE",
+        "riskBenchmarkAvailability": "MISSING"
       },
       "expect": {
         "countsInShares": true,
-        "countsAsUnsized": false
+        "entersRowSums": true,
+        "rDenominatorPresent": false,
+        "countsAsUnsized": false,
+        "countsAsRiskBenchmarkMissing": true,
+        "missingBenchmarkMarksAbsentDenominator": true
+      }
+    },
+    {
+      "case": "контрпример: знаменателя R нет, а признак доступности его объявляет",
+      "unreachable": "писатель признака на терминале ставит AVAILABLE только принявшей риск сделке с положительным плановым риском, а всякой иной принявшей риск — MISSING (docs/models/domain/aggregate/Deal.md, RiskBenchmarkAvailability; docs/spec/deal-lifecycle.json, benchmarkAvailabilityOnTerminal); пустой плановый риск рядом с AVAILABLE у сделки не собирается",
+      "state": {
+        "tookRisk": true,
+        "graphComplete": true,
+        "resultProfit": 7,
+        "fundingCost": 0,
+        "plannedRisk": null,
+        "currency": "USDT",
+        "riskBenchmarkAvailability": "AVAILABLE"
+      },
+      "expect": {
+        "rDenominatorPresent": false,
+        "countsAsRiskBenchmarkMissing": false,
+        "missingBenchmarkMarksAbsentDenominator": false
       }
     },
     {
@@ -1013,9 +1106,9 @@
         "deals": [
           {
             "tookRisk": true,
-            "priceResult": 12.5,
+            "graphComplete": true,
             "fee": 1.2,
-            "funding": 2.5,
+            "fundingCost": 2.5,
             "liqPenalty": 0,
             "plannedRisk": 50,
             "currency": "USDT",
@@ -1027,9 +1120,9 @@
           },
           {
             "tookRisk": true,
-            "priceResult": -8,
+            "graphComplete": true,
             "fee": 0.8,
-            "funding": 1.0,
+            "fundingCost": 1.0,
             "liqPenalty": 0,
             "plannedRisk": 40,
             "currency": "USDT",
@@ -1041,9 +1134,9 @@
           },
           {
             "tookRisk": true,
-            "priceResult": null,
+            "graphComplete": true,
             "fee": null,
-            "funding": null,
+            "fundingCost": null,
             "liqPenalty": null,
             "plannedRisk": 30,
             "currency": "USDT",
@@ -1055,9 +1148,9 @@
           },
           {
             "tookRisk": true,
-            "priceResult": 0,
+            "graphComplete": true,
             "fee": 0.2,
-            "funding": 1.0,
+            "fundingCost": 1.0,
             "liqPenalty": 0,
             "plannedRisk": 10,
             "currency": "USDT",
@@ -1069,9 +1162,9 @@
           },
           {
             "tookRisk": false,
-            "priceResult": 0,
+            "graphComplete": true,
             "fee": 0,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 0,
             "currency": "USDT",
@@ -1121,9 +1214,9 @@
         "deals": [
           {
             "tookRisk": true,
-            "priceResult": -3,
+            "graphComplete": true,
             "fee": 0.4,
-            "funding": -5,
+            "fundingCost": -5,
             "liqPenalty": 0,
             "plannedRisk": 20,
             "currency": "USDT",
@@ -1163,15 +1256,15 @@
       }
     },
     {
-      "case": "сутки с ликвидацией и несошедшейся сверкой: суммы считаются, ненадёжность видна счётчиками",
+      "case": "сутки с ликвидацией и несошедшейся сверкой: суммы считаются, ненадёжность видна счётчиками; у второй сделки плановый риск пуст — из R она выпадает, и её показывает счётчик потерянной базы риска",
       "state": {
         "rowCurrency": "USDT",
         "deals": [
           {
             "tookRisk": true,
-            "priceResult": -50,
+            "graphComplete": true,
             "fee": 1.5,
-            "funding": 2,
+            "fundingCost": 2,
             "liqPenalty": 12,
             "plannedRisk": 20,
             "currency": "USDT",
@@ -1183,11 +1276,11 @@
           },
           {
             "tookRisk": true,
-            "priceResult": 5,
+            "graphComplete": true,
             "fee": 0.2,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
-            "plannedRisk": 10,
+            "plannedRisk": null,
             "currency": "USDT",
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MISMATCHED",
@@ -1214,19 +1307,20 @@
         "liquidationPenaltySum": 12,
         "winResultSum": 5,
         "lossResultSum": -50,
-        "plannedRiskSum": 30,
+        "plannedRiskSum": 20,
         "plannedRiskExcludedSum": 0,
-        "rSum": -2.0,
+        "rSum": -2.5,
         "winRateDenominator": 2,
         "winRateReportable": true,
         "rReportable": true,
         "fundingDecompositionHolds": true,
         "rowCurrencyUniform": true,
-        "rDenominatorDeals": 2,
+        "rDenominatorDeals": 1,
         "forcedReductionDeals": 0,
         "outcomeUndeterminedDeals": 0,
         "reconciliationNotRunDeals": 0,
-        "breakdownNotAssessedDeals": 0
+        "breakdownNotAssessedDeals": 0,
+        "riskUnsizedDeals": 0
       }
     },
     {
@@ -1236,9 +1330,9 @@
         "deals": [
           {
             "tookRisk": false,
-            "priceResult": 0,
+            "graphComplete": true,
             "fee": 0,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 0,
             "currency": "USDT",
@@ -1250,9 +1344,9 @@
           },
           {
             "tookRisk": false,
-            "priceResult": 0,
+            "graphComplete": true,
             "fee": 0,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 0,
             "currency": "USDT",
@@ -1298,23 +1392,23 @@
         "deals": [
           {
             "tookRisk": true,
-            "priceResult": 7,
+            "graphComplete": true,
             "fee": 0.3,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 0,
             "currency": "USDT",
             "closeOutcome": "NORMAL_EXIT",
             "reconciliationStatus": "MATCHED",
             "breakdownIncomplete": "COMPLETE",
-            "riskBenchmarkAvailability": "AVAILABLE",
+            "riskBenchmarkAvailability": "MISSING",
             "resultProfit": 7
           },
           {
             "tookRisk": true,
-            "priceResult": -2,
+            "graphComplete": true,
             "fee": 0.1,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 25,
             "currency": "USDT",
@@ -1345,7 +1439,8 @@
         "rReportable": true,
         "fundingDecompositionHolds": true,
         "rowCurrencyUniform": true,
-        "rDenominatorDeals": 1
+        "rDenominatorDeals": 1,
+        "riskBenchmarkMissingDeals": 1
       }
     },
     {
@@ -1355,9 +1450,9 @@
         "deals": [
           {
             "tookRisk": true,
-            "priceResult": 3,
+            "graphComplete": true,
             "fee": 0.1,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 15,
             "currency": null,
@@ -1391,16 +1486,73 @@
       }
     },
     {
-      "case": "контрпример: тройка операндов сделки не согласована — разложение сумм ложно",
-      "unreachable": "три числа приходят ОДНОЙ записью закрытия эпизода: итог есть биржевой net, результат до финансирования — тот же net плюс накопленное финансирование, а само финансирование — его слагаемое (docs/spec/loss-streak-halt.json, priceResult). Тройка, в которой разность двух первых не равна третьему, у сделки не собирается",
+      "case": "итог есть, а граф сделки на момент терминала неполон: результат до финансирования недоступен, и сделка выпадает из обеих денежных сумм",
+      "note": "Состояние «итог непуст, результат до финансирования пуст» достижимо: число законно записала финализация выхода на полном графе, а аварийный терминал пришёл на усечённом. Форма дома исполняется на строке: без конъюнкта полноты графа второе слагаемое — финансирование по ЗАГРУЖЕННЫМ эпизодам — на усечённой загрузке выходило бы заниженным молча, и в суммы строки лёг бы результат до финансирования, которого никто не считал. Сделка выпадает из обеих сумм сразу, потому что отбор у них общий, — и разложение сумм остаётся верным.",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          {
+            "tookRisk": true,
+            "graphComplete": false,
+            "resultProfit": 5,
+            "fee": 0.4,
+            "fundingCost": -3,
+            "liqPenalty": 0,
+            "plannedRisk": 20,
+            "currency": "USDT",
+            "closeOutcome": "UNDETERMINED",
+            "reconciliationStatus": "NOT_RUN",
+            "breakdownIncomplete": "COMPLETE",
+            "riskBenchmarkAvailability": "AVAILABLE"
+          },
+          {
+            "tookRisk": true,
+            "graphComplete": true,
+            "resultProfit": 2,
+            "fee": 0.2,
+            "fundingCost": 1,
+            "liqPenalty": 0,
+            "plannedRisk": 10,
+            "currency": "USDT",
+            "closeOutcome": "NORMAL_EXIT",
+            "reconciliationStatus": "MATCHED",
+            "breakdownIncomplete": "COMPLETE",
+            "riskBenchmarkAvailability": "AVAILABLE"
+          }
+        ]
+      },
+      "expect": {
+        "closedDeals": 2,
+        "riskBearingDeals": 2,
+        "winningDeals": 1,
+        "losingDeals": 0,
+        "resultUnavailableDeals": 1,
+        "resultBeforeFundingSum": 3,
+        "netResultSum": 2,
+        "fundingSum": 1,
+        "feeSum": 0.2,
+        "winResultSum": 3,
+        "plannedRiskSum": 10,
+        "plannedRiskExcludedSum": 20,
+        "rSum": 0.3,
+        "rDenominatorDeals": 1,
+        "winRateDenominator": 1,
+        "fundingDecompositionHolds": true,
+        "rowCurrencyUniform": true
+      }
+    },
+    {
+      "case": "контрпример: результат до финансирования стоит своим числом мимо формы дома — разложение сумм ложно",
+      "unreachable": "у результата до финансирования нет своего носителя — ни поля содержимого, ни колонки факта: пересчёт складывает его формой дома (docs/spec/loss-streak-halt.json, priceResult) из итога и финансирования ТОЙ ЖЕ строки. Строка, где он стоит своим числом, расходящимся с этими двумя, есть второй носитель производного (docs/concept.md, П4) и у сделки не собирается",
       "state": {
         "rowCurrency": "USDT",
         "deals": [
           {
             "tookRisk": true,
             "priceResult": 5,
+            "graphComplete": true,
             "fee": 0,
-            "funding": 3,
+            "fundingCost": 3,
             "liqPenalty": 0,
             "plannedRisk": 10,
             "currency": "USDT",
@@ -1423,9 +1575,9 @@
         "deals": [
           {
             "tookRisk": true,
-            "priceResult": 1,
+            "graphComplete": true,
             "fee": 0,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 10,
             "currency": "USDT",
@@ -1433,9 +1585,9 @@
           },
           {
             "tookRisk": true,
-            "priceResult": 2,
+            "graphComplete": true,
             "fee": 0,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 10,
             "currency": "BTC",
@@ -1530,7 +1682,9 @@
         "tookRisk": true,
         "plannedRisk": 20,
         "currency": "USDT",
-        "priceResult": -30,
+        "graphComplete": true,
+        "resultProfit": -30,
+        "fundingCost": 0,
         "closeOutcome": "FORCED_REDUCTION",
         "reconciliationStatus": "MATCHED",
         "breakdownIncomplete": "COMPLETE",
@@ -1554,7 +1708,9 @@
         "tookRisk": true,
         "plannedRisk": 20,
         "currency": "USDT",
-        "priceResult": 0,
+        "graphComplete": true,
+        "resultProfit": 0,
+        "fundingCost": 0,
         "closeOutcome": "UNDETERMINED",
         "reconciliationStatus": "NOT_RUN",
         "breakdownIncomplete": "COMPLETE",
@@ -1577,7 +1733,9 @@
         "tookRisk": true,
         "plannedRisk": 20,
         "currency": "USDT",
-        "priceResult": null,
+        "graphComplete": true,
+        "resultProfit": null,
+        "fundingCost": null,
         "breakdownIncomplete": "NOT_ASSESSED"
       },
       "expect": {
@@ -1595,7 +1753,9 @@
         "tookRisk": true,
         "plannedRisk": 20,
         "currency": "USDT",
-        "priceResult": 4,
+        "graphComplete": true,
+        "resultProfit": 4,
+        "fundingCost": 0,
         "breakdownIncomplete": "NOT_ASSESSED"
       },
       "expect": {
@@ -1613,7 +1773,9 @@
         "tookRisk": true,
         "plannedRisk": 20,
         "currency": "USDT",
-        "priceResult": 2,
+        "graphComplete": true,
+        "resultProfit": 2,
+        "fundingCost": 0,
         "riskBenchmarkAvailability": "NOT_APPLICABLE"
       },
       "expect": {
@@ -1628,10 +1790,10 @@
         "deals": [
           {
             "tookRisk": true,
-            "priceResult": -30,
+            "graphComplete": true,
             "resultProfit": -31,
             "fee": 1,
-            "funding": 1,
+            "fundingCost": 1,
             "liqPenalty": 0,
             "plannedRisk": 20,
             "currency": "USDT",
@@ -1642,10 +1804,10 @@
           },
           {
             "tookRisk": true,
-            "priceResult": 0,
+            "graphComplete": true,
             "resultProfit": 0,
             "fee": 0,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 10,
             "currency": "USDT",
@@ -1656,10 +1818,10 @@
           },
           {
             "tookRisk": true,
-            "priceResult": 6,
+            "graphComplete": true,
             "resultProfit": 6,
             "fee": 0.5,
-            "funding": 0,
+            "fundingCost": 0,
             "liqPenalty": 0,
             "plannedRisk": 10,
             "currency": "USDT",
@@ -1670,10 +1832,10 @@
           },
           {
             "tookRisk": true,
-            "priceResult": null,
+            "graphComplete": true,
             "resultProfit": null,
             "fee": 0,
-            "funding": 0,
+            "fundingCost": null,
             "liqPenalty": 0,
             "plannedRisk": 10,
             "currency": "USDT",

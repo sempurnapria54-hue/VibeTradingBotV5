@@ -54,8 +54,12 @@ public class ReceptionCompletenessSource {
      *
      * @param staleBefore момент, раньше которого строка состояния приёма
      *                    считается устаревшей
+     * @param lowerBound  нижняя граница полноты группы: разрыв раньше неё
+     *                    дыры не даёт
      */
-    public Long countSubscribedPairsWithBreak(String consumerGroup, OffsetDateTime staleBefore) {
-        return receptionStateDataService.countSubscribedPairsWithBreak(consumerGroup, staleBefore);
+    public Long countSubscribedPairsWithBreak(String consumerGroup,
+                                              OffsetDateTime staleBefore,
+                                              OffsetDateTime lowerBound) {
+        return receptionStateDataService.countSubscribedPairsWithBreak(consumerGroup, staleBefore, lowerBound);
     }
 }

@@ -123,8 +123,8 @@
   нативная модель источника — `docs/models/integrations/{name}/`;
   модель нашего API — `docs/models/api/`. Состав нормализованного
   граничного объекта (`*ExternalSnapshot`) живёт в mapping-доке своей
-  сущности, представление в хранимом слое — в §Персистентность её
-  доменного дока (`docs/rules/persistence-representation.md`);
+  сущности, представление в хранимом слое — в разделе «Персистентность»
+  её доменного дока (`docs/rules/persistence-representation.md`);
   отдельных каталогов у этих двух типов нет. См.
   `.claude/decisions/model-layer-ontology.md`. Имя совпадает с
   Java-классом (где применимо).

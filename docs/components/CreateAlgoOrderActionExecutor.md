@@ -20,8 +20,8 @@ SUBMITTED -> REFRESH_ALGO_ORDER_COMMAND
 **Исход округления выхода тейком читается до преконтроля.** Исход
 `SKIPPED` — команды нет, строка исполнения уходит в `SKIPPED`; `FULL` —
 команда уходит экспозицией транша целиком. Оба пишут журнальный отчёт —
-таблица исходов и коды — `docs/components/SizeCalculator.md` §«Reduce-only
-выход: пола минимального размера нет».
+таблица исходов и коды — reduce-only выход без пола минимального размера,
+`docs/components/SizeCalculator.md`.
 
 ## Сборка дерева `Condition`
 

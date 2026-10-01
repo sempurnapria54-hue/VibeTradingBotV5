@@ -100,6 +100,37 @@ public class Constants {
     }
 
     /**
+     * Имена строковых операндов вопроса журнальной выборки — те, которыми
+     * их называет читатель в параметрах запроса.
+     *
+     * <p><b>Они нужны пояснению отказа</b>: пустой строковый операнд
+     * отвергается, и текст отказа называет, какой именно
+     * (docs/models/domain/other/AuditRecord.md §«Как журнал читается»).
+     * Имена отборов совпадают с именами компонентов содержимого
+     * ({@link RadiusFields}) не по совпадению, а по форме вопроса — отбор
+     * назван колонкой, которую он отбирает; но предмет у перечней разный
+     * (вопрос читателя против разбора содержимого), и перечень заведён свой.
+     */
+    @UtilityClass
+    public static class JournalQueryOperands {
+
+        /** Вторая половина курсора — идентичность события. */
+        public static final String CURSOR_EVENT_ID = "cursorEventId";
+
+        /** Отбор по биржевому счёту. */
+        public static final String EXCHANGE_ACCOUNT_INTERNAL_ID = "exchangeAccountInternalId";
+
+        /** Отбор по инструменту. */
+        public static final String INSTRUMENT_INTERNAL_ID = "instrumentInternalId";
+
+        /** Отбор по сделке. */
+        public static final String DEAL_INTERNAL_ID = "dealInternalId";
+
+        /** Отбор по определению стратегии. */
+        public static final String STRATEGY_INTERNAL_ID = "strategyInternalId";
+    }
+
+    /**
      * Имена рядов, которые сервис отдаёт наблюдателю, и метка их пары.
      *
      * <p><b>Имена — КОНТРАКТ С ПРАВИЛОМ АЛЕРТА, а не деталь экспортёра:</b>

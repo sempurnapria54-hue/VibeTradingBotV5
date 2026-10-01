@@ -37,6 +37,7 @@ import com.example.tradingcore.domain.command.executor.ServiceCommandExecutor;
 import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.safety.KillSwitchExecutor;
+import com.example.tradingcore.domain.safety.PositionSliceReader;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.persistence.service.AlgoOrderDataService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
@@ -96,7 +97,8 @@ class KillSwitchTeardownTest {
                 new CancelOrderExecutor(orders, states, exchange),
                 new ClosePositionExecutor(positions, states, exchange),
                 new CancelAlgoOrderExecutor(algoOrders, states, exchange),
-                new CancelAttachedProtectionExecutor(orders, states, exchange));
+                new CancelAttachedProtectionExecutor(orders, states, exchange),
+                new PositionSliceReader(exchange));
         when(orders.getRequiredById(any())).thenAnswer(invocation -> legOf(invocation.getArgument(0)));
         when(orders.getRequiredAttachedById(any()))
                 .thenAnswer(invocation -> attachedOf(invocation.getArgument(0)));

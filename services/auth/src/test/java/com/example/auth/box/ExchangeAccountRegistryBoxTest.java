@@ -20,7 +20,8 @@ import org.junit.jupiter.api.Test;
  * контейнера: предмет её — состояние таблицы ЦЕЛИКОМ, и разностной формой
  * он не выражается вовсе
  * (.claude/decisions/test-contour-design-pass.md §«Оснований брать свой
- * контейнер ДВА…»).
+ * контейнер ДВА, и второе не выводится из первого: предмет кейса есть
+ * состояние субстрата ЦЕЛИКОМ»).
  */
 class ExchangeAccountRegistryBoxTest extends SharedAuthBox {
 

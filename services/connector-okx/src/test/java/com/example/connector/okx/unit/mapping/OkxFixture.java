@@ -1,6 +1,7 @@
 package com.example.connector.okx.unit.mapping;
 
 import com.example.connector.okx.integration.external.api.model.okx.response.AccountBillOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.AccountConfigOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.AlgoOrderOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.AttachAlgoOrdOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.BalanceDetailOkxResponse;
@@ -9,6 +10,7 @@ import com.example.connector.okx.integration.external.api.model.okx.response.Can
 import com.example.connector.okx.integration.external.api.model.okx.response.InstrumentOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.OrderOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.PositionOkxResponse;
+import com.example.connector.okx.integration.external.api.model.okx.response.PositionTierOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.PositionsHistoryOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.TickerOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.TradeFeeOkxResponse;
@@ -163,11 +165,12 @@ final class OkxFixture {
     /** Индекс позиции признака закрытия свечи. */
     static final int CANDLE_CONFIRM = 8;
 
-    /** Инструмент листинга: все девятнадцать полей худой формы непусты. */
+    /** Инструмент листинга: все двадцать полей худой формы непусты. */
     static InstrumentOkxResponse instrument() {
         InstrumentOkxResponse response = new InstrumentOkxResponse();
         response.setInstId(INSTRUMENT);
         response.setInstType("SWAP");
+        response.setInstFamily("ETH-USDT");
         response.setBaseCcy("ETH");
         response.setQuoteCcy("USDT");
         response.setSettleCcy("USDT");
@@ -215,6 +218,25 @@ final class OkxFixture {
         response.setAdjEq("1000");
         response.setAvailEq("900");
         response.setDetails(new java.util.ArrayList<>(List.of(balanceDetail("USDT"))));
+        return response;
+    }
+
+    /** Конфигурация счёта контура: фьючерсный режим, нетто-позиции. */
+    static AccountConfigOkxResponse accountConfig() {
+        AccountConfigOkxResponse response = new AccountConfigOkxResponse();
+        response.setAcctLv("2");
+        response.setPosMode("net_mode");
+        return response;
+    }
+
+    /** Позиционный тир семьи инструмента базовой сборки. */
+    static PositionTierOkxResponse positionTier(String tier, String minSz, String maxSz, String mmr) {
+        PositionTierOkxResponse response = new PositionTierOkxResponse();
+        response.setInstFamily("ETH-USDT");
+        response.setTier(tier);
+        response.setMinSz(minSz);
+        response.setMaxSz(maxSz);
+        response.setMmr(mmr);
         return response;
     }
 

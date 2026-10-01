@@ -32,7 +32,7 @@ FSM / StateHandler
 **Сборка контекста ВНЕ калькулятора, и граница здесь не косметическая.**
 Фабрика живёт в ядре: её входы — персистентность ядра плюс вызов к соседу,
 а расчёт лежит в общей библиотеке и к базе не ходит вовсе
-(`docs/architecture/services.md` §«Что в библиотеку НЕ уезжает»). Бэктест
+(что в библиотеку не уезжает — `docs/architecture/services.md`). Бэктест
 соберёт тот же контекст из своего состояния и позовёт **тот же** расчёт.
 
 Компоненты: `docs/components/StrategyActionCalculator.md`,
@@ -51,7 +51,7 @@ transaction.
 ## Границы
 
 - Калькулятор **не** вызывает `RiskValidator`, не возвращает risk-policy
-  результат и risk-метрики; решение `ALLOWED/WARNING/BLOCKED` — у
+  результат и risk-метрики; решение `ALLOWED/BLOCKED` — у
   `docs/processes/risk-evaluation.md`.
 - **Не** создаёт команды (это `StrategyActionOrchestrator` через per-type
   `StrategyActionExecutor`) и не вызывает

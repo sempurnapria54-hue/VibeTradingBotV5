@@ -269,7 +269,8 @@ public class ExchangeAccountDataService {
      * <p>Здесь тянется строка целиком, а не проекция: читателю нужен и
      * ключ записи, и идентичность вызова коннектора, и торговое
      * состояние, — то есть сам счёт, а не поле
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Transactional(readOnly = true)
     public List<ExchangeAccount> findTradingAccounts() {

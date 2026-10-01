@@ -89,8 +89,8 @@ import org.springframework.web.server.ResponseStatusException;
  * шаг 2 (400) — разрешённые enum'ы, парс duration, уникальность
  * ключей настроек/действий, разрешённость ссылок в рамках детали,
  * «ровно одна деталь на каждую фазу», матрица политика×фаза,
- * sanity warmup-override, минимальный per-ruleType контракт операндов
- * (дозаполняется инкрементально), пара «вид, тип» действия
+ * sanity warmup-override, контракт операндов по типу правила
+ * (docs/rules/strategy-condition-contract.md), пара «вид, тип» действия
  * (docs/models/domain/aggregate/Strategy.md §Действия). Торгово-суждённые
  * диапазоны — отложены до activate (422):
  * docs/rules/strategy-validation.md §«Что проверяется на активации».
@@ -109,11 +109,12 @@ public class StrategyDefinitionValidator {
     private static final BigDecimal FRACTION_PERCENTS_MAX = BigDecimal.valueOf(100);
 
     /**
-     * Операторы подтверждённого пробоя: направление — перечень, над ним есть
-     * только равенство и его отрицание; прочие интерпретатор читает ложью,
-     * и правило с ними не сработало бы никогда.
+     * Операторы правил над перечнем — подтверждённого пробоя, утверждений о
+     * структуре и о фазе: над перечнем есть только равенство и его
+     * отрицание; прочие интерпретатор читает ложью, и правило с ними не
+     * сработало бы никогда.
      */
-    private static final Set<String> BREAKOUT_OPERATORS = Set.of(
+    private static final Set<String> EQUALITY_OPERATORS = Set.of(
             StrategyConditionOperator.EQ.name(),
             StrategyConditionOperator.NE.name());
 
@@ -138,7 +139,11 @@ public class StrategyDefinitionValidator {
     /**
      * Типы условной заявки, образующие ЗАЩИТУ (docs/spec/strategy-reference.json
      * §{@code isProtectiveAction}). Тейк-профит защитой не является: он не
-     * ограничивает убыток.
+     * ограничивает убыток. {@code TRAILING_VALUE} здесь остаётся, хотя
+     * создание его отвергает ({@code validateConditionTypeSupported}):
+     * защитность — предикат исполнимой формы, и отказ типа не делает
+     * действие незащитным — иначе поверх единственного отказа шаг получал бы
+     * ещё и неполное покрытие.
      */
     private static final Set<String> PROTECTIVE_CONDITION_TYPES = Set.of(
             AlgoOrder.ConditionType.STOP_LOSS.name(),
@@ -1358,9 +1363,8 @@ public class StrategyDefinitionValidator {
     }
 
     /**
-     * Минимальный per-ruleType контракт (инкрементальный: только типы,
-     * нужные текущему авторингу; дозаполняется при реализации каждого
-     * ruleType — strategy-condition-authoring-contract.md).
+     * Контракт полей и операндов по типу правила — дом
+     * docs/rules/strategy-condition-contract.md §«Правило и операнды».
      */
     private void validateRuleContract(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
         if (isFalse(EnumUtils.isValidEnum(StrategyConditionRuleType.class, rule.getRuleType()))) {
@@ -1405,9 +1409,7 @@ public class StrategyDefinitionValidator {
             violations.add(path + ": RANGE_BREAKOUT_CONFIRMED requires operator and both operands");
             return;
         }
-        if (isFalse(BREAKOUT_OPERATORS.contains(rule.getOperator()))) {
-            violations.add(path + ": RANGE_BREAKOUT_CONFIRMED accepts only EQ or NE, got " + rule.getOperator());
-        }
+        validateEqualityOperator(rule, path, violations);
         StrategyConditionOperandApiModel constant =
                 constantOperand(rule.getLeftOperand(), rule.getRightOperand());
         if (isNull(constant)
@@ -1417,7 +1419,19 @@ public class StrategyDefinitionValidator {
         }
     }
 
-    /** MARKET_STRUCTURE_IS — зеркало MARKET_PHASE_IS: MARKET_STRUCTURE операнд vs CONSTANT ENUM MarketStructure.Type. */
+    /**
+     * MARKET_STRUCTURE_IS — зеркало MARKET_PHASE_IS: операнд структуры
+     * против константы, чьё значение — член перечня
+     * {@link MarketStructure.Type}; оператор — {@code EQ} либо {@code NE}.
+     * Та же форма, что у RANGE_BREAKOUT_CONFIRMED (дом —
+     * docs/rules/strategy-condition-contract.md §«Правило и операнды»).
+     *
+     * <p>Значение сверяется с перечнем при ЛЮБОМ объявленном типе значения
+     * константы и при пустом значении: оценка читает значение константы
+     * строкой, не глядя на её тип, и на значении вне перечня её ответ от
+     * рынка не зависит — при {@code EQ} правило не сработало бы никогда, при
+     * {@code NE} срабатывало бы всегда, молча.
+     */
     private void validateMarketStructureIs(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
         if (isNull(rule.getOperator()) || isNull(rule.getLeftOperand()) || isNull(rule.getRightOperand())) {
             violations.add(path + ": MARKET_STRUCTURE_IS requires operator and both operands");
@@ -1426,16 +1440,27 @@ public class StrategyDefinitionValidator {
         if (isFalse(hasOperandOfSource(rule, StrategyConditionSourceType.MARKET_STRUCTURE))) {
             violations.add(path + ": MARKET_STRUCTURE_IS requires a MARKET_STRUCTURE operand (structureKey)");
         }
+        validateEqualityOperator(rule, path, violations);
         StrategyConditionOperandApiModel constant =
                 constantOperand(rule.getLeftOperand(), rule.getRightOperand());
         if (isNull(constant)) {
             violations.add(path + ": MARKET_STRUCTURE_IS requires a CONSTANT operand with the structure type");
             return;
         }
-        if (Objects.equals(constant.getValueType(), ConstantValueType.ENUM.name())
-                && nonNull(constant.getValue())
-                && isFalse(EnumUtils.isValidEnum(MarketStructure.Type.class, constant.getValue()))) {
+        if (isFalse(EnumUtils.isValidEnum(MarketStructure.Type.class, constant.getValue()))) {
             violations.add(path + ": unknown MarketStructure.Type " + constant.getValue());
+        }
+    }
+
+    /**
+     * Оператор правила над перечнем — только {@code EQ} либо {@code NE}
+     * (довод — {@link #EQUALITY_OPERATORS}). Пустой оператор сюда не
+     * доезжает: его отвергает ранний возврат вызывающего.
+     */
+    private void validateEqualityOperator(StrategyConditionRuleApiModel rule, String path,
+                                          List<String> violations) {
+        if (isFalse(EQUALITY_OPERATORS.contains(rule.getOperator()))) {
+            violations.add(path + ": " + rule.getRuleType() + " accepts only EQ or NE, got " + rule.getOperator());
         }
     }
 
@@ -1448,20 +1473,26 @@ public class StrategyDefinitionValidator {
         return nonNull(operand) && Objects.equals(operand.getSourceType(), source.name());
     }
 
+    /**
+     * MARKET_PHASE_IS — константа, чьё значение — член перечня
+     * {@link MarketPhase.Type}, и оператор {@code EQ} либо {@code NE}; та же
+     * форма и тот же довод, что у {@link #validateMarketStructureIs}: оценка
+     * читает ложью всякий иной оператор и значение, не разобранное перечнем,
+     * при любом объявленном типе значения.
+     */
     private void validateMarketPhaseIs(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
         if (isNull(rule.getOperator()) || isNull(rule.getLeftOperand()) || isNull(rule.getRightOperand())) {
             violations.add(path + ": MARKET_PHASE_IS requires operator and both operands");
             return;
         }
+        validateEqualityOperator(rule, path, violations);
         StrategyConditionOperandApiModel constant =
                 constantOperand(rule.getLeftOperand(), rule.getRightOperand());
         if (isNull(constant)) {
             violations.add(path + ": MARKET_PHASE_IS requires a CONSTANT operand with the phase");
             return;
         }
-        if (Objects.equals(constant.getValueType(), ConstantValueType.ENUM.name())
-                && nonNull(constant.getValue())
-                && isFalse(EnumUtils.isValidEnum(MarketPhase.Type.class, constant.getValue()))) {
+        if (isFalse(EnumUtils.isValidEnum(MarketPhase.Type.class, constant.getValue()))) {
             violations.add(path + ": unknown MarketPhase.Type " + constant.getValue());
         }
     }
@@ -1910,10 +1941,29 @@ public class StrategyDefinitionValidator {
         }
     }
 
+    /**
+     * Трейлинг абсолютным откатом не объявляется — у всякого действия над
+     * условной заявкой: у создающего, у замещающего и у снимающего.
+     *
+     * <p>Настройки трейлинга несут одну величину отката, и она процентная;
+     * абсолютной величины у объявления нет, и тип {@code TRAILING_VALUE}
+     * расчёт и площадка исполняли бы процентным трейлингом, не сообщая об
+     * этом. Условие возврата — абсолютная величина отката у настроек
+     * трейлинга. Дом правила — docs/rules/strategy-validation.md.
+     */
+    private void validateConditionTypeSupported(StrategyAlgoOrderActionApiModel action, String path,
+                                                List<String> violations) {
+        if (AlgoOrder.ConditionType.TRAILING_VALUE.name().equals(action.getConditionType())) {
+            violations.add(path + ".conditionType STRATEGY_CONDITION_TYPE_UNSUPPORTED: трейлинг абсолютным "
+                    + "откатом не объявляется — настройки трейлинга несут только процентный откат");
+        }
+    }
+
     private void validateAlgoOrderAction(StrategyAlgoOrderActionApiModel action, String path,
                                          Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
                                          List<String> violations) {
         validateEnum(AlgoOrder.ConditionType.class, action.getConditionType(), path + ".conditionType", violations);
+        validateConditionTypeSupported(action, path, violations);
         validateLevelSourceUnambiguous(action, path, violations);
         validateLevelSourceDeclared(action, path, violations);
         validateFractionPositive(action.getCloseFractionPercents(), "STRATEGY_ACTION_FRACTION_NOT_POSITIVE",
@@ -2032,6 +2082,13 @@ public class StrategyDefinitionValidator {
      * же код. Держит проверку валидатор, а не аннотация api-модели, по
      * доводу {@code validateFractionPositive}: именованный код с аннотацией
      * был бы недостижим. Дом правила — docs/rules/strategy-validation.md.
+     *
+     * <p><b>Объявленный срок положителен.</b> Нулевой и отрицательный срок
+     * разбираются, но ни одно значение не бывает свежим на таком сроке —
+     * предикат ложен всегда, то есть исход тот же, что без срока. Обязательность
+     * и диапазон разведены кодами, как у окна расчёта структуры: отказ
+     * адресует тот конъюнкт, который ложен. Неразобранная строка диапазоном
+     * не мерится — её отвергает разбор.
      */
     private void validateExpirationDeclared(String value, String path, List<String> violations) {
         if (isBlank(value)) {
@@ -2039,14 +2096,20 @@ public class StrategyDefinitionValidator {
                     + "рыночных данных объявляется явно, умолчания нет");
             return;
         }
-        validateDuration(value, path, violations);
+        Duration duration = validateDuration(value, path, violations);
+        if (nonNull(duration) && isFalse(duration.isPositive())) {
+            violations.add(path + " STRATEGY_MARKET_DATA_EXPIRATION_NOT_POSITIVE: срок свежести объявления "
+                    + "рыночных данных больше нуля, получено " + value);
+        }
     }
 
-    private void validateDuration(String value, String path, List<String> violations) {
+    /** Разобранная длительность; строка не разбирается — нарушение и {@code null}. */
+    private Duration validateDuration(String value, String path, List<String> violations) {
         try {
-            Duration.parse(value);
+            return Duration.parse(value);
         } catch (DateTimeParseException e) {
             violations.add(path + ": invalid ISO-8601 duration " + value);
+            return null;
         }
     }
 }

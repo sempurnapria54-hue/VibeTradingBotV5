@@ -121,7 +121,8 @@ public class InstrumentController {
      *
      * <p><b>Окно обязательно.</b> Безлимитного чтения истории нет:
      * минутные свечи за годы кладут и базу, и читателя
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Operation(summary = "История свечей инструмента окном")
     @ApiResponses({

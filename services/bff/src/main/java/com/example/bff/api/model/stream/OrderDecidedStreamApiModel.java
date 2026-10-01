@@ -9,7 +9,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param dealInternalId            сделка, к которой заявка относится
  * @param exchangeAccountInternalId биржевой счёт решения
  * @param instrumentInternalId      инструмент решения
- * @param orderType                 бизнес-тип заявки — имя значения
+ * @param replacesInternalId        предшественник в цепочке замещений;
+ *                                  пусто — первичная постановка
+ * @param orderType                бизнес-тип заявки — имя значения
  *                                  перечня {@code Order.Type}; область
  *                                  значений домовая
  *                                  (docs/models/domain/core/Order.md), и
@@ -26,6 +28,8 @@ public record OrderDecidedStreamApiModel(
         @Schema(description = "Идентичность сделки, к которой относится заявка") String dealInternalId,
         @Schema(description = "Идентичность биржевого счёта") String exchangeAccountInternalId,
         @Schema(description = "Идентичность инструмента") String instrumentInternalId,
+        @Schema(description = "Идентичность предшественника в цепочке замещений; пусто — первичная постановка")
+        String replacesInternalId,
         @Schema(description = "Бизнес-тип заявки") String orderType,
         @Schema(description = "Сторона заявки") String direction,
         @Schema(description = "Запланированный объём в контрактах") String plannedSizeContracts,

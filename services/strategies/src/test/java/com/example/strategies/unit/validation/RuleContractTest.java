@@ -210,13 +210,61 @@ class RuleContractTest {
                 .contains("unknown MarketStructure.Type SQUEEZE");
     }
 
+    /**
+     * Ожидание перевёрнуто кодовой пачкой 2026-09-30: прежде клетка пинила
+     * проход числовой константы — сверка шла только у типа «перечень», — а
+     * оценка читает значение строкой, не глядя на тип, и на значении вне
+     * перечня правило ложно всегда.
+     */
     @Test
-    @DisplayName("U28.13 — константа объявлена числовым типом: сверка с перечнем не идёт")
-    void u28_13_aNumericConstantIsNotMatchedAgainstTheEnum() {
+    @DisplayName("U28.13 — константа объявлена числовым типом со значением вне перечня: нарушение значения")
+    void u28_13_aNumericConstantIsMatchedAgainstTheEnumToo() {
         StrategyConditionRuleApiModel rule = newRule("MARKET_STRUCTURE_IS");
         rule.setOperator("EQ");
         rule.setLeftOperand(structureOperand());
         rule.setRightOperand(constantOperand("NUMBER", "SQUEEZE"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("unknown MarketStructure.Type SQUEEZE");
+    }
+
+    @Test
+    @DisplayName("U28.36 — утверждение о структуре с оператором GT: нарушение «только EQ либо NE»")
+    void u28_36_aStructureAssertionAcceptsOnlyEqualityOperators() {
+        StrategyConditionRuleApiModel rule = newRule("MARKET_STRUCTURE_IS");
+        rule.setOperator("GT");
+        rule.setLeftOperand(structureOperand());
+        rule.setRightOperand(constantOperand("ENUM", "RANGE"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("MARKET_STRUCTURE_IS accepts only EQ or NE, got GT");
+    }
+
+    @Test
+    @DisplayName("U28.39 — константа утверждения о структуре пуста: нарушение значения")
+    void u28_39_aBlankStructureConstantIsRejected() {
+        StrategyConditionRuleApiModel rule = newRule("MARKET_STRUCTURE_IS");
+        rule.setOperator("EQ");
+        rule.setLeftOperand(structureOperand());
+        rule.setRightOperand(constantOperand("ENUM", ""));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("unknown MarketStructure.Type");
+    }
+
+    @Test
+    @DisplayName("U28.41 — числовой тип значения со значением перечня структур: нарушений нет")
+    void u28_41_theValueTypeOfTheStructureConstantIsNotChecked() {
+        StrategyConditionRuleApiModel rule = newRule("MARKET_STRUCTURE_IS");
+        rule.setOperator("NE");
+        rule.setLeftOperand(structureOperand());
+        rule.setRightOperand(constantOperand("NUMBER", "RANGE"));
 
         assertThat(violationsOfRule(rule)).isEmpty();
     }
@@ -269,6 +317,45 @@ class RuleContractTest {
         rule.setOperator("EQ");
         rule.setLeftOperand(newOperand("MARKET_PHASE"));
         rule.setRightOperand(constantOperand("ENUM", "BULL_TREND"));
+
+        assertThat(violationsOfRule(rule)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U28.37 — утверждение о фазе с оператором GT: нарушение «только EQ либо NE»")
+    void u28_37_aPhaseAssertionAcceptsOnlyEqualityOperators() {
+        StrategyConditionRuleApiModel rule = newRule("MARKET_PHASE_IS");
+        rule.setOperator("GT");
+        rule.setLeftOperand(newOperand("MARKET_PHASE"));
+        rule.setRightOperand(constantOperand("ENUM", "BULL_TREND"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("MARKET_PHASE_IS accepts only EQ or NE, got GT");
+    }
+
+    @Test
+    @DisplayName("U28.38 — константа фазы числового типа со значением вне перечня: нарушение значения")
+    void u28_38_aNumericPhaseConstantIsMatchedAgainstTheEnum() {
+        StrategyConditionRuleApiModel rule = newRule("MARKET_PHASE_IS");
+        rule.setOperator("EQ");
+        rule.setLeftOperand(newOperand("MARKET_PHASE"));
+        rule.setRightOperand(constantOperand("NUMBER", "5"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("unknown MarketPhase.Type 5");
+    }
+
+    @Test
+    @DisplayName("U28.40 — утверждение о фазе с оператором NE и годной константой: нарушений нет")
+    void u28_40_aNegatedPhaseAssertionIsLegal() {
+        StrategyConditionRuleApiModel rule = newRule("MARKET_PHASE_IS");
+        rule.setOperator("NE");
+        rule.setLeftOperand(newOperand("MARKET_PHASE"));
+        rule.setRightOperand(constantOperand("ENUM", "BEAR_TREND"));
 
         assertThat(violationsOfRule(rule)).isEmpty();
     }
@@ -415,7 +502,7 @@ class RuleContractTest {
     }
 
     @Test
-    @DisplayName("U28.24 — тип правила, которого контракт не описывает: он инкрементален")
+    @DisplayName("U28.24 — тип без требований контракта")
     void u28_24_anUndescribedRuleTypeCarriesNoContract() {
         assertThat(violationsOfRule(newRule("TREND_CHANGED"))).isEmpty();
     }

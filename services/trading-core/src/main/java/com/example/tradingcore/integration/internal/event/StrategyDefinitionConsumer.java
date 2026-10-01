@@ -21,9 +21,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Потребитель событий владельца определений — <b>первый потребитель
- * событий в конструкции</b> (docs/architecture/contracts.md §«Первый
- * потребитель в конструкции — ядро на трёх классах определения
- * стратегии»).
+ * событий в конструкции</b> (docs/architecture/contracts.md §«Ядро —
+ * потребитель трёх классов определения стратегии»).
  *
  * <p><b>Он же целевой писатель копии.</b> Команда приёма определения на
  * поверхности ядра снята тем же ходом, которым появился этот потребитель:
@@ -43,10 +42,13 @@ import org.springframework.stereotype.Component;
  * запись</b> ({@link PoisonStrategyFactException}): повтор её не исправит
  * ни при каком состоянии базы ядра, и она уходит той же тропой, что всякая
  * отравленная, — обработчик отказа ({@link StrategyFactErrorHandler})
- * пропускает её сразу, со строкой журнала, несущей тему, партицию, смещение
- * и первопричину (docs/architecture/contracts.md §«Как конверт лежит на
+ * пропускает её сразу, со следом пропуска в базе ядра, несущим группу, тему,
+ * партицию, смещение и первопричину, а колонку отсутствующего поля
+ * конверта — пустой (docs/architecture/contracts.md §«Как конверт лежит на
  * проводе — поимённо»; перечень отравленных —
- * docs/architecture/data-ownership.md §«Копии чужих данных»).
+ * docs/architecture/data-ownership.md §«Копии чужих данных»; форма следа —
+ * docs/rules/durable-consumer-reception.md §«След пропуска — таблица
+ * `reception_skips`»).
  *
  * <p><b>Неизвестный класс события пропускается, а не роняет проход:</b>
  * производитель вправе завести новый класс раньше, чем появится его
@@ -58,9 +60,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class StrategyDefinitionConsumer {
 
-    /** Имена полей конверта в заголовках сообщения. */
-    private static final String HEADER_EVENT_ID = "eventId";
-    private static final String HEADER_EVENT_TYPE = "eventType";
+    /**
+     * Имена полей конверта в заголовках сообщения. Видны пакету: их же
+     * читает обработчик отказа, пишущий идентичность и класс в след
+     * пропуска, и второй записи формы конверта не заводится.
+     */
+    static final String HEADER_EVENT_ID = "eventId";
+    static final String HEADER_EVENT_TYPE = "eventType";
 
     private final ObjectMapper objectMapper;
     private final StrategyDefinitionApplier applier;
@@ -93,7 +99,7 @@ public class StrategyDefinitionConsumer {
     /**
      * Разбор содержимого. Отказ разбора <b>роняет обработку</b> как
      * отравленная запись: повтор её не исправит, и обработчик отказа
-     * пропускает её со строкой журнала, несущей координаты и первопричину,
+     * пропускает её со следом пропуска, несущим координаты и первопричину,
      * а не молча ({@link StrategyFactErrorHandler}). Пустое содержимое —
      * тот же класс: разбирать нечего при любом состоянии базы.
      */
@@ -109,9 +115,14 @@ public class StrategyDefinitionConsumer {
         }
     }
 
-    /** Пустой заголовок означает «значения не было», а не пустую строку. */
+    /**
+     * Пустой заголовок означает «значения не было», а не пустую строку.
+     * Заголовок без значения читается так же, как отсутствующий: иначе
+     * разбор падал бы до признания записи отравленной, и запись
+     * откладывалась бы без конца, останавливая партию.
+     */
     private String header(ConsumerRecord<String, String> record, String name) {
         Header header = record.headers().lastHeader(name);
-        return isNull(header) ? null : new String(header.value(), StandardCharsets.UTF_8);
+        return isNull(header) || isNull(header.value()) ? null : new String(header.value(), StandardCharsets.UTF_8);
     }
 }

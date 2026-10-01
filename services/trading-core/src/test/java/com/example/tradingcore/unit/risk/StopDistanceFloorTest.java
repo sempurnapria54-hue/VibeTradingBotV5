@@ -8,7 +8,10 @@ import static com.example.tradingcore.unit.risk.RiskFixture.context;
 import static com.example.tradingcore.unit.risk.RiskFixture.emptyDeal;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.episode;
+import static com.example.tradingcore.unit.risk.RiskFixture.pairStateWithLeverage;
+import static com.example.tradingcore.unit.risk.RiskFixture.protection;
 import static com.example.tradingcore.unit.risk.RiskFixture.rules;
+import static com.example.tradingcore.unit.risk.RiskFixture.tranche;
 import static com.example.tradingcore.unit.risk.RiskFixture.transferAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingContext;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,8 +62,11 @@ class StopDistanceFloorTest {
     @DisplayName("U7.3 — дистанция РАВНА полу: граница включена")
     void u7_3_aDistanceExactlyAtTheFloorPasses() {
         // Якорь 1100 и уровень 900 при ставке 0.1 дают дистанцию 200 и пол
-        // 0.1 × 2000 = 200 — равенство точное, без округления.
+        // 0.1 × 2000 = 200 — равенство точное, без округления. Плечо 1, а
+        // не рабочее: при ставке 0.1 оценка ликвидации входа на плече 10
+        // легла бы выше уровня 900, и её отказ подмешался бы к предмету.
         harness.givenRules(rules(CONTRACT_VALUE, "1", "1", "0.1"));
+        harness.givenPairState(pairStateWithLeverage(1));
 
         assertThat(codes(harness.validate(entryAction("1", new BigDecimal("1100"), "900"), workingContext())))
                 .as("на самой границе отказа нет")
@@ -105,9 +111,14 @@ class StopDistanceFloorTest {
     void u7_8_theFloorIsMeasuredFromTheActualEpisodeAnchor() {
         Deal deal = emptyDeal();
         deal.setPositions(List.of(episode("10", new BigDecimal("2000"))));
+        deal.setTranches(List.of(tranche(List.of(), List.of(protection("1999")))));
+        harness.givenPairState(pairStateWithLeverage(2));
 
         // От фактического якоря 2000 дистанция равна единице при поле
         // 0.0005 × 3999 = 1.9995; от плановой цены 3000 она была бы 1001.
+        // Защита транша и плечо 2 — операнды не предмета: у входа при живом
+        // эпизоде без действующего уровня оценка ликвидации не измерена, а
+        // на рабочем плече она легла бы выше уровня 1999.
         assertThat(codes(harness.validate(entryAction("10", ANCHOR, "1999"), context(deal))))
                 .containsExactly(RiskCheckCode.STOP_DISTANCE_BELOW_FLOOR);
     }

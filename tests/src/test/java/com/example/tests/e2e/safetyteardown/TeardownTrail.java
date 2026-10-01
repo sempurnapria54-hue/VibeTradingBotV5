@@ -47,6 +47,8 @@ final class TeardownTrail {
 
     static final String HOLD_RAISED = "HOLD_RAISED";
 
+    static final String HOLD_RELEASED = "HOLD_RELEASED";
+
     static final String ANOMALY_REPORTED = "ANOMALY_REPORTED";
 
     static final String FOREIGN_ORDER = "EXCHANGE_FOREIGN_ORDER";
@@ -357,9 +359,14 @@ final class TeardownTrail {
      *
      * <p><b>Ответы по второму инструменту стоят и в состоянии «плоско», на его
      * приоритете, и заведены после ответов пролога:</b> ответы пролога в этом
-     * состоянии — по пути без параметра, и иначе перекрыли бы их. Запись
-     * закрытия по второму инструменту площадка не отдаёт: список пуст, а запись
-     * тропы по нему не приходит.
+     * состоянии — по пути без параметра, и иначе перекрыли бы их.
+     *
+     * <p><b>Запись закрытия по второму инструменту площадка отдаёт с того
+     * момента, как вторая позиция плоская</b> — в состояниях «вторая плоская» и
+     * «обе плоские»: пустой ответ живой ноги один эпизода не закрывает, и без
+     * записи его пары строка второй сделки осталась бы живой
+     * (docs/components/RefreshPositionExecutor.md). Пока вторая позиция жива,
+     * история по ней пуста.
      */
     private static void exchangeHoldsSecondPosition(Trail trail) {
         Stub exchange = trail.exchange();
@@ -389,11 +396,13 @@ final class TeardownTrail {
         exchange.answersWhereInState(Trail.EXCHANGE_POSITIONS, "instType", "SWAP", flatScenario, SECOND_FLAT,
                 slice(trailPosition));
         exchange.answersWhereInState(POSITIONS_HISTORY, "instId", EXTERNAL_SECOND_INSTRUMENT, flatScenario,
-                SECOND_FLAT, EMPTY);
+                SECOND_FLAT, slice(secondCloseRecord()));
         exchange.answersInState(Trail.EXCHANGE_POSITIONS, flatScenario, BOTH_FLAT, EMPTY);
         exchange.answersInState(POSITIONS_HISTORY, flatScenario, BOTH_FLAT, EMPTY);
         exchange.answersWhereInState(POSITIONS_HISTORY, "instId", Trail.EXTERNAL_INSTRUMENT, flatScenario, BOTH_FLAT,
                 slice(ExitTrail.mirroredCloseRecord()));
+        exchange.answersWhereInState(POSITIONS_HISTORY, "instId", EXTERNAL_SECOND_INSTRUMENT, flatScenario,
+                BOTH_FLAT, slice(secondCloseRecord()));
         exchange.answersPostMoving(ExitTrail.CLOSE_POSITION, "$.instId", EXTERNAL_SECOND_INSTRUMENT, flatScenario,
                 Stub.STARTED, SECOND_FLAT, closeAck(EXTERNAL_SECOND_INSTRUMENT));
         exchange.answersPostMoving(ExitTrail.CLOSE_POSITION, "$.instId", EXTERNAL_SECOND_INSTRUMENT, flatScenario,
@@ -443,6 +452,19 @@ final class TeardownTrail {
         return """
                 {"code": "0", "msg": "", "data": [%s]}
                 """.formatted(entries);
+    }
+
+    /**
+     * Запись закрытия эпизода второй позиции — той же пары «идентификатор,
+     * момент открытия», что у её живого среза.
+     */
+    private static String secondCloseRecord() {
+        return """
+                {"posId": "%s", "instId": "%s", "direction": "long",
+                  "realizedPnl": "-0.4", "ccy": "USDT", "closeAvgPx": "60000", "pnl": "0", "fee": "-0.4",
+                  "fundingFee": "0", "liqPenalty": "0", "type": "2",
+                  "cTime": "1758240000000", "uTime": "1758240005000"}
+                """.formatted(SECOND_POSITION, EXTERNAL_SECOND_INSTRUMENT);
     }
 
     private static String closeAck(String instrument) {

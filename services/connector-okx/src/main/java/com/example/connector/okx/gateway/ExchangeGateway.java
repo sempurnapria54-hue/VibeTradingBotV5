@@ -160,7 +160,11 @@ public interface ExchangeGateway {
     List<Position> getPositionCloseRecords(String accountInternalId, String externalInstrumentId,
                                            OffsetDateTime windowBegin);
 
-    /** Баланс расчётной валюты. */
+    /**
+     * Баланс расчётной валюты вместе с режимом счёта и режимом позиций —
+     * посылками контура, которые преконтроль меряет на том же свежем снимке
+     * ({@code docs/models/domain/core/BalanceContainer.md}).
+     */
     BalanceContainer getBalance(String accountInternalId, String settleCurrency);
 
     /** Движения средств за окно. */
@@ -196,6 +200,10 @@ public interface ExchangeGateway {
      * Правила меняются площадкой независимо от листинга, и читатель
      * синхронизирует их своим тиком: сложи их в одно чтение — и
      * обновление правил стоило бы обхода всего листинга.
+     *
+     * <p>Правила несут позиционные тиры изолированной маржи семьи
+     * инструмента — операнд оценки ликвидации до входа
+     * ({@code docs/models/domain/other/InstrumentExternalRules.md}).
      */
     InstrumentExternalRules getInstrumentRules(String externalInstrumentId, String externalInstrumentType);
 
@@ -207,7 +215,8 @@ public interface ExchangeGateway {
      *
      * <p>Окно ограничено пределом, а не «всё, что есть»: минутные свечи
      * за годы кладут и площадку, и базу читателя
-     * ({@code .claude/rules/codestyle.md} §«Выборка данных»).
+     * ({@code .claude/rules/codestyle.md} §«Выборка данных: не тянем
+     * сущность ради одного поля»).
      */
     List<Candle> getHistoryCandles(String externalInstrumentId, TimeFrame timeframe, Long afterMillis,
                                    Integer limit);

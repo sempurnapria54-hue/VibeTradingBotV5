@@ -1,11 +1,14 @@
 package com.example.tradingcore.unit.risk;
 
 import static com.example.tradingcore.unit.risk.RiskFixture.ANCHOR;
+import static com.example.tradingcore.unit.risk.RiskFixture.STOP;
 import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.context;
 import static com.example.tradingcore.unit.risk.RiskFixture.emptyDeal;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.episode;
+import static com.example.tradingcore.unit.risk.RiskFixture.protection;
+import static com.example.tradingcore.unit.risk.RiskFixture.tranche;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingContext;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -86,10 +89,17 @@ class EntryAnchorTest {
                 .doesNotContain(RiskCheckCode.STOP_LOSS_INVALID_SIDE);
     }
 
-    /** Сделка базовой сборки с названным эпизодом позиции. */
+    /**
+     * Сделка базовой сборки с названным эпизодом позиции и стоящей защитой
+     * транша. Защита несущая: у входа при живом эпизоде без действующего
+     * уровня на всю позицию оценка ликвидации не измерена, и её отказ
+     * подмешался бы к предмету группы (docs/spec/risk-limits.json, величина
+     * {@code stopNearestLiquidation}).
+     */
     private static Deal dealWith(Position episode) {
         Deal deal = emptyDeal();
         deal.setPositions(List.of(episode));
+        deal.setTranches(List.of(tranche(List.of(), List.of(protection(STOP.toPlainString())))));
         return deal;
     }
 }

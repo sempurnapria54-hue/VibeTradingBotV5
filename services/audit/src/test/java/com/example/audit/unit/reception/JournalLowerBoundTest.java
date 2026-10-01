@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.audit.domain.model.JournalCompleteness;
 import com.example.audit.domain.service.JournalCompletenessService;
 import com.example.audit.persistence.service.JournalCompletenessSource;
 import java.time.OffsetDateTime;
@@ -39,6 +40,8 @@ class JournalLowerBoundTest {
             OffsetDateTime.of(2026, 9, 10, 3, 0, 0, 0, ZoneOffset.UTC);
     private static final OffsetDateTime RECORDED =
             OffsetDateTime.of(2026, 9, 9, 3, 0, 0, 0, ZoneOffset.UTC);
+    private static final OffsetDateTime STALE_BEFORE =
+            OffsetDateTime.of(2026, 9, 12, 12, 0, 0, 0, ZoneOffset.UTC);
 
     private final JournalCompletenessService service = new JournalCompletenessService();
 
@@ -122,6 +125,25 @@ class JournalLowerBoundTest {
         assertThat(lowerBound(0L, OBSERVED, RECORDED))
                 .as("«строк нет вовсе» и «все сняты с подписки» неразличимы по ответу")
                 .isEqualTo(lowerBound(0L, null, null));
+    }
+
+    @Test
+    @DisplayName("U1.11 — разрыв читается против той же границы, что отдана рядом с предикатом")
+    void u1_11_theBreakIsReadAgainstTheBoundThatTravelsWithThePredicate() {
+        OffsetDateTime observed = RECORDED;
+        OffsetDateTime earliestRecorded = OBSERVED;
+        JournalCompletenessSource source = source(2L, observed, earliestRecorded);
+        when(source.countSubscribedPairsWithBreak(GROUP, STALE_BEFORE, earliestRecorded)).thenReturn(0L);
+
+        JournalCompleteness completeness = service.completeness(source, GROUP, STALE_BEFORE);
+
+        assertThat(completeness.getLowerBound())
+                .as("вход поставлен: границей служит ПЕРВЫЙ операнд, а не момент наблюдения")
+                .isEqualTo(earliestRecorded);
+        verify(source).countSubscribedPairsWithBreak(GROUP, STALE_BEFORE, completeness.getLowerBound());
+        assertThat(completeness.getContinuityClaimable())
+                .as("момент разрыва сравнивается с полной границей — той, что читатель получил рядом")
+                .isTrue();
     }
 
     // --- оснастка ---------------------------------------------------------

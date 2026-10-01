@@ -26,6 +26,7 @@ import com.example.tradingcore.domain.safety.HoldService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.ManualHaltClass;
 import com.example.tradingcore.domain.safety.ManualHaltService;
+import com.example.tradingcore.domain.safety.PositionSliceReader;
 import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
 import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
@@ -67,6 +68,7 @@ class ManualHaltSurfaceTest {
     private final DealContextService contexts = mock(DealContextService.class);
     private final SafetyHoldCoordinator coordinator = mock(SafetyHoldCoordinator.class);
     private final AnomalyReportService reports = mock(AnomalyReportService.class);
+    private final PositionSliceReader slices = mock(PositionSliceReader.class);
 
     private final ExchangeAccount account = account(ExchangeAccount.SafetyRung.ACTIVE);
     private final Instrument instrument = instrument(Instrument.Status.ACTIVE);
@@ -76,7 +78,8 @@ class ManualHaltSurfaceTest {
             new HoldRungEdgeService(pairStates, accounts, new ActorProvider(), coreEventWriter));
 
     private final ManualHaltService service = new ManualHaltService(accounts, instruments, pairStates,
-            deals, contexts, new DealTerminalGate(), coordinator, holdService, reports);
+            deals, contexts, new DealTerminalGate(), coordinator, holdService, reports, slices,
+            new ActorProvider(), coreEventWriter);
 
     @BeforeEach
     void givenWorkingObjects() {
@@ -86,6 +89,7 @@ class ManualHaltSurfaceTest {
                 .thenReturn(pairState(Instrument.SafetyRung.ACTIVE));
         when(deals.findNonTerminalByExchangeAccountId(anyLong())).thenReturn(List.of());
         when(deals.findNonTerminalOnPair(anyLong(), anyLong())).thenReturn(List.of());
+        when(slices.livePositions(any(), any())).thenReturn(new ArrayList<>());
     }
 
     // --- допустимые пары ---------------------------------------------------
@@ -280,6 +284,46 @@ class ManualHaltSurfaceTest {
 
         verify(reports).journal(any(), eq(HoldSignal.exchangeAccountJournal(
                 Constants.Hold.MANUAL_HALT_CLEARED)));
+    }
+
+    /**
+     * Применённое снятие пишет факт своего класса рядом со строкой журнала:
+     * без него поток периметра и журнал видели бы снятие только отчётом о
+     * происшествии, без снятой ступени (docs/architecture/contracts.md
+     * §«Снятие ступени несёт пару подъёма, но без кода причины»). Мягкий
+     * класс счёта снимает МЯГКУЮ ступень; инструмента у счётного радиуса нет.
+     */
+    @Test
+    void anAppliedClearancePublishesTheReleasedFact() {
+        when(accounts.clearRung(any(), any(), any())).thenReturn(Boolean.TRUE);
+
+        service.clear(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
+
+        verify(coreEventWriter).holdReleased(eq("tn-0001"), eq(HoldScope.EXCHANGE_ACCOUNT), eq(HoldRung.SOFT),
+                eq(ACCOUNT_INTERNAL_ID), eq(null), any());
+    }
+
+    /** Снятие сворачивания пары снимает ЖЁСТКУЮ ступень и называет инструмент радиуса. */
+    @Test
+    void clearingThePairTeardownReleasesTheHardRungOfThePair() {
+        when(pairStates.getRequiredByPair(ACCOUNT_ID, INSTRUMENT_ID))
+                .thenReturn(pairState(Instrument.SafetyRung.TRADE_BLOCKED));
+        when(pairStates.clearRung(any(), any(), any(), any())).thenReturn(Boolean.TRUE);
+
+        service.clear(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
+
+        verify(coreEventWriter).holdReleased(eq("tn-0001"), eq(HoldScope.INSTRUMENT), eq(HoldRung.HARD),
+                eq(ACCOUNT_INTERNAL_ID), eq(INSTRUMENT_INTERNAL_ID), any());
+    }
+
+    /** Холостое снятие события не пишет: ступень не переставлена — ничего не произошло. */
+    @Test
+    void aNoopClearancePublishesNothing() {
+        when(accounts.clearRung(any(), any(), any())).thenReturn(Boolean.FALSE);
+
+        service.clear(ManualHaltClass.FREEZE, ACCOUNT_INTERNAL_ID, null);
+
+        verify(coreEventWriter, never()).holdReleased(any(), any(), any(), any(), any(), any());
     }
 
     // --- сборка ------------------------------------------------------------

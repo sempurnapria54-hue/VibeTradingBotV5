@@ -103,6 +103,22 @@ final class Feed {
                 """.formatted(externalId);
     }
 
+    /**
+     * Справочные правила инструмента с двумя позиционными тирами
+     * изолированной маржи — та же форма, что {@link #rules(String)}, плюс
+     * перечень тиров (docs/models/domain/other/InstrumentExternalRules.md).
+     */
+    static String rulesWithTiers(String externalId) {
+        String rules = rules(externalId).stripTrailing();
+        return rules.substring(0, rules.length() - 1) + """
+                  ,"positionTiers": [
+                    {"minSize": 0, "maxSize": 1000, "maintenanceMarginRate": 0.004},
+                    {"minSize": 1000, "maxSize": 5000, "maintenanceMarginRate": 0.006}
+                  ]
+                }
+                """;
+    }
+
     /** Закрытая свеча: открытие бара и его цены. */
     static String candle(Long openTimestamp, String close) {
         return """

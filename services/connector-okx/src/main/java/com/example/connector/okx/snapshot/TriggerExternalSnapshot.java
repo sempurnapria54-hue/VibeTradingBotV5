@@ -6,7 +6,8 @@ import lombok.Value;
 /**
  * Снапшот trigger-механизма algo-order: ноги stop-loss и take-profit.
  * Раздел AlgoOrderExternalSnapshot. См.
- * docs/models/domain/core/AlgoOrder.md (§External snapshots).
+ * docs/models/mapping/AlgoOrder.md (§«AlgoOrderExternalSnapshot →
+ * AlgoOrder»).
  */
 @Value
 @Builder

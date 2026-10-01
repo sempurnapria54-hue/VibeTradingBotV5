@@ -2,6 +2,8 @@ package com.example.tradingcore.unit.fsm;
 
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeAskingRung;
 import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeObserving;
+import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeWithCommands;
+import static com.example.tradingcore.unit.fsm.DealActiveHarness.cascadeWithEdges;
 import static com.example.tradingcore.unit.fsm.FsmFixture.TRANCHE_ID;
 import static com.example.tradingcore.unit.fsm.FsmFixture.closedPosition;
 import static com.example.tradingcore.unit.fsm.FsmFixture.contextBuilder;
@@ -24,6 +26,7 @@ import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.fsm.DealTransition;
 import com.example.tradingcore.domain.fsm.StepSelection;
+import com.example.tradingcore.domain.fsm.TrancheEdge;
 import com.example.tradingcore.domain.safety.HoldRung;
 import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldSignal;
@@ -41,11 +44,18 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка.</b> Та же, что у {@code U7}; каскад молчит; отбор
  * шага подменён и отдаёт объявленный входом исход.
  *
- * <p><b>Кейс {@code U9.13} не прогоняется</b> по той же причине, что
- * {@code U8.9}: потерю затребованной ступени на тропах агрегатного шага и
- * удалённого определения не называет ни один дом (находка {@code F-6}).
+ * <p><b>Ступень каскада едет на каждом исходе прохода</b>, на котором
+ * каскад прогонялся (docs/components/DealActiveHandler.md §«Рабочая
+ * логика»), — клетка {@code U9.13}. <b>Удаление определения не ждёт тихого
+ * прохода</b>: проверка стои́т над работой каскада, и исход уровня сделки
+ * на таком проходе отбирается даже при занятом каскаде — клетки
+ * {@code U9.16}-{@code U9.19}.
  */
 class DealActiveExitChecksTest {
+
+    /** Мягкая ступень каскада: жёсткая ступень уровня сделки строже её. */
+    private static final HoldSignal SOFT_RUNG =
+            HoldSignal.instrumentSoft(Constants.Hold.INSTRUMENT_MARKET_DATA_EXPIRED);
 
     private final DealActiveHarness harness = new DealActiveHarness();
 
@@ -230,6 +240,120 @@ class DealActiveExitChecksTest {
         assertThat(transition.getCommands()).extracting(ServiceCommand::getType)
                 .containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND);
         assertThat(transition.movesStatus()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U9.13а — каскад просит только ступень, сработал шаг EXIT: ребро выхода и ступень каскада")
+    void u9_13a_anExitStepCarriesTheCascadeRung() {
+        harness.givenCascade(cascadeAskingRung(SOFT_RUNG));
+        harness.givenDealStep(StepSelection.of(step(1L, StrategyStepType.EXIT)));
+
+        DealTransition transition = harness.handle(managedContext());
+
+        assertThat(transition.getNextStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
+        assertThat(transition.getCloseReason()).isEqualTo(Deal.CloseReason.STRATEGY_EXIT);
+        assertThat(transition.getHoldSignal()).isEqualTo(SOFT_RUNG);
+    }
+
+    @Test
+    @DisplayName("U9.13б — каскад просит только ступень, реакция «управляемое сворачивание»: ребро и ступень")
+    void u9_13b_aGracefulCloseCarriesTheCascadeRung() {
+        harness.givenCascade(cascadeAskingRung(SOFT_RUNG));
+        harness.givenDealStep(StepSelection.escalated(MarketDataExpiredAction.GRACEFUL_CLOSE));
+
+        DealTransition transition = harness.handle(managedContext());
+
+        assertThat(transition.getNextStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
+        assertThat(transition.getShutdownReason()).isEqualTo(Deal.ShutdownReason.MARKET_DATA_EXPIRED);
+        assertThat(transition.getCloseReason()).isEqualTo(Deal.CloseReason.RISK_CONTROL);
+        assertThat(transition.getHoldSignal()).isEqualTo(SOFT_RUNG);
+    }
+
+    @Test
+    @DisplayName("U9.13в — каскад просит только ступень, определение удалено: ребро удаления и ступень")
+    void u9_13c_aDeletedDefinitionCarriesTheCascadeRung() {
+        harness.givenCascade(cascadeAskingRung(SOFT_RUNG));
+        DealContext context = contextBuilder(managedDeal()).strategy(deletedDefinition()).build();
+
+        DealTransition transition = harness.handle(context);
+
+        assertThat(transition.getNextStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
+        assertThat(transition.getShutdownReason()).isEqualTo(Deal.ShutdownReason.STRATEGY_DELETED);
+        assertThat(transition.getCloseReason()).isEqualTo(Deal.CloseReason.STRATEGY_EXIT);
+        assertThat(transition.getHoldSignal()).isEqualTo(SOFT_RUNG);
+    }
+
+    @Test
+    @DisplayName("U9.13г — каскад просит мягкую ступень, реакция «аварийное снятие»: ребра нет, жёсткая из двух")
+    void u9_13d_theHarsherOfTheTwoRungsStays() {
+        harness.givenCascade(cascadeAskingRung(SOFT_RUNG));
+        harness.givenDealStep(StepSelection.escalated(MarketDataExpiredAction.KILL_SWITCH));
+
+        DealTransition transition = harness.handle(managedContext());
+
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.getHoldSignal().getRung()).isEqualTo(HoldRung.HARD);
+        assertThat(transition.getHoldSignal().getCode())
+                .isEqualTo(Constants.Hold.INSTRUMENT_MARKET_DATA_EXPIRED);
+    }
+
+    @Test
+    @DisplayName("U9.16 — определение удалено, каскад выдал команду: ребро удаления, команды каскада не едут")
+    void u9_16_aDeletedDefinitionDoesNotWaitForABusyCascade() {
+        harness.givenCascade(cascadeWithCommands(ServiceCommandType.CREATE_ORDER_COMMAND));
+        DealContext context = contextBuilder(managedDeal()).strategy(deletedDefinition()).build();
+
+        DealTransition transition = harness.handle(context);
+
+        assertThat(transition.getNextStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
+        assertThat(transition.getShutdownReason()).isEqualTo(Deal.ShutdownReason.STRATEGY_DELETED);
+        assertThat(transition.getCloseReason()).isEqualTo(Deal.CloseReason.STRATEGY_EXIT);
+        assertThat(transition.hasCommands()).isFalse();
+    }
+
+    @Test
+    @DisplayName("U9.17 — определение удалено, каскад одобрил ребро транша: ребро удаления, ребро транша приложено")
+    void u9_17_aDeletedDefinitionCarriesTheApprovedTrancheEdges() {
+        DealContext context = contextBuilder(managedDeal()).strategy(deletedDefinition()).build();
+        List<TrancheEdge> edges = List.of(new TrancheEdge(context.getDeal().getTranches().getFirst(),
+                DealTranche.Status.EXIT_PENDING, null));
+        harness.givenCascade(cascadeWithEdges(edges));
+
+        DealTransition transition = harness.handle(context);
+
+        assertThat(transition.getNextStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
+        assertThat(transition.getShutdownReason()).isEqualTo(Deal.ShutdownReason.STRATEGY_DELETED);
+        assertThat(transition.getTrancheEdges()).isEqualTo(edges);
+    }
+
+    @Test
+    @DisplayName("U9.18 — удалено, каскад занят, реакция «аварийное снятие»: просьба ступени, ребра и команд нет")
+    void u9_18_theKillSwitchOutranksTheDeletionEvenWithABusyCascade() {
+        harness.givenCascade(cascadeWithCommands(ServiceCommandType.CREATE_ORDER_COMMAND));
+        harness.givenDealStep(StepSelection.escalated(MarketDataExpiredAction.KILL_SWITCH));
+        DealContext context = contextBuilder(managedDeal()).strategy(deletedDefinition()).build();
+
+        DealTransition transition = harness.handle(context);
+
+        assertThat(transition.movesStatus()).isFalse();
+        assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.getHoldSignal().getCode())
+                .isEqualTo(Constants.Hold.INSTRUMENT_MARKET_DATA_EXPIRED);
+    }
+
+    @Test
+    @DisplayName("U9.19 — удалено, каскад занят, сработал шаг EXIT: ребро шага, команды каскада не едут")
+    void u9_19_theExitStepOutranksTheDeletionEvenWithABusyCascade() {
+        harness.givenCascade(cascadeWithCommands(ServiceCommandType.CREATE_ORDER_COMMAND));
+        harness.givenDealStep(StepSelection.of(step(1L, StrategyStepType.EXIT)));
+        DealContext context = contextBuilder(managedDeal()).strategy(deletedDefinition()).build();
+
+        DealTransition transition = harness.handle(context);
+
+        assertThat(transition.getNextStatus()).isEqualTo(Deal.Status.EXIT_PENDING);
+        assertThat(transition.getCloseReason()).isEqualTo(Deal.CloseReason.STRATEGY_EXIT);
+        assertThat(transition.getShutdownReason()).isNull();
+        assertThat(transition.hasCommands()).isFalse();
     }
 
     // --- сборка ------------------------------------------------------------

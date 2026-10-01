@@ -1,0 +1,78 @@
+# Контроллер ингресса — исполнитель объектов Ingress всех окружений кластера.
+#
+# ЗАЧЕМ ОН ЕСТЬ. Ingress окружения (deploy/base/services/bff.yaml) без
+# контроллера — объявление, которое никто не исполняет: снаружи поверхность
+# не отвечала ни по какому имени хоста. Контроллер один на кластер, как
+# оператор: окружения — пространства имён одного кластера
+# (docs/architecture/platform.md §Развёртывание), и каждое приносит свой
+# Ingress со своим именем хоста.
+#
+# ПОЧЕМУ TRAEFIK. Отвергнуты: ingress-nginx — проект снят с сопровождения
+# сообществом Kubernetes, и ставить его сейчас значит заводить компонент без
+# исправлений безопасности; контроллеры только Gateway API — потребовали бы
+# переписать объект Ingress в пару Gateway/HTTPRoute ради того же маршрута.
+# Traefik исполняет оба API, поэтому переход на Gateway API, когда он
+# понадобится, контроллера не меняет. Довод —
+# .claude/decisions/environment-ingress-controller.md.
+#
+# КЛАСС НАЗВАН ЯВНО. IngressClass `traefik` заводит чарт, и умолчанием
+# кластера он не объявлен: Ingress окружения называет его полем
+# ingressClassName, то есть исполнитель читается по манифесту, а не угадывается
+# по умолчанию кластера.
+#
+# ФОРМА ВЫХОДА НАРУЖУ — ПОРТ УЗЛА. Кластер сегодня один и это стенд kind
+# (docs/architecture/platform.md §Развёртывание): порт 443 узла пробрасывается
+# на хост (tools/stand/kind-cluster.yaml), а контроллер слушает его hostPort'ом.
+# Балансировщика у kind нет, поэтому Service — ClusterIP. Облачный кластер
+# меняет ровно эту строку (Service типа LoadBalancer) и выбирается вместе с
+# облаком; до выбора провайдер-специфичного не пишется.
+#
+# НАРУЖУ ТОЛЬКО TLS. hostPort стои́т у одной точки входа — websecure; у
+# открытой точки web его нет, и с хоста она недостижима. Сертификат выдаёт
+# cert-manager по аннотации Ingress.
+#
+# ВЫКАТКА БЕЗ ПЕРЕКРЫТИЯ. Умолчание чарта поднимает новый под раньше, чем
+# гасит старый; на одном узле hostPort занят старым, и новый висел бы в
+# Pending вечно. Поэтому сначала гасим, потом поднимаем: перерыв входа на
+# время выкатки контроллера — цена одного узла.
+#
+# ВЕРСИЯ ВЫБРАНА ПРИ ПИСЬМЕ И ЗАКРЕПЛЯЕТСЯ ПЕРВЫМ РАЗВЁРТЫВАНИЕМ, как у
+# прочих чартов кластерного слоя: не поднялась — меняется здесь на ту,
+# что поднялась (.claude/work/backlog.md — проверка входа снаружи на стенде).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-controller
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://traefik.github.io/charts
+    chart: traefik
+    targetRevision: 37.1.1
+    helm:
+      releaseName: traefik
+      valuesObject:
+        ingressClass:
+          enabled: true
+          isDefaultClass: false
+          name: traefik
+        service:
+          type: ClusterIP
+        ports:
+          websecure:
+            hostPort: 443
+        updateStrategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 1
+            maxSurge: 0
+  destination:
+    server: https://kubernetes.default.svc
+    # Имя пространства читают встречные разрешения окружения
+    # (deploy/base/services/bff.yaml): запрет по умолчанию закрывает вход
+    # к подам окружения, и пропускают его только правила с этим именем.
+    namespace: ingress
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

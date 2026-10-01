@@ -3,7 +3,9 @@ package com.example.tradingbot.domain.model.core.instrument;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -92,6 +94,16 @@ public class InstrumentExternalRules {
     private String externalFeeGroupId;
 
     /**
+     * Позиционные тиры изолированной маржи инструмента
+     * (docs/integrations/okx/contracts/position-tiers.md) — операнд оценки
+     * ликвидации до входа (docs/rules/risk-policy.md). Пусто — тиры не
+     * материализованы: оценка тогда не вычисляется, и ставка первого тира
+     * вместо неизвестной не подставляется. Пустота остаётся пустотой, а не
+     * пустым перечнем, — и строка навеса ключа тогда не несёт.
+     */
+    private List<PositionTier> positionTiers;
+
+    /**
      * Ставка taker комиссионной группы, ГИДРИРОВАННАЯ хранилищным слоем
      * навеса при чтении (docs/integrations/okx/contracts/trade-fee.md):
      * поверхность чтения не двинулась — калькуляторы и преконтроль берут
@@ -114,7 +126,17 @@ public class InstrumentExternalRules {
         return toDecimal(externalTakerFeeRate);
     }
 
-    /** Инструмент торгуем (статус LIVE). */
+    /**
+     * Инструмент торгуем (статус LIVE).
+     *
+     * <p>Изъят из сериализации на самой модели: вычисленный ответ — вопрос к
+     * модели, а не её данные, и ключом без поля он уезжал бы в колонку навеса
+     * и к читателю провода (.claude/rules/codestyle.md §«Предикат формы,
+     * пересекающей сериализацию, не является её свойством»). Изъятие ПОЛЕЙ
+     * при этом остаётся за хранилищным слоем — см. javadoc поля
+     * {@code externalTakerFeeRate}.
+     */
+    @JsonIgnore
     public Boolean isLive() {
         return Objects.equals(status, Status.LIVE);
     }

@@ -96,6 +96,12 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
     /** Реализованный результат эпизода: ноль. */
     private static final String ZERO = "0";
 
+    /**
+     * Метка реализованного результата, который запись закрытия не несёт:
+     * в ответе стаба она заменяется пустым значением.
+     */
+    private static final String UNKNOWN_RESULT = "unknown-result";
+
     /** Машинный код хвостов заявок, не объяснимых живой сделкой. */
     private static final String ORPHAN_ORDERS = "INSTRUMENT_ORPHAN_ORDERS";
 
@@ -119,6 +125,12 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
 
     /** Определение, которым проверяется отбор входа после закрытия сделки. */
     private static final String NEXT_DEFINITION = "S-SAFE-NEXT";
+
+    /** Машинный код ступени, поднятой контролируемым отказом границы на проходе. */
+    private static final String CONTROLLED_FAILURE = "EXCHANGE_CONTROLLED_FAILURE";
+
+    /** Причина пометки ноги, чей статус площадки не разобран. */
+    private static final String UNKNOWN_EXTERNAL_STATUS = "UNKNOWN_EXTERNAL_STATUS";
 
     @Test
     @DisplayName("B5.1 — порядок полной реакции: статус, отчёт, снятие риска, терминал отчёта, каскад")
@@ -538,6 +550,104 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
         assertThat(AppLog.since(mark)).contains("Anomaly report open failed");
     }
 
+    /**
+     * Нога помечена {@code ERROR} ТРОПОЙ ЯЩИКА — отказом разбора статуса на
+     * добыче, — и тот же отказ поднимает жёсткую ступень счёта
+     * (контролируемое исключение границы, {@code B3.7}): вход клетки и
+     * предусловие «нога в ошибке» ставит один тик. Площадка после отказа
+     * отдаёт ногу живой, пока её не снимет команда отмены
+     * ({@link #standEntryStatusRefusedOnce}).
+     *
+     * <p>Предмет — множество «живость не исключена»
+     * (docs/spec/order-lifecycle.json, {@code orderMayBeLive}) и класс
+     * родителя по наблюдённому статусу ({@code attachedParentStatus}): при
+     * статусном прочтении нога не отменялась бы вовсе, а её защита уходила
+     * бы в {@code ERROR} классом проблемного родителя.
+     */
+    @Test
+    @DisplayName("B5.16 — нога в ERROR, стоящая на площадке живой, снимается первой очередью")
+    void anErrorLegStandingLiveOnTheVenueIsCancelledFirst() {
+        openPartiallyFilledDeal();
+        standExchangeFollowingCommands(LOSS, LOSS, partialFill());
+        standEntryStatusRefusedOnce();
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        // Добыча пометила ногу, и ступень поднята тем же ходом.
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        // Порядок команд площадке: отмена помеченной ноги, закрытие позиции,
+        // снятие защиты — и ни одной сверх.
+        assertThat(commandCalls()).containsExactly(cancellationPath(ACCOUNT), closurePath(ACCOUNT),
+                attachedCancellationPath(ACCOUNT));
+        List<String> calls = connector.paths();
+        Integer cancellation = calls.indexOf(cancellationPath(ACCOUNT));
+        Integer closure = calls.indexOf(closurePath(ACCOUNT));
+        Integer protectionCancel = calls.indexOf(attachedCancellationPath(ACCOUNT));
+        assertThat(calls.subList(closure, protectionCancel)).contains(positionPath(ACCOUNT));
+        // Статус ноги отмена не двигает, причина ошибки стоит; снятой её
+        // показала добыча ПОСЛЕ отмены — наблюдённая живость ложна.
+        assertThat(entryStatus()).isEqualTo("ERROR");
+        assertThat(entryRow().get("close_reason")).isEqualTo(UNKNOWN_EXTERNAL_STATUS);
+        assertThat(entryRow().get("external_live")).isEqualTo(Boolean.FALSE);
+        Integer lastLookup = calls.lastIndexOf(lookupPath(ACCOUNT));
+        assertThat(lastLookup).isGreaterThan(cancellation);
+        // Снятие подтверждено только после той добычи: отчёт закрыт позже
+        // последнего чтения ноги.
+        Map<String, Object> report = rows.row("anomaly_reports", "code", CONTROLLED_FAILURE);
+        assertThat(report.get("status")).isEqualTo("COMPLETED");
+        assertThat(momentOf(report.get("modified_at")))
+                .isAfter(connector.requests(lookupPath(ACCOUNT)).getLast().getLoggedDate().toInstant());
+        // Защита в ошибочное не уходила: снята с причиной ступени.
+        assertThat(protectionRow().get("status")).isEqualTo("CANCELED");
+        assertThat(protectionRow().get("close_reason")).isEqualTo(KILL_SWITCH);
+    }
+
+    /**
+     * Нога, чей статус площадки не разобран ни одной добычей, наблюдением не
+     * становится никогда: живость не исключена, отмена уходит каждой
+     * попыткой, и ни одна попытка снятия не подтверждается
+     * (docs/lifecycles/Order.md §«Нога в {@code ERROR}: живость на площадке
+     * читается наблюдением»). Доведение остаётся за держателем, а гейт
+     * доказанного отсутствия риска держит сделку вне аварийного терминала
+     * (docs/spec/deal-lifecycle.json, {@code anyLiveOrder}).
+     */
+    @Test
+    @DisplayName("B5.17 — нога в ERROR с неразобранным статусом держит снятие неподтверждённым")
+    void anErrorLegWithAnUnparsedStatusKeepsTheTeardownUnconfirmed() {
+        submitEntry(workingDefinition());
+        connector.answers(lookupPath(ACCOUNT), 422, Feed.peerFailure(EXTERNAL_STATUS));
+        connector.answers(cancellationPath(ACCOUNT), Feed.ack(entryExternalId(), entryClientId()));
+        connector.answers(positionPath(ACCOUNT), Feed.absent());
+        connector.answers(positionsPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(pendingOrdersPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(pendingAlgoOrdersPath(ACCOUNT), Feed.emptyArray());
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        assertThat(entryStatus()).isEqualTo("ERROR");
+        assertThat(entryRow().get("external_live")).isNull();
+        // Отмена помеченной ноги уходит каждой попыткой; попыток ровно три —
+        // предел kill-switch.max-teardown-attempts, — и ни одна не
+        // подтверждена.
+        assertThat(connector.requests(cancellationPath(ACCOUNT))).hasSize(3);
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        Map<String, Object> report = rows.row("anomaly_reports", "code", CONTROLLED_FAILURE);
+        assertThat(report).isNotEmpty();
+        assertThat(report.get("status")).isNotEqualTo("COMPLETED");
+        assertThat(report.get("internal_after")).isNull();
+        assertThat(dealStatus()).isEqualTo("ERROR");
+
+        ticks(Tick.DEAL_ORCHESTRATOR, 2);
+
+        // Аварийный терминал не применяется: живость помеченной ноги не
+        // исключена, и риск доказанно отсутствующим не читается.
+        assertThat(dealStatus()).isEqualTo("ERROR");
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(rows.row("anomaly_reports", "code", CONTROLLED_FAILURE).get("status"))
+                .isNotEqualTo("COMPLETED");
+    }
+
     // ------------------------------------------------------------------
     // Предусловия группы
     // ------------------------------------------------------------------
@@ -618,9 +728,16 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
     }
 
     /**
-     * Живая сделка, закрытая выходом БЕЗ числа: площадка записи закрытия
-     * не отдаёт, бюджет добычи исчерпывается, и сделка кончается
-     * аварийным терминалом, у которого результата нет.
+     * Живая сделка, закрытая выходом БЕЗ числа: площадка отдаёт запись
+     * закрытия своей пары, но без реализованного результата — эпизод
+     * закрыт, а его факт не добыт ({@code Position#closeRecordFetched}),
+     * бюджет добычи исчерпывается, и сделка кончается аварийным
+     * терминалом, у которого результата нет.
+     *
+     * <p><b>Пустой ответ истории эту тропу не даёт</b>: без записи своей
+     * пары эпизод не закрывается вовсе, и сделка остаётся в ошибочном
+     * состоянии (docs/spec/external-status-resolution.json,
+     * {@code positionCloseCorroborated}).
      *
      * <p><b>Мягкая ступень пары, поднятая исчерпанием, снимается ручным
      * снятием</b> — иначе следующая сделка серии на этом инструменте не
@@ -631,7 +748,9 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
                 MarketPhase.Type.BULL_TREND);
         openLiveDeal(definition);
         standExchangeFollowingCommands(LOSS);
-        connector.answers(closedPositionsPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(closedPositionsPath(ACCOUNT), Feed.array(
+                Feed.closedPosition(positionExternalId(), POSITION_CREATED_AT, CLOSED_AT, UNKNOWN_RESULT)
+                        .replace("\"" + UNKNOWN_RESULT + "\"", "null")));
         exitByDeletion(definition);
         passesUntilDealTerminal();
         assertThat(dealStatus()).isEqualTo("EMERGENCY_CLOSED");

@@ -20,6 +20,8 @@ import com.example.tradingcore.domain.command.risk.RiskBlockResolver;
 import com.example.tradingcore.domain.command.risk.RiskValidator;
 import com.example.tradingcore.domain.command.strategy.ActionPlan;
 import com.example.tradingcore.domain.command.strategy.ActionRiskGate;
+import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -46,25 +48,19 @@ class ActionRiskGateTest {
 
     private final ActionRiskGate gate = new ActionRiskGate(validator, resolver);
 
+    /**
+     * Следа разрешающая реакция не оставляет, и мерится это по построению
+     * узла, а не захватом журнала: точки записи у него нет вовсе —
+     * предупредительного рода у преконтроля нет
+     * (docs/components/models/RiskCheckResult.md).
+     */
     @Test
-    @DisplayName("U26.1 — реакция «продолжить»: плана нет, записи в лог нет")
+    @DisplayName("U26.1 — реакция «продолжить»: плана нет, точки записи в журнал у узла нет")
     void u26_1_theContinueReactionYieldsNoPlanAndNoRecord() {
-        try (RiskLogCapture log = RiskLogCapture.attach(ActionRiskGate.class)) {
-            assertThat(gateWith(RiskBlockAction.Type.CONTINUE)).isEmpty();
-            assertThat(log.messages()).isEmpty();
-        }
-    }
-
-    @Test
-    @DisplayName("U26.2 — реакция «продолжить с предупреждением»: запись предупреждения — весь эффект")
-    void u26_2_theWarningReactionOnlyLeavesARecord() {
-        try (RiskLogCapture log = RiskLogCapture.attach(ActionRiskGate.class)) {
-            assertThat(gateWith(RiskBlockAction.Type.CONTINUE_WITH_WARNING)).isEmpty();
-            assertThat(log.messages())
-                    .as("дома у этого эффекта в корпусе нет — находка R-7")
-                    .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
-                    .contains("risk comment");
-        }
+        assertThat(gateWith(RiskBlockAction.Type.CONTINUE)).isEmpty();
+        assertThat(Arrays.stream(ActionRiskGate.class.getDeclaredFields()).map(Field::getType))
+                .as("журнального логгера у узла нет")
+                .noneMatch(type -> type.getName().endsWith("Logger"));
     }
 
     @Test
@@ -94,12 +90,6 @@ class ActionRiskGateTest {
         assertThat(plan).isPresent();
         assertThat(plan.orElseThrow().getBlocked().getCloseReason()).isEqualTo(Deal.CloseReason.RISK_CONTROL);
         assertThat(plan.orElseThrow().hasCommand()).isFalse();
-    }
-
-    @Test
-    @DisplayName("U26.6 — реакция «запросить добычу»: то же")
-    void u26_6_theRefreshRequestYieldsABlockingPlan() {
-        assertBlockingPlan(RiskBlockAction.Type.REQUEST_REFRESH);
     }
 
     @Test

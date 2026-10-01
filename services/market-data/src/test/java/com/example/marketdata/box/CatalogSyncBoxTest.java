@@ -2,10 +2,12 @@ package com.example.marketdata.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.json.JsonParserFactory;
 
 /**
  * Синк каталога — группа {@code B2} документа
@@ -135,34 +137,39 @@ class CatalogSyncBoxTest extends SharedMarketDataBox {
     }
 
     /**
-     * Ожидание взято из дома: валюты инструмента синк не пишет — они
-     * добываются один раз при заведении и подтверждения не требуют
-     * (docs/components/InstrumentSyncJob.md §Границы;
-     * docs/lifecycles/Instrument.md §«Переходы и триггеры»).
+     * Писатель валют инструмента — тик синка каталога: при заведении и на
+     * каждом следующем сведении с листингом непустое значение ответа
+     * переносится на строку (docs/models/domain/core/Instrument.md §«Валюты
+     * инструмента»). Сменённая площадкой валюта доходит до каталога следующим
+     * тиком, а не остаётся устаревшей навсегда; обратная сторона — пустота
+     * ответа известного не стирает — клетка {@code B2.3}.
      *
-     * <p>Сегодня маппер обновления из листинга их ПЕРЕПИСЫВАЕТ при каждом
-     * тике, когда ответ их несёт: находка {@code F-2}, долг —
-     * `.claude/work/backlog.md` §«Клейм о том, что синк валют не пишет,
-     * опровергнут маппером обновления из листинга». Расхождение разрешимо
-     * в обе стороны, и выбор принадлежит владельцу предмета.
+     * <p>Предусловие пинит валюты заведения, иначе равенство после тика было
+     * бы зелено и у синка, валют не пишущего вовсе: заведение и сведение
+     * разведены значениями.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("B2.10 — валюты инструмента синк не пишет")
-    void b2_10_theSyncDoesNotWriteInstrumentCurrencies() {
-        stubListing(INSTRUMENT);
+    @DisplayName("B2.10 — сведение с листингом переписывает валюты инструмента")
+    void b2_10_theSyncRewritesInstrumentCurrenciesFromTheListing() {
+        connector.answers(ConnectorStub.rulesOf(INSTRUMENT), Feed.rules(INSTRUMENT));
+        connector.answers(ConnectorStub.INSTRUMENTS, Feed.array(Feed.instrument(INSTRUMENT, "BTC", "USDT")));
         tick(Tick.INSTRUMENT_SYNC);
         Map<String, Object> before = rows.row("instruments", "external_id", INSTRUMENT);
-        connector.answers(ConnectorStub.INSTRUMENTS, Feed.array(
-                Feed.instrument(INSTRUMENT, "WBTC", "USDC")));
+        assertThat(before.get("external_base_currency"))
+                .as("B2.10: предусловие — инструмент заведён с валютами BTC/USDT/USDT")
+                .isEqualTo("BTC");
+        assertThat(before.get("external_quote_currency")).isEqualTo("USDT");
+        assertThat(before.get("external_settlement_currency")).isEqualTo("USDT");
+        connector.answers(ConnectorStub.INSTRUMENTS, Feed.array(Feed.instrument(INSTRUMENT, "WBTC", "USDC")));
 
         tick(Tick.INSTRUMENT_SYNC);
 
         Map<String, Object> after = rows.row("instruments", "external_id", INSTRUMENT);
-        assertThat(after.get("external_base_currency")).isEqualTo(before.get("external_base_currency"));
-        assertThat(after.get("external_quote_currency")).isEqualTo(before.get("external_quote_currency"));
-        assertThat(after.get("external_settlement_currency"))
-                .isEqualTo(before.get("external_settlement_currency"));
+        assertThat(after.get("external_base_currency"))
+                .as("B2.10: вход — листинг с валютами WBTC/USDC/USDC; валюты строки равны валютам ответа")
+                .isEqualTo("WBTC");
+        assertThat(after.get("external_quote_currency")).isEqualTo("USDC");
+        assertThat(after.get("external_settlement_currency")).isEqualTo("USDC");
     }
 
     /**
@@ -182,6 +189,64 @@ class CatalogSyncBoxTest extends SharedMarketDataBox {
         Map<String, Object> row = rows.row("instruments", "external_id", INSTRUMENT);
         assertThat(row.get("created_by")).isEqualTo(PRINCIPAL);
         assertThat(row.get("modified_by")).isEqualTo(PRINCIPAL);
+    }
+
+    /**
+     * Позиционные тиры приезжают от коннектора в составе правил и ложатся
+     * в навес той же записью (docs/components/InstrumentSyncJob.md
+     * §«Листинг и правила идут разным охватом»); наружу уходят формой
+     * поверхности — её читает проекция ядра
+     * (docs/models/domain/other/InstrumentExternalRules.md). Правила без
+     * тиров ключа тиров в строке навеса не несут: пустота остаётся
+     * пустотой, а не пустым перечнем.
+     */
+    @Test
+    @DisplayName("B2.12 — позиционные тиры правил ложатся в навес и уходят поверхностью")
+    void b2_12_positionTiersOfTheRulesLandInTheOverlayAndLeaveThroughTheSurface() {
+        connector.answers(ConnectorStub.rulesOf(INSTRUMENT), Feed.rulesWithTiers(INSTRUMENT));
+        connector.answers(ConnectorStub.rulesOf(SECOND_INSTRUMENT), Feed.rules(SECOND_INSTRUMENT));
+        connector.answers(ConnectorStub.INSTRUMENTS, Feed.array(
+                Feed.instrument(INSTRUMENT, "BTC", "USDT"),
+                Feed.instrument(SECOND_INSTRUMENT, "ETH", "USDT")));
+
+        tick(Tick.INSTRUMENT_SYNC);
+
+        List<Map<String, Object>> stored = tiersOf(overlayOf(INSTRUMENT));
+        assertThat(stored).as("B2.12: два тира ответа легли в навес").hasSize(2);
+        assertThat(decimal(stored.get(0).get("minSize"))).isEqualByComparingTo("0");
+        assertThat(decimal(stored.get(0).get("maxSize"))).isEqualByComparingTo("1000");
+        assertThat(decimal(stored.get(0).get("maintenanceMarginRate"))).isEqualByComparingTo("0.004");
+        assertThat(decimal(stored.get(1).get("minSize"))).isEqualByComparingTo("1000");
+        assertThat(decimal(stored.get(1).get("maxSize"))).isEqualByComparingTo("5000");
+        assertThat(decimal(stored.get(1).get("maintenanceMarginRate"))).isEqualByComparingTo("0.006");
+        assertThat(overlayOf(SECOND_INSTRUMENT))
+                .as("B2.12: правила без тиров ключа тиров в строке навеса не несут")
+                .containsKey("externalTickSize")
+                .doesNotContainKey("positionTiers");
+
+        String internalId = String.valueOf(rows.row("instruments", "external_id", INSTRUMENT).get("internal_id"));
+        Answer surface = get(INSTRUMENTS + "/" + internalId + "/rules");
+
+        assertThat(surface.status()).isEqualTo(200);
+        List<Map<String, Object>> served = tiersOf(surface.asObject());
+        assertThat(served).as("B2.12: поверхность отдаёт тиры навеса").hasSize(2);
+        assertThat(decimal(served.get(1).get("maintenanceMarginRate"))).isEqualByComparingTo("0.006");
+    }
+
+    /** Строка навеса правил инструмента как объект. */
+    private Map<String, Object> overlayOf(String externalId) {
+        Object overlay = rows.row("instruments", "external_id", externalId).get("external_rules");
+        assertThat(overlay).as("навес правил %s материализован", externalId).isNotNull();
+        return JsonParserFactory.getJsonParser().parseMap(String.valueOf(overlay));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> tiersOf(Map<String, Object> rules) {
+        return (List<Map<String, Object>>) rules.get("positionTiers");
+    }
+
+    private static BigDecimal decimal(Object value) {
+        return new BigDecimal(String.valueOf(value));
     }
 
     private void stubListing(String... externalIds) {

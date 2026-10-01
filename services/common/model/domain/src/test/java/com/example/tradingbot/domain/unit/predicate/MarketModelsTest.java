@@ -4,6 +4,7 @@ import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.at;
 import static com.example.tradingbot.domain.unit.predicate.PredicateFixture.dec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.trade.candle.CandleGroup;
@@ -25,8 +26,9 @@ import org.junit.jupiter.params.provider.EnumSource;
  * группа `U18` документа
  * `.claude/tests/cases/domain-model-predicates.md`
  * (docs/models/domain/other/CandleGroup.md §«Целостность по count
- * (density-инвариант)», docs/models/domain/other/MarketStructure.md,
- * docs/models/mapping/MarketPriceData.md,
+ * (density-инвариант)» и §«Новый закрытый бар»,
+ * docs/models/domain/other/MarketStructure.md,
+ * docs/components/models/MarketPriceData.md §«Середина спреда»,
  * docs/models/domain/core/BalanceContainer.md §Свежесть).
  *
  * <p><b>Базовая сборка:</b> группа свечей с таймфреймом, фактическими
@@ -34,11 +36,11 @@ import org.junit.jupiter.params.provider.EnumSource;
  * событием пробоя; цена момента с двумя сторонами спреда; контейнер
  * баланса с моментом обновления снимка.
  *
- * <p><b>Две клетки группы не прогоняются, и это не пропуск.</b> `U18.12`
- * и `U18.14` ожидания не имеют: через сколько длительностей бара
- * наступает «новый закрытый бар» и что происходит на пустом моменте
- * «сейчас», не называет ни один носитель корпуса (находка `D-2`, звено
- * `Z1`).
+ * <p><b>Порог нового закрытого бара и исход на пустом моменте «сейчас»
+ * берутся из дома</b> (docs/models/domain/other/CandleGroup.md §«Новый
+ * закрытый бар»; находка `D-2` закрыта): бар подошёл, когда от открытия
+ * последней свечи прошло не меньше двух длительностей бара, а пустой момент
+ * — нарушение предусловия вызывающего. Клетки `U18.12`, `U18.14`, `U18.28`.
  */
 class MarketModelsTest {
 
@@ -118,11 +120,46 @@ class MarketModelsTest {
         assertThat(group(0L, null, null).hasNewClosedBar(10 * MINUTE)).isFalse();
     }
 
-    /** Направление ответа домом задано, порог — нет (звено `Z1`). */
+    /**
+     * Следующий бар открылся через одну длительность после последнего и ещё
+     * не закрылся: порог — две длительности, а не одна. Подаются обе стороны
+     * окна — сразу за одной длительностью и за миг до двух.
+     */
+    @Test
+    @DisplayName("U18.12 — прошло больше одной, но меньше двух длительностей бара: нового закрытого бара нет")
+    void u18_12_theNextBarIsOpenButNotYetClosed() {
+        CandleGroup subject = group(0L, 0L, null);
+
+        assertThat(subject.hasNewClosedBar(MINUTE + 1)).isFalse();
+        assertThat(subject.hasNewClosedBar(MINUTE + MINUTE / 2)).isFalse();
+        assertThat(subject.hasNewClosedBar(2 * MINUTE - 1)).isFalse();
+    }
+
     @Test
     @DisplayName("U18.13 — прошло заведомо много длительностей бара")
     void u18_13_aLongSilenceGivesANewClosedBar() {
         assertThat(group(0L, 0L, null).hasNewClosedBar(100 * MINUTE)).isTrue();
+    }
+
+    /**
+     * Пустой момент «сейчас» — нарушение предусловия вызывающего: у группы с
+     * последней свечой исход — отказ вызова разыменованием, а не ответ «нет»;
+     * у пустой группы ответ «нет» даётся раньше, чем момент читается.
+     */
+    @Test
+    @DisplayName("U18.14 — пустой момент «сейчас»: у группы со свечой отказ вызова, у пустой группы ответ «нет»")
+    void u18_14_anAbsentNowRefusesTheCallUnlessTheGroupIsEmpty() {
+        assertThatThrownBy(() -> group(0L, 0L, null).hasNewClosedBar(null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatCode(() -> group(0L, null, null).hasNewClosedBar(null)).doesNotThrowAnyException();
+        assertThat(group(0L, null, null).hasNewClosedBar(null)).isFalse();
+    }
+
+    /** Сравнение нестрогое: бар, закрывшийся ровно сейчас, уже закрыт. */
+    @Test
+    @DisplayName("U18.28 — прошло ровно две длительности бара: новый закрытый бар есть")
+    void u18_28_exactlyTwoBarDurationsGiveANewClosedBar() {
+        assertThat(group(0L, 0L, null).hasNewClosedBar(2 * MINUTE)).isTrue();
     }
 
     @Test

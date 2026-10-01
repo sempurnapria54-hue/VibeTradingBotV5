@@ -1,12 +1,15 @@
 package com.example.tradingcore.unit.risk;
 
+import static com.example.tradingcore.unit.risk.RiskFixture.ANCHOR;
 import static com.example.tradingcore.unit.risk.RiskFixture.NEIGHBOUR_TRANCHE_ID;
 import static com.example.tradingcore.unit.risk.RiskFixture.STOP;
 import static com.example.tradingcore.unit.risk.RiskFixture.TRANCHE_ID;
+import static com.example.tradingcore.unit.risk.RiskFixture.appetite;
 import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.context;
 import static com.example.tradingcore.unit.risk.RiskFixture.emptyDeal;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryLeg;
+import static com.example.tradingcore.unit.risk.RiskFixture.episode;
 import static com.example.tradingcore.unit.risk.RiskFixture.pairState;
 import static com.example.tradingcore.unit.risk.RiskFixture.protection;
 import static com.example.tradingcore.unit.risk.RiskFixture.tranche;
@@ -17,6 +20,7 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
@@ -35,12 +39,11 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка.</b> Транш с экспозицией в десять контрактов,
  * одной входной ногой и двумя живыми защитами — снимаемой (размер 15) и
  * остающейся (размер 12); ступени у пары нет. После снятия покрытие
- * равно 12 против экспозиции 10.
- *
- * <p><b>Клетки U19.11 и U19.12 здесь не прогоняются:</b> у них нет
- * ожидания — дом объявляет набор проверок ветки тем же, а точка входа
- * мерит два предиката (находка R-4, документ §«Кейсы, не прогоняемые
- * сегодня»).
+ * равно 12 против экспозиции 10. <b>Операнды полные</b> — граф предъявлен,
+ * правила материализованы и торгуемы, валюта, база, числа тенанта и
+ * детали объявлены, маржа изолирована: набор ветки тот же, что у
+ * рассчитанного действия (docs/components/RiskValidator.md §«Ветка
+ * ослабления защиты»), и пустой операнд дал бы отказ входного гейта.
  */
 class ProtectionRemovalTest {
 
@@ -149,6 +152,33 @@ class ProtectionRemovalTest {
 
         assertThat(codes(harness.validator().validateProtectionRemoval(
                 context(dealWith(tranche)), tranche, REMOVED_ID))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U19.11 — живой риск при доактном уровне выше потолка стратегии: единственный отказ")
+    void u19_11_theLiveRiskIsCheckedAgainstTheStrategySimultaneousCeiling() {
+        harness.givenAppetite(appetite("5", 3));
+        DealTranche tranche = trancheWith("10", "12");
+        Deal deal = dealWith(tranche);
+        deal.setPositions(List.of(episode("20", ANCHOR)));
+
+        RiskValidationResult result = harness.validator().validateProtectionRemoval(context(deal), tranche,
+                REMOVED_ID);
+
+        assertThat(codes(result))
+                .as("92.955 × 20 × 0.1 = 185.91 выше потолка стратегии 100 и ниже глобального 500")
+                .containsExactly(RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED);
+    }
+
+    @Test
+    @DisplayName("U19.12 — неизолированный режим маржи, покрытие сохраняется: единственный отказ")
+    void u19_12_aNonIsolatedMarginModeRejectsTheRemoval() {
+        AccountInstrumentState cross = pairState(Instrument.SafetyRung.ACTIVE);
+        cross.setMarginMode(Instrument.MarginMode.CROSS);
+        harness.givenPairState(cross);
+
+        assertThat(codes(removalFrom(trancheWith("10", "12"))))
+                .containsExactly(RiskCheckCode.MARGIN_MODE_NOT_ISOLATED);
     }
 
     /** Транш базовой сборки: названные экспозиция и размер остающейся защиты. */

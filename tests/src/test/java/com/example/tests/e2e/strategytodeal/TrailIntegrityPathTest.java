@@ -137,11 +137,12 @@ class TrailIntegrityPathTest {
                 .containsOnly("GET " + Trail.PEER_INSTRUMENTS, "GET " + Trail.PEER_INSTRUMENTS + "/"
                         + Trail.INSTRUMENT + "/rules", "POST " + Trail.PEER_FEATURES);
         List<String> exchange = paths(trail.exchange().requests());
-        assertThat(exchange).as("E8.2: у площадки — ставка комиссии, три среза детекции, момент, средства, "
-                        + "плечо, постановка, добыча заявки и её защиты; иных обращений нет")
+        assertThat(exchange).as("E8.2: у площадки — ставка комиссии, три среза детекции, момент, средства "
+                        + "и конфигурация счёта, плечо, постановка, добыча заявки и её защиты; иных обращений нет")
                 .containsOnly("GET " + Trail.EXCHANGE_FEE, "GET " + Trail.EXCHANGE_POSITIONS,
                         "GET " + Trail.EXCHANGE_ORDERS_PENDING, "GET " + Trail.EXCHANGE_TIME,
-                        "GET " + Trail.EXCHANGE_BALANCE, "POST " + Trail.EXCHANGE_LEVERAGE,
+                        "GET " + Trail.EXCHANGE_BALANCE, "GET " + Trail.EXCHANGE_ACCOUNT_CONFIG,
+                        "POST " + Trail.EXCHANGE_LEVERAGE,
                         "POST " + Trail.EXCHANGE_ORDER, "GET " + Trail.EXCHANGE_ORDER,
                         "GET " + Trail.EXCHANGE_ALGO_PENDING);
         assertThat(exchange.stream().filter(request -> request.startsWith("POST")).toList())

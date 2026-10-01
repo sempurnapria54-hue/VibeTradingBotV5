@@ -37,6 +37,11 @@ public class ReceptionCompletenessService {
      * одной наблюдаемой темы» обе обязаны сказать одно и то же: границы
      * нет, непрерывность не утверждаема.
      *
+     * <p><b>Граница считается один раз, и предикат сравнивает момент разрыва
+     * с ней же.</b> Отданная граница и та, против которой читался разрыв,
+     * обязаны быть одним числом: иначе выдача могла бы назвать границу,
+     * позже которой лежит дыра, и одновременно утверждать непрерывность.
+     *
      * @param source      откуда читаются операнды
      * @param staleBefore момент, раньше которого строка состояния приёма
      *                    считается устаревшей: момент выдачи за вычетом
@@ -45,8 +50,9 @@ public class ReceptionCompletenessService {
     public ReceptionCompleteness completeness(ReceptionCompletenessSource source,
                                               String consumerGroup,
                                               OffsetDateTime staleBefore) {
-        return new ReceptionCompleteness(lowerBound(source, consumerGroup).orElse(null),
-                continuityClaimable(source, consumerGroup, staleBefore));
+        Optional<OffsetDateTime> lowerBound = lowerBound(source, consumerGroup);
+        return new ReceptionCompleteness(lowerBound.orElse(null),
+                continuityClaimable(source, consumerGroup, staleBefore, lowerBound));
     }
 
     /**
@@ -92,11 +98,16 @@ public class ReceptionCompletenessService {
      * неразличение «не проверяли» с «проверили, всё в порядке»
      * (docs/concept.md, П1).
      *
-     * <p><b>Гасящего писателя у момента разрыва здесь нет</b>, и по тому же
-     * доводу, что у единственного операнда границы: гасит его чистка
-     * следствий, а чистки у фактов не существует. Разрыв, случившийся
-     * однажды, держит предикат ложным навсегда — верно по существу: дыра в
-     * принятом есть безвозвратная потеря.
+     * <p><b>Момент разрыва читается против нижней границы</b>
+     * (docs/spec/durable-reception.json, {@code lagExceededRetention}):
+     * разрыв раньше неё дыры внутри обещаемого ряда не образует, и снятия у
+     * момента нет ни у одного писателя
+     * (docs/rules/durable-consumer-reception.md §«Писатели величин — по роли,
+     * а не по имени класса»). Разрыв внутри обещаемого ряда держит предикат
+     * ложным, пока граница его не минует, — верно по существу: дыра в
+     * принятом есть безвозвратная потеря. Минует его граница у статистики
+     * только ходами второго операнда: заведением строки новой темы и
+     * возобновлением наблюдения.
      *
      * <p><b>Ложь означает «не утверждаема», а не «дыра есть»:</b> поводов у
      * неё два, и читателю оба говорят одно — числам верить нельзя.
@@ -104,9 +115,24 @@ public class ReceptionCompletenessService {
     public Boolean continuityClaimable(ReceptionCompletenessSource source,
                                        String consumerGroup,
                                        OffsetDateTime staleBefore) {
-        if (source.countSubscribedPairs(consumerGroup) == 0) {
+        return continuityClaimable(source, consumerGroup, staleBefore, lowerBound(source, consumerGroup));
+    }
+
+    /**
+     * Предикат против уже посчитанной границы.
+     *
+     * <p><b>Пустая граница и есть пустая область квантора</b>: границы нет
+     * ровно тогда, когда подписанных пар ноль
+     * (docs/spec/durable-reception.json, {@code receptionLowerBound}), — и о
+     * дырах источник в этой ветви не спрашивается.
+     */
+    private Boolean continuityClaimable(ReceptionCompletenessSource source,
+                                        String consumerGroup,
+                                        OffsetDateTime staleBefore,
+                                        Optional<OffsetDateTime> lowerBound) {
+        if (lowerBound.isEmpty()) {
             return Boolean.FALSE;
         }
-        return source.countSubscribedPairsWithBreak(consumerGroup, staleBefore) == 0;
+        return source.countSubscribedPairsWithBreak(consumerGroup, staleBefore, lowerBound.get()) == 0;
     }
 }

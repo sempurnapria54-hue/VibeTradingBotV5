@@ -95,13 +95,23 @@ public class CandleJob {
         }
     }
 
+    /**
+     * Уводит в {@code SYNC} готовые группы, у которых подошёл новый закрытый
+     * бар.
+     *
+     * <p>Ребро пишется той же точечной записью, что и шаг ведения
+     * ({@link CandleLoader#advance}): требование, углубившее горизонт между
+     * чтением готовых групп и записью, иначе было бы переписано статусом
+     * {@code SYNC} и прежним горизонтом.
+     */
     private void triggerTailSync() {
         List<CandleGroup> activeGroups = candleGroupDataService.findByStatusIn(Set.of(CandleGroup.Status.ACTIVE));
         long now = Instant.now().toEpochMilli();
         for (CandleGroup group : activeGroups) {
             if (isTrue(group.hasNewClosedBar(now))) {
                 group.setStatus(CandleGroup.Status.SYNC);
-                candleGroupDataService.save(group);
+                candleGroupDataService.saveLoadingStep(group, CandleGroup.Status.ACTIVE,
+                        group.getPlannedFirstUtcMillis());
             }
         }
     }

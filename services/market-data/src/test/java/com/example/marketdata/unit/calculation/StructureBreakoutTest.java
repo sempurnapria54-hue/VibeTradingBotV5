@@ -19,7 +19,6 @@ import com.example.tradingbot.domain.model.trade.market_structure.MarketStructur
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -33,14 +32,11 @@ import org.junit.jupiter.api.Test;
  * границы диапазона {@code 110} и {@code 90}. Порог пробоя вверх поэтому
  * равен {@code 111.1}, вниз — {@code 89.1}.
  *
- * <p><b>Три клетки красны по построению:</b> `U14.7` предъявляет находку
- * `M-2` (подтверждённый пробой структуру не переклассифицирует и считается
- * на любом типе), `U14.8` — её же вторую половину, `U14.9` — находку `M-9`
- * (детекция читает только хвост окна). Они помечены меткой {@code debt}.
- * Половина `U14.9`, которую предъявляла находка `M-4`, закрыта: момент
- * события берётся из последнего бара удержания, а не присваивается концом
- * окна, — но пока удержание ищется только в хвосте, эти два бара
- * совпадают, и клетка остаётся красной одной `M-9`.
+ * <p><b>Пробит бывает выданный граничный уровень, и пробой ломает
+ * структуру:</b> событие несёт тип сломанной границы, а сама структура
+ * становится «неизвестно» без граничных уровней. Детекция читает хвост
+ * окна: удержание, завершившееся раньше последнего бара, событием не
+ * становится.
  *
  * <p>Клетка `U14.10` получила код с закрытием находки `M-5`: база процента
  * буфера — цена пробиваемого уровня, и дом называет её прямо.
@@ -49,27 +45,29 @@ class StructureBreakoutTest {
 
     private final MarketStructureResolver resolver = new MarketStructureResolver();
 
-    /** Хвост, закрытый выше сопротивления с запасом буфера, даёт событие вверх. */
+    /** Хвост, закрытый выше верхней границы с запасом буфера, даёт событие вверх. */
     @Test
-    @DisplayName("U14.1 — два бара хвоста закрыты выше 111.1: событие RESISTANCE/UP с ценой 110 и моментом бара 10")
-    void u14_1_aTailHeldAboveTheResistanceWithTheBufferYieldsAnUpwardBreakout() {
+    @DisplayName("U14.1 — два бара хвоста закрыты выше 111.1: событие RANGE_HIGH/UP с ценой 110 и моментом бара 10")
+    void u14_1_aTailHeldAboveTheUpperBoundaryWithTheBufferYieldsAnUpwardBreakout() {
         MarketBreakoutEvent event = resolve(rangeBreakoutUpWindow(), structureParams()).getBreakoutEvent();
 
         assertThat(event).isNotNull();
-        assertThat(event.getBrokenLevelType()).isEqualTo(MarketPriceLevel.Type.RESISTANCE);
+        assertThat(event.getBrokenLevelType())
+                .as("тип сломанного уровня — тип выданной границы диапазона")
+                .isEqualTo(MarketPriceLevel.Type.RANGE_HIGH);
         assertThat(event.getDirection()).isEqualTo(MarketBreakoutEvent.Direction.UP);
         assertThat(event.getLevelPrice()).isEqualByComparingTo("110");
         assertThat(event.getConfirmedAt()).isEqualTo(barAt(10));
     }
 
-    /** Тот же хвост ниже поддержки даёт событие вниз. */
+    /** Тот же хвост ниже нижней границы даёт событие вниз. */
     @Test
-    @DisplayName("U14.2 — два бара хвоста закрыты ниже 89.1: событие SUPPORT/DOWN с ценой 90")
-    void u14_2_aTailHeldBelowTheSupportYieldsADownwardBreakout() {
+    @DisplayName("U14.2 — два бара хвоста закрыты ниже 89.1: событие RANGE_LOW/DOWN с ценой 90")
+    void u14_2_aTailHeldBelowTheLowerBoundaryYieldsADownwardBreakout() {
         MarketBreakoutEvent event = resolve(rangeBreakoutDownWindow(), structureParams()).getBreakoutEvent();
 
         assertThat(event).isNotNull();
-        assertThat(event.getBrokenLevelType()).isEqualTo(MarketPriceLevel.Type.SUPPORT);
+        assertThat(event.getBrokenLevelType()).isEqualTo(MarketPriceLevel.Type.RANGE_LOW);
         assertThat(event.getDirection()).isEqualTo(MarketBreakoutEvent.Direction.DOWN);
         assertThat(event.getLevelPrice()).isEqualByComparingTo("90");
     }
@@ -87,8 +85,8 @@ class StructureBreakoutTest {
         assertThat(structure.getType())
                 .as("прочие поля структуры не меняются")
                 .isEqualTo(MarketStructure.Type.RANGE);
-        assertThat(structure.getLevels())
-                .hasSameSizeAs(resolve(rangeBreakoutUpWindow(), structureParams()).getLevels());
+        assertThat(priceOf(structure, MarketPriceLevel.Type.RANGE_HIGH)).isEqualByComparingTo("110");
+        assertThat(priceOf(structure, MarketPriceLevel.Type.RANGE_LOW)).isEqualByComparingTo("90");
     }
 
     /** Запас буфера обязателен наравне с удержанием. */
@@ -127,34 +125,36 @@ class StructureBreakoutTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Дом
-     * объявляет, что подтверждённый пробой переклассифицирует структуру;
-     * код считает событие <b>после</b> классификации и типа не меняет.
-     * Красный прогон предъявляет находку `M-2` (`.claude/work/backlog.md`
-     * §«Подтверждённый пробой структуру не переклассифицирует и считается
-     * на любом типе»).
+     * Подтверждённый пробой ломает структуру окна: тип «неизвестно»,
+     * граничных уровней нет, свинги сохранены, момент подтверждения каркаса
+     * пуст — момент несёт событие. Тренда пробой не объявляет.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U14.7 — подтверждённый пробой на диапазоне: тип переклассифицирован, а не остался RANGE")
-    void u14_7_aConfirmedBreakoutReclassifiesTheStructureAwayFromTheRange() {
+    @DisplayName("U14.7 — подтверждённый пробой на диапазоне: тип UNKNOWN, границ нет, свинги и событие на месте")
+    void u14_7_aConfirmedBreakoutBreaksTheStructureOfTheWindow() {
         MarketStructure structure = resolve(rangeBreakoutUpWindow(), structureParams());
 
         assertThat(structure.getBreakoutEvent()).as("предпосылка кейса — событие есть").isNotNull();
+        assertThat(structure.getBreakoutEvent().getBrokenLevelType())
+                .as("событие несёт сломанную границу")
+                .isEqualTo(MarketPriceLevel.Type.RANGE_HIGH);
         assertThat(structure.getType())
-                .as("подтверждённый пробой уводит из диапазона")
-                .isNotEqualTo(MarketStructure.Type.RANGE);
+                .as("подтверждённый пробой уводит в «неизвестно», а не в тренд")
+                .isEqualTo(MarketStructure.Type.UNKNOWN);
+        assertThat(structure.getConfirmedAt()).as("у каркаса подтверждать нечего").isNull();
+        assertThat(structure.getLevels())
+                .as("свинги сохранены, граничных уровней нет: четыре максимума и четыре минимума")
+                .hasSize(8)
+                .allSatisfy(level -> assertThat(level.getType())
+                        .isIn(MarketPriceLevel.Type.SWING_HIGH, MarketPriceLevel.Type.SWING_LOW));
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Пробит
-     * бывает <b>уровень</b>, а уровень — подтверждённый; у консервативного
-     * исхода подтверждённых уровней не объявлено, значит ломать нечего. Код
-     * считает событие на любом типе. Красный прогон предъявляет ту же
-     * находку `M-2`.
+     * Пробит бывает <b>выданный граничный уровень</b>; у консервативного
+     * исхода граничных уровней нет, значит ломать нечего, хотя хвост закрыт
+     * за крайним пивотом окна.
      */
     @Test
-    @Tag("debt")
     @DisplayName("U14.8 — тип UNKNOWN, хвост закрыт за крайним пивотом: события нет, ломать нечего")
     void u14_8_aConservativeOutcomeHasNoConfirmedLevelToBreak() {
         MarketStructure structure = resolve(unknownTypeBreakoutWindow(), structureParams());
@@ -167,27 +167,24 @@ class StructureBreakoutTest {
     }
 
     /**
-     * <b>Ожидание взято из дома, и дерево кода несёт иначе.</b> Дом
-     * объявляет уровень сломанным, как только цена закрылась за ним с
-     * запасом и продержалась требуемое число баров; код читает только
-     * <b>хвост</b> окна, поэтому удержание, завершившееся раньше последнего
-     * бара, событием не становится вовсе. Красный прогон предъявляет находку
-     * `M-9` (`.claude/work/backlog.md` §«Пробой обнаруживается только
-     * хвостом окна»); вторая половина ожидания — момент события равен бару
-     * конца удержания — у построенного кода уже исполнена.
+     * Событие мерит удержание <b>на хвосте окна</b>: пробой, после которого
+     * цена вернулась внутрь, к моменту прохода ложный. Бар выхода {@code 10}
+     * пивотом не стал — сосед справа выше, — поэтому крайний пивот потолка
+     * и с ним граница {@code 110} остаются на месте.
      */
     @Test
-    @Tag("debt")
-    @DisplayName("U14.9 — удержание завершилось на баре 10, дальше возврат внутрь: событие есть с моментом бара 10")
-    void u14_9_aBreakoutThatEndedBeforeTheWindowEndIsStillAnEvent() {
+    @DisplayName("U14.9 — удержание завершилось на баре 10, бар 11 вернулся внутрь: события нет, RANGE 110/90")
+    void u14_9_aBreakoutFollowedByAReturnInsideIsNoEvent() {
         MarketStructure structure = resolve(rangeBreakoutReturnWindow(), structureParams());
 
         assertThat(structure.getBreakoutEvent())
-                .as("уровень жив, пока его не сломал подтверждённый пробой")
-                .isNotNull();
-        assertThat(structure.getBreakoutEvent().getConfirmedAt())
-                .as("момент подтверждения — бар, на котором удержание завершилось")
-                .isEqualTo(barAt(10));
+                .as("удержания на хвосте окна нет — пробой с возвратом ложный")
+                .isNull();
+        assertThat(structure.getType())
+                .as("граница окна не сдвинута, пока пивот выхода не подтверждён")
+                .isEqualTo(MarketStructure.Type.RANGE);
+        assertThat(priceOf(structure, MarketPriceLevel.Type.RANGE_HIGH)).isEqualByComparingTo("110");
+        assertThat(priceOf(structure, MarketPriceLevel.Type.RANGE_LOW)).isEqualByComparingTo("90");
     }
 
     /**
@@ -243,5 +240,11 @@ class StructureBreakoutTest {
 
     private MarketStructure resolve(List<Candle> window, MarketStructureParams params) {
         return resolver.resolve(window, new BigDecimal("0.1"), null, params);
+    }
+
+    private static BigDecimal priceOf(MarketStructure structure, MarketPriceLevel.Type type) {
+        MarketPriceLevel level = structure.findLevel(type);
+        assertThat(level).as("уровень типа %s", type).isNotNull();
+        return level.getPrice();
     }
 }

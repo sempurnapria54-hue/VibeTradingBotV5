@@ -8,15 +8,35 @@
 # сервис своим Deployment'ом. В целевой конструкции этот перенос делает
 # Vault (docs/architecture/platform.md §Безопасность).
 #
+# ПЕРЕЧЕНЬ КЛИЕНТОВ ЧИТАЕТСЯ ИЗ МАНИФЕСТА РЕАЛМА — служебные клиенты, то
+# есть объявленные с `serviceAccountsEnabled: true`. Своей копии перечня
+# здесь нет: прежняя отстала от реалма, и сервис, чей клиент в неё не попал,
+# остался без секрета молча. Клиент, объявленный манифестом, но отсутствующий
+# в живом реалме, — отказ, а не пропуск.
+#
 # Идемпотентна: повторный прогон перезаписывает секреты теми же значениями.
 #
 # Запуск:  bash tools/stand/identity-client-secret.sh
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENVIRONMENT="${STAND_ENVIRONMENT:-dev}"
 REALM="vibetrading"
-# Клиенты сервисов, у которых есть исходящие межсервисные вызовы.
-CLIENTS=("market-data" "trading-core")
+REALM_MANIFEST="$ROOT/deploy/base/services/identity-realm.yaml"
+# Блок клиента начинается строкой `- clientId:`; служебный — тот, в чьём
+# блоке стои́т `serviceAccountsEnabled: true`.
+mapfile -t CLIENTS < <(py -3 -c "
+import re, sys
+text = open(sys.argv[1], encoding='utf-8').read()
+for block in re.split(r'(?m)^\s*- clientId:', text)[1:]:
+    name = block.split('\n', 1)[0].strip()
+    if re.search(r'(?m)^\s*serviceAccountsEnabled:\s*true\s*$', block):
+        print(name)
+" "$REALM_MANIFEST" | tr -d '\r')
+if [ "${#CLIENTS[@]}" -eq 0 ]; then
+  echo "ОТКАЗ: в $REALM_MANIFEST не найдено ни одного служебного клиента" >&2
+  exit 1
+fi
 POD="platform-identity-0"
 # Пути внутри контейнера не должны конвертироваться оболочкой Git Bash в
 # windows-пути: без этого exec получает «C:/Program Files/Git/opt/...».

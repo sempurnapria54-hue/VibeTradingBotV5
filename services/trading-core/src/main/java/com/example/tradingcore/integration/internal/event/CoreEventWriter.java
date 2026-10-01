@@ -2,10 +2,13 @@ package com.example.tradingcore.integration.internal.event;
 
 import com.example.tradingbot.domain.event.CoreEventType;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.util.InternalIdFactory;
 import com.example.tradingbot.message.EventEnvelopeMessage;
 import com.example.tradingcore.domain.safety.AnomalyReport;
+import com.example.tradingcore.domain.safety.HoldRung;
+import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.mapping.CoreEventMessageMapper;
 import com.example.tradingcore.persistence.model.OutboxEntity;
@@ -64,15 +67,16 @@ public class CoreEventWriter {
      * Версия формы содержимого. Растёт, когда меняется состав полей;
      * потребитель старой версии обязан оставаться рабочим.
      *
-     * <p><b>Поднята один раз на весь состав производителя</b>, а не на
-     * каждую форму: составы всех пяти классов ядра приехали одним ходом —
+     * <p><b>Поднимается один раз на ход, а не на каждую форму:</b> версия
+     * на класс потребовала бы второго носителя версии в конверте, у которого
+     * поле одно. Вторая версия несла составы, приехавшие одним ходом, —
      * операнды отчёта и признаки отбора у терминала, контекст входа у
-     * создания, транш у решения о заявке, актор у обоих классов с ручной
-     * тропой (docs/architecture/contracts.md §События). Версия на класс
-     * потребовала бы второго носителя версии в конверте, у которого поле
-     * одно.
+     * создания, транш у решения о заявке, актор у классов с ручной тропой;
+     * третья — предшественника в цепочке замещений у решения о заявке и два
+     * новых класса, решение об условной заявке и снятие ступени
+     * (docs/architecture/contracts.md §События).
      */
-    private static final Integer FORM_VERSION = 2;
+    private static final Integer FORM_VERSION = 3;
 
     private final OutboxDataService outboxDataService;
     private final ObjectMapper objectMapper;
@@ -84,6 +88,15 @@ public class CoreEventWriter {
                              String instrumentInternalId) {
         write(tenantId, CoreEventType.ORDER_DECIDED,
                 eventMessageMapper.domainToOrderDecidedMessage(order, dealInternalId,
+                        dealTrancheInternalId, exchangeAccountInternalId, instrumentInternalId));
+    }
+
+    /** Решение об отдельной условной заявке; идентичности радиуса резолвит вызывающий. */
+    public void algoOrderDecided(String tenantId, AlgoOrder algoOrder, String dealInternalId,
+                                 String dealTrancheInternalId, String exchangeAccountInternalId,
+                                 String instrumentInternalId) {
+        write(tenantId, CoreEventType.ALGO_ORDER_DECIDED,
+                eventMessageMapper.domainToAlgoOrderDecidedMessage(algoOrder, dealInternalId,
                         dealTrancheInternalId, exchangeAccountInternalId, instrumentInternalId));
     }
 
@@ -118,6 +131,17 @@ public class CoreEventWriter {
                            String instrumentInternalId, String actor) {
         write(tenantId, CoreEventType.HOLD_RAISED,
                 eventMessageMapper.domainToHoldRaisedMessage(signal, exchangeAccountInternalId,
+                        instrumentInternalId, actor));
+    }
+
+    /**
+     * Снятие ступени радиуса ручной поверхностью: радиус и СНЯТАЯ ступень;
+     * инструмент пуст у счётного радиуса.
+     */
+    public void holdReleased(String tenantId, HoldScope scope, HoldRung rung,
+                             String exchangeAccountInternalId, String instrumentInternalId, String actor) {
+        write(tenantId, CoreEventType.HOLD_RELEASED,
+                eventMessageMapper.domainToHoldReleasedMessage(scope, rung, exchangeAccountInternalId,
                         instrumentInternalId, actor));
     }
 

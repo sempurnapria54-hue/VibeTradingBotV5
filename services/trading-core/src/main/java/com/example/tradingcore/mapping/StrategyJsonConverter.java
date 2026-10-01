@@ -24,6 +24,7 @@ import com.example.tradingcore.persistence.model.StrategyIndicatorSettingEntity;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.mapstruct.Named;
@@ -35,7 +36,13 @@ import org.springframework.stereotype.Component;
  * клаузы фазы, условие шага, политика устаревания, вложенные настройки
  * действий).
  *
- * <p>Пишутся только непустые значения.
+ * <p><b>Маппер — копия общего бина, и копия пинит сама ДВЕ оси</b>
+ * (docs/rules/persistence-representation.md §«Состав ключей строки
+ * навеса»): политику включения — пишутся только непустые значения — и
+ * терпимость к неизвестному свойству при чтении своей строки — строка,
+ * записанная прежней редакцией формы, читается, лишний ключ отбрасывается.
+ * Ни одна ось не наследуется умолчанием бина: настройка сериализатора
+ * сервиса сдвигала бы форму колонки либо делала её нечитаемой целиком.
  *
  * <p><b>Тега подтипа в параметрах индикатора нет:</b> он восстанавливается
  * по колонке {@code indicator_type} строки-владельца — дискриминатор живёт
@@ -49,7 +56,8 @@ public class StrategyJsonConverter {
 
     public StrategyJsonConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy()
-                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
     /** Параметры индикатора в JSON — без тега типа, он в колонке строки. */

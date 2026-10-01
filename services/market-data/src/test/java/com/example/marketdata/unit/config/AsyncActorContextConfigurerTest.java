@@ -15,7 +15,8 @@ import org.springframework.core.task.AsyncTaskExecutor;
  * — общий артефакт, и его ветви проверяются у него
  * ({@code com.example.platform.security.ActorProviderTest}); переносчик же
  * — класс ЭТОГО дерева, и на одном classpath с артефактом его нет
- * (§«Решение: где живёт дерево прогона»).
+ * (`.claude/tests/cases/platform-shared-logic.md` §«Решение: где живёт
+ * дерево прогона»).
  *
  * <p><b>Чего тест НЕ мерит, и это названо.</b> Он не поднимает контекст
  * приложения: {@code @SpringBootTest} у модуля нет — он потянул бы БД и

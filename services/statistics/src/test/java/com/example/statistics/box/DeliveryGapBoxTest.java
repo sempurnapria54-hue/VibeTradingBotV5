@@ -3,6 +3,7 @@ package com.example.statistics.box;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,14 @@ import org.springframework.test.context.DynamicPropertySource;
  * конверта (.claude/tests/cases/statistics.md, {@code B1.2}), — и сравнить два
  * момента здесь не с чем. Границу транзакций предъявляет клетка {@code B4.8}:
  * момент разрыва лежит там, где обработка откатилась целиком.
+ *
+ * <p><b>Клетка {@code B6.8} живёт здесь же, хотя принадлежит группе
+ * предиката, — класс равен КОНФИГУРАЦИИ КОНТЕКСТА.</b> Её вход — вторая тема
+ * подписки, строку которой такт заводит ПОСЛЕ разрыва на первой; подписка
+ * двумя темами есть ровно у этого контекста, и свой подъём ради одной клетки
+ * стоил бы больше, чем она мерит. Строка пары с разрывом ставится прямой
+ * записью: момент наблюдения тик ставит своим тактом, то есть «сейчас», а
+ * клетке нужен момент ПОЗАДИ разрыва.
  */
 class DeliveryGapBoxTest extends StatisticsBox {
 
@@ -57,6 +66,19 @@ class DeliveryGapBoxTest extends StatisticsBox {
 
     /** Идентичности записей, идущих подряд за записью с пропуском. */
     private static final List<String> AFTER_GAP = List.of("E-N1", "E-N2", "E-N3");
+
+    /** Насколько раньше «сейчас» наблюдается пара с разрывом в клетке о новой теме. */
+    private static final Duration OBSERVED_AGO = Duration.ofHours(2);
+
+    /** Возраст разрыва: позже момента наблюдения пары, раньше такта «сейчас». */
+    private static final Duration GAP_AGO = Duration.ofMinutes(90);
+
+    /** Вставка строки пары: колонки те же, которыми её заводит тик. */
+    private static final String OPEN_PAIR = """
+            insert into reception_states
+                (consumer_group, topic, observed_since, subscribed, reception_halted, updated_at)
+            values (?, ?, ?, true, false, ?)
+            """;
 
     @DynamicPropertySource
     static void substrate(DynamicPropertyRegistry registry) {
@@ -164,6 +186,37 @@ class DeliveryGapBoxTest extends StatisticsBox {
         assertThat(continuityClaimable())
                 .as("групповой предикат ложен: дыра хоть на одной теме есть дыра в принятом")
                 .isEqualTo(Boolean.FALSE);
+    }
+
+    @Test
+    @DisplayName("B6.8 — Строка новой темы двигает границу за разрыв: предикат утверждаем")
+    void aNewTopicRowMovesTheBoundPastTheGapAndTheClaimReturns() {
+        OffsetDateTime gapAt = momentsAgo(GAP_AGO);
+        rows.write(OPEN_PAIR, consumerGroup(), subject(), momentsAgo(OBSERVED_AGO), now());
+        givenGapOf(subject(), gapAt);
+
+        assertThat(pairs())
+                .as("вход поставлен: строки второй темы подписки ещё нет").hasSize(1);
+        assertThat(lowerBoundMoment().toInstant())
+                .as("граница — момент наблюдения единственной пары, и разрыв лежит ПОЗЖЕ неё")
+                .isBefore(gapAt.toInstant());
+        assertThat(continuityClaimable())
+                .as("поэтому до такта непрерывность не утверждаема").isEqualTo(Boolean.FALSE);
+
+        givenReceptionStateRows();
+
+        assertThat(instant(pair(neighbour()), OBSERVED_COLUMN))
+                .as("такт завёл строку новой темы моментом, лежащим позже разрыва")
+                .isAfter(gapAt.toInstant());
+        assertThat(lowerBoundMoment().toInstant())
+                .as("и граница, позднейший из моментов наблюдения, ушла за разрыв")
+                .isAfter(gapAt.toInstant());
+        assertThat(instant(pair(subject()), GAP_COLUMN))
+                .as("момент разрыва при этом цел: снятия у величины нет ни у одного писателя")
+                .isEqualTo(gapAt.toInstant());
+        assertThat(continuityClaimable())
+                .as("непрерывность утверждаема: разрыв раньше границы дыры в обещаемом ряду не даёт")
+                .isEqualTo(Boolean.TRUE);
     }
 
     /** Тема, в которую клетки кладут записи с пропуском. */

@@ -42,6 +42,11 @@ public class ProtectionCoverageGate {
      *
      * <p>Отказавшая строка обязательством не является: попытки исчерпаны,
      * и доиграть надобность больше некому.
+     *
+     * <p>Кроме третьей конъюнкты нарушения покрытия, признак читает гейт
+     * детектора ликвидации за стопом: в окне замены защиты уровень на всю
+     * позицию читается по худшей из двух (docs/components/AnomalyJob.md
+     * §«Переоценка инварианта ликвидации»).
      */
     public Boolean hasLiveCommitment(DealContext dealContext, DealTranche tranche) {
         StrategyDetail detail = dealContext.getStrategyDetail();

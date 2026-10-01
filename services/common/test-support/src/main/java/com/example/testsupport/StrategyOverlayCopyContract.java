@@ -39,15 +39,19 @@ import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Кейсы навеса дерева стратегии: группы `U4`, `U5`, `U6` и `U10.1`, `U10.2`
- * документа `.claude/tests/cases/jsonb-overlay-roundtrip.md`.
+ * Кейсы навеса дерева стратегии: группы `U4`, `U5`, `U6` и клетки `U10.1`,
+ * `U10.2`, `U11.7`, `U13.2` документа
+ * `.claude/tests/cases/jsonb-overlay-roundtrip.md`.
  *
  * <p><b>Ожидание объявлено один раз и прогоняется каждым деревом своей
  * копии.</b> `StrategyJsonConverter` живёт двумя экземплярами —
@@ -63,12 +67,63 @@ import org.junit.jupiter.api.Test;
  * навеса нет ни одного — наследуемый {@code equals} сравнивает ссылки, — а
  * сравнение строк слепо к полю, потерянному на записи: его нет в обеих
  * строках (§«Новая ось формы: выход кейса — ТОЖДЕСТВО пары»).
+ *
+ * <p><b>Состав ключей строки пинится СЛОВОМ</b> (`U13.2`): перечни ниже
+ * записаны литералами, а не выведены из класса формы — выведенный перечень
+ * уехал бы вместе с переименованием аксессора, и проба осталась бы зелёной
+ * (docs/rules/persistence-representation.md §«Состав ключей строки
+ * навеса»). Перечни параметров индикатора и структуры рынка открыты: те же
+ * формы пишет конвертер параметров вычисления (`U13.5`), и у формы один
+ * носитель перечня.
  */
 public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
 
     /** Имена, под которыми тег подтипа мог бы поехать в payload. */
     private static final List<String> SUBTYPE_TAG_NAMES =
             List.of("@class", "@type", "type", "indicatorType", "paramsType");
+
+    /**
+     * Ключи строки у каждого подтипа параметров индикатора, собранного всеми
+     * полями (`U13.2`, `U13.5`). Ключ карты — подтип, значение — слова строки.
+     */
+    public static final Map<Class<? extends IndicatorParams>, List<String>> INDICATOR_PARAMS_KEYS =
+            Map.of(
+                    AtrParams.class, List.of("timeframe", "warmup", "period"),
+                    EmaParams.class, List.of("timeframe", "warmup", "period"),
+                    RsiParams.class, List.of("timeframe", "warmup", "period"),
+                    MacdParams.class,
+                    List.of("timeframe", "warmup", "fastPeriod", "slowPeriod", "signalPeriod"),
+                    StochasticParams.class,
+                    List.of("timeframe", "warmup", "kPeriod", "dPeriod", "smoothPeriod"),
+                    BollingerBandsParams.class,
+                    List.of("timeframe", "warmup", "period", "deviationMultiplier"),
+                    ObvParams.class, List.of("timeframe", "warmup", "enabled"),
+                    EfficiencyRatioParams.class, List.of("timeframe", "warmup", "period"));
+
+    /** Ключи строки параметров структуры рынка, собранных всеми полями (`U13.2`, `U13.5`). */
+    public static final List<String> MARKET_STRUCTURE_PARAMS_KEYS = List.of(
+            "lookbackBars",
+            "minTouches",
+            "minRangeWidthPercents",
+            "maxRangeWidthPercents",
+            "breakoutBufferPercents",
+            "breakoutConfirmationBars",
+            "swingLookbackBars",
+            "trendEfficiencyThreshold",
+            "levelToleranceAtrMultiplier");
+
+    /** Ключи правила условия, собранного всеми полями (`U13.2`). */
+    private static final List<String> CONDITION_RULE_KEYS = List.of(
+            "level", "ruleType", "percents", "timeframe", "operator", "leftOperand", "rightOperand");
+
+    /** Ключи операнда правила, собранного всеми полями (`U13.2`). */
+    private static final List<String> CONDITION_OPERAND_KEYS = List.of(
+            "sourceType", "indicatorKey", "indicatorComponent", "structureKey", "priceSource",
+            "valueType", "value");
+
+    /** Ключи настройки стопа, собранной всеми полями (`U13.2`). */
+    private static final List<String> STOP_LOSS_SETTINGS_KEYS = List.of(
+            "calculationType", "distancePercents", "triggerPriceType", "indicatorKey", "structureKey");
 
     // --- порты к своей копии конвертера ---------------------------------
 
@@ -117,6 +172,13 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
      * политику включения конструктор ставит безусловно.
      */
     protected abstract String writePlacementOn(ObjectMapper source, StrategyPricePlacement placement);
+
+    /**
+     * Чтение той же копией, собранной на ЧУЖОМ маппере: клетка `U11.7`
+     * мерит, что терпимость к неизвестному свойству конструктор ставит
+     * безусловно.
+     */
+    protected abstract StrategyPricePlacement readPlacementOn(ObjectMapper source, String json);
 
     // --- U4: дискриминатор у владельца и закрытый перечень подтипов ------
 
@@ -372,7 +434,105 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
                 .hasMessageContaining("SUPERTREND");
     }
 
+    // --- U11.7: терпимость к неизвестному свойству пинит конвертер -------
+
+    @Test
+    @DisplayName("U11.7 — на строгом источнике лишний ключ своей строки отброшен, прочее тождественно")
+    protected void u11_7_onAStrictSourceAnUnknownKeyOfTheOwnRowIsDropped() {
+        ObjectMapper strict = beanAssemblyMapper()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        StrategyPricePlacement placement = placement();
+        String withUnknown = writePlacement(placement)
+                .replaceFirst("\\{", "{\"offsetTicks\":3,");
+
+        assertThat(readPlacementOn(strict, withUnknown))
+                .as("U11.7: вход %s, источник строгий — терпимость запинена конвертером", withUnknown)
+                .usingRecursiveComparison().isEqualTo(placement);
+    }
+
+    // --- U13.2: состав ключей строки — литеральным перечнем -------------
+
+    @Test
+    @DisplayName("U13.2 — каждая форма дерева стратегии: ключи на каждом уровне равны литеральному перечню")
+    protected void u13_2_everyStrategyTreeFormWritesExactlyTheLiteralKeysOnEveryLevel() {
+        for (IndicatorParams params : indicatorParamsOfEverySubtype()) {
+            assertThat(keysOf(writeIndicatorParams(params)))
+                    .as("U13.2: подтип %s", params.getClass().getSimpleName())
+                    .containsExactlyInAnyOrderElementsOf(INDICATOR_PARAMS_KEYS.get(params.getClass()));
+        }
+        assertThat(keysOf(writeMarketStructureParams(marketStructureParamsWithEveryField())))
+                .as("U13.2: параметры структуры рынка")
+                .containsExactlyInAnyOrderElementsOf(MARKET_STRUCTURE_PARAMS_KEYS);
+
+        JsonNode phaseRule = readTree(writePhaseRules(List.of(
+                new StrategyMarketPhaseRule(MarketPhase.Type.RANGE, conditionWithEveryField())))).get(0);
+        assertThat(keysOf(phaseRule.toString()))
+                .as("U13.2: клауза фазы")
+                .containsExactlyInAnyOrder("type", "condition");
+        assertThat(keysOf(phaseRule.get("condition").toString()))
+                .as("U13.2: условие внутри клаузы фазы")
+                .containsExactlyInAnyOrder("rules");
+
+        String condition = writeCondition(conditionWithEveryField());
+        JsonNode rule = readTree(condition).get("rules").get(0);
+        assertThat(keysOf(condition)).as("U13.2: условие").containsExactlyInAnyOrder("rules");
+        assertThat(keysOf(rule.toString()))
+                .as("U13.2: правило условия")
+                .containsExactlyInAnyOrderElementsOf(CONDITION_RULE_KEYS);
+        assertThat(keysOf(rule.get("leftOperand").toString()))
+                .as("U13.2: левый операнд")
+                .containsExactlyInAnyOrderElementsOf(CONDITION_OPERAND_KEYS);
+        assertThat(keysOf(rule.get("rightOperand").toString()))
+                .as("U13.2: правый операнд")
+                .containsExactlyInAnyOrderElementsOf(CONDITION_OPERAND_KEYS);
+
+        assertThat(keysOf(writeExpiredSetting(new StrategyMarketDataExpiredSetting(
+                MarketDataExpiredAction.WAIT, MarketDataExpiredAction.KILL_SWITCH))))
+                .as("U13.2: настройка устаревания")
+                .containsExactlyInAnyOrder("protectedPositionAction", "unprotectedPositionAction");
+        assertThat(keysOf(writePlacement(placement())))
+                .as("U13.2: размещение цены")
+                .containsExactlyInAnyOrder("baseType", "priceSource", "structureKey", "offsetSide",
+                        "percents");
+
+        String attached = writeAttachedProtection(attachedProtection());
+        assertThat(keysOf(attached))
+                .as("U13.2: встроенная защита")
+                .containsExactlyInAnyOrder("attachedType", "stopLossSettings");
+        assertThat(keysOf(readTree(attached).get("stopLossSettings").toString()))
+                .as("U13.2: стоп внутри встроенной защиты")
+                .containsExactlyInAnyOrderElementsOf(STOP_LOSS_SETTINGS_KEYS);
+        assertThat(keysOf(writeStopLossSettings(stopLossSettings())))
+                .as("U13.2: стоп")
+                .containsExactlyInAnyOrderElementsOf(STOP_LOSS_SETTINGS_KEYS);
+        assertThat(keysOf(writeTrailingSettings(trailingSettings())))
+                .as("U13.2: трейлинг")
+                .containsExactlyInAnyOrder("activationProfitPercents", "callbackPercents",
+                        "activationBufferPercents");
+    }
+
     // --- материал кейсов ---------------------------------------------------
+
+    /**
+     * Восемь подтипов параметров индикатора, каждый собран ВСЕМИ полями.
+     * Открыт ради `U13.5`: те же формы пишет конвертер параметров вычисления.
+     */
+    public static List<IndicatorParams> indicatorParamsOfEverySubtype() {
+        return List.of(atrParams(), emaParams(), rsiParams(), macdParams(), stochasticParams(),
+                bollingerParams(), obvParams(), efficiencyRatioParams());
+    }
+
+    /** Параметры структуры рынка со ВСЕМИ полями; открыт ради `U13.5`. */
+    public static MarketStructureParams marketStructureParamsWithEveryField() {
+        MarketStructureParams params = marketStructureParams();
+        params.setMaxRangeWidthPercents(new BigDecimal("4.0"));
+        params.setBreakoutBufferPercents(new BigDecimal("0.1"));
+        params.setBreakoutConfirmationBars(2);
+        params.setSwingLookbackBars(8);
+        params.setTrendEfficiencyThreshold(new BigDecimal("0.35"));
+        params.setLevelToleranceAtrMultiplier(new BigDecimal("0.25"));
+        return params;
+    }
 
     /** Строка `U10.1`: объявлена один раз и сверяется каждой копией. */
     private static final String CONDITION_JSON =
@@ -496,6 +656,32 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
         second.setRightOperand(constant);
 
         return new StrategyCondition(List.of(first, second));
+    }
+
+    /** Условие из одного правила, у которого заполнено каждое поле, включая оба операнда. */
+    private static StrategyCondition conditionWithEveryField() {
+        StrategyConditionRule rule = new StrategyConditionRule();
+        rule.setLevel(1);
+        rule.setRuleType(StrategyConditionRuleType.INDICATOR_COMPARE);
+        rule.setPercents(new BigDecimal("0.5"));
+        rule.setTimeframe(TimeFrame.ONE_HOUR);
+        rule.setOperator(StrategyConditionOperator.GT);
+        rule.setLeftOperand(operandWithEveryField());
+        rule.setRightOperand(operandWithEveryField());
+        return new StrategyCondition(List.of(rule));
+    }
+
+    /** Операнд, у которого заполнено каждое поле формы — сочетание ради состава, а не смысла. */
+    private static StrategyConditionOperand operandWithEveryField() {
+        StrategyConditionOperand operand = new StrategyConditionOperand();
+        operand.setSourceType(StrategyConditionSourceType.INDICATOR);
+        operand.setIndicatorKey("ema_fast");
+        operand.setIndicatorComponent(IndicatorComponent.MIDDLE_BAND);
+        operand.setStructureKey("range_main");
+        operand.setPriceSource(StrategyPriceSource.LAST_PRICE);
+        operand.setValueType(ConstantValueType.NUMBER);
+        operand.setValue("42");
+        return operand;
     }
 
     private static List<StrategyMarketPhaseRule> phaseRules() {

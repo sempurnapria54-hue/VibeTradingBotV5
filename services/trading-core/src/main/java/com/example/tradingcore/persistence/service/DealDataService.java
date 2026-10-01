@@ -299,7 +299,8 @@ public class DealDataService {
      *
      * <p>Читатель — обход проактивной детекции: он задаёт вопрос по
      * каждому инструменту контура, и пачка избавляет его от чтения на
-     * итерацию (.claude/rules/codestyle.md §«Выборка данных»).
+     * итерацию (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность
+     * ради одного поля»).
      */
     @Transactional(readOnly = true)
     public Set<Long> findInstrumentIdsWithActiveDeal(Long exchangeAccountId) {

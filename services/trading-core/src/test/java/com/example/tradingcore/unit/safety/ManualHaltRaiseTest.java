@@ -15,11 +15,14 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.ManualHaltClass;
 import com.example.tradingcore.domain.safety.ManualHaltService;
 import com.example.tradingcore.util.Constants;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -259,6 +262,28 @@ class ManualHaltRaiseTest {
         assertThat(raisedSignal())
                 .isEqualTo(HoldSignal.exchangeAccount(Constants.Hold.MANUAL_HALT_REQUESTED));
         verify(harness.coordinator, never()).react(any(), any(), any());
+    }
+
+    /**
+     * Предикат доведения — тот же, что у предусловия снятия, со вторым его
+     * носителем: у отказа снятия по живой позиции вне графа сделок выход
+     * тот же, что у отказа по сделке, — повторный полный вызов держателя.
+     * Без этого ступень, отвергнутая срезом позиций, осталась бы без выхода.
+     */
+    @Test
+    @DisplayName("U12.19 — полный класс, жёсткая ступень стои́т, сделок нет, в срезе живая позиция: доведение")
+    void u12_19_aLivePositionOutsideTheDealGraphGrantsTheRetryRight() {
+        harness.instrumentStands(Instrument.SafetyRung.TRADE_BLOCKED, Instrument.Status.ACTIVE);
+        Position live = new Position();
+        live.setExternalInstrumentId(SafetyFixture.INSTRUMENT_EXTERNAL_ID);
+        live.setExternalSize(BigDecimal.ONE);
+        when(harness.slices.livePositions(any(), any())).thenReturn(new ArrayList<>(List.of(live)));
+
+        harness.manualHalt.raise(ManualHaltClass.FULL, ACCOUNT_INTERNAL_ID, INSTRUMENT_INTERNAL_ID);
+
+        verify(harness.coordinator).react(
+                eq(HoldSignal.instrument(Constants.Hold.MANUAL_HALT_REQUESTED)), any(), eq(true));
+        verify(harness.holdService, never()).raiseManual(any(), any());
     }
 
     /** Одна сделка радиуса риска не доказала — предусловие не выполнено. */

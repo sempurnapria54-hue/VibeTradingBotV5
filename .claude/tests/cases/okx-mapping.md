@@ -14,8 +14,9 @@
 §«Новая ось формы: вход бывает текстом провода».
 
 Предмет — четыре пакета коннектора: `mapping` (тринадцать файлов —
-двенадцать мапперов и конвертер границы), `snapshot` (двадцать граничных
-форм, считая три узла дерева условия и уровень книги), `resolve` (три
+двенадцать мапперов и конвертер границы), `snapshot` (двадцать одна
+граничная форма, считая три узла дерева условия, уровень книги и
+позиционный тир), `resolve` (три
 резолвера), `util` (разбор сырых строк и словарь площадки) плюс **формы
 источника** `integration.external.api.model.okx` — их разбор из текста и
 сборка в текст. Счёт воспроизводим:
@@ -35,9 +36,9 @@ for d in mapping snapshot resolve util; do echo -n "$d "; ls $d/*.java | wc -l; 
 | `PositionMapper` | снапшот живой позиции, снапшот записи закрытия, доменная позиция, наполнение эпизода положением закрытия | `docs/models/mapping/Position.md`, `docs/models/mapping/PositionCloseResult.md` |
 | `CandleMapper` | снапшот свечи из позиционного массива, доменная свеча | `docs/models/mapping/Candle.md` |
 | `InstrumentMapper` | снапшот инструмента, обновление доменного инструмента из снапшота | `docs/models/mapping/Instrument.md` |
-| `InstrumentExternalRulesMapper` | снапшот правил и резолв трёх перечней при материализации | `docs/models/mapping/InstrumentExternalRules.md` |
+| `InstrumentExternalRulesMapper` | снапшот правил **из двух форм источника** — спецификации и позиционных тиров семьи, — резолв трёх перечней и разбор тиров при материализации | `docs/models/mapping/InstrumentExternalRules.md` |
 | `TradeFeeRateMapper` | снапшот на группу со снятым знаком ставки, доменная ставка | `docs/models/mapping/TradeFeeRate.md` |
-| `BalanceContainerMapper` | двухуровневый снапшот баланса, доменный контейнер | `docs/models/mapping/Balance.md` |
+| `BalanceContainerMapper` | двухуровневый снапшот баланса **из двух форм источника** — баланса и конфигурации счёта, доменный контейнер | `docs/models/mapping/Balance.md` |
 | `DealCashFlowMapper` | снапшот движения средств, доменное движение | `docs/models/mapping/DealCashFlow.md` |
 | `MarketPriceDataMapper` | снапшот цены тикера, доменная цена | `docs/models/mapping/MarketPriceData.md` |
 | `MarketSnapshotMapper` | снапшоты рыночных срезов: тикер, книга с позиционными уровнями, марк- и индексная цена | `docs/models/domain/other/MarketTicker.md`, `docs/models/domain/other/MarketOrderBook.md` |
@@ -419,7 +420,10 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 **значение** и **отказ** (поле есть, значение неизвестно). Второй и
 третий у разных полей решены по-разному, и различие названо, а не
 случилось: у стороны заявки неизвестное значение **отказывает**, у
-ценовой базы триггера — **даёт пустоту**.
+ценовой базы триггера — **даёт пустоту**. У режимов счёта и позиций —
+тоже пустоту, и довод свой: пустой режим преконтроль читает выходом из
+контура (`docs/spec/risk-limits.json`, величина `accountModeOutOfContour`),
+то есть незнакомое значение запрещает вход, не требуя отказа на границе.
 
 | Метка | Вход | Ожидаемый выход — весь | Чем подтверждается | Факт |
 |---|---|---|---|---|
@@ -449,6 +453,13 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 | `U6.24` | `ackSuccess("0")` | истина | javadoc `OkxConstants.SUCCESS_CODE` |  зелено 2026-09-19 |
 | `U6.25` | `ackSuccess("51008")` | ложь | `docs/rules/ack-not-runtime-truth.md` |  зелено 2026-09-19 |
 | `U6.26` | `ackSuccess("")` / `ackSuccess(null)` | ложь: пустой код успехом не считается — направление консервативное | там же |  зелено 2026-09-19 |
+| `U6.27` | `accountMode("1")` / `("2")` / `("3")` / `("4")` | `SPOT` / `FUTURES` / `MULTI_CURRENCY_MARGIN` / `PORTFOLIO_MARGIN` — **четыре** значения, и словарь обходится целиком: преконтроль сравнивает режим счёта с режимом контура | `docs/models/mapping/Balance.md` §«`AccountConfigOkxResponse` → snapshot» | зелено 2026-10-01 — заход 258 |
+| `U6.28` | `accountMode(" 2 ")` | `FUTURES`: обрамляющие пробелы снимаются | реализация `OkxResponseConverter.accountMode` | зелено 2026-10-01 — заход 258 |
+| `U6.29` | `accountMode("0")` / `("5")` / `("futures")` / `("2.0")` | пустота, **не отказ и не ближайший режим**: угаданного режима нет, а пустоту преконтроль читает выходом из контура | `docs/models/mapping/Balance.md` («иное либо пусто — пусто»); `docs/spec/risk-limits.json`, величина `accountModeOutOfContour` | зелено 2026-10-01 — заход 258 |
+| `U6.30` | `accountMode(null)` / `("")` / `("  ")` | пустота — тот же исход у отсутствующего, пустого и пробельного | там же | зелено 2026-10-01 — заход 258 |
+| `U6.31` | `positionMode("net_mode")` / `("long_short_mode")` | `NET` / `LONG_SHORT` — оба значения словаря | `docs/models/mapping/Balance.md` §«`AccountConfigOkxResponse` → snapshot» | зелено 2026-10-01 — заход 258 |
+| `U6.32` | `positionMode("net")` / `("NET_MODE")` / `("hedge_mode")` | пустота: сравнение точное после снятия пробелов — **регистр не подбирается**, и усечённое имя в словарь не попадает; незнакомое значение оставляет след в логе | реализация `OkxResponseConverter.positionMode` | зелено 2026-10-01 — заход 258 |
+| `U6.33` | `positionMode(null)` / `("")` | пустота | `docs/models/mapping/Balance.md` («иное либо пусто — пусто») | зелено 2026-10-01 — заход 258 |
 
 ## U7 — Заявка площадки → граничный снапшот
 
@@ -654,7 +665,7 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 
 ## U14 — Инструмент → граничный снапшот
 
-**Базовая сборка.** `InstrumentOkxResponse` со всеми девятнадцатью полями
+**Базовая сборка.** `InstrumentOkxResponse` со всеми двадцатью полями
 худой формы источника непустыми.
 
 **Дом группы** — `docs/models/mapping/Instrument.md`
@@ -676,7 +687,10 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 
 **Базовая сборка.** Тот же `InstrumentOkxResponse`; второй переход —
 материализация `InstrumentExternalRules` из снапшота, с ключом навеса и
-без него.
+без него. Первый переход принимает **вторую форму источника** — перечень
+позиционных тиров семьи (`PositionTierOkxResponse`); базовая сборка подаёт
+его пустотой, а кейсы тиров — строками `positionTier(tier, minSz, maxSz,
+mmr)` той же семьи `ETH-USDT`.
 
 **Дом группы** — `docs/models/mapping/InstrumentExternalRules.md`
 §«`InstrumentOkxResponse` → snapshot» и §«Резолв enum'ов при
@@ -692,7 +706,7 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 |---|---|---|---|---|
 | `U15.1` | базовая сборка | пятнадцать `external*`-строк перенесены 1:1, включая `externalFeeGroupId` = `groupId` и `externalState` = `state`; **ни один перечень не резолвится** | `docs/models/mapping/InstrumentExternalRules.md` §«`InstrumentOkxResponse` → snapshot» |  зелено 2026-09-19 |
 | `U15.2` | базовая сборка | три валюты в снапшот правил **не входят** — их дом инструмент | там же («**Валюты… навесом не маппятся**») |  зелено 2026-09-19 |
-| `U15.3` | базовая сборка | `ctMult`, `instFamily`, `uly`, `listTime`, `expTime` и прочие поля площадки в снапшот не входят — их нет и в форме источника | там же §«Не маппимые поля OKX» |  зелено 2026-09-19 |
+| `U15.3` | базовая сборка | `ctMult`, `instFamily`, `uly`, `listTime`, `expTime` и прочие поля площадки в снапшот не входят. `instFamily` в форме источника есть — он операнд запроса позиционных тиров, — но в снапшот и навес не переносится; прочих нет и в форме источника | там же §«Не маппимые поля OKX» |  зелено 2026-09-19 |
 | `U15.4` | снапшот с `externalInstrumentType` = `"SWAP"`, ключ навеса `42` | `instrumentType` = `SWAP`, `instrumentId` = `42`, прочие `external*` перенесены по имени | там же §«Резолв enum'ов при материализации (`snapshotToDomain`)» |  зелено 2026-09-19 |
 | `U15.5` | `externalInstrumentType` = `"swap"` | `SWAP`: регистр подбирается | реализация `resolveInstrumentType` |  зелено 2026-09-19 |
 | `U15.6` | `externalInstrumentType` = `" FUTURES "` | `FUTURES`: обрамляющие пробелы снимаются | там же |  зелено 2026-09-19 |
@@ -704,6 +718,10 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 | `U15.12` | `externalState` = `"delisted"` | `UNKNOWN`. Кейс несущий: `UNKNOWN` **не равен** «торгуется», и преконтроль обязан читать его запрещающе | `docs/models/domain/other/InstrumentExternalRules.md`; `.claude/tests/cases/trading-core-risk.md` §«U2 — Торговые ограничения инструмента» |  зелено 2026-09-19 |
 | `U15.13` | материализация **без** ключа навеса | `instrumentId` — пустота, прочее как в `U15.4`: числовой ключ базы границу сервиса не переходит, его ставит владелец | javadoc `InstrumentExternalRulesMapper.snapshotToDomain`; `docs/architecture/data-ownership.md` |  зелено 2026-09-19 |
 | `U15.14` | пустота вместо снапшота — порознь у формы **без** ключа и у формы **с** непустым ключом | без ключа — пустота на выходе (форма делегирует вызов с двумя пустыми источниками); с непустым ключом — объект, у которого заполнен **только** `instrumentId`, а доменные проекции пусты: охрана конъюнктивна | `Z1`; реализация `InstrumentExternalRulesMapper.snapshotToDomain(snapshot)` (делегирует с пустым ключом) |  зелено 2026-09-19 |
+| `U15.15` | базовая сборка плюс два тира: `(1, "0", "1000", "0.004")` и `(2, "1000", "5000", "0.006")` | `externalPositionTiers` — два снапшота тира **в порядке ответа**, у второго `externalMinSize` = `"1000"`, `externalMaxSize` = `"5000"`, `externalMaintenanceMarginRate` = `"0.006"` — **строками**, как прочие числа правил; прочие поля снапшота не тронуты (`externalTickSize` = `"0.01"`) | `docs/models/mapping/InstrumentExternalRules.md` §«`PositionTierOkxResponse` → snapshot» | зелено 2026-10-01 — заход 258 |
+| `U15.16` | материализация снапшота с одним тиром `("0", "1000", "0.004")` | `positionTiers` — один доменный тир: `minSize` = 0, `maxSize` = 1000, `maintenanceMarginRate` = 0.004 — **числами**: разбор идёт на материализации, как у прочих чисел правил | там же (таблица, колонка «Домен») | зелено 2026-10-01 — заход 258 |
+| `U15.17` | базовая сборка без тиров → материализация с ключом `42` | `positionTiers` — **пустота, а не пустой перечень**: «не прочли» и «нет» оценке ликвидации неразличимы и обе значат «не измерено»; прочие поля правил на месте | там же («Пустой ответ — пустые тиры, а не пустой перечень») | зелено 2026-10-01 — заход 258 |
+| `U15.18` | тир с `externalMaintenanceMarginRate` = `"n/a"` → материализация с ключом `42` | `NumberFormatException` — наследник `IllegalArgumentException`, то есть класс, который ловит родовая сеть разбора шлюза (`OkxExchangeGateway#parsed`) и переводит в нарушение инварианта контракта | там же («Число, не разобравшееся при материализации, — то же нарушение»); `docs/rules/controlled-exchange-exceptions.md` | зелено 2026-10-01 — заход 258 |
 
 ## U16 — Ставка комиссии → снапшот группы: знак, время, перечень
 
@@ -743,10 +761,13 @@ taker: "-0.0005", maker: "-0.0002"}`. Переход принимает **отв
 
 **Базовая сборка.** `BalanceOkxResponse` с `uTime`, `totalEq`, `adjEq`,
 `availEq` и списком `details` из одной валютной записи (`ccy` = `"USDT"`,
-`uTime`, `eq`, `cashBal`, `availBal`, `frozenBal`).
+`uTime`, `eq`, `cashBal`, `availBal`, `frozenBal`). Переход принимает
+**вторую форму источника** — конфигурацию счёта `AccountConfigOkxResponse`
+с `acctLv` = `"2"` и `posMode` = `"net_mode"`.
 
 **Дом группы** — `docs/models/mapping/Balance.md`
-§«`BalanceOkxResponse` → snapshot».
+§«`BalanceOkxResponse` → snapshot» и §«`AccountConfigOkxResponse` →
+snapshot».
 
 **Числа остаются строками — и в снапшоте, и на уровне валюты.** Перевод
 в числа происходит **на следующем переходе**, при сборке доменного
@@ -764,6 +785,8 @@ taker: "-0.0005", maker: "-0.0002"}`. Переход принимает **отв
 | `U17.7` | `totalEq` = `""` | `externalTotalEquity` — пустая **строка**, а не пустота: перевода здесь нет вовсе, и пустота появится на следующем переходе | §«Currency-level → `BalanceExternalSnapshot`» («Числовые поля в snapshot остаются строками») |  зелено 2026-09-19 |
 | `U17.8` | базовая сборка | поля счёта у снапшота **нет вовсе** — снимок его не несёт по построению; у доменного контейнера поле есть, и там оно остаётся пустым (`U21.15`): счёт коннектор не знает, его проставляет ядро, приземляя снимок | javadoc `BalanceContainerExternalSnapshot` («Счёта снимок не несёт»); javadoc `BalanceContainerMapper` |  зелено 2026-09-19 |
 | `U17.9` | пустота вместо формы источника | пустота на выходе у обоих уровней | конвенция MapStruct |  зелено 2026-09-19 |
+| `U17.10` | базовая сборка | `externalAccountLevel` = `"2"`, `externalPositionMode` = `"net_mode"` — режимы едут **сырыми строками**, перевода здесь нет: словарь переводит следующий переход (`U6.27`–`U6.33`) | `docs/models/mapping/Balance.md` §«`AccountConfigOkxResponse` → snapshot» | зелено 2026-10-01 — заход 258 |
+| `U17.11` | баланс базовой сборки, конфигурация — пустота | режимы — пустота, а средства заполнены: `externalTotalEquity` = `"1000"`, `balances` — один валютный снапшот. Две формы источника **независимы**: пустота одной не гасит другую | там же; `Z1` | зелено 2026-10-01 — заход 258 |
 
 ## U18 — Движение средств → граничный снапшот
 
@@ -1004,7 +1027,7 @@ taker: "-0.0005", maker: "-0.0002"}`. Переход принимает **отв
 | `U25.13` | `condition` = пустота | все ноги и оба флага пусты; отказа нет | реализация `hasStopLoss` / `hasTakeProfit` |  зелено 2026-09-19 |
 | `U25.14` | `condition.trigger` = пустота | то же | там же |  зелено 2026-09-19 |
 | `U25.15` | трейлинг процентами: `trailingPercents` = `0.5`, `activationPrice.value` = `110` | `callbackRatio` = `"0.005"` — **доля площадки** (`0.01` = 1%), а не проценты домена; `activePx` = `"110"`, `callbackSpread` — пустота | §«OKX request mapping — дополнения» |  зелено 2026-09-23 |
-| `U25.16` | трейлинг абсолютным шагом: `trailingStepValue` = `2` | `callbackSpread` = `"2"`, `callbackRatio` — пустота | там же; `.claude/work/backlog.md` §«Трейлинг абсолютным откатом объявляем, а величины отката у объявления нет» |  зелено 2026-09-19 |
+| `U25.16` | трейлинг абсолютным шагом: `trailingStepValue` = `2` | `callbackSpread` = `"2"`, `callbackRatio` — пустота | там же; `docs/rules/strategy-validation.md` (трейлинг абсолютным откатом создание не объявляет); отказ создания построен — группа U38 `.claude/tests/cases/strategy-definition-validation.md` |  зелено 2026-09-19 |
 | `U25.17` | `direction` = `SELL` | `side` = `"sell"` | `U6.10` |  зелено 2026-09-19 |
 | `U25.18` | `direction` = пустота | `side` — пустота | `U6.11` |  зелено 2026-09-19 |
 | `U25.19` | базовая сборка | доля закрытия в запрос не уходит — поля у формы нет: размер считает расчётный слой | `docs/models/mapping/AlgoOrder.md` §«`Domain AlgoOrder → request`» («`closeFraction` … на первом этапе не используется») |  зелено 2026-09-19 |

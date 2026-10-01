@@ -73,9 +73,10 @@ class DerivativesBoxTest extends SharedMarketDataBox {
         // уводит группу в проверку, а из BACKFILL расчёт группу не берёт.
         requireCandles(instrument, HOUR, 5L);
         // Ровно столько баров, сколько нужно на разгон плюс три: у RSI с
-        // периодом 14 разгон по умолчанию — два периода.
+        // периодом 14 выведенный прогрев — три периода, 42 бара
+        // (docs/spec/indicator-calculation.json, величина `derivedWarmup`).
         connector.answers(ConnectorStub.HISTORY_CANDLES,
-                Feed.candles(barsAgo(HOUR_MILLIS, 40), HOUR_MILLIS, 31, 50000));
+                Feed.candles(barsAgo(HOUR_MILLIS, 54), HOUR_MILLIS, 45, 50000));
         tick(Tick.CANDLES);
         tick(Tick.CANDLES);
         requireIndicator("RSI", HOUR, "{\"period\": 14}");

@@ -37,7 +37,10 @@ spec:
       serviceAccountName: connector-okx
       containers:
         - name: connector-okx
-          image: registry.invalid/vibetrading/connector-okx
+          # Метка `unpromoted` — зарезервированная: сервис, чей тег в
+          # окружение не продвинут, не разворачивается
+          # (docs/architecture/platform.md §Развёртывание).
+          image: registry.invalid/vibetrading/connector-okx:unpromoted
           # Тег неизменяем (docs/architecture/platform.md §Развёртывание),
           # поэтому образ, уже лежащий на узле, — тот самый: ходить за ним
           # в реестр незачем. Умолчание здесь опасно ещё и тем, что при
@@ -53,8 +56,20 @@ spec:
                 configMapKeyRef:
                   name: environment-axes
                   key: environment
+            # Провайдер идентичности. Издатель токена — имя хоста окружения
+            # (значение приезжает осью окружения, поэтому манифест одинаков
+            # во всех трёх), ключи подписи — внутренний адрес провайдера:
+            # наружу за ключами сервис не ходит (docs/architecture/platform.md
+            # §Безопасность).
+            - name: PLATFORM_INGRESS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: ingressHost
             - name: OIDC_ISSUER_URI
-              value: http://platform-identity-service:8080/realms/vibetrading
+              value: https://$(PLATFORM_INGRESS_HOST)/realms/vibetrading
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI
+              value: http://platform-identity-service:8080/realms/vibetrading/protocol/openid-connect/certs
             - name: VAULT_URI
               value: http://vault.vault-system.svc:8200
             - name: VAULT_ROLE

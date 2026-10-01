@@ -82,6 +82,12 @@ abstract class LiveDealBox extends TradingCoreBox {
     /** Состояние сценария защиты после исполненного снятия. */
     private static final String CANCELED = "canceled";
 
+    /** Состояние сценария входа после отказа разбора статуса: нога помечена, на площадке жива. */
+    private static final String FLAGGED = "flagged";
+
+    /** Класс отказа коннектора «статус площадки не разобран». */
+    protected static final String EXTERNAL_STATUS = "EXTERNAL_STATUS";
+
     /** Жёсткая ступень биржевого счёта. */
     protected static final String TRADE_BLOCKED = "TRADE_BLOCKED";
 
@@ -245,6 +251,24 @@ abstract class LiveDealBox extends TradingCoreBox {
         assertThat(new BigDecimal(String.valueOf(rows.all("positions").getFirst().get("external_size"))))
                 .isEqualByComparingTo(filled);
         PeerStub.all().forEach(PeerStub::forgetRequests);
+    }
+
+    /**
+     * Помечает входную ногу частично налитой сделки ошибкой ТРОПОЙ ЯЩИКА:
+     * ближайшая добыча ноги получает отказ разбора статуса (слово площадки
+     * вне словаря), а после него площадка отдаёт ногу живой — пока её не
+     * снимет команда отмены, переключающая тот же сценарий в снятую
+     * ({@link #openPartiallyFilledDeal}).
+     *
+     * <p><b>Ставится ПОСЛЕ</b>
+     * {@link #standExchangeFollowingCommands(String, String, String)}: тот
+     * сбрасывает сценарии стаба, и однократный отказ ушёл бы вместе с ними.
+     */
+    protected void standEntryStatusRefusedOnce() {
+        connector.answersInStateAndMoves(ENTRY_SCENARIO, lookupPath(ACCOUNT), PeerStub.INITIAL, 422,
+                Feed.peerFailure(EXTERNAL_STATUS), FLAGGED);
+        connector.answersInState(ENTRY_SCENARIO, lookupPath(ACCOUNT), FLAGGED,
+                partiallyFilledEntry("PARTIALLY_COMPLETED", partialFill()));
     }
 
     /** Налив частично налитого входа: половина размера ноги. */
@@ -843,6 +867,8 @@ abstract class LiveDealBox extends TradingCoreBox {
                   "externalTotalEquity": "100000",
                   "externalAdjustedEquity": "100000",
                   "externalAvailableEquity": "100000",
+                  "accountMode": "FUTURES",
+                  "positionMode": "NET",
                   "balances": [
                     {
                       "externalCurrency": "USDT",

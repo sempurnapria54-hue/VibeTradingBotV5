@@ -18,7 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategy.engine.calc.CalculatedStrategyAction;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.core.balance.AccountMode;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
+import com.example.tradingbot.domain.model.core.balance.PositionMode;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
@@ -34,14 +36,16 @@ import org.junit.jupiter.api.Test;
  * `.claude/tests/cases/trading-core-risk.md` (дом —
  * docs/components/RiskValidator.md §«Проверки средств счёта»; форма —
  * docs/spec/risk-limits.json, величины {@code actRequiredMargin},
- * {@code balanceNotEnoughBlocksAction} и {@code borrowOrDebtDetected}).
+ * {@code balanceNotEnoughBlocksAction}, {@code borrowOrDebtDetected} и
+ * {@code accountModeOutOfContour}).
  *
  * <p><b>Снимок средств собирается настоящими полями</b> — моментом у
  * площадки и остатками строки расчётной валюты; предикаты свежести и
  * выбора строки считаются сами.
  *
  * <p><b>Базовая сборка</b> — U1.1 со свежим снимком: маржа акта при плече
- * 10 равна {@code 3000 / 10 + 0.0005 × 3000 = 301.5}.
+ * 10 равна {@code 3000 / 10 + 0.0005 × 3000 = 301.5}; режим счёта
+ * фьючерсный и позиции нетто — те, что держит контур.
  */
 class AccountFundsTest {
 
@@ -191,6 +195,55 @@ class AccountFundsTest {
 
         assertThat(codes(harness.validate(unpriced, fundedDeal(deal, fresh("1000", "1000", "1000")))))
                 .containsExactly(RiskCheckCode.CALCULATED_ACTION_INVALID, RiskCheckCode.CALCULATED_ACTION_INVALID);
+    }
+
+    @Test
+    @DisplayName("U31.19 — свежий снимок, мультивалютная маржа: режим вне контура — единственный отказ")
+    void u31_19_aMultiCurrencyAccountModeIsOutOfContour() {
+        assertThat(codes(harness.validate(entryAction(),
+                funded(inModes(fresh("1000", "1000", "1000"), AccountMode.MULTI_CURRENCY_MARGIN, PositionMode.NET)))))
+                .containsExactly(RiskCheckCode.ACCOUNT_MODE_OUT_OF_CONTOUR);
+    }
+
+    @Test
+    @DisplayName("U31.20 — свежий снимок, раздельные длинные и короткие позиции: вне контура")
+    void u31_20_aLongShortPositionModeIsOutOfContour() {
+        assertThat(codes(harness.validate(entryAction(),
+                funded(inModes(fresh("1000", "1000", "1000"), AccountMode.FUTURES, PositionMode.LONG_SHORT)))))
+                .containsExactly(RiskCheckCode.ACCOUNT_MODE_OUT_OF_CONTOUR);
+    }
+
+    @Test
+    @DisplayName("U31.21 — свежий снимок режима не несёт: пустая посылка контура выполненной не читается")
+    void u31_21_anUnobservedAccountModeIsOutOfContour() {
+        assertThat(codes(harness.validate(entryAction(),
+                funded(inModes(fresh("1000", "1000", "1000"), null, null)))))
+                .containsExactly(RiskCheckCode.ACCOUNT_MODE_OUT_OF_CONTOUR);
+    }
+
+    @Test
+    @DisplayName("U31.22 — снимок старше толерантности, мультивалютная маржа: режим не меряется")
+    void u31_22_aStaleSnapshotLeavesTheAccountModeUnmeasured() {
+        BalanceContainer stale = inModes(balanceSnapshot(minutesAgo(10), "1000", "1000", "1000"),
+                AccountMode.MULTI_CURRENCY_MARGIN, PositionMode.NET);
+
+        assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), funded(stale)))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("U31.23 — защитное действие, режим вне контура: отказ — область всякое проверяемое действие")
+    void u31_23_anOutOfContourAccountModeRejectsAProtectiveActToo() {
+        assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()),
+                funded(inModes(fresh("1000", "1000", "1000"), AccountMode.PORTFOLIO_MARGIN, PositionMode.NET)))))
+                .containsExactly(RiskCheckCode.ACCOUNT_MODE_OUT_OF_CONTOUR);
+    }
+
+    /** Тот же снимок с названными режимом счёта и режимом позиций; пусто — снимок режима не несёт. */
+    private static BalanceContainer inModes(BalanceContainer snapshot, AccountMode accountMode,
+                                            PositionMode positionMode) {
+        snapshot.setAccountMode(accountMode);
+        snapshot.setPositionMode(positionMode);
+        return snapshot;
     }
 
     /** Свежий снимок: обновлён площадкой только что. */

@@ -36,7 +36,9 @@ public interface AlgoOrderMapper {
      * <p>Не переносятся: наш клиентский идентификатор и связи строки, наше
      * дерево условия (площадка отдаёт эхо своих полей, а не нашу
      * декларацию), статус и причина закрытия — их назначает исполнитель
-     * доменным переходом (docs/rules/external-status-resolution.md).
+     * доменным переходом (docs/rules/external-status-resolution.md);
+     * наблюдённая живость — её пишет исполнитель по итогу всего цикла
+     * добычи, а не по одной записи (docs/components/RefreshAlgoOrderExecutor.md).
      */
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
@@ -44,5 +46,6 @@ public interface AlgoOrderMapper {
     @Mapping(target = "condition", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "closeReason", ignore = true)
+    @Mapping(target = "externalLive", ignore = true)
     void updateFromFetched(AlgoOrder fetched, @MappingTarget AlgoOrder algoOrder);
 }

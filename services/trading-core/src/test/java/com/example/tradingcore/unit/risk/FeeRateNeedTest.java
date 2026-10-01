@@ -93,6 +93,21 @@ class FeeRateNeedTest {
         assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), workingContext()))).isEmpty();
     }
 
+    /**
+     * Активная строка без размера живым эпизодом не является: второй
+     * конъюнкт живого эпизода ложен, живое слагаемое равно нулю по
+     * построению, и ставка ему не нужна (docs/spec/protection-coverage.json,
+     * {@code hasLiveEpisode}).
+     */
+    @Test
+    @DisplayName("U3.8 — уровня нет; строка эпизода активна, внешний размер ноль: отказа нет вовсе")
+    void u3_8_anActiveRowWithoutSizeDoesNotNeedTheRate() {
+        Deal deal = emptyDeal();
+        deal.setPositions(List.of(episode("0", ANCHOR)));
+
+        assertThat(codes(harness.validate(weakeningAction(), context(deal)))).isEmpty();
+    }
+
     /** Сделка с живым эпизодом и стоящей защитой транша: уровень после акта резолвится. */
     private static Deal dealWithLiveEpisode() {
         Deal deal = emptyDeal();

@@ -11,6 +11,11 @@
 source ответ → `InstrumentExternalRulesExternalSnapshot` (сырые
 `external*` строки) → `InstrumentExternalRules`.
 
+**Ответов источника два:** спецификация инструмента и позиционные тиры его
+семьи. Тиры едут в снапшот сырыми строками и разбираются в числа при
+материализации — в доменные `PositionTier`
+(`docs/models/domain/other/InstrumentExternalRules.md`).
+
 `external*`-поля snapshot сохраняются как есть (`externalTickSize`,
 `externalLotSize`, `externalMinSize`, `externalContractValue` и
 др.). Доменные проекции резолвятся при материализации модели:
@@ -54,6 +59,36 @@ source ответ → `InstrumentExternalRulesExternalSnapshot` (сырые
 | `groupId` | `externalFeeGroupId` |
 | `state` | `externalState` |
 
+### `PositionTierOkxResponse` → snapshot
+
+Инвентарь — `docs/models/integrations/okx/PositionTierOkxResponse.md`;
+контракт — `docs/integrations/okx/contracts/position-tiers.md`.
+
+**Чтение идёт по семье инструмента, взятой из ответа спецификации:** запрос
+`instType` (тип правил), `tdMode=isolated`, `instFamily` = `instFamily`
+ответа спецификации. Одно чтение правил инструмента стоит поэтому двух
+запросов к площадке, и второй идёт по своему лимиту публичного эндпоинта
+(10 запросов за 2 секунды по IP). Семьи в ответе спецификации нет — тиры не
+читаются, и правила уходят с пустыми тирами.
+
+| OKX field | Snapshot field (`externalPositionTiers[]`) | Домен (`positionTiers[]`) |
+|---|---|---|
+| `minSz` | `externalMinSize` | `minSize` |
+| `maxSz` | `externalMaxSize` | `maxSize` |
+| `mmr` | `externalMaintenanceMarginRate` | `maintenanceMarginRate` |
+
+**Структурная валидация тиров — до маппинга:** каждая запись несёт
+запрошенную семью, а `minSz`, `maxSz`, `mmr` непусты; иначе — нарушение
+инварианта контракта (`docs/rules/controlled-exchange-exceptions.md`).
+Число, не разобравшееся при материализации, — то же нарушение. Пустой
+ответ — пустые тиры, а не пустой перечень: «не прочли» и «нет» оценке
+ликвидации неразличимы и обе значат «не измерено».
+
+**Отказ чтения тиров роняет всё чтение правил инструмента**, а не
+отдаёт правила без тиров: частичные правила переписали бы навес читателя
+вместе с прежними тирами, а прежний навес честнее — его несвежесть
+измерима по строке-владельцу.
+
 **Валюты (`settleCcy`/`baseCcy`/`quoteCcy`) навесом не маппятся** — их
 дом `Instrument`. Промежуточная редакция маппила их сюда; строки сняты вместе с полями модели.
 
@@ -86,7 +121,7 @@ source ответ → `InstrumentExternalRulesExternalSnapshot` (сырые
 
 ### Не маппимые поля OKX
 
-`instFamily`, `uly`, `ctMult`,
+`uly`, `ctMult`,
 `maxTwapSz`/`maxIcebergSz`/`maxLmtAmt`/`maxMktAmt` (per-order лимиты
 неиспользуемых типов ордеров — не используем),
 `listTime`/`expTime`/`openType`/`ruleType` (lifecycle биржи; для
@@ -94,6 +129,9 @@ SWAP `expTime` обычно пусто), `category`/`alias`/`stk`/
 `optType`, `posLmtAmt`/`posLmtPct`/`maxPlatOILmt` (позиционные лимиты —
 форвард к риску на биржу/портфель — потолок одновременного риска тенанта (`docs/architecture/signal-strategy-allocator.md`),
 `docs/rules/risk-policy.md`).
+
+**`instFamily` из этого списка снят:** он операнд запроса позиционных
+тиров, хотя в снапшот и навес по-прежнему не переносится.
 
 **`groupId` из этого списка снят**. Он не «прочее
 поле биржи», а **ключ резолва ставки комиссии**: офдок OKX прямо предписывает

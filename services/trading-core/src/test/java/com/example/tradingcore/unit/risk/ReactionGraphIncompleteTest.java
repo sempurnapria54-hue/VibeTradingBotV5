@@ -11,11 +11,7 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingcore.domain.command.risk.RiskBlockAction;
 import com.example.tradingcore.domain.command.risk.RiskBlockResolver;
-import com.example.tradingcore.domain.command.risk.RiskCheckResult;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
-import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckStatus;
-import com.example.tradingcore.domain.command.risk.RiskValidationResult;
-import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -84,27 +80,6 @@ class ReactionGraphIncompleteTest {
 
         assertThat(action.getType()).isEqualTo(RiskBlockAction.Type.MOVE_DEAL_TO_ERROR);
         assertThat(action.getRiskCode()).isEqualTo(RiskCheckCode.DEAL_GRAPH_INCOMPLETE);
-    }
-
-    @Test
-    @DisplayName("U21.6 — неполнота пришла членом «пройдено»: свёртка читает только блокирующие")
-    void u21_6_aPassedGraphMemberDoesNotTriggerTheRow() {
-        RiskValidationResult passedGraphMember = RiskValidationResult.builder()
-                .decision(RiskDecision.BLOCKED)
-                .checks(List.of(RiskCheckResult.builder()
-                        .code(RiskCheckCode.DEAL_GRAPH_INCOMPLETE)
-                        .status(RiskCheckStatus.PASSED)
-                        .comment("graph presented")
-                        .build()))
-                .comment("blocked without blocking members")
-                .build();
-
-        RiskBlockAction action = resolver.resolve(context(emptyDeal()), DealTranche.Status.PRECHECK,
-                passedGraphMember);
-
-        assertThat(action.getType()).isEqualTo(RiskBlockAction.Type.SKIP_ACTION);
-        assertThat(action.getRiskCode()).isNull();
-        assertThat(action.getCloseReason()).isNull();
     }
 
     @Test

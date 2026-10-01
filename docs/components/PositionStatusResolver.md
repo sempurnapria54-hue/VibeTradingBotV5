@@ -16,19 +16,22 @@
 нечего, а отсутствие записи трактуется вместе с исчерпанием цикла добычи,
 то есть операндом исполнителя. Пер-источниковой реализации у резолвера
 поэтому нет: он один. Критерий и его доводы —
-`docs/rules/external-status-resolution.md` §«Где резолвится — сторона
-выбирается по словарю источника».
+`docs/rules/external-status-resolution.md` (сторона резолва выбирается
+по словарю источника).
 
 ## Политика
 
 ```text
-позиция не добыта       -> CLOSED + closeReason candidate = EXTERNAL_CLOSE
+позиция не добыта, запись закрытия добыта   -> CLOSED + closeReason candidate = EXTERNAL_CLOSE
+позиция не добыта, записи закрытия нет      -> ACTIVE + null
 позиция добыта          -> ACTIVE + null
 externalSize == 0       -> ACTIVE, live risk = false
 ```
 
-Успешное «не найдено» по запросу позиции — нормальный closed-on-exchange
-факт, **не** `ExternalNotFoundException`. Live risk: `ACTIVE &&
+Успешное «не найдено» по запросу позиции — **не** `ExternalNotFoundException`;
+закрытием оно становится только с записью закрытия эпизода
+(`docs/components/RefreshPositionExecutor.md`, форма —
+`docs/spec/external-status-resolution.json`, `positionCloseCorroborated`). Live risk: `ACTIVE &&
 externalSize > 0` (см. `docs/models/domain/core/Position.md`).
 
 ## Границы

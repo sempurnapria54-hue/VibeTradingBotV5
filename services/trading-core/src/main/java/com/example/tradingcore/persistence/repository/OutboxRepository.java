@@ -14,7 +14,8 @@ public interface OutboxRepository extends JpaRepository<OutboxEntity, Long> {
 
     /**
      * Неопубликованные строки окном <b>в порядке записи</b>
-     * (docs/components/OutboxRelayJob.md §«Чтение — окном»).
+     * (docs/components/OutboxRelayJob.md §«Чтение — окном, а не «всё
+     * неопубликованное»»).
      *
      * <p><b>Порядок несущий:</b> события одного тенанта обязаны прийти в
      * порядке происшествия, а ключ партиции — тенант, и

@@ -36,7 +36,8 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     /**
      * Расчётная валюта инструмента площадки — ПРОЕКЦИЕЙ одного поля.
      * Строку целиком ради валюты не тянем
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Query("select i.externalSettlementCurrency from InstrumentEntity i "
             + "where i.exchangeCode = :exchangeCode and i.externalId = :externalId")
@@ -55,7 +56,8 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
      *
      * <p>Окно обязательно: каталог растёт вместе с контуром, и упор в
      * окно засчитывается неполнотой прохода
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Query("""
             select i from InstrumentEntity i
@@ -91,7 +93,8 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
      * Сырые типы инструментов проекции — ПРОЕКЦИЕЙ колонки: перечень
      * нужен синку ставок, а ставка есть атрибут группы, не инструмента,
      * и строки ради типа не тянутся
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Query("select distinct i.externalType from InstrumentEntity i where i.externalType is not null")
     List<String> findDistinctExternalTypes();
@@ -104,7 +107,7 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
      * пересекает, и ответу нужна ровно идентичность
      * (.claude/rules/codestyle.md §«Идентичность наружу»). Запрос по
      * одному ключу на строку ответа дал бы чтение на каждую строку окна
-     * (там же, §«Выборка данных»).
+     * (там же, §«Выборка данных: не тянем сущность ради одного поля»).
      */
     @Query("select i.id, i.internalId from InstrumentEntity i where i.id in :ids")
     List<Object[]> findInternalIdsByIdIn(@Param("ids") Collection<Long> ids);
@@ -112,7 +115,8 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
     /**
      * Биржевые имена названных инструментов — проекцией одного поля и одним
      * запросом на пачку: читателю нужно ровно имя, по которому площадка
-     * адресует позицию (.claude/rules/codestyle.md §«Выборка данных»).
+     * адресует позицию (.claude/rules/codestyle.md §«Выборка данных: не тянем
+     * сущность ради одного поля»).
      */
     @Query("select i.externalId from InstrumentEntity i where i.id in :ids")
     List<String> findExternalIdsByIdIn(@Param("ids") Collection<Long> ids);

@@ -63,16 +63,18 @@ public class TrancheEntrySubmittedHandler implements DealTrancheHandler {
                     deal.getId(), tranche.getId(), nonNull(entry));
             return TrancheTransition.escalate();
         }
-        // Третий триггер выхода, симметричный триггеру сопровождения: под
+        // Триггер выхода по статусу сделки, симметричный триггеру сопровождения: под
         // сворачиванием сделки живую входную ногу снимает дочистка обработчика
         // выхода — тем же порядком «сначала нога, потом экспозиция»
         // (docs/rules/exit-teardown-order.md). Без него ногу не снимал бы никто.
         // Налив снятой ноги тоже уводит в выход: прямой терминал — только у
         // транша без живой ноги и без операций, иначе экспозиция ушла бы мимо выхода.
+        // Пустая причина сделки терминала не даёт — сделка уходит ошибочной
+        // тропой (docs/lifecycles/DealTranche.md).
         if (isTrue(deal.isCollapsing())) {
             return isTrue(tranche.hasLiveEntryOrder()) || isTrue(tranche.hasEntryFill())
                     ? TrancheTransition.moveTo(DealTranche.Status.EXIT_PENDING)
-                    : TrancheTransition.close(disposition.inheritedCloseReason(deal));
+                    : disposition.inheritedClose(deal);
         }
         if (isTrue(entryTerminalWithoutOperations(entry, tranche))) {
             return TrancheTransition.close(DealTranche.CloseReason.ENTRY_CONDITION_EXPIRED);

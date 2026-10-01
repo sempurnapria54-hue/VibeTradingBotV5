@@ -50,13 +50,32 @@
     совпадение ВЫРАЖЕНИЙ у разных предметов, а два предмета под одним
     ИМЕНЕМ остаются неразличимыми для читателя и для указателя.
 
-ЧЕГО ИНСТРУМЕНТ НЕ МЕРИТ (названо, чтобы им не удостоверяли лишнего): общий
-операндный контракт — имена полей строк (`type`, `size`, `status`, `carrier`,
-…), которые приходят из состояния примера и дома-величины в корпусе не имеют.
-Это нормальный режим корпуса, а не дефект: файл законно берёт набор целиком и
-пользуется частью. Сколько таких имён — печатает сам прогон полем «ПРОПУЩЕНО
-ПО ОПЕРАНДНОМУ КОНТРАКТУ» итоговой строки. Числом в шапке оно не фиксируется:
-корпус живой, число дрейфует с каждой новой величиной.
+ЧЕГО ИНСТРУМЕНТ НЕ МЕРИТ (названо, чтобы им не удостоверяли лишнего). Класс B
+ловит подмену дома гостевым состоянием ПО СОВПАДЕНИЮ ИМЕНИ, и мимо проверки
+уходят три рода имён выражения — каждый прогон считает их отдельным полем
+итоговой строки:
+
+  1. «РЕЗОЛВЛЕНО ОПЕРАНДОМ ФАЙЛА» — имя, которое резолвит операнд самого
+     файла-потребителя. Оно отсекается до всякого учёта, и туда попадают
+     обе формы разом: законная (операнд, несущий величину с указателем на
+     дом-спеку под тем же именем, — `.claude/rules/structure.md`, строка
+     `docs/spec`) и СИНОНИМ величины — операнд, выражающий величину с домом
+     в корпусе ПОД ДРУГИМ ИМЕНЕМ (`positionLive` против дома
+     `hasLiveEpisode`). Синоним детектор не видит по построению: признак у
+     него смысловой, а не текстовый, и ни один класс A-D его не ловит;
+  2. «ТОЧЕЧНЫХ» — имя пути поля строки (`deal.x`, `tranche.exposure`):
+     отсекается целиком, без сверки с домами, и префиксный синоним величины
+     (`tranche.exposure` против дома `trancheExposure`) здесь тоже невидим;
+  3. «ПРОПУЩЕНО ПО ОПЕРАНДНОМУ КОНТРАКТУ» — имя без дома-величины в корпусе
+     и без операнда файла-потребителя: поле строк (`type`, `size`,
+     `status`, `carrier`, …), которое заимствованная величина берёт из
+     состояния примера. Это нормальный режим корпуса, а не дефект: файл
+     законно берёт набор целиком и пользуется частью.
+
+Прежняя редакция называла непокрытым только род 3 («дома-величины в корпусе
+не имеют»), тогда как фактический слепой класс шире — «не имеют дома ПОД ТЕМ
+ЖЕ ИМЕНЕМ», и роды 1-2 не попадали ни в одно поле вывода. Числами в шапке
+поля не фиксируются: корпус живой, число дрейфует с каждой новой величиной.
 
 БАТАРЕЯ ОСЕЙ ИСПОЛНЯЕТСЯ ЭТОЙ ЖЕ КОМАНДОЙ, до проверки. Каждая ось —
 самодостаточная фикстура с дефектом ровно этой оси плюс контроль на ложное
@@ -123,7 +142,7 @@ def unprefixed(form):
 
 def scope_findings(directory, specs, declared_in, out):
     """Классы A и B: область видимости величин."""
-    broken, guest, skipped = 0, 0, set()
+    broken, guest, skipped, own, dotted = 0, 0, set(), set(), set()
     for name in specs:
         spec = load(directory, name)
         includes = spec.get("includes", [])
@@ -145,7 +164,13 @@ def scope_findings(directory, specs, declared_in, out):
                     continue
                 for match in IDENT.finditer(strip_literals(str(value[slot]))):
                     ident = match.group(0).lstrip("?")
-                    if "." in ident or ident in FUNCS or ident in names or ident in operands[name]:
+                    if ident in FUNCS or ident in names:
+                        continue
+                    if "." in ident:
+                        dotted.add(ident)
+                        continue
+                    if ident in operands[name]:
+                        own.add(ident)
                         continue
                     if ident not in declared_in:
                         skipped.add(ident)
@@ -167,7 +192,7 @@ def scope_findings(directory, specs, declared_in, out):
                                "видимости не входит"
                                % (name, value["name"], origin, ident, ", ".join(declared_in[ident])))
                     broken += 1
-    return broken, guest, skipped
+    return broken, guest, skipped, own, dotted
 
 
 def copy_findings(directory, specs, out):
@@ -226,10 +251,10 @@ def scan(directory):
     if not declared_in:
         return None, "ни одной величины не объявлено — проверять нечего"
     out = []
-    broken, guest, skipped = scope_findings(directory, specs, declared_in, out)
+    broken, guest, skipped, own, dotted = scope_findings(directory, specs, declared_in, out)
     copies = copy_findings(directory, specs, out)
     homes = home_findings(declared_in, out)
-    return (out, (broken, guest, copies, homes, len(skipped))), None
+    return (out, (broken, guest, copies, homes, len(skipped), len(own), len(dotted))), None
 
 
 def home_findings(declared_in, out):
@@ -357,6 +382,26 @@ def battery():
                                                    independentFrom="deal/transitionAllowed")]})
         axis("11. объявленная независимость класс D не снимает", eleven, "КЛАСС D", True)
 
+        # граница, объявленная шапкой: синоним величины в операнде (под другим
+        # именем и на префиксе) находки не даёт, но уходит в свой счётчик —
+        # ось держит ПОЛЕ ВЫВОДА, которым непокрытое называется, а не слепоту
+        twelve = area("k")
+        write(twelve, "coverage", {"subject": "coverage",
+                                   "values": [value("hasLiveEpisode", "true"),
+                                              value("trancheExposure", "1")]})
+        write(twelve, "order", {"subject": "order",
+                                "operands": {"positionLive": "", "tranche.exposure": ""},
+                                "values": [value("searchGoesOn",
+                                                 "positionLive && tranche.exposure != 0")]})
+        result, refusal = scan(twelve)
+        counts = result[1] if result else None
+        axes.append(("12. синоним величины в операнде уходит в счётчики «НЕ МЕРИЛОСЬ», "
+                     "а не в находки", bool(counts) and counts[:4] == (0, 0, 0, 0)
+                     and counts[5] == 1 and counts[6] == 1,
+                     "отказ: " + refusal if refusal else
+                     "находок A-D: %r; операндом файла: %d; точечных: %d"
+                     % (counts[:4], counts[5], counts[6])))
+
         # базовый гейт
         _, refusal = scan(os.path.join(work, "нет-такого"))
         axes.append(("7. каталога нет — проверка отказывает", bool(refusal),
@@ -383,13 +428,15 @@ def main():
     if refusal:
         print("ПРОВЕРКА НЕ ПРОВОДИТСЯ: " + refusal)
         return 2
-    lines, (gaps, guest, copies, homes, skipped) = result
+    lines, (gaps, guest, copies, homes, skipped, own, dotted) = result
     for line in lines:
         print(line)
     print("РАЗРЫВОВ (A): %d; ПОДМЕН ДОМА ГОСТЕВЫМ СОСТОЯНИЕМ (B): %d; "
           "КОПИЙ ФОРМЫ (C): %d; ДВУХ ДОМОВ У ИМЕНИ (D): %d; "
-          "ПРОПУЩЕНО ПО ОПЕРАНДНОМУ КОНТРАКТУ (не дефект): %d имён"
-          % (gaps, guest, copies, homes, skipped))
+          "ПРОПУЩЕНО ПО ОПЕРАНДНОМУ КОНТРАКТУ (не дефект): %d имён; "
+          "НЕ МЕРИЛОСЬ — РЕЗОЛВЛЕНО ОПЕРАНДОМ ФАЙЛА (синоним величины неразличим): %d имён, "
+          "ТОЧЕЧНЫХ: %d имён"
+          % (gaps, guest, copies, homes, skipped, own, dotted))
     return 1 if gaps or guest or copies or homes else 0
 
 

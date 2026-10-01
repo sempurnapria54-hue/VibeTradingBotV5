@@ -25,8 +25,8 @@
 
 Числа OKX приходят строками; обязательные числовые строки парсятся
 в `BigDecimal`. `MID_PRICE` источником не передаётся — это величина
-runtime-модели цены (`docs/components/models/MarketPriceData.md`
-§«Середина спреда»); переход её не маппит
+runtime-модели цены (середина спреда —
+`docs/components/models/MarketPriceData.md`); переход её не маппит
 (`docs/models/mapping/MarketPriceData.md`).
 
 ## Поля, которые НЕ входят в DTO

@@ -3,6 +3,8 @@ package com.example.marketdata.domain.service;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.marketdata.config.CandleLoadingProperties;
 import com.example.marketdata.integration.internal.api.ExchangeReadClient;
@@ -56,7 +58,8 @@ import org.springframework.stereotype.Component;
  * шаг {@code CHECK} после {@code SYNC} держал бы готовую группу вне
  * {@code ACTIVE} на пересчёте готовности каждого тика с новым баром, и
  * инструмент терял бы готовность на штатной догонке
- * (docs/lifecycles/Instrument.md §«Координация»).
+ * (docs/lifecycles/Instrument.md §«Штатная докачка хвоста готовности не
+ * снимает»).
  */
 @Slf4j
 @Component
@@ -69,9 +72,30 @@ public class CandleLoader {
     private final InstrumentDataService instrumentDataService;
     private final CandleLoadingProperties properties;
 
-    /** Продвигает группу на один шаг согласно её статусу. */
+    /**
+     * Продвигает группу на один шаг согласно её статусу.
+     *
+     * <p><b>Итог шага ложится точечной записью, и только если группу за
+     * время шага никто не переписал.</b> Шаг идёт с чтением площадки, а
+     * углублённое требование потребителя пишет ту же строку в любой момент
+     * (docs/lifecycles/CandleGroup.md §«Возврат к `BACKFILL` по углублённому
+     * требованию»). Запись группы целиком вернула бы статус и горизонт к
+     * снимку начала шага, и группа дошла бы до {@code ACTIVE} с непокрытым
+     * горизонтом. Поэтому горизонт шаг не пишет вовсе, а свой итог
+     * записывает лишь при статусе и горизонте, застанных в начале шага;
+     * иначе итог отбрасывается, и следующий тик ведёт группу из того, что
+     * написало требование. Свечи, записанные шагом, остаются: ряд идемпотентен
+     * по ключу, а счёт и границы следующий шаг берёт из ряда заново.
+     *
+     * <p><b>Переход в {@code ERROR} журналируется после записи, а не до:</b>
+     * отброшенный итог перехода не совершил, и лог не говорит больше
+     * записанного. Терминал, который пишет этот цикл, один — {@code ERROR}
+     * исчерпанной докачки дыр.
+     */
     public void advance(CandleGroup group) {
-        switch (group.getStatus()) {
+        CandleGroup.Status loadedStatus = group.getStatus();
+        Long loadedHorizon = group.getPlannedFirstUtcMillis();
+        switch (loadedStatus) {
             case CREATED -> startBackfill(group);
             case BACKFILL -> backfill(group);
             case SYNC -> sync(group);
@@ -79,13 +103,22 @@ public class CandleLoader {
             case REPAIR -> repair(group);
             default -> {
                 // ACTIVE / ERROR / DELETED — в этом цикле не ведутся.
+                return;
             }
+        }
+        if (isFalse(candleGroupDataService.saveLoadingStep(group, loadedStatus, loadedHorizon))) {
+            log.info("CandleGroup {} was rewritten during its {} step; the step outcome is dropped",
+                    group.getId(), loadedStatus);
+            return;
+        }
+        if (isTrue(group.isTerminal())) {
+            log.error("CandleGroup {} exceeded {} repair attempts -> ERROR",
+                    group.getId(), properties.getMaxRepairAttempts());
         }
     }
 
     private void startBackfill(CandleGroup group) {
         group.setStatus(CandleGroup.Status.BACKFILL);
-        candleGroupDataService.save(group);
     }
 
     private void backfill(CandleGroup group) {
@@ -97,7 +130,6 @@ public class CandleLoader {
         if (isBackfillComplete(group, page)) {
             group.setStatus(CandleGroup.Status.CHECK);
         }
-        candleGroupDataService.save(group);
     }
 
     private void sync(CandleGroup group) {
@@ -107,13 +139,11 @@ public class CandleLoader {
         persist(group, page);
         reconcile(group);
         settleIntegrity(group);
-        candleGroupDataService.save(group);
     }
 
     private void check(CandleGroup group) {
         reconcile(group);
         settleIntegrity(group);
-        candleGroupDataService.save(group);
     }
 
     /**
@@ -133,30 +163,25 @@ public class CandleLoader {
     private void repair(CandleGroup group) {
         group.registerRepairAttempt();
         if (group.hasExceededRepairAttempts(properties.getMaxRepairAttempts())) {
-            log.error("CandleGroup {} exceeded {} repair attempts -> ERROR",
-                    group.getId(), properties.getMaxRepairAttempts());
             group.setStatus(CandleGroup.Status.ERROR);
-            candleGroupDataService.save(group);
             return;
         }
         HoleWindow window = locateHole(group);
         if (isNull(window)) {
             group.setStatus(CandleGroup.Status.CHECK);
-            candleGroupDataService.save(group);
             return;
         }
         Instrument instrument = instrumentDataService.getRequiredById(group.getInstrumentId());
         long step = group.getTimeframe().getDurationMillis();
-        long deficitBefore = deficit(group);
+        Long deficitBefore = group.deficit();
         List<Candle> page = readClient.getHistoryCandles(instrument.getExternalId(), group.getTimeframe(),
                 window.toMillis() + step, properties.getPageSize());
         persist(group, page);
         reconcile(group);
-        if (deficit(group) < deficitBefore) {
+        if (group.deficit() < deficitBefore) {
             group.resetRepairAttempts();
         }
         group.setStatus(CandleGroup.Status.CHECK);
-        candleGroupDataService.save(group);
     }
 
     /**
@@ -202,15 +227,6 @@ public class CandleLoader {
             }
         }
         return new HoleWindow(lo, hi);
-    }
-
-    /**
-     * Недостача ряда до плотности на фактических границах: ожидаемое по
-     * density-инварианту минус поддерживаемый {@code count}.
-     */
-    private long deficit(CandleGroup group) {
-        long actual = isNull(group.getCount()) ? 0L : group.getCount();
-        return group.expectedCount() - actual;
     }
 
     private void persist(CandleGroup group, List<Candle> candles) {

@@ -34,7 +34,8 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
     /**
      * Нетерминальные сделки ограниченным окном — вход прохода
      * оркестратора. Окно обязательно: безлимитное чтение растёт вместе с
-     * числом торговых строк (.claude/rules/codestyle.md §Выборка данных).
+     * числом торговых строк (.claude/rules/codestyle.md §«Выборка данных: не
+     * тянем сущность ради одного поля»).
      */
     List<DealEntity> findByStatusNotInOrderByIdAsc(Collection<String> statuses, Pageable pageable);
 
@@ -66,7 +67,8 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      * <p>Читатель — обход проактивной детекции: ему тот же вопрос нужен по
      * КАЖДОМУ инструменту контура, и вопрос по одной паре на итерацию дал
      * бы запрос в цикле длиной в окно контура
-     * (.claude/rules/codestyle.md §«Выборка данных»).
+     * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
+     * одного поля»).
      */
     @Query("select distinct d.instrumentId from DealEntity d "
             + "where d.exchangeAccountId = :exchangeAccountId and d.status not in :statuses")
@@ -95,8 +97,8 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
     /**
      * Сделки счёта недавним окном — чтение поверхности. Порядок от новых:
      * читатель приходит за текущим состоянием торговой строки, а история
-     * счёта растёт без предела (.claude/rules/codestyle.md §«Выборка
-     * данных»).
+     * счёта растёт без предела (.claude/rules/codestyle.md §«Выборка данных: не
+     * тянем сущность ради одного поля»).
      */
     @Query("""
             select d from DealEntity d
@@ -136,7 +138,8 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      * <p><b>Одним запросом на проход, а не чтением ступени на сделку.</b>
      * Радиусов у сделки два, и чтение каждого по строке дало бы два
      * обращения на сделку — то есть выборку, растущую вместе с числом
-     * торговых строк (.claude/rules/codestyle.md §«Выборка данных»).
+     * торговых строк (.claude/rules/codestyle.md §«Выборка данных: не тянем
+     * сущность ради одного поля»).
      *
      * <p>Возвращаются идентичности, а не строки: шагу нужен ответ
      * «стои́т ли ступень», а сами счета у него уже есть.

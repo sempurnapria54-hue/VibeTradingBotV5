@@ -45,8 +45,12 @@ import org.junit.jupiter.api.Test;
  */
 class SchemaInputBoxTest extends SharedStatisticsBox {
 
-    /** Единственная миграция цепочки: она у сервиса своя и начинается с неё. */
-    private static final String BASELINE = "1";
+    /**
+     * Цепочка целиком, в порядке наката: она у сервиса своя и начинается с
+     * базовой миграции; вторая переписывает комментарий колонки момента
+     * разрыва — применённая миграция не правится ни в одном байте.
+     */
+    private static final List<String> CHAIN = List.of("1", "2");
 
     /** Состав схемы, положенный цепочкой: шесть таблиц предмета. */
     private static final List<String> OWN_TABLES = List.of(
@@ -96,8 +100,8 @@ class SchemaInputBoxTest extends SharedStatisticsBox {
     @DisplayName("B12.8 — Схема накатывается миграциями и сходится с отображением")
     void theSchemaIsMigratedAndTheMappingMeetsIt() {
         assertThat(rows.appliedMigrations())
-                .as("цепочка у сервиса одна и накатана со своего начала")
-                .containsExactly(BASELINE);
+                .as("цепочка у сервиса одна и накатана со своего начала целиком")
+                .containsExactlyElementsOf(CHAIN);
         assertThat(rows.tableNames())
                 .as("генерации схемы вторым писателем не происходит: состав равен тому, "
                         + "что положила цепочка")

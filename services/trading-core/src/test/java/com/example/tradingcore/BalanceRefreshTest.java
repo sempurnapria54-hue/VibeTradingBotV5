@@ -8,8 +8,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.tradingbot.domain.model.core.balance.AccountMode;
 import com.example.tradingbot.domain.model.core.balance.Balance;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
+import com.example.tradingbot.domain.model.core.balance.PositionMode;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingcore.domain.command.DealActionState;
@@ -171,6 +173,32 @@ class BalanceRefreshTest {
         assertThat(landed.getValue().getId()).isEqualTo(77L);
         assertThat(landed.getValue().getBalances()).extracting(Balance::getExternalCurrency)
                 .containsExactly(SETTLE);
+    }
+
+    /**
+     * Режимы счёта и позиций приземляются той же записью, что и прочие
+     * поля снимка, и ПУСТОТА ответа переносится пустотой: прежнее значение
+     * строки ею не подменяется — непроверенная посылка контура выполненной
+     * не читается (docs/components/RefreshBalanceExecutor.md).
+     */
+    @Test
+    void landingCarriesTheAccountAndPositionModesIncludingTheirAbsence() {
+        BalanceContainer stored = new BalanceContainer();
+        stored.setId(77L);
+        stored.setExchangeAccountId(ACCOUNT_ID);
+        stored.setAccountMode(AccountMode.FUTURES);
+        stored.setPositionMode(PositionMode.NET);
+        when(balanceContainerDataService.findByExchangeAccountId(ACCOUNT_ID)).thenReturn(Optional.of(stored));
+        BalanceContainer observed = observed(balance(SETTLE, "1500"));
+        observed.setAccountMode(AccountMode.MULTI_CURRENCY_MARGIN);
+        givenObserved(observed);
+
+        executor.execute(command(), row(), context(account(null)));
+
+        ArgumentCaptor<BalanceContainer> landed = ArgumentCaptor.forClass(BalanceContainer.class);
+        verify(balanceContainerDataService).save(landed.capture());
+        assertThat(landed.getValue().getAccountMode()).isEqualTo(AccountMode.MULTI_CURRENCY_MARGIN);
+        assertThat(landed.getValue().getPositionMode()).as("ответ режима позиций не нёс").isNull();
     }
 
     private HoldSignal journalledSignal() {

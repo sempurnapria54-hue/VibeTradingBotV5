@@ -244,7 +244,8 @@ public class ServiceCommandExecutor {
      * исчерпанным бюджетом — и потому эскалации «бюджет кончился» этот
      * ход тоже не порождает
      * (docs/components/ServiceCommandExecutor.md §«У третьего строка
-     * закрывается отказом БЕЗ повтора»).
+     * закрывается отказом БЕЗ повтора, и это отдельный ход, а не ветка общего
+     * учёта»).
      */
     private void failWithoutRetry(DealActionState actionState, RuntimeErrorCode errorCode, String message) {
         if (isNull(actionState)) {

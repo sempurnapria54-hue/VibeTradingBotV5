@@ -8,6 +8,8 @@ import com.example.testsupport.JsonbOverlayProbe;
 import com.example.tradingbot.domain.model.trade.market_snapshot.OrderBookLevel;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +19,7 @@ import org.junit.jupiter.api.Test;
  * Навес уровней книги заявок: единственная форма предмета, у которой
  * пустота НЕ зеркальна.
  *
- * <p>Кейсы — группа `U8`
+ * <p>Кейсы — группа `U8` и клетки `U11.7`, `U13.4`
  * (.claude/tests/cases/jsonb-overlay-roundtrip.md). Маппер подаётся явным
  * входом: `U8.5` меряет, что политику включения конвертер пинит сам, и
  * правка настроек чужого бина форму строки не двигает.
@@ -94,6 +96,30 @@ class OrderBookLevelJsonConverterTest extends JsonbOverlayProbe {
         assertThatThrownBy(() -> converter.jsonToLevels("{\"price\":1}"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasCauseInstanceOf(JsonProcessingException.class);
+    }
+
+    @Test
+    @DisplayName("U11.7 — на строгом источнике лишний ключ своей строки отброшен, прочее тождественно")
+    void u11_7_onAStrictSourceAnUnknownKeyOfTheOwnRowIsDropped() {
+        ObjectMapper strict = beanAssemblyMapper()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        List<OrderBookLevel> levels = levels();
+        String withUnknown = converter.levelsToJson(levels)
+                .replaceFirst("\\{", "{\"liquidatedOrders\":0,");
+
+        assertThat(new OrderBookLevelJsonConverter(strict).jsonToLevels(withUnknown))
+                .as("U11.7: вход %s, источник строгий — терпимость запинена конвертером", withUnknown)
+                .usingRecursiveComparison().isEqualTo(levels);
+    }
+
+    @Test
+    @DisplayName("U13.4 — уровень со всеми полями: ключи строки равны литеральному перечню")
+    void u13_4_theRowKeysOfAFullLevelEqualTheLiteralList() {
+        String json = converter.levelsToJson(levels());
+
+        assertThat(keysOf(readTree(json).get(0).toString()))
+                .as("U13.4: уровень книги заявок")
+                .containsExactlyInAnyOrder("price", "size", "orderCount");
     }
 
     private static List<OrderBookLevel> levels() {

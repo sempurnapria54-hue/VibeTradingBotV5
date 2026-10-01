@@ -25,6 +25,7 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrd
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingcore.config.DealContextProperties;
 import com.example.tradingcore.domain.calc.CalculationContextFactory;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
@@ -67,7 +68,7 @@ class ExitRoundingReaderTest {
     private final CalculationContextFactory contextFactory = mock(CalculationContextFactory.class);
     private final StrategyActionCalculator calculator = mock(StrategyActionCalculator.class);
     private final CreateOrderActionExecutor orderExecutor = new CreateOrderActionExecutor(contextFactory,
-            calculator, mock(ActionRiskGate.class), reader);
+            calculator, mock(ActionRiskGate.class), reader, new DealContextProperties());
 
     @Test
     @DisplayName("U16.1 — исход «ниже минимума»: строка пропущена, план без команды, отчёт по строке")

@@ -16,12 +16,15 @@ candlesticks», «Get mark price candlesticks history»). Процедура с�
 
 ## Статус использования
 
-Не используется напрямую. Форвард-кандидат (риск-преконтроль,
-риск/преконтроль): дистанция до ликвидации считается от mark price;
-protective algo для SWAP рекомендованы с `tpTriggerPxType=mark`
-(`algo-order.md`) — мониторинг той же цены, по которой триггерится
-биржа. Mark price строится от спот-индекса с защитой от манипуляции
-ценой контракта (офдок).
+Кандидатом риск-преконтроля не является
+(`.claude/decisions/server-side-precheck-not-adopted.md`): марк-цену и цену
+ликвидации **живой** позиции приносит добыча позиции
+(`Position.externalMarkPrice`, `Position.externalLiquidationPrice`), а до
+входа позиции нет, и оценка ликвидации стои́т на средней цене входа
+позиции после акта (`docs/rules/risk-policy.md`). Protective algo для SWAP
+рекомендованы с `tpTriggerPxType=mark` (`algo-order.md`) — мониторинг той
+же цены, по которой триггерится биржа. Mark price строится от
+спот-индекса с защитой от манипуляции ценой контракта (офдок).
 
 ## GET /api/v5/public/mark-price
 

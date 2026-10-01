@@ -14,8 +14,9 @@ import lombok.Setter;
 public class StrategyAlgoOrderActionApiModel extends StrategyActionApiModel {
 
     @NotBlank
-    @Schema(description = "Тип условия: STOP_LOSS/TAKE_PROFIT/OCO_FULL/TRAILING_PERCENTS/TRAILING_VALUE/"
-            + "PARTIAL_TAKE_PROFIT/PARTIAL_STOP_LOSS", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Тип условия: STOP_LOSS/TAKE_PROFIT/OCO_FULL/TRAILING_PERCENTS/"
+            + "PARTIAL_TAKE_PROFIT/PARTIAL_STOP_LOSS; трейлинг абсолютным откатом (TRAILING_VALUE) "
+            + "не объявляется — создание его отвергает", requiredMode = Schema.RequiredMode.REQUIRED)
     private String conditionType;
 
     @Valid
@@ -23,7 +24,7 @@ public class StrategyAlgoOrderActionApiModel extends StrategyActionApiModel {
     private StopLossSettingsApiModel stopLossSettings;
 
     @Valid
-    @Schema(description = "Настройки трейлинга (TRAILING_*)")
+    @Schema(description = "Настройки трейлинга (TRAILING_PERCENTS): процентный откат")
     private TrailingSettingsApiModel trailingSettings;
 
     /**

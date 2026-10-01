@@ -11,13 +11,14 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 /**
- * Вычислитель одного типа технического индикатора по закрытым свечам.
- * Реализация считает значения по всей переданной истории (рекурсивные/
- * кумулятивные индикаторы требуют полного ряда для корректного хвоста) и
- * отдаёт только значения после warmup-зоны (без look-ahead). Эффективный
- * warmup = override настройки ?? выведенный из типа и периода.
- * Идемпотентность (дедуп по candle_timestamp) и checkpoint держит
- * IndicatorDataService/job. См. docs/components/IndicatorJob.md (§Warmup),
+ * Вычислитель одного типа технического индикатора по закрытым свечам окна
+ * прохода; отдаёт только значения, сохраняемые по прогреву (без
+ * заглядывания вперёд). Действующий прогрев и граница сохранения —
+ * docs/spec/indicator-calculation.json (`effectiveWarmup`,
+ * `indicatorValueStored`); кумулятивный тип продолжает записанный ряд —
+ * docs/components/IndicatorJob.md §«Кумулятивный тип продолжает записанный
+ * ряд». Идемпотентность (дедуп по candle_timestamp) держит
+ * IndicatorDataService. См. docs/components/IndicatorJob.md §Прогрев,
  * docs/models/domain/other/IndicatorValue.md.
  */
 public interface IndicatorCalculator {
@@ -34,7 +35,28 @@ public interface IndicatorCalculator {
     List<IndicatorValue> calculate(Long instrumentId, Long indicatorConfigId, List<Candle> closedCandles,
                                    IndicatorParams params);
 
-    /** Эффективный warmup: явный override настройки имеет приоритет над выведенным. */
+    /**
+     * Кумулятивный тип: сумму продолжает от последнего записанного значения
+     * ряда идентичности, а не начинает заново со своего окна
+     * (docs/components/IndicatorJob.md §«Кумулятивный тип продолжает
+     * записанный ряд»).
+     */
+    default Boolean isCumulative() {
+        return false;
+    }
+
+    /**
+     * Считает значения, продолжая записанный ряд идентичности от
+     * {@code lastStored} — последнего записанного значения, чей бар лежит в
+     * окне; пусто — такого значения нет. Некумулятивному типу записанное
+     * значение не нужно, и он считает по окну.
+     */
+    default List<IndicatorValue> calculate(Long instrumentId, Long indicatorConfigId, List<Candle> closedCandles,
+                                           IndicatorParams params, IndicatorValue lastStored) {
+        return calculate(instrumentId, indicatorConfigId, closedCandles, params);
+    }
+
+    /** Действующий прогрев (`effectiveWarmup`): объявленный override старше выведенного. */
     default Integer effectiveWarmup(Integer override, Integer derived) {
         return nonNull(override) ? override : derived;
     }

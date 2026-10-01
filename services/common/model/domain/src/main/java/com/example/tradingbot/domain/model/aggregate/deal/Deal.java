@@ -309,6 +309,41 @@ public class Deal extends Auditable {
                 : levels.max(BigDecimal::compareTo).orElse(null);
     }
 
+    /**
+     * Инвариант «ликвидация за стопом» у УДЕРЖИВАЕМОЙ позиции: действующий
+     * уровень остановки убытка на всю позицию ({@link #currentStopLevel()})
+     * лежит между ценой и ценой ликвидации, которую площадка называет у
+     * живого эпизода, — у LONG строго выше неё, у SHORT строго ниже; равенство
+     * — нарушение (docs/spec/risk-limits.json, величина
+     * {@code heldStopBeforeLiquidation}).
+     *
+     * <p><b>Пусто — не измерено, и ветвей три:</b> живого эпизода нет
+     * (ликвидировать нечего; цена на строке закрытого эпизода не читается),
+     * действующего уровня нет (хоть один транш с экспозицией своего уровня
+     * не несёт), площадка цены ликвидации не называет. Оценка ликвидации
+     * вместо факта площадки не подставляется: она заведена на случай, когда
+     * факта нет, а у ведомой позиции он есть.
+     *
+     * <p>Предикат живёт на модели, потому что оба операнда — данные графа
+     * сделки. Ложь — признак детектора переоценки инварианта ликвидации;
+     * пустоту он читает молчанием, а гейт живого обязательства покрытия и
+     * гистерезис — его, а не формы (docs/components/AnomalyJob.md).
+     */
+    public Boolean heldStopBeforeLiquidation() {
+        Position live = livePosition();
+        if (isNull(live)) {
+            return null;
+        }
+        BigDecimal stop = currentStopLevel();
+        BigDecimal liquidation = live.getExternalLiquidationPrice();
+        if (isNull(stop) || isNull(liquidation)) {
+            return null;
+        }
+        return StrategyTradeDirection.LONG.equals(direction)
+                ? stop.compareTo(liquidation) > 0
+                : stop.compareTo(liquidation) < 0;
+    }
+
     /** Живые транши сделки: те, что ещё занимают место в проходе. */
     public List<DealTranche> liveTranches() {
         return emptyIfNull(tranches).stream()
@@ -353,18 +388,47 @@ public class Deal extends Auditable {
         return StrategyTradeDirection.LONG.equals(direction) ? Order.Side.SELL : Order.Side.BUY;
     }
 
-    /** Живой эпизод позиции сделки либо пусто. */
+    /**
+     * Живой эпизод позиции сделки по дому — строка, на которой держится
+     * конъюнкция «статус {@code ACTIVE} и размер больше нуля», — либо пусто
+     * (docs/models/domain/core/Position.md §«Живой риск»;
+     * docs/spec/protection-coverage.json, {@code hasLiveEpisode}).
+     *
+     * <p><b>Активная строка с нулевым размером живым эпизодом не является:</b>
+     * она несёт факты эпизода, чья экспозиция уже снята, и её средняя цена
+     * якорем себестоимости не служит. Адресуемая строка независимо от
+     * размера — второй ответ, {@link #activeEpisode()}, с одним читателем.
+     */
     public Position livePosition() {
         return emptyIfNull(positions).stream()
-                .filter(episode -> isTrue(episode.hasLiveRisk()) || Position.Status.ACTIVE == episode.getStatus())
+                .filter(episode -> isTrue(episode.hasLiveRisk()))
                 .findFirst()
                 .orElse(null);
     }
 
-    /** Позиция сделки несёт live market risk (есть и в статусе с живым риском). */
+    /**
+     * Активная строка эпизода — строка в статусе {@code ACTIVE} НЕЗАВИСИМО
+     * от размера — либо пусто (docs/models/domain/core/Position.md
+     * §«Живой риск», активная строка эпизода).
+     *
+     * <p><b>Живого риска не удостоверяет, и читатель у неё один</b> — добыча
+     * позиции: сверка пары наблюдения, закрытие прежней строки при смене
+     * пары, добыча записи закрытия по строке, которой площадка больше не
+     * показывает, и ось эпизода у налитых ног
+     * (docs/components/RefreshPositionExecutor.md). Между обнулением позиции
+     * на площадке и приходом факта её закрытия два ответа расходятся:
+     * строка активна, живого эпизода нет.
+     */
+    public Position activeEpisode() {
+        return emptyIfNull(positions).stream()
+                .filter(episode -> Position.Status.ACTIVE.equals(episode.getStatus()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** Позиция сделки несёт живой рыночный риск: живой эпизод есть. */
     public Boolean hasLivePositionRisk() {
-        Position live = livePosition();
-        return nonNull(live) && isTrue(live.hasLiveRisk());
+        return nonNull(livePosition());
     }
 
     /**
@@ -599,7 +663,12 @@ public class Deal extends Auditable {
                 .orElse(null);
     }
 
-    /** Ранг причины транша: 1 — старшая. Значение вне перечня старшинства рангу не подлежит. */
+    /**
+     * Ранг причины транша: 1 — старшая. Перечень причин транша покрыт
+     * целиком, и ветви умолчания нет намеренно: значение, добавленное в
+     * перечень без ранга, роняет компиляцию, а не получает ранг молча.
+     * Пустую причину вызывающий отсекает до вызова.
+     */
     private static int trancheReasonRank(DealTranche.CloseReason reason) {
         return switch (reason) {
             case EXTERNAL_CLOSE -> 1;
@@ -608,7 +677,6 @@ public class Deal extends Auditable {
             case STRATEGY_EXIT -> 4;
             case TAKE_PROFIT -> 5;
             case ENTRY_CONDITION_EXPIRED -> 6;
-            default -> 99;
         };
     }
 
@@ -641,7 +709,11 @@ public class Deal extends Auditable {
         };
     }
 
-    /** Причина транша в перечне сделки; перечни пересекаются по этим шести значениям. */
+    /**
+     * Причина транша в перечне сделки. Каждая причина транша есть и у
+     * сделки, поэтому перевод полный и ветви умолчания нет; пустую причину
+     * вызывающий отсекает до вызова.
+     */
     private static CloseReason toDealReason(DealTranche.CloseReason reason) {
         return switch (reason) {
             case EXTERNAL_CLOSE -> CloseReason.EXTERNAL_CLOSE;
@@ -650,7 +722,6 @@ public class Deal extends Auditable {
             case STRATEGY_EXIT -> CloseReason.STRATEGY_EXIT;
             case TAKE_PROFIT -> CloseReason.TAKE_PROFIT;
             case ENTRY_CONDITION_EXPIRED -> CloseReason.ENTRY_CONDITION_EXPIRED;
-            default -> null;
         };
     }
 
@@ -711,7 +782,10 @@ public class Deal extends Auditable {
         /** Устаревание рыночных данных (только если policy решила завершать сделку). */
         MARKET_DATA_EXPIRED,
 
-        /** Risk-policy. */
+        /**
+         * Жёсткая ступень пары, любым поводом: значение — имя радиуса, а
+         * повод несёт код отчёта (docs/lifecycles/Deal.md).
+         */
         RISK_POLICY,
 
         /** Exchange hold. */

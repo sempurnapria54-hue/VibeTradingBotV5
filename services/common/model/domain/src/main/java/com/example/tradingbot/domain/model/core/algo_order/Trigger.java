@@ -8,7 +8,7 @@ import lombok.Setter;
 /**
  * Trigger-механизм algo-order: ноги stop-loss и take-profit (null —
  * соответствующая нога не используется). Раздел модели AlgoOrder. См.
- * docs/models/domain/core/AlgoOrder.md (§Condition-модель).
+ * docs/models/domain/core/AlgoOrder.md (§«Условие срабатывания»).
  */
 @Getter
 @Setter

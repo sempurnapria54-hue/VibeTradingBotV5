@@ -12,10 +12,10 @@ import lombok.Setter;
  * строка strategy-scope (таблица strategy_market_structure_settings,
  * UNIQUE(strategy_id, key)); адресуется по {@code key} (операнд условия
  * {@code structureKey}, «мягкие» ссылки JSON-листьев placement/stopLossSettings).
- * Результат расчёта MarketStructure ссылается на её {@code id}
- * (результат считается по идентичности вычисления, а не по этой
- * настройке — docs/models/domain/other/IndicatorValue.md).
- * {@code key} на индикаторные настройки стратегии. См.
+ * Значения структуры адресуются идентичностью вычисления у владельца
+ * рыночных данных ({@code computationConfigInternalId}), а не строкой
+ * настройки; {@code efficiencyRatioKey} и {@code atrKey} — ключи
+ * индикаторных настроек того же каталога. См.
  * docs/models/domain/aggregate/Strategy.md (§StrategyMarketStructureSetting).
  */
 @Getter
@@ -24,7 +24,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class StrategyMarketStructureSetting {
 
-    /** Технический ID настройки (strategy-scope-строка; цель FK результата расчёта). */
+    /** Технический ID настройки (strategy-scope-строка). */
     private Long id;
 
     /** Стабильный ключ настройки — по нему ссылается операнд market-structure. */

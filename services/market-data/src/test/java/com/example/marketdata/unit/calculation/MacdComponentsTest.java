@@ -31,9 +31,10 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Инвариант согласованности компонентов проверяется без знания
  * формулы линий</b> (`U6.2`): компоненты адресуются порознь, и гистограмма
- * обязана сходиться со своими операндами на том же баре. Клетки `U6.6`
- * (выведенный прогрев) и `U6.7`-`U6.8` (порядок периодов, который не
- * охраняет никто, — M-7) кода не получили.
+ * обязана сходиться со своими операндами на том же баре. Выведенный прогрев
+ * (`U6.6`) берётся из спеки: docs/spec/indicator-calculation.json, величина
+ * `derivedWarmup`. Порядок периодов (`U6.7`, `U6.8`) охраняет проверка
+ * требования на входе, и её клетки живут в {@code RequirementParamsCheckTest}.
  */
 class MacdComponentsTest {
 
@@ -82,9 +83,9 @@ class MacdComponentsTest {
 
     /** На постоянном ряде обе линии и их разность нулевые. */
     @Test
-    @DisplayName("U6.4 — ряд из 14 равных закрытий: линия, сигнальная и гистограмма равны нулю на всех барах")
+    @DisplayName("U6.4 — ряд из 20 равных закрытий: линия, сигнальная и гистограмма равны нулю на всех барах")
     void u6_4_aConstantCloseSeriesZeroesAllThreeComponents() {
-        List<IndicatorValue> values = calculate(flatSeries(14, "100"), macdParams(FAST, SLOW, SIGNAL, null));
+        List<IndicatorValue> values = calculate(flatSeries(20, "100"), macdParams(FAST, SLOW, SIGNAL, null));
 
         assertThat(values).isNotEmpty().allSatisfy(value -> {
             MacdValue macd = (MacdValue) value;
@@ -103,6 +104,21 @@ class MacdComponentsTest {
         assertThat(values.getFirst().getCandleTimestamp())
                 .as("бар 5 несёт линию, но сигнальная там ещё пуста")
                 .isEqualTo(barAt(SLOW - 1 + SIGNAL - 1));
+    }
+
+    /**
+     * Выведенный прогрев — медленная EMA до своего остатка затравки плюс
+     * сигнальная поверх сошедшейся линии: два медленных периода плюс
+     * сигнальный (docs/spec/indicator-calculation.json, величина
+     * `derivedWarmup`). У периодов {@code 3, 6, 3} это бар {@code 15}.
+     */
+    @Test
+    @DisplayName("U6.6 — прогрев не переопределён, периоды 3, 6, 3: ряд начинается с бара 15")
+    void u6_6_theDerivedWarmupIsTwoSlowPeriodsPlusTheSignalPeriod() {
+        List<IndicatorValue> values = base();
+
+        assertThat(values).hasSize(20 - (2 * SLOW + SIGNAL));
+        assertThat(values.getFirst().getCandleTimestamp()).isEqualTo(barAt(2 * SLOW + SIGNAL));
     }
 
     // --- базовая сборка и отклонения ---------------------------------------

@@ -9,7 +9,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.json.JsonParserFactory;
 
@@ -375,29 +374,17 @@ class JournalReadBoxTest extends SharedAuditBox {
     }
 
     /**
-     * <b>Клетка КРАСНАЯ, и её краснота есть предъявление названного
-     * долга</b> (находка {@code F-8}, .claude/work/backlog.md §«Пустое
-     * значение отбора журнальной выборки даёт пустую страницу молча»).
+     * Обратный запрос — «строки, у которых сделки нет», — этим входом не
+     * выражается, и попытка выразить его пустым операндом получает отказ
+     * (docs/models/domain/other/AuditRecord.md §«Как журнал читается»;
+     * довод — .claude/decisions/journal-read-empty-operand.md).
      *
-     * <p>Первая половина ожидания исполнена: отбор отдаёт строки СО
-     * значением. Вторая — нет. Пустое значение операнда отбора уезжает в
-     * выборку как значение, и сравнение равенством не берёт ни одной
-     * строки: колонка радиуса либо пуста, либо непуста, и пустой строкой не
-     * бывает никогда. Читатель, оставивший поле незаполненным, получает
-     * пустую страницу при непустом журнале — то есть ответ «за этот период
-     * ничего не происходило» на вопрос, которого он не задавал
-     * (docs/concept.md, П1). Ветвь эта домом не объявлена вовсе — тот же
-     * класс, что у {@code F-4}.
-     *
-     * <p><b>Ожидание под текущий факт не ослаблено</b>
-     * (.claude/tests/cases/audit.md §«Ожидание берётся из дома, даже когда
-     * сегодня оно не исполнено»), а клетка помечена {@code debt} и в
-     * умолчание прогона не входит: зелёная половина её ожидания накрыта
-     * соседней клеткой {@code B8.9} целиком, и потери покрытия пометка не
-     * даёт.
+     * <p><b>Отказ мерится отсутствием строк в ответе, а не только
+     * классом:</b> пустое значение, прочитанное значением, дало бы пустую
+     * страницу, прочитанное как «отбор не задан» — весь ряд окна; отказ не
+     * отдаёт ни того, ни другого. Число ответа не пинится — оно в «Факт».
      */
     @Test
-    @Tag("debt")
     @DisplayName("B8.10 — Отбор выбирает строки СО значением, а не строки без него")
     void aFilterPicksRowsThatCarryTheValueRatherThanRowsWithoutIt() {
         given("E-WITH-DEAL", Duration.ofMinutes(20), Bodies.withDeal(DEAL));
@@ -411,9 +398,27 @@ class JournalReadBoxTest extends SharedAuditBox {
         assertThat(page().records().getFirst().get(DEAL_FIELD))
                 .as("вход поставлен: у второй строки радиуса нет вовсе")
                 .isNull();
-        assertThat(ids(pageOf(to.minus(WINDOW), to, DEAL_FIELD, "")))
-                .as("обратное этим входом не выражается: пустое значение читается как «отбор не задан»")
-                .containsExactly("E-WITHOUT-DEAL", "E-WITH-DEAL");
+
+        Answer empty = pageOf(to.minus(WINDOW), to, DEAL_FIELD, "");
+        Answer spaces = pageOf(to.minus(WINDOW), to, DEAL_FIELD, "   ");
+        for (Answer blank : List.of(empty, spaces)) {
+            assertThat(blank.asObject().get(CODE_FIELD))
+                    .as("пустое значение отбора вопросом не принято").isEqualTo(QUERY_REJECTED);
+            assertThat(String.valueOf(blank.asObject().get(MESSAGE_FIELD)))
+                    .as("текст называет операнд").contains(DEAL_FIELD);
+            assertThat(blank.asObject())
+                    .as("ни пустой страницы, ни всего ряда окна: строк не отдано")
+                    .doesNotContainKey(RECORDS_FIELD);
+        }
+
+        Answer blankCursor = pageOf(to.minus(WINDOW), to, CURSOR_MOMENT, iso(to), CURSOR_ID, "");
+        assertThat(blankCursor.asObject().get(CODE_FIELD))
+                .as("то же у пустой идентичности курсора при названном моменте").isEqualTo(QUERY_REJECTED);
+        assertThat(String.valueOf(blankCursor.asObject().get(MESSAGE_FIELD)))
+                .as("и текст называет её операнд").contains(CURSOR_ID);
+        assertThat(blankCursor.asObject())
+                .as("непрочитанные строки момента курсора молча не выброшены: строк не отдано")
+                .doesNotContainKey(RECORDS_FIELD);
     }
 
     @Test

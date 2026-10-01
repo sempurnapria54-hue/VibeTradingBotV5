@@ -25,11 +25,13 @@ import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyOrd
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPositionAction;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
+import com.example.tradingcore.config.DealContextProperties;
 import com.example.tradingcore.domain.calc.CalculationContextFactory;
 import com.example.tradingcore.domain.command.DealActionState;
 import com.example.tradingcore.domain.command.DealActionStateStatus;
@@ -51,6 +53,9 @@ import com.example.tradingcore.domain.command.strategy.ExitRoundingReader;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -79,8 +84,10 @@ class ActionCommandPlanTest {
     private final ExitRoundingReader exitRoundingReader = new ExitRoundingReader(
             mock(AnomalyReportService.class), mock(DealActionStateDataService.class));
 
+    private final DealContextProperties properties = new DealContextProperties();
+
     private final CreateOrderActionExecutor orderExecutor =
-            new CreateOrderActionExecutor(contextFactory, calculator, riskGate, exitRoundingReader);
+            new CreateOrderActionExecutor(contextFactory, calculator, riskGate, exitRoundingReader, properties);
     private final CreateAlgoOrderActionExecutor algoExecutor =
             new CreateAlgoOrderActionExecutor(contextFactory, calculator, riskGate, exitRoundingReader);
     private final CancelAlgoOrderActionExecutor cancelExecutor = new CancelAlgoOrderActionExecutor(riskGate);
@@ -88,6 +95,7 @@ class ActionCommandPlanTest {
 
     @BeforeEach
     void setUp() {
+        properties.setBalanceFreshness(Duration.ofMinutes(5));
         when(contextFactory.build(any(), any(), any())).thenReturn(context());
         when(riskGate.gate(any(), any(), any())).thenReturn(Optional.empty());
         when(riskGate.gateProtectionRemoval(any(), any(), any())).thenReturn(Optional.empty());
@@ -509,7 +517,19 @@ class ActionCommandPlanTest {
         deal.setPositions(List.of(live));
         return DealContext.builder()
                 .deal(deal)
+                .balanceContainer(freshBalance())
                 .actionStates(new ArrayList<>())
                 .build();
+    }
+
+    /**
+     * Снимок средств, снятый минуту назад: акт, создающий риск, на несвежем
+     * снимке этим проходом не решается (docs/components/RiskValidator.md
+     * §«Проверки средств счёта»), и предмет этих кейсов — план решённого акта.
+     */
+    private BalanceContainer freshBalance() {
+        BalanceContainer container = new BalanceContainer();
+        container.setExternalUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+        return container;
     }
 }

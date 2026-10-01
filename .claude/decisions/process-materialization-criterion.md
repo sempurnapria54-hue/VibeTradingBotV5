@@ -113,5 +113,5 @@
   и блок загрузки/целостности из него вынесены.
 - Владелец оркестрации переходов `Instrument.Status` /
   `CandleGroup.Status` (отдельный orchestrator-компонент + handler'ы
-  по образцу Deal, или иначе) пока не материализуется — открытый
-  вопрос ORCH-Q1 (`.claude/work/questions/open-questions.md`).
+  по образцу Deal, или иначе) не материализуется — вопрос закрыт
+  решением `.claude/decisions/instrument-onboarding-status-writer.md`.

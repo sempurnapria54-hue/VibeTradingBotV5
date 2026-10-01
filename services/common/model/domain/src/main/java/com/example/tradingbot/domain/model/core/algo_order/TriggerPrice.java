@@ -10,7 +10,7 @@ import lombok.Setter;
  * Триггерная цена ноги algo-order: внутренний тип/значение и биржевые
  * type/value (могут отличаться округлением). Раздел модели AlgoOrder
  * (model-granularity). См. docs/models/domain/core/AlgoOrder.md
- * (§Condition-модель).
+ * (§«Условие срабатывания»).
  */
 @Getter
 @Setter

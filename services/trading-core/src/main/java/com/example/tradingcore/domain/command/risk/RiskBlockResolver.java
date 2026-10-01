@@ -11,12 +11,11 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
-import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckStatus;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
@@ -81,17 +80,15 @@ public class RiskBlockResolver {
                     .type(RiskBlockAction.Type.CONTINUE)
                     .comment("risk allowed")
                     .build();
-            case WARNING -> RiskBlockAction.builder()
-                    .type(RiskBlockAction.Type.CONTINUE_WITH_WARNING)
-                    .comment(riskValidationResult.getComment())
-                    .build();
             case BLOCKED -> resolveBlocked(dealContext, currentStatus, riskValidationResult);
         };
     }
 
     private RiskBlockAction resolveBlocked(DealContext dealContext, DealTranche.Status currentStatus,
                                            RiskValidationResult result) {
-        List<RiskCheckResult> blocking = blockingChecks(result);
+        // Перечень вердикта несёт только отказы: каждый его член блокирующий
+        // (docs/components/models/RiskCheckResult.md).
+        List<RiskCheckResult> blocking = new ArrayList<>(emptyIfNull(result.getChecks()));
         if (hasCode(blocking, RiskCheckCode.DEAL_GRAPH_INCOMPLETE)) {
             // Не вердикт риск-политики: операндов не предъявлено. Стадия его
             // реакцию не делит ни одной строкой — на всех идёт тропа ошибки
@@ -118,19 +115,10 @@ public class RiskBlockResolver {
                     .comment("risk blocked with live risk present: " + result.getComment())
                     .build();
         }
-        // Живого риска ещё нет. ОПЕРАНД НЕ ДОБЫТ — вердикт откладывается, а
-        // не выносится: снимок средств добывается звеном REFRESH_BALANCE, и
-        // причины у такой реакции нет (docs/components/RiskBlockResolver.md
-        // §«Карта «вердикт → действие»»). Ветвь стои́т ПОСЛЕ живого риска, а
-        // не до него: при живом риске несвежий снимок — рассогласование
-        // учёта и ведёт в ERROR (docs/processes/risk-evaluation.md
-        // §«Карв-аут исчерпанного бюджета сделки»).
-        if (hasCode(blocking, RiskCheckCode.BALANCE_NOT_FRESH)) {
-            return RiskBlockAction.builder()
-                    .type(RiskBlockAction.Type.REQUEST_REFRESH)
-                    .comment("balance not fresh; refresh required")
-                    .build();
-        }
+        // Живого риска ещё нет. Отложенного вердикта карта не знает:
+        // несвежий снимок средств добывает предвходовая проверка ДО
+        // преконтроля, и в вердикт он не приходит
+        // (docs/components/RiskBlockResolver.md §«Карта «вердикт → действие»»).
         // Род реакции даёт СТАДИЯ, а терминал ставит только БЕССРОЧНЫЙ
         // вердикт. Временный отказ закрывал бы уровень сетки навсегда —
         // бюджет освободится выходом соседнего транша, а транша, который
@@ -205,12 +193,6 @@ public class RiskBlockResolver {
                 .map(RiskCheckResult::getCode)
                 .findFirst()
                 .orElse(null);
-    }
-
-    private List<RiskCheckResult> blockingChecks(RiskValidationResult result) {
-        return emptyIfNull(result.getChecks()).stream()
-                .filter(check -> RiskCheckStatus.BLOCKED.equals(check.getStatus()))
-                .collect(Collectors.toList());
     }
 
     /**
