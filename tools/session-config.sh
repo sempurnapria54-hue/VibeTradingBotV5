@@ -46,6 +46,7 @@ load_session_config() { # отказ — сообщение в stderr и код 
     # Замена в кавычках: у bash 5.2 `&` и `\` в незакавыченной замене особые,
     # а путь Windows несёт обратные косые.
     val="${val//'${LOCALAPPDATA}'/"${LOCALAPPDATA:-$HOME}"}"
+    val="${val//'${HOME}'/"$HOME"}"
     if [ -n "${!key+x}" ]; then
       SESSION_CONFIG_ORIGIN[$key]="окружение"
     else

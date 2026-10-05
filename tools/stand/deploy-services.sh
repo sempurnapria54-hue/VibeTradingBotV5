@@ -57,7 +57,7 @@ NODE="$CLUSTER-control-plane"
 # аргументов в windows-форму, и `ctr` внутри узла получает мусор.
 node_ctr() { MSYS_NO_PATHCONV=1 docker exec "$NODE" ctr -n k8s.io "$@"; }
 ENVIRONMENT="${STAND_ENVIRONMENT:-dev}"
-KIND="${KIND:-$LOCALAPPDATA/kind/kind.exe}"
+KIND="${KIND:-${LOCALAPPDATA:-}/kind/kind.exe}"
 [ -x "$KIND" ] || KIND="kind"
 
 # Дом путей JDK/Maven — .claude/skills/environment-commands.md
@@ -68,8 +68,15 @@ KIND="${KIND:-$LOCALAPPDATA/kind/kind.exe}"
 # молча собирала бы проект не тем компилятором: сборка падает на
 # repackage — «class file version 61.0 … recognizes up to 55.0».
 # Переопределяется явно: STAND_JDK / STAND_MAVEN.
-STAND_JDK="${STAND_JDK:-$HOME/.jdks/corretto-25.0.3}"
-STAND_MAVEN="${STAND_MAVEN:-/c/Program Files/JetBrains/IntelliJ IDEA 2026.1/plugins/maven/lib/maven3}"
+if [ "$(uname -s)" = "Darwin" ]; then
+  # macOS: JDK — ссылка ~/.jdks/corretto-25 (её же ждёт tools/spec-runner-env.sh),
+  # Maven — встроенный в IDEA, как на Windows.
+  STAND_JDK="${STAND_JDK:-$HOME/.jdks/corretto-25}"
+  STAND_MAVEN="${STAND_MAVEN:-/Applications/IntelliJ IDEA.app/Contents/plugins/maven-plugin/lib/maven3}"
+else
+  STAND_JDK="${STAND_JDK:-$HOME/.jdks/corretto-25.0.3}"
+  STAND_MAVEN="${STAND_MAVEN:-/c/Program Files/JetBrains/IntelliJ IDEA 2026.1/plugins/maven/lib/maven3}"
+fi
 [ -x "$STAND_JDK/bin/java" ] || { echo "ОТКАЗ: нет JDK в $STAND_JDK" >&2; exit 2; }
 [ -x "$STAND_MAVEN/bin/mvn" ] || { echo "ОТКАЗ: нет Maven в $STAND_MAVEN" >&2; exit 2; }
 export JAVA_HOME="$STAND_JDK"

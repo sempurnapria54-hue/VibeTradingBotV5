@@ -46,6 +46,30 @@ Vault в не-dev режиме.
 **отвергает**, а не тем, что профиль выставляет `okx.simulated=1`. Второе —
 заявление о нашей настройке, первое — свойство самого ключа.
 
+## Факты среды macOS — проверено прогоном 2026-10-04
+
+Второй хост держателя: macOS 26.5, Apple Silicon (`arm64`), IDEA 2026.x.
+Таблица выше описывает Windows; здесь — только то, чем мак от неё
+отличается. Команды стенда и реактора выбирают пути сами по `uname -s`.
+
+| Что нужно | Состояние | Чем проверено |
+|---|---|---|
+| JDK 25 | Corretto 25.0.4.1 из IDEA; ссылка `~/.jdks/corretto-25` → `~/Library/Java/JavaVirtualMachines/corretto-25.0.4.1/Contents/Home` — её по умолчанию берут `tools/reactor-test.sh`, `tools/stand/deploy-services.sh`, `tools/spec-runner-env.sh` | `~/.jdks/corretto-25/bin/java -version` |
+| Maven | встроенный в IDEA: `/Applications/IntelliJ IDEA.app/Contents/plugins/maven-plugin/lib/maven3`, 3.9.16; на `PATH` нет | `"…/maven3/bin/mvn" -v` |
+| Лаунчер Python | `py` — шим в `/opt/homebrew/bin/py`, отбрасывает `-3` и зовёт Homebrew `python3.11`; системный `/usr/bin/python3` — 3.9 | `py -3 -c "import sys; print(sys.version)"` |
+| bash | Homebrew bash 5 первым на `PATH`: системный 3.2 не знает `mapfile` (`tools/stand/identity-client-secret.sh`) | `bash --version` |
+| `timeout` | в macOS нет; Homebrew `coreutils` даёт `gtimeout`, и цепочка сессий берёт его сама (`tools/session-loop.sh`, `tools/session-unattended.sh`); `date -d @эпоха` там же заменён разбором с откатом на BSD `date -r` | `bash tools/session-loop.sh 1 --dry-run` |
+| Docker | Docker Desktop без привилегированного помощника: сокет `~/.docker/run/docker.sock` (контекст `desktop-linux`), `/var/run/docker.sock` нет; порт хоста 443 пробрасывается и без помощника. Testcontainers сокет находит сам | ящик `auth` зелён: `bash tools/reactor-test.sh --modules services/auth` |
+| kind, kubectl | Homebrew, на `PATH`; кластер — v0.33.0, узел v1.37.0 (`arm64`) | `kind version` |
+| Каталог стенда | `~/vibetrading-stand` (вместо `%LOCALAPPDATA%\vibetrading-stand`): `vault-init.json`, `identity-holder-dev.json`, `ingress-dev.crt` | `ls ~/vibetrading-stand` |
+| Loopback | на `lo0` есть только `127.0.0.1`; сквозной набор `tests` занимает `127.0.0.21`–`127.0.0.27` и `127.0.0.40` — без алиасов «Failed to bind to /127.0.0.40:8080». Алиасы и строку hosts стенда ставит разово `sudo bash ~/vibetrading-stand/macos-host-setup.sh` (вне репозитория; LaunchDaemon возвращает алиасы после перезагрузки) | прогон `--modules tests` 2026-10-04 |
+| Файл hosts | `/etc/hosts` — строку `127.0.0.1 dev.vibetrading.invalid` ставит тот же скрипт | `curl --resolve dev.vibetrading.invalid:443:127.0.0.1 -k …/realms/vibetrading/.well-known/openid-configuration` → `200` |
+| Сеть до реестров образов | **узкое место**: зарубежные хосты отдают единицы сотен КБ/с, выкачка kubelet зависает без таймаута, и очередь выкачки в узле стоит. Первая постановка стенда шла около четырёх часов; повторная выкачки не требует | замер 2026-10-04 |
+
+`/usr/bin/curl` мака (LibreSSL) не принимает самоподписанный сертификат
+ингресса через `--cacert` («couldn't get X509-issuer name»); это свойство
+клиента, а не стенда.
+
 ## Воспроизводимые команды
 
 ```bash

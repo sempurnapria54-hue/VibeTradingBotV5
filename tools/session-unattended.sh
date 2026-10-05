@@ -98,6 +98,9 @@ LOOP_DIR="$SESSION_LOOP_DIR"
 JOURNAL="$LOOP_DIR/journal.md"
 VAULT_NS="vault-system"
 VAULT_POD="vault-0"
+# `timeout` — GNU coreutils; в macOS его нет, Homebrew coreutils даёт `gtimeout`.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
+[ -n "$TIMEOUT_BIN" ] || { echo "ОТКАЗ: timeout не найден (macOS: brew install coreutils — даёт gtimeout)" >&2; exit 2; }
 
 case "${1:-}" in -h|--help) awk 'NR > 1 { if (/^#/) print; else exit }' "${BASH_SOURCE[0]}"; exit 0 ;; esac
 [ $# -eq 2 ] || { echo "ОТКАЗ: нужно два аргумента — <всего сессий> <потолок USD>" >&2; exit 2; }
@@ -167,13 +170,13 @@ trap 'finish 130 "прерван сигналом"' INT TERM
 STAND_ERR=""
 stand_check() {
   STAND_ERR=""
-  if ! timeout 60 docker info >/dev/null 2>&1; then
+  if ! "$TIMEOUT_BIN" 60 docker info >/dev/null 2>&1; then
     STAND_ERR="Docker не отвечает (docker info за 60 с) — запустить Docker Desktop"
     return 1
   fi
   # `vault status`: 0 — распечатан, 2 — запечатан, прочее — не ответил.
   local out code=0 sealed
-  out="$(timeout 60 kubectl -n "$VAULT_NS" exec "$VAULT_POD" -- vault status -format=json 2>/dev/null)" || code=$?
+  out="$("$TIMEOUT_BIN" 60 kubectl -n "$VAULT_NS" exec "$VAULT_POD" -- vault status -format=json 2>/dev/null)" || code=$?
   sealed="$(printf '%s' "$out" | py -3 -c 'import json, sys
 try:
     print(str(json.load(sys.stdin)["sealed"]).lower())

@@ -141,8 +141,12 @@ duration_seconds() { # $1 — значение SESSION_TIMEOUT; печатает
     d) echo $(( number * 86400 )) ;;
   esac
 }
+# `timeout` — GNU coreutils: в Git Bash он есть, в macOS его нет вовсе, а
+# Homebrew coreutils ставит его под именем `gtimeout`. Код 124 у обоих один.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
 TIMEOUT_S=""
 if [ -n "${SESSION_TIMEOUT:-}" ]; then
+  [ -n "$TIMEOUT_BIN" ] || { echo "ОТКАЗ: SESSION_TIMEOUT задан, а timeout не найден (macOS: brew install coreutils — даёт gtimeout)" >&2; exit 2; }
   TIMEOUT_S="$(duration_seconds "$SESSION_TIMEOUT")" \
     || { echo "ОТКАЗ: SESSION_TIMEOUT=«$SESSION_TIMEOUT» — не длительность timeout (целое с суффиксом s, m, h, d)" >&2; exit 2; }
 fi
@@ -180,6 +184,8 @@ say() { printf "\n=== %s\n" "$*"; }
 jrn() { printf '%s\n' "$*" >>"$JOURNAL"; }
 # Строка ленты: время слева, событие справа (формат — session-chain.md).
 feed() { printf '%s %s\n' "$(date '+%H:%M')" "$*"; }
+# Эпоха → «ЧЧ:ММ»: GNU date берёт `-d @эпоха`, BSD date мака — `-r эпоха`.
+clock_of() { date -d "@$1" '+%H:%M' 2>/dev/null || date -r "$1" '+%H:%M'; }
 FEED="$ROOT/tools/session_feed.py"
 
 # ------------------------------------------------------------------ диск
@@ -199,12 +205,19 @@ FEED="$ROOT/tools/session_feed.py"
 # Путь — ручка SESSION_DOCKER_DATA_DIR (tools/session-loop.conf). Имя
 # проверяемого пути держится отдельной переменной: отказ ниже называет адрес,
 # который ДЕЙСТВИТЕЛЬНО проверялся.
+#
+# ХОСТОВ ДВА — Windows и macOS, — и ручка несёт адреса обоих через `:`.
+# Подтверждение файлом образа и разводит их: у Windows это `*.vhdx` WSL, у
+# Docker Desktop мака — `Docker.raw`; адрес чужого хоста образа не несёт и
+# пропускается, как пустой каталог после переноса.
 DOCKER_DATA_DIR_TRIED="$SESSION_DOCKER_DATA_DIR"
 docker_data_dir() {
-  local host_path="$DOCKER_DATA_DIR_TRIED" root
-  if [ -d "$host_path" ]      && [ -n "$(find "$host_path" -maxdepth 2 -name '*.vhdx' -print -quit 2>/dev/null)" ]; then
-    printf '%s' "$host_path"; return
-  fi
+  local host_path root IFS=':'
+  for host_path in $DOCKER_DATA_DIR_TRIED; do
+    if [ -d "$host_path" ] && [ -n "$(find "$host_path" -maxdepth 2 \( -name '*.vhdx' -o -name 'Docker.raw' \) -print -quit 2>/dev/null)" ]; then
+      printf '%s' "$host_path"; return
+    fi
+  done
   root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
   if [ -n "$root" ] && [ -d "$root" ]; then printf '%s' "$root"; return; fi
 }
@@ -245,7 +258,7 @@ else
 fi
 
 DOCKER_DIR="$(docker_data_dir)"
-[ -n "$DOCKER_DIR" ] || { echo "ОТКАЗ: хранилище Docker не найдено — в «$DOCKER_DATA_DIR_TRIED» нет ни одного *.vhdx (иной адрес — SESSION_DOCKER_DATA_DIR), DockerRootDir демона тоже не годится. Свободное место мерить нечем" >&2; exit 2; }
+[ -n "$DOCKER_DIR" ] || { echo "ОТКАЗ: хранилище Docker не найдено — в «$DOCKER_DATA_DIR_TRIED» нет ни одного *.vhdx либо Docker.raw (иной адрес — SESSION_DOCKER_DATA_DIR), DockerRootDir демона тоже не годится. Свободное место мерить нечем" >&2; exit 2; }
 echo "хранилище Docker: $DOCKER_DIR"
 # Откуда взято каждое значение — файл или окружение: ручка, перекрытая
 # забытым `export`, видна здесь, а не по поведению сессий.
@@ -351,7 +364,7 @@ for (( n = 1; n <= MAX; n++ )); do
   STARTED="$(date '+%Y-%m-%d %H:%M:%S')"
   if [ -n "$TIMEOUT_S" ]; then
     export SESSION_DEADLINE=$(( $(date +%s) + TIMEOUT_S ))
-    feed "▶ сессия $n/$MAX · шаг $STEP_BEFORE · $STATUS_BEFORE · дедлайн $(date -d "@$SESSION_DEADLINE" '+%H:%M')"
+    feed "▶ сессия $n/$MAX · шаг $STEP_BEFORE · $STATUS_BEFORE · дедлайн $(clock_of "$SESSION_DEADLINE")"
   else
     unset SESSION_DEADLINE
     feed "▶ сессия $n/$MAX · шаг $STEP_BEFORE · $STATUS_BEFORE · без предела времени"
@@ -362,7 +375,7 @@ for (( n = 1; n <= MAX; n++ )); do
   # выхода берётся у claude, а не у фильтра (PIPESTATUS).
   set +e
   if [ -n "${SESSION_TIMEOUT:-}" ]; then
-    timeout "$SESSION_TIMEOUT" claude -p "$PROMPT" \
+    "$TIMEOUT_BIN" "$SESSION_TIMEOUT" claude -p "$PROMPT" \
       --output-format stream-json --verbose --json-schema "$SCHEMA" \
       --permission-mode "$PERMISSION_MODE" --permission-prompts none \
       --effort "$EFFORT" \

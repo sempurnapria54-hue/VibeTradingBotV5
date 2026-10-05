@@ -23,8 +23,10 @@ ENVIRONMENT="${STAND_ENVIRONMENT:-dev}"
 # может лежать в манифесте окружения, потому что применяется до того, как
 # манифесты кто-то читает.
 ARGOCD_VERSION="v3.5.2"
-KIND="${KIND:-$LOCALAPPDATA/kind/kind.exe}"
-STAND_DIR="${STAND_DIR:-$LOCALAPPDATA/vibetrading-stand}"
+KIND="${KIND:-${LOCALAPPDATA:-}/kind/kind.exe}"
+# Вне Windows %LOCALAPPDATA% нет — каталог стенда ложится в $HOME, как у
+# tools/session-unattended.sh.
+STAND_DIR="${STAND_DIR:-${LOCALAPPDATA:-$HOME}/vibetrading-stand}"
 
 say() { printf "\n=== %s\n" "$*"; }
 
@@ -59,7 +61,7 @@ kubectl create namespace "$ENVIRONMENT" --dry-run=client -o yaml | kubectl apply
 # Перечень идёт по РОЛЯМ, а не по сервисам: у процесса с двумя владельцами
 # данных ролей две (audit, statistics — docs/architecture/data-ownership.md
 # §Раскладка). Роль, чьего секрета нет, оператор не сводит вовсе.
-for role in keycloak auth market_data trading_core audit statistics; do
+for role in keycloak auth market_data strategies trading_core audit statistics; do
   secret="postgres-role-$(echo "$role" | tr '_' '-')"
   if kubectl -n "$ENVIRONMENT" get secret "$secret" >/dev/null 2>&1; then
     echo "секрет $secret уже есть"
@@ -72,6 +74,16 @@ for role in keycloak auth market_data trading_core audit statistics; do
     echo "секрет $secret заведён"
   fi
 done
+
+# Подпись билета подписки периметра: общая у реплик, поэтому генерируется
+# один раз на окружение, а не подом (.claude/skills/local-stand.md).
+if kubectl -n "$ENVIRONMENT" get secret bff-ticket-secret >/dev/null 2>&1; then
+  echo "секрет bff-ticket-secret уже есть"
+else
+  kubectl -n "$ENVIRONMENT" create secret generic bff-ticket-secret \
+    --from-literal=secret="$(openssl rand -base64 32)" >/dev/null
+  echo "секрет bff-ticket-secret заведён"
+fi
 
 say "5. Окружение $ENVIRONMENT"
 kubectl apply -k "$ROOT/deploy/$ENVIRONMENT"

@@ -10,32 +10,24 @@
         <module name="test-support" />
         <module name="tests" />
       </profile>
-      <profile name="Annotation profile for domain-model" enabled="true">
+      <profile name="Annotation profile for vibetradingbot" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok-mapstruct-binding/0.2.0/lombok-mapstruct-binding-0.2.0.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct-processor/1.6.3/mapstruct-processor-1.6.3.jar" />
         </processorPath>
-        <module name="domain-model" />
-      </profile>
-      <profile name="Annotation profile for strategy-engine" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
-        </processorPath>
-        <module name="strategy-engine" />
-      </profile>
-      <profile name="Annotation profile for message-model" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
-        </processorPath>
-        <module name="message-model" />
+        <module name="market-data" />
+        <module name="trading-core" />
+        <module name="bff" />
+        <module name="auth" />
+        <module name="strategies" />
+        <module name="audit" />
+        <module name="tradingbot (1)" />
+        <module name="connector-okx" />
+        <module name="statistics" />
       </profile>
       <profile name="Annotation profile for api-model" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -45,6 +37,24 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
         </processorPath>
         <module name="api-model" />
+      </profile>
+      <profile name="Annotation profile for domain-model" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+        </processorPath>
+        <module name="domain-model" />
+      </profile>
+      <profile name="Annotation profile for message-model" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+        </processorPath>
+        <module name="message-model" />
       </profile>
       <profile name="Annotation profile for persistence-model" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -64,24 +74,14 @@
         </processorPath>
         <module name="platform" />
       </profile>
-      <profile name="Annotation profile for vibetradingbot" enabled="true">
+      <profile name="Annotation profile for strategy-engine" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok-mapstruct-binding/0.2.0/lombok-mapstruct-binding-0.2.0.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct-processor/1.6.3/mapstruct-processor-1.6.3.jar" />
         </processorPath>
-        <module name="market-data" />
-        <module name="trading-core" />
-        <module name="bff" />
-        <module name="auth" />
-        <module name="strategies" />
-        <module name="audit" />
-        <module name="tradingbot (1)" />
-        <module name="connector-okx" />
-        <module name="statistics" />
+        <module name="strategy-engine" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>

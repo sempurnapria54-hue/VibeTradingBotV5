@@ -28,7 +28,9 @@
 set -euo pipefail
 
 ENVIRONMENT="${STAND_ENVIRONMENT:-dev}"
-STAND_DIR="${STAND_DIR:-$LOCALAPPDATA/vibetrading-stand}"
+# Вне Windows %LOCALAPPDATA% нет — каталог стенда ложится в $HOME, как у
+# tools/session-unattended.sh.
+STAND_DIR="${STAND_DIR:-${LOCALAPPDATA:-$HOME}/vibetrading-stand}"
 REALM="vibetrading"
 HOLDER="holder"
 POD="platform-identity-0"

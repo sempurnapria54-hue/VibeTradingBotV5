@@ -474,8 +474,14 @@ if ! battery; then
 fi
 
 # --- собственно прогон ---------------------------------------------------
-JDK_HOME="${REACTOR_JDK:-C:/Users/RomanKrd/.jdks/corretto-25.0.3}"
-MVN="${REACTOR_MVN:-C:/Program Files/JetBrains/IntelliJ IDEA 2026.1/plugins/maven/lib/maven3/bin/mvn.cmd}"
+if [ "$(uname -s)" = "Darwin" ]; then
+  # macOS: те же JDK и Maven, что у tools/stand/deploy-services.sh.
+  JDK_HOME="${REACTOR_JDK:-$HOME/.jdks/corretto-25}"
+  MVN="${REACTOR_MVN:-/Applications/IntelliJ IDEA.app/Contents/plugins/maven-plugin/lib/maven3/bin/mvn}"
+else
+  JDK_HOME="${REACTOR_JDK:-C:/Users/RomanKrd/.jdks/corretto-25.0.3}"
+  MVN="${REACTOR_MVN:-C:/Program Files/JetBrains/IntelliJ IDEA 2026.1/plugins/maven/lib/maven3/bin/mvn.cmd}"
+fi
 
 if [ ! -x "$JDK_HOME/bin/javac" ] && [ ! -f "$JDK_HOME/bin/javac.exe" ]; then
   echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: JDK не найден — $JDK_HOME (переопределяется REACTOR_JDK)"

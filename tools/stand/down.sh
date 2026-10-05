@@ -16,7 +16,7 @@
 set -euo pipefail
 
 CLUSTER="vibetrading"
-KIND="${KIND:-$LOCALAPPDATA/kind/kind.exe}"
+KIND="${KIND:-${LOCALAPPDATA:-}/kind/kind.exe}"
 [ -x "$KIND" ] || KIND="kind"
 
 if "$KIND" get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
