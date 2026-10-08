@@ -88,10 +88,19 @@ public class AlgoOrder extends Auditable {
     /** Рассчитанный materialized размер (для SWAP/FUTURES — контракты). */
     private BigDecimal size;
 
-    /** Направление (closing long → SELL, short → BUY). */
+    /**
+     * Направление (closing long → SELL, short → BUY). У нашей строки —
+     * намерение; у прочитанной копии — эхо стороны площадки, переведённое
+     * коннектором в словарь домена, и на строку оно не переносится: оно
+     * операнд сверки ({@link #matchesEcho}).
+     */
     private Direction direction;
 
-    /** Доменное намерение: только уменьшать позицию. */
+    /**
+     * Доменное намерение: только уменьшать позицию. У прочитанной копии —
+     * эхо признака площадки; на строку не переносится, операнд сверки
+     * ({@link #matchesEcho}; docs/integrations/okx/rules/reduce-only-invariant.md).
+     */
     private Boolean positionReducingOnly;
 
     /** internalId предшественника в цепочке REPLACE (nullable; обратная ссылка выводится запросом). */
@@ -291,6 +300,34 @@ public class AlgoOrder extends Auditable {
     }
 
     /**
+     * Эхо площадки совпадает с нашей строкой по трём осям сверки
+     * (docs/models/mapping/AlgoOrder.md §«Сверка эха»): признак «только
+     * уменьшать», сторона и ценовая база КАЖДОЙ триггерной ноги — стопа и
+     * тейка. У каждой оси есть правило, опирающееся на исполненность нашего
+     * намерения до срабатывания; прочие поля записи не сверяются, и это
+     * решение, а не пропуск.
+     *
+     * <p><b>Пустое эхо либо пустая декларация оси сверку не запускают:</b>
+     * молчание источника — недобытый факт, а реакция на расхождение —
+     * аварийный контур всего счёта. Отсюда и пустая копия совпадением
+     * читается.
+     *
+     * <p>У трейлинга оси базы нет: у его постановки поля базы нет вовсе, и
+     * сверять эхо не с чем (docs/models/domain/core/AlgoOrder.md).
+     *
+     * @param echo копия этой заявки, прочитанная у площадки
+     */
+    public Boolean matchesEcho(AlgoOrder echo) {
+        if (isNull(echo)) {
+            return true;
+        }
+        return agrees(positionReducingOnly, echo.getPositionReducingOnly())
+                && agrees(direction, echo.getDirection())
+                && agrees(declaredBase(stopLossLeg()), echoedBase(echo.stopLossLeg()))
+                && agrees(declaredBase(takeProfitLeg()), echoedBase(echo.takeProfitLeg()));
+    }
+
+    /**
      * Сколько эта защита реально закрывает: остаток размера после
      * срабатывания (docs/spec/protection-coverage.json, величина
      * {@code coveredSize} носителя STANDALONE).
@@ -414,6 +451,29 @@ public class AlgoOrder extends Auditable {
         if (isNull(reason)) {
             throw new IllegalArgumentException("closeReason is required");
         }
+    }
+
+    /** Нога стопа триггерной ветки; пусто — ветки либо ноги нет. */
+    private TriggerPrice stopLossLeg() {
+        return isNull(condition) || isNull(condition.getTrigger()) ? null : condition.getTrigger().getStopLoss();
+    }
+
+    /** Нога тейка триггерной ветки; пусто — ветки либо ноги нет. */
+    private TriggerPrice takeProfitLeg() {
+        return isNull(condition) || isNull(condition.getTrigger()) ? null : condition.getTrigger().getTakeProfit();
+    }
+
+    private static TriggerPriceType declaredBase(TriggerPrice leg) {
+        return isNull(leg) ? null : leg.getType();
+    }
+
+    private static TriggerPriceType echoedBase(TriggerPrice leg) {
+        return isNull(leg) ? null : leg.getExternalType();
+    }
+
+    /** Ось сверки расходится, только когда непусты обе стороны и они различны. */
+    private static boolean agrees(Object declared, Object echoed) {
+        return isNull(declared) || isNull(echoed) || Objects.equals(declared, echoed);
     }
 
     /** Направление algo-order. */

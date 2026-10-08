@@ -174,6 +174,31 @@ public class OkxResponseConverter {
         return isNull(direction) ? null : direction.name().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Эхо стороны условной заявки (buy/sell) → доменное направление: перевод
+     * словаря площадки делает граница, сверяет эхо добыча в ядре
+     * (docs/models/mapping/AlgoOrder.md §«Сверка эха»).
+     *
+     * <p><b>Молчание и неразрешимость — разные вещи.</b> Поле пусто — пусто,
+     * и сверка по стороне не запускается. Значение вне словаря — нарушение
+     * формы контракта: пустота на его месте выдала бы ответ, нарушивший
+     * контракт, за молчание и погасила бы сверку
+     * (docs/rules/controlled-exchange-exceptions.md).
+     */
+    @Named("okxAlgoSideToDomain")
+    public AlgoOrder.Direction algoSideToDomain(String raw) {
+        if (isBlank(raw)) {
+            return null;
+        }
+        if (OkxConstants.SIDE_BUY.equals(raw)) {
+            return AlgoOrder.Direction.BUY;
+        }
+        if (OkxConstants.SIDE_SELL.equals(raw)) {
+            return AlgoOrder.Direction.SELL;
+        }
+        throw new ExternalInvariantViolationException("algo order: сторона вне словаря контракта: " + raw);
+    }
+
     /** Внутренний тип trigger-цены → OKX тип (last/index/mark). */
     @Named("okxTriggerType")
     public String triggerType(AlgoOrder.TriggerPriceType type) {
@@ -181,11 +206,14 @@ public class OkxResponseConverter {
     }
 
     /**
-     * OKX эхо slTriggerPxType (last/index/mark) → доменный тип. Пустое эхо
-     * даёт пустой тип: молчание источника — недобытый факт, а не разрешение
-     * подставить умолчание. Значение вне перечня тоже пусто — сверку базы
-     * запускает только распознанное эхо
-     * (docs/models/mapping/Order.md §«AttachedAlgoOrder (attached protection)»).
+     * OKX эхо базы триггера (slTriggerPxType/tpTriggerPxType:
+     * last/index/mark) → доменный тип — у обеих форм защиты, встроенной и
+     * отдельной условной заявки. Пустое эхо даёт пустой тип: молчание
+     * источника — недобытый факт, а не разрешение подставить умолчание.
+     * Значение вне перечня тоже пусто — сверку базы запускает только
+     * распознанное эхо
+     * (docs/models/mapping/Order.md §«AttachedAlgoOrder (attached protection)»;
+     * docs/models/mapping/AlgoOrder.md).
      */
     @Named("okxTriggerPriceType")
     public AlgoOrder.TriggerPriceType triggerPriceType(String rawType) {

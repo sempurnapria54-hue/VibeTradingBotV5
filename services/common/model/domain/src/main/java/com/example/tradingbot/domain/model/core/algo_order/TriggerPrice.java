@@ -24,8 +24,14 @@ public class TriggerPrice {
     /** Внутреннее значение цены. */
     private BigDecimal value;
 
-    /** Биржевой тип цены. */
-    private String externalType;
+    /**
+     * Эхо ценовой базы, которую площадка применила, — в словаре домена:
+     * литерал площадки переводит коннектор на своей границе, и значение вне
+     * перечня приезжает пустым. Несёт его только прочитанная копия: на строку
+     * эхо не переносится, оно операнд сверки объявленной базы {@link #type}
+     * (docs/models/mapping/AlgoOrder.md §«Сверка эха»).
+     */
+    private AlgoOrder.TriggerPriceType externalType;
 
     /** Биржевое значение (может отличаться округлением). */
     private BigDecimal externalValue;

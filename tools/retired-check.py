@@ -206,7 +206,7 @@ WORK_FILES = ('.claude/work/backlog.md',
               '.claude/work/questions/open-questions.md',
               '.claude/work/roadmap/roadmap.md')
 
-# ДЕРЕВО ИНСТРУМЕНТОВ — СЕМЬ РАСШИРЕНИЙ.
+# ДЕРЕВО ИНСТРУМЕНТОВ — ВОСЕМЬ РАСШИРЕНИЙ.
 # Шаблоны выписаны литералами, а не собраны из перечня суффиксов: их читает не
 # только эта строка, но и условие возврата задачи, которая их потребовала, —
 # собранный в цикле шаблон в тексте файла не встречается вовсе.
@@ -216,10 +216,12 @@ WORK_FILES = ('.claude/work/backlog.md',
 # несущий ту же прозу. `tools/**/*.yaml` — манифест стенда
 # (`tools/stand/kind-cluster.yaml`) с комментариями о выборе формы кластера.
 # `tools/**/*.conf` — конфиг цикла (`tools/session-loop.conf`): значения ручек
-# и проза о приоритете окружения и месте секретов.
+# и проза о приоритете окружения и месте секретов. `tools/**/*.xml` —
+# собственные настройки Maven проекта (`tools/maven-settings.xml`) с прозой о
+# том, почему пользовательские настройки не правятся.
 TOOL_PATTERNS = ('tools/**/*.py', 'tools/**/*.sh', 'tools/**/*.txt',
                  'tools/**/*.md', 'tools/**/*.ps1', 'tools/**/*.yaml',
-                 'tools/**/*.conf')
+                 'tools/**/*.conf', 'tools/**/*.xml')
 
 ROOTS = (('CLAUDE.md', 'README.md', '*/README.md',
           'docs/**/*.md', 'docs/**/*.json',
@@ -3536,9 +3538,7 @@ RETIRED = [
         # офдока close-position (.claude/decisions/kill-switch-teardown-cancel-first.md):
         # корпус интеграции читал флаг шире, чем его объявляет площадка. Что
         # действует теперь — объявляет ключ `arrived` у каждого носителя
-        # популяции. Файл кода в разрешённых местах — остаток кодового
-        # захода: javadoc тела запроса правится им, и строка `allowed`
-        # снимается той же правкой.
+        # популяции.
         'pattern': r'отменить\s+все\s+активные\s+ордера'
                    r'|autoCxl\s+снимает\s+активные'
                    r'|Снять\s+активные\s+ордера\s+при\s+закрытии'
@@ -3548,9 +3548,7 @@ RETIRED = [
         'date': '2026-10-01',
         'source': '.claude/decisions/kill-switch-teardown-cancel-first.md (ORCH-Q2, узел 1e шага 12 фазы 2)',
         'allowed': ('.claude/work/decision-digest.md',
-                    '.claude/decisions/kill-switch-teardown-cancel-first.md',
-                    'services/connector-okx/src/main/java/com/example/connector/okx/integration/'
-                    'external/api/model/okx/request/ClosePositionOkxRequest.java'),
+                    '.claude/decisions/kill-switch-teardown-cancel-first.md'),
         'population': (
             ('docs/integrations/okx/contracts/position.md', None),
             ('docs/models/mapping/Position.md', None),

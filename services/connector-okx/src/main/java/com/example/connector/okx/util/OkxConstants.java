@@ -259,6 +259,12 @@ public class OkxConstants {
     /** Сторона ордера OKX: продажа. */
     public static final String SIDE_SELL = "sell";
 
+    /** Строковый признак OKX: истина (эхо reduceOnly условной заявки). */
+    public static final String FLAG_TRUE = "true";
+
+    /** Строковый признак OKX: ложь (эхо reduceOnly условной заявки). */
+    public static final String FLAG_FALSE = "false";
+
     /** Тип ордера OKX: лимитный. */
     public static final String ORD_TYPE_LIMIT = "limit";
 

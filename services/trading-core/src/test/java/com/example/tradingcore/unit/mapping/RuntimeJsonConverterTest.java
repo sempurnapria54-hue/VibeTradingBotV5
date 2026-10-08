@@ -422,10 +422,10 @@ class RuntimeJsonConverterTest extends JsonbOverlayProbe {
         Condition condition = new Condition();
         condition.setType(AlgoOrder.ConditionType.OCO_FULL);
         condition.setTrigger(new Trigger(
-                new TriggerPrice(AlgoOrder.TriggerPriceType.LAST, new BigDecimal("30000"), "last",
-                        new BigDecimal("30000")),
-                new TriggerPrice(AlgoOrder.TriggerPriceType.MARK, new BigDecimal("36000"), "mark",
-                        new BigDecimal("36000"))));
+                new TriggerPrice(AlgoOrder.TriggerPriceType.LAST, new BigDecimal("30000"),
+                        AlgoOrder.TriggerPriceType.LAST, new BigDecimal("30000")),
+                new TriggerPrice(AlgoOrder.TriggerPriceType.MARK, new BigDecimal("36000"),
+                        AlgoOrder.TriggerPriceType.MARK, new BigDecimal("36000"))));
         return condition;
     }
 
@@ -435,7 +435,7 @@ class RuntimeJsonConverterTest extends JsonbOverlayProbe {
         condition.getTrailing().setTrailingStepValue(new BigDecimal("50"));
         condition.getTrailing().setExternalPrice(new BigDecimal("31500.5"));
         condition.getTrailing().setActivationPrice(new TriggerPrice(AlgoOrder.TriggerPriceType.LAST,
-                new BigDecimal("33000"), "last", new BigDecimal("33000")));
+                new BigDecimal("33000"), AlgoOrder.TriggerPriceType.LAST, new BigDecimal("33000")));
         return condition;
     }
 

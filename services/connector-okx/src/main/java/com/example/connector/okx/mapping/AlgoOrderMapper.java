@@ -6,6 +6,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
 import com.example.connector.okx.snapshot.AlgoOrderExternalSnapshot;
 import com.example.connector.okx.snapshot.ConditionExternalSnapshot;
 import com.example.connector.okx.snapshot.TrailingExternalSnapshot;
@@ -39,8 +40,25 @@ public interface AlgoOrderMapper {
      * модель, а не доливает чужую. Доменный статус здесь не
      * проставляется — его ставит шлюз резолвером, последним шагом чтения
      * (docs/rules/external-status-resolution.md).
+     *
+     * <p><b>Эхо трёх осей сверки едет в словаре домена</b>: сторона — в
+     * {@code direction}, признак — в {@code positionReducingOnly}, база
+     * каждой триггерной ноги — в {@code condition.trigger.*.externalType}.
+     * Перевод словаря площадки делает граница, а сверяет эхо с нашей строкой
+     * добыча в ядре: строки коннектор при чтении не видит
+     * (docs/models/mapping/AlgoOrder.md §«Сверка эха»).
      */
+    @Mapping(target = "direction", source = "side", qualifiedByName = "okxAlgoSideToDomain")
+    @Mapping(target = "positionReducingOnly", source = "reduceOnly")
     AlgoOrder snapshotToDomain(AlgoOrderExternalSnapshot snapshot);
+
+    /**
+     * Нога цены снапшота → доменная: эхо базы переводится из словаря
+     * площадки; пусто и вне перечня — пусто, и сверку базы такая нога не
+     * запускает.
+     */
+    @Mapping(target = "externalType", qualifiedByName = "okxTriggerPriceType")
+    TriggerPrice snapshotToDomain(TriggerPriceExternalSnapshot snapshot);
 
     /** OKX algo response → snapshot: плоские OKX-поля → дерево condition. */
     default AlgoOrderExternalSnapshot integrationToSnapshot(AlgoOrderOkxResponse response) {
@@ -57,6 +75,8 @@ public interface AlgoOrderMapper {
                 .externalPrice(OkxParse.decimal(response.getActualPx()))
                 .externalTriggerTime(OkxParse.instant(response.getTriggerTime()))
                 .linkedOrderExternalIds(response.getOrdIdList())
+                .side(response.getSide())
+                .reduceOnly(OkxParse.flag(response.getReduceOnly()))
                 .condition(toConditionSnapshot(response))
                 .externalCreatedAt(OkxParse.offsetTime(response.getcTime()))
                 .externalModifiedAt(OkxParse.offsetTime(response.getuTime()))

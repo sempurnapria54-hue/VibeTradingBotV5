@@ -2551,46 +2551,30 @@ javadoc, комментария или литерала восстановить
 **Причина парковки.** Ось кода заведена доковой пачкой; правка дерева кода ей не
 давалась.
 
-## Сверки эха отдельной условной заявки не построены, а доки о `reduceOnly` расходятся
+## Хвосты двадцать девятой пачки 2026-10-08
 
-<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
 
-**Что сделать — кодовая половина** (доки сведены; решение —
-`.claude/decisions/standalone-algo-echo-check.md`, перечень сверяемого —
-`docs/models/mapping/AlgoOrder.md`). Исполнители:
+**Что сделать** — сверка эха отдельной условной заявки построена кодом
+(решение `.claude/decisions/standalone-algo-echo-check.md`), кейсы за ней не
+пошли:
 
-- `AlgoOrderOkxResponse` — поля `side`, `reduceOnly`; `AlgoOrderExternalSnapshot`
-  — `side` литералом источника, `reduceOnly` типом `Boolean`; коннекторный
-  `AlgoOrderMapper` — эхо в домен на прочитанной копии (`direction`,
-  `positionReducingOnly`, база через `okxTriggerPriceType`);
-  `TriggerPrice.externalType` — `AlgoOrder.TriggerPriceType` вместо `String`;
-- `AlgoOrder` — предикат совпадения эха по трём осям (пустое эхо или пустая
-  декларация сверку не запускают);
-- ядерный `AlgoOrderMapper.updateFromFetched` — игнор `direction` и
-  `positionReducingOnly`, перенос только непустого
-  `condition.trailing.externalPrice` (без ветви трейлинга у триггерной);
-- `RefreshAlgoOrderExecutor` — сверка первым ходом над найденной записью,
-  расхождение — `ExternalInvariantViolationException` без записи строки;
-  `RefreshOrderExecutor` (`resolveOne`) и `AttachedAlgoOrder` — сверка базы
-  встроенной защиты на обеих тропах;
-- javadoc: `ExternalInvariantViolationException` коннектора (перечень поводов
-  по факту), `PositionOkxResponse` (снять «adapter validation»),
-  `ClosePositionOkxRequest` (`autoCxl` — только заявки на закрытие; снять
-  строку `allowed` у записи реестра `tools/retired-check.py`);
-- миграция `trading-core` — `NOT NULL` на
-  `attached_algo_orders.trigger_price_type`.
+- `.claude/tests/cases/okx-mapping.md`: клетки `U10.14` (у формы источника
+  нет уже трёх полей, а не пяти) и `U9.8` (`reduceOnly` есть у формы
+  условной заявки, нет только у снапшота встроенной защиты) — ожидания
+  привести к коду; тесты переписаны тем же заходом;
+- завести клетки: предикат `AlgoOrder.matchesEcho` и
+  `AttachedAlgoOrder.matchesEcho` (юнит `EchoMatchTest` в
+  `services/common/model/domain` написан без меток); перевод коннектором
+  стороны и признака — пусто, в словаре, вне словаря (отказ инварианта);
+  ящик ядра — расхождение эха даёт отказ без записи строки и без живости;
+  перенос наблюдённого уровня трейлинга; сверка базы встроенной защиты на
+  трёх тропах (тело родителя, живая запись, история).
 
-Не затронуты: `SubmitAlgoOrderExecutor`, `AnomalyScanReader`,
-`CancelAlgoOrderActionExecutor`, `ExchangeOperationsClient`. Тестеру — клетка
-`U10.14` `.claude/tests/cases/okx-mapping.md` станет ложной; клетки сверки и
-переноса уровня трейлинга. Реестр пересобирается:
+**Дом** — `docs/models/mapping/AlgoOrder.md`, `docs/models/mapping/Order.md`,
+`docs/components/RefreshAlgoOrderExecutor.md`.
 
-```bash
-grep -rln "AlgoOrderOkxResponse\|AlgoOrderExternalSnapshot\|AlgoOrderMapper\|TriggerPrice\b\|getAlgoOrder(\|getPendingAlgoOrders\|getAlgoOrderHistory\|AttachedAlgoOrder" services/*/src/main services/common/*/src/main services/common/model/*/src/main
-```
-
-**Причина парковки.** Доковая пачка кода не правит; торговая цена ожидания —
-трейлинг-защита не считается покрытием, пока уровень не садится на строку.
+**Причина парковки.** Кодовая пачка документов кейсов не правит.
 
 ## Распил гигантов `manual-halt` и `risk-policy` по домам
 

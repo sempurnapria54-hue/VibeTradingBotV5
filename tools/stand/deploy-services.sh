@@ -125,7 +125,10 @@ done
 MODULES="${MODULES#,}"
 
 echo "=== сборка реактора: $MODULES"
-mvn -q -f "$ROOT/pom.xml" -pl "$MODULES" -am package -DskipTests
+# Собственные настройки Maven проекта, а не ~/.m2/settings.xml держателя
+# (шапка tools/maven-settings.xml).
+MVN_SETTINGS="$(cygpath -m "$ROOT/tools/maven-settings.xml" 2>/dev/null || printf '%s' "$ROOT/tools/maven-settings.xml")"
+mvn -q -s "$MVN_SETTINGS" -f "$ROOT/pom.xml" -pl "$MODULES" -am package -DskipTests
 
 for svc in "${SERVICES[@]}"; do
   echo "=== образ $svc:$TAG"

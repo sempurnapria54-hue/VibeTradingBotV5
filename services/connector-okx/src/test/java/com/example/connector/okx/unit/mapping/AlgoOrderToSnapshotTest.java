@@ -209,13 +209,17 @@ class AlgoOrderToSnapshotTest {
         assertThat(mapper.integrationToSnapshot(response).getExternalTriggerTime()).isNull();
     }
 
-    /** В снапшот они не попадают по построению, а не решением маппера. */
+    /**
+     * В снапшот они не попадают по построению, а не решением маппера.
+     * Сторона и признак «только уменьшать» у формы есть — это эхо, операнды
+     * сверки (docs/models/mapping/AlgoOrder.md §«Сверка эха»).
+     */
     @Test
-    @DisplayName("U10.14 — пяти полей запроса у самой формы источника нет")
-    void u10_14_fiveRequestFieldsAreAbsentFromTheSourceForm() {
+    @DisplayName("U10.14 — трёх полей запроса у самой формы источника нет")
+    void u10_14_threeRequestFieldsAreAbsentFromTheSourceForm() {
         assertThat(AlgoOrderOkxResponse.class.getDeclaredFields())
                 .extracting(Field::getName)
-                .doesNotContain("ordType", "side", "tdMode", "posSide", "reduceOnly");
+                .doesNotContain("ordType", "tdMode", "posSide");
     }
 
     /** Охрана написана явно, потому что метод не порождается. */

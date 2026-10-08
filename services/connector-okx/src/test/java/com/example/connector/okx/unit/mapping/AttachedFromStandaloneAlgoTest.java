@@ -102,12 +102,18 @@ class AttachedFromStandaloneAlgoTest {
         assertThat(mapper.integrationToSnapshot(response).getSize()).isEqualByComparingTo("100");
     }
 
+    /**
+     * Эхо признака у формы источника есть — его читает сверка отдельной
+     * условной заявки, — но в снапшот встроенной защиты оно не едет:
+     * намерения у неё не объявлено, и сверять эхо не с чем
+     * (docs/integrations/okx/rules/reduce-only-invariant.md).
+     */
     @Test
-    @DisplayName("U9.8 — признака «только уменьшать» у формы источника нет")
-    void u9_8_theSourceFormCarriesNoReduceOnly() {
-        assertThat(AlgoOrderOkxResponse.class.getDeclaredFields())
+    @DisplayName("U9.8 — признак «только уменьшать» в снапшот встроенной защиты не едет")
+    void u9_8_theAttachedSnapshotCarriesNoReduceOnly() {
+        assertThat(AttachedAlgoOrderExternalSnapshot.class.getDeclaredFields())
                 .extracting(Field::getName)
-                .doesNotContain("reduceOnly");
+                .doesNotContain("reduceOnly", "positionReducingOnly");
     }
 
     /** Связь с родителем держится только этим полем: сопоставляющий спрашивает `isBlank`. */

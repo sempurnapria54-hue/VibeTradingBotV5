@@ -57,6 +57,21 @@ public class AlgoOrderOkxResponse {
     /** Связанные ordinary order ids. */
     private List<String> ordIdList;
 
+    /**
+     * Эхо стороны ({@code buy}/{@code sell}) — операнд сверки с нашим
+     * направлением у отдельной условной заявки
+     * (docs/models/mapping/AlgoOrder.md §«Сверка эха»).
+     */
+    private String side;
+
+    /**
+     * Эхо признака «только уменьшать» ({@code true}/{@code false}) — операнд
+     * сверки с намерением у отдельной условной заявки; у материализованной
+     * встроенной защиты не читается — намерения у неё не объявлено
+     * (docs/integrations/okx/rules/reduce-only-invariant.md).
+     */
+    private String reduceOnly;
+
     /** SL trigger price. */
     private String slTriggerPx;
 

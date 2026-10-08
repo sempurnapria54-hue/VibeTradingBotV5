@@ -4,7 +4,17 @@
     <remote-repository>
       <option name="id" value="central" />
       <option name="name" value="Central Repository" />
+      <option name="url" value="https://repository.s7corp.ru/repository/epaas-maven-proxy/" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="central" />
+      <option name="name" value="Central Repository" />
       <option name="url" value="https://repo.maven.apache.org/maven2" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="nexus" />
+      <option name="name" value="nexus" />
+      <option name="url" value="https://nexus.web.s7.ru/repository/rdc-maven" />
     </remote-repository>
     <remote-repository>
       <option name="id" value="central" />
@@ -12,9 +22,19 @@
       <option name="url" value="https://repo1.maven.org/maven2" />
     </remote-repository>
     <remote-repository>
+      <option name="id" value="nexus.snapshots" />
+      <option name="name" value="nexus.snapshots" />
+      <option name="url" value="https://nexus.web.s7.ru/repository/maven-snapshots/" />
+    </remote-repository>
+    <remote-repository>
       <option name="id" value="jboss.community" />
       <option name="name" value="JBoss Community repository" />
       <option name="url" value="https://repository.jboss.org/nexus/content/repositories/public/" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="nexus.internal" />
+      <option name="name" value="nexus.internal" />
+      <option name="url" value="https://nexus.web.s7.ru/repository/maven-internal/" />
     </remote-repository>
   </component>
 </project>

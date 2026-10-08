@@ -7,7 +7,8 @@ import lombok.Setter;
 /**
  * Сырой ответ OKX по позиции (GET /account/positions). За adapter не
  * выходит; нормализуется маппером в PositionExternalSnapshot.
- * posSide/mgnMode/lever — adapter validation, в snapshot не маппятся;
+ * instType/posSide/mgnMode/lever не читаются и не сверяются: посылки, которые
+ * они выражают, меряет преконтроль перед действием, а не ответ чтения;
  * instId маппится — срез по множеству инструментов иначе не адресуем.
  * См. docs/models/mapping/Position.md.
  *
@@ -49,18 +50,18 @@ public class PositionOkxResponse {
     @JsonProperty("uTime")
     private String uTime;
 
-    /** Инструмент (adapter validation). */
+    /** Инструмент — адрес снапшота в срезе по множеству инструментов. */
     private String instId;
 
-    /** Тип инструмента (adapter validation). */
+    /** Тип инструмента — не читается (параметр запроса среза). */
     private String instType;
 
-    /** Сторона позиции (adapter validation: net). */
+    /** Сторона позиции — не читается и не сверяется. */
     private String posSide;
 
-    /** Режим маржи (adapter validation: isolated). */
+    /** Режим маржи — не читается и не сверяется. */
     private String mgnMode;
 
-    /** Плечо (adapter validation: ≤ максимум). */
+    /** Плечо — не читается и не сверяется. */
     private String lever;
 }

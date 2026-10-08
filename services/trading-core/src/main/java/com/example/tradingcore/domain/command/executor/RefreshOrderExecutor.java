@@ -26,6 +26,7 @@ import com.example.tradingcore.domain.command.resolve.AttachedProtectionResoluti
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.exception.ControlledExchangeException;
+import com.example.tradingcore.exception.ExternalInvariantViolationException;
 import com.example.tradingcore.exception.ExternalNotFoundException;
 import com.example.tradingcore.exception.ExternalStatusException;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
@@ -64,6 +65,11 @@ import org.springframework.transaction.annotation.Transactional;
  * материализовать её нечему, и исчерпание цикла давало бы потерянное
  * покрытие на живой защите. Сам гейт живёт у резолвера — своей копии
  * здесь нет.
+ *
+ * <p><b>Эхо базы триггера встроенной защиты сверяется с объявленной</b> на
+ * обеих тропах предъявления — телом родителя и самостоятельной записью
+ * цикла 2; расхождение — контролируемый отказ чтения, статусов он не двигает
+ * (docs/models/mapping/Order.md, {@code AttachedAlgoOrder#matchesEcho}).
  *
  * <p><b>Метрики исполнения приходят готовыми той же добычей</b> —
  * накопленный налив, средняя цена, комиссия; отдельной команды по сделкам
@@ -193,6 +199,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
             orderDataService.save(order);
             throw e;
         }
+        requireParentBodyEchoMatch(order, fetched);
         order.observeOnVenue(fetched);
         if (nonNull(fetched) || isTrue(order.isNotSubmitted()) || isTrue(order.isLocallyTerminal())) {
             return fetched;
@@ -342,11 +349,12 @@ public class RefreshOrderExecutor implements CommandExecutor {
                 ? matchProtection(exchangeOperationsClient.getPendingMaterializedProtections(accountInternalId,
                         externalInstrumentId), attached.getInternalId())
                 : null;
+        requireEchoMatch(attached, live);
         BigDecimal trancheExposure = isNull(tranche) ? null : tranche.exposure();
         Boolean standaloneProtectionExists = nonNull(tranche) && isTrue(tranche.hasStandaloneProtection());
         Boolean cancelIntentStanding = nonNull(attached.getCloseReason());
         ProtectionHistoryLeg leg = isNull(live) && searchCycle
-                ? findInHistory(attached.getInternalId(), accountInternalId, externalInstrumentId)
+                ? findInHistory(attached, accountInternalId, externalInstrumentId)
                 : null;
         AttachedProtectionFacts facts = AttachedProtectionFacts.builder()
                 .observed(isNull(live) ? parentBody : live)
@@ -400,15 +408,58 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * сделка в ошибочном состоянии по факту, который закрыл риск
      * (docs/lifecycles/Order.md §«Исход ненайденности — вторая ступень»).
      */
-    private ProtectionHistoryLeg findInHistory(String internalId, String accountInternalId,
+    private ProtectionHistoryLeg findInHistory(AttachedAlgoOrder attached, String accountInternalId,
                                                String externalInstrumentId) {
         for (ProtectionHistoryLeg leg : ProtectionHistoryLeg.values()) {
-            if (nonNull(matchProtection(exchangeOperationsClient.getMaterializedProtectionHistory(
-                    accountInternalId, externalInstrumentId, leg), internalId))) {
+            AttachedAlgoOrder record = matchProtection(exchangeOperationsClient.getMaterializedProtectionHistory(
+                    accountInternalId, externalInstrumentId, leg), attached.getInternalId());
+            if (nonNull(record)) {
+                requireEchoMatch(attached, record);
                 return leg;
             }
         }
         return null;
+    }
+
+    /**
+     * Сверка базы встроенной защиты на первой тропе — телом добытого
+     * родителя: первым ходом над найденной записью, до переноса фактов,
+     * статуса и наблюдённой живости родителя. Сверяется защита, которую
+     * резолв этого прохода и читает, — нетерминальная: у терминальной судьба
+     * уже стоит, и эхо её базы ни одного решения не питает.
+     */
+    private void requireParentBodyEchoMatch(Order order, Order fetched) {
+        if (isNull(fetched)) {
+            return;
+        }
+        emptyIfNull(order.getAttachedAlgoOrders()).stream()
+                .filter(attached -> isFalse(attached.isTerminal()))
+                .forEach(attached -> requireEchoMatch(attached,
+                        matchProtection(fetched.getAttachedAlgoOrders(), attached.getInternalId())));
+    }
+
+    /**
+     * Сверка базы триггера встроенной защиты с эхом площадки — на каждой
+     * тропе предъявления: телом родителя и самостоятельной записью цикла
+     * добычи материализованной защиты (живой либо найденной разбором
+     * истории). Ожидаемое — наша строка, которой коннектор при чтении не
+     * видит; ось и правило пустоты держит модель
+     * ({@link AttachedAlgoOrder#matchesEcho}; docs/models/mapping/Order.md).
+     *
+     * <p><b>Расхождение — контролируемый отказ чтения</b>: статуса родителя
+     * и защиты он не двигает, и строки этим проходом не пишутся — бросок
+     * уходит раньше их сохранения (docs/rules/controlled-exchange-exceptions.md).
+     * На тропе самостоятельной записи он приходит уже после переноса фактов
+     * родителя в память прохода: цикл добычи защиты идёт после первого, и
+     * перенос остаётся несохранённым.
+     */
+    private void requireEchoMatch(AttachedAlgoOrder attached, AttachedAlgoOrder echo) {
+        if (isNull(echo) || isTrue(attached.matchesEcho(echo))) {
+            return;
+        }
+        throw new ExternalInvariantViolationException("Attached protection trigger base diverges from our row: "
+                + "internalId=" + attached.getInternalId() + " declared=" + attached.getTriggerPriceType()
+                + " echo=" + echo.getTriggerPriceType());
     }
 
     /** Транш заявки из графа прохода; пусто — заявка транша не несёт. */

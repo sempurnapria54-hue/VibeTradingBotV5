@@ -215,7 +215,7 @@ class SnapshotToDomainCreationTest {
         assertThat(algoOrder.getExternalStatus()).isEqualTo("live");
         assertThat(algoOrder.getExternalSize()).isEqualByComparingTo("3");
         assertThat(algoOrder.getCondition().getTrigger().getStopLoss().getExternalType())
-                .isEqualTo("mark");
+                .isEqualTo(AlgoOrder.TriggerPriceType.MARK);
         assertThat(algoOrder.getCondition().getTrigger().getStopLoss().getExternalValue())
                 .isEqualByComparingTo("90");
         assertThat(algoOrder.getCondition().getTrigger().getStopLoss().getType()).isNull();
@@ -339,7 +339,7 @@ class SnapshotToDomainCreationTest {
     void u21_17_emptinessInIsEmptinessOutEverywhere() {
         assertThat(orderMapper.snapshotToDomain((OrderExternalSnapshot) null)).isNull();
         assertThat(orderMapper.snapshotToDomain((AttachedAlgoOrderExternalSnapshot) null)).isNull();
-        assertThat(algoOrderMapper.snapshotToDomain(null)).isNull();
+        assertThat(algoOrderMapper.snapshotToDomain((AlgoOrderExternalSnapshot) null)).isNull();
         assertThat(positionMapper.snapshotToDomain(null)).isNull();
         assertThat(candleMapper.snapshotToDomain(null)).isNull();
         assertThat(cashFlowMapper.snapshotToDomain(null)).isNull();

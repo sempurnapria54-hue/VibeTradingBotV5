@@ -14,7 +14,11 @@ import lombok.Value;
 @Builder
 public class TriggerPriceExternalSnapshot {
 
-    /** Биржевой тип цены. */
+    /**
+     * Эхо ценовой базы — литералом источника (OKX last/index/mark); в
+     * доменный перечень переводится на переходе снапшота в домен, пусто и вне
+     * перечня — пусто (docs/models/mapping/AlgoOrder.md).
+     */
     String externalType;
 
     /** Биржевое значение. */

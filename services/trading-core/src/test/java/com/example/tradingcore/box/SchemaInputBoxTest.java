@@ -33,7 +33,7 @@ class SchemaInputBoxTest extends SharedLiveDealBox {
 
     /** Версии миграций дерева: перечень закрыт каталогом `db/migration`. */
     private static final List<String> MIGRATIONS = List.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
-            "15", "16", "17");
+            "15", "16", "17", "18");
 
     /** Движение, чей сырой тип отображение контура знает. */
     private static final String MAPPED_BILL = "bill-close-1";

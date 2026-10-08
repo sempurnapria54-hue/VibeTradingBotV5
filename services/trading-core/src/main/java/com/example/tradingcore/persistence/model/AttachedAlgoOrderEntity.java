@@ -63,8 +63,11 @@ public class AttachedAlgoOrderEntity extends AuditableEntity {
     @Column(name = "fail_code")
     private String failCode;
 
-    /** Ценовая база триггера; пусто — эхо не добыто, а не «базы нет». */
-    @Column(name = "trigger_price_type")
+    /**
+     * ОБЪЯВЛЕННАЯ ценовая база триггера — пишет создатель ноги; эхо площадки
+     * колонку не пишет, оно операнд сверки (docs/models/domain/core/Order.md).
+     */
+    @Column(name = "trigger_price_type", nullable = false)
     private String triggerPriceType;
 
     @Column(name = "size", precision = 36, scale = 18)

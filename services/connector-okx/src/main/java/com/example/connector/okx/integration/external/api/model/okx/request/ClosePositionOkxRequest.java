@@ -6,8 +6,10 @@ import lombok.Setter;
 
 /**
  * Тело OKX close-position (POST /trade/close-position). mgnMode/posSide
- * — adapter-константы; ccy — settle currency; autoCxl снимает активные
- * ордера. null-поля не сериализуются. См. docs/models/mapping/Position.md.
+ * — adapter-константы; ccy — settle currency; autoCxl снимает стоящие
+ * заявки на закрытие (reduce-only), которые иначе отвергли бы закрытие, —
+ * входные заявки он не снимает. null-поля не сериализуются. См.
+ * docs/models/mapping/Position.md, docs/integrations/okx/contracts/position.md.
  */
 @Getter
 @Setter
@@ -26,6 +28,9 @@ public class ClosePositionOkxRequest {
     /** Валюта расчётов (settle currency); необязательна — пустая в тело не уходит. */
     private String ccy;
 
-    /** Снять активные ордера при закрытии. */
+    /**
+     * Снять стоящие заявки на закрытие (reduce-only) при закрытии позиции
+     * рыночной заявкой; входные заявки флаг не снимает.
+     */
     private Boolean autoCxl;
 }

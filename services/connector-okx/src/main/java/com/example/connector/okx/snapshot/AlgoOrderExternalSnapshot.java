@@ -42,6 +42,19 @@ public class AlgoOrderExternalSnapshot {
     /** Время срабатывания (OKX triggerTime). */
     Instant externalTriggerTime;
 
+    /**
+     * Эхо стороны — литералом источника (OKX side: buy/sell); в доменный
+     * перечень переводится на переходе снапшота в домен. Операнд сверки, на
+     * строку не переносится (docs/models/mapping/AlgoOrder.md §«Сверка эха»).
+     */
+    String side;
+
+    /**
+     * Эхо признака «только уменьшать» (OKX reduceOnly); пусто — источник
+     * промолчал. Операнд сверки, на строку не переносится.
+     */
+    Boolean reduceOnly;
+
     /** Условие срабатывания (trigger/trailing) как пришло с биржи. */
     ConditionExternalSnapshot condition;
 

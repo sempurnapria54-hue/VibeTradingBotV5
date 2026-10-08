@@ -292,20 +292,20 @@ write-once.
 | `order_id` | `bigint`, FK | `NOT NULL` |
 | `internal_id` | `varchar(64)`, уникален | `NOT NULL` |
 | `status`, `type` | `varchar(64)` | `NOT NULL` |
-| `external_attached_id`, `external_id`, `external_status`, `external_type`, `trigger_price_type` | `varchar(64)` | null |
+| `trigger_price_type` | `varchar(32)` | `NOT NULL` |
+| `external_attached_id`, `external_id`, `external_status`, `external_type` | `varchar(64)` | null |
 | `close_reason`, `fail_code` | `varchar(64)` | null |
 | `size`, `stop_loss_trigger_price` | `numeric(36,18)` | null |
 
-**Колонка ценовой базы триггера nullable, хотя поле обязательно, — и
-довода за это у схемы нет.** Колонка несёт **объявленную** базу, и
+**Колонка ценовой базы триггера обязательна.** Колонка несёт **объявленную** базу, и
 писатель у неё один — создатель ноги, который пишет её при создании
 строки из объявления стратегии (`docs/components/CreateOrderExecutor.md`).
 Пустая база до него не доезжает: незаполненная база защиты замыкается в
 `MARK` ещё на определении (`docs/models/domain/core/AlgoOrder.md`), а без
 базы вход не выпускается. Эхо площадки колонку не пишет — оно операнд
 сверки, а не значение строки, — поэтому у строки нет момента, когда колонка
-законно пуста. Обязательность сегодня держит писатель, а не схема;
-`NOT NULL` по существу модели законен, и его ввод — остаток кода.
+законно пуста, и обязательность держат оба — писатель и схема (миграция
+`V18` ядра).
 
 **Тип триггера в биржевом эхе наблюдается.** Инвентарь источника
 объявляет `slTriggerPxType` у **обеих** форм — и у элемента

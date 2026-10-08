@@ -492,6 +492,25 @@ if [ ! -f "$MVN" ] && ! command -v "$MVN" >/dev/null; then
   exit 2
 fi
 
+# macOS засыпает от бездействия и посреди долгого прогона: после пробуждения
+# часы VM Docker отстают от хоста на длительность сна, и `now()` базы
+# субстрата уезжает в прошлое — ящик краснеет на гейтах возраста, а не на
+# коде. Сон от бездействия держим выключенным, пока живёт этот прогон
+# (закрытая крышка его всё равно усыпит).
+if [ "$(uname -s)" = "Darwin" ] && command -v caffeinate >/dev/null; then
+  caffeinate -i -w $$ &
+fi
+
+# Собственные настройки Maven проекта: пользовательский ~/.m2/settings.xml
+# принадлежит держателю и не правится, а его зеркала способны отвергнуть
+# офлайн артефакты локального репозитория (шапка tools/maven-settings.xml).
+MVN_SETTINGS="${REACTOR_MVN_SETTINGS:-$REPO_ROOT/tools/maven-settings.xml}"
+if [ ! -f "$MVN_SETTINGS" ]; then
+  echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: файл настроек Maven не найден — $MVN_SETTINGS (переопределяется REACTOR_MVN_SETTINGS)"
+  exit 2
+fi
+MVN_SETTINGS_ARG="$(cygpath -m "$MVN_SETTINGS" 2>/dev/null || printf '%s' "$MVN_SETTINGS")"
+
 DOCKER="${REACTOR_DOCKER:-docker}"
 if [ "$(docker_verdict "$DOCKER")" != "OK" ]; then
   echo "ПРОВЕРКА НЕ ПРОВОДИТСЯ: демон Docker не отвечает — $DOCKER info (переопределяется REACTOR_DOCKER); ящики без него не поднимут субстрат"
@@ -556,7 +575,7 @@ if [ -n "$MODULES" ]; then
   exclusion_list "$REPO_ROOT" "${TARGETS[@]}" > "$EXCLUDES"
   # Путь файла — в форме, которую прочтёт JVM, а не только Git Bash.
   EXCLUDES_ARG="$(cygpath -m "$EXCLUDES" 2>/dev/null || printf '%s' "$EXCLUDES")"
-  JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-verify} \
+  JAVA_HOME="$JDK_HOME" "$MVN" -o -s "$MVN_SETTINGS_ARG" ${REACTOR_MVN_ARGS:-verify} \
       -am -pl "$(IFS=,; printf '%s' "${TARGETS[*]}")" "-Dsurefire.excludesFile=$EXCLUDES_ARG" \
       "${CLASS_ARGS[@]}" -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
   MVN_CODE=$?
@@ -564,7 +583,7 @@ if [ -n "$MODULES" ]; then
   VERDICT="$(analyze_log "$LOG" "$(grep -cE '^\[INFO\] -+\[ pom \]-+$' "$LOG")")"
 else
   FULL_STARTED="$(date +%s)"
-  JAVA_HOME="$JDK_HOME" "$MVN" -o ${REACTOR_MVN_ARGS:-verify} \
+  JAVA_HOME="$JDK_HOME" "$MVN" -o -s "$MVN_SETTINGS_ARG" ${REACTOR_MVN_ARGS:-verify} \
       -f "$REPO_ROOT/pom.xml" > "$LOG" 2>&1
   MVN_CODE=$?
   VERDICT="$(analyze_log "$LOG")"

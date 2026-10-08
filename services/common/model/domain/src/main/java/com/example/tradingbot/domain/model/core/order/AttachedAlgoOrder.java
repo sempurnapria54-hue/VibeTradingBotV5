@@ -76,9 +76,13 @@ public class AttachedAlgoOrder extends Auditable {
     private BigDecimal stopLossTriggerPrice;
 
     /**
-     * Ценовая база триггера, объявленная стратегией и доезжающая до биржи.
-     * Пуста, пока эхо источника её не принесло: пустое эхо — недобытый
-     * факт, а не разрешение (docs/rules/absent-value-semantics.md).
+     * Ценовая база триггера. У нашей строки — <b>объявленная</b> база:
+     * пишет её создатель ноги из объявления стратегии, и колонка обязательна.
+     * У прочитанной копии — <b>эхо</b> базы, которую площадка применила,
+     * переведённое коннектором в словарь домена; пустое эхо — недобытый
+     * факт, а не разрешение (docs/rules/absent-value-semantics.md). Эхо на
+     * строку не переносится: перенос стёр бы то, с чем оно сверяется
+     * ({@link #matchesEcho}; docs/models/domain/core/Order.md).
      */
     private AlgoOrder.TriggerPriceType triggerPriceType;
 
@@ -114,6 +118,26 @@ public class AttachedAlgoOrder extends Auditable {
     @JsonIgnore
     public Boolean isTerminal() {
         return TERMINAL_STATUSES.contains(status);
+    }
+
+    /**
+     * Эхо площадки совпадает с объявленной базой триггера. Ось сверки у
+     * встроенной защиты одна — база: признака «только уменьшать» мы у неё не
+     * объявляем, и сверять его эхо не с чем
+     * (docs/integrations/okx/rules/reduce-only-invariant.md). Сверка идёт на
+     * обеих тропах предъявления защиты — телом родителя и самостоятельной
+     * записью цикла добычи материализованной защиты
+     * (docs/models/mapping/Order.md).
+     *
+     * <p><b>Пустое эхо либо пустая декларация сверку не запускают:</b>
+     * молчание источника нарушением не является, а реакция на расхождение —
+     * аварийный контур всего счёта.
+     *
+     * @param echo копия этой защиты, прочитанная у площадки
+     */
+    public Boolean matchesEcho(AttachedAlgoOrder echo) {
+        return isNull(echo) || isNull(triggerPriceType) || isNull(echo.getTriggerPriceType())
+                || Objects.equals(triggerPriceType, echo.getTriggerPriceType());
     }
 
     /** Допустим ли переход в target по матрице. */

@@ -2,6 +2,7 @@ package com.example.connector.okx.util;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -10,7 +11,7 @@ import lombok.experimental.UtilityClass;
 
 /**
  * Парсинг сырых OKX-строк (общий для мапперов и {@code OkxResponseConverter}):
- * empty→null, numeric→BigDecimal, epoch-ms→время UTC.
+ * empty→null, numeric→BigDecimal, epoch-ms→время UTC, строковый признак→Boolean.
  */
 @UtilityClass
 public class OkxParse {
@@ -40,5 +41,24 @@ public class OkxParse {
     /** OKX epoch-ms строка → Instant; empty→null. */
     public static Instant instant(String millis) {
         return isBlank(millis) ? null : Instant.ofEpochMilli(Long.parseLong(millis));
+    }
+
+    /**
+     * OKX строковый признак ({@code true}/{@code false}) → Boolean; empty→null.
+     * Значение вне формы контракта — нарушение инварианта контракта, как у
+     * стороны вне словаря, а не пустота: молча пустой признак гасил бы сверку
+     * эха (docs/rules/controlled-exchange-exceptions.md).
+     */
+    public static Boolean flag(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        if (OkxConstants.FLAG_TRUE.equals(value)) {
+            return Boolean.TRUE;
+        }
+        if (OkxConstants.FLAG_FALSE.equals(value)) {
+            return Boolean.FALSE;
+        }
+        throw new ExternalInvariantViolationException("OKX flag outside the contract: " + value);
     }
 }

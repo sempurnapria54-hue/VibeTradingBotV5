@@ -56,6 +56,9 @@ Vault в не-dev режиме.
 |---|---|---|
 | JDK 25 | Corretto 25.0.4.1 из IDEA; ссылка `~/.jdks/corretto-25` → `~/Library/Java/JavaVirtualMachines/corretto-25.0.4.1/Contents/Home` — её по умолчанию берут `tools/reactor-test.sh`, `tools/stand/deploy-services.sh`, `tools/spec-runner-env.sh` | `~/.jdks/corretto-25/bin/java -version` |
 | Maven | встроенный в IDEA: `/Applications/IntelliJ IDEA.app/Contents/plugins/maven-plugin/lib/maven3`, 3.9.16; на `PATH` нет | `"…/maven3/bin/mvn" -v` |
+| Настройки Maven | **`~/.m2/settings.xml` и всё в `~/.m2`, кроме `repository`, принадлежат держателю и не правятся ни в одном байте** — там его рабочие настройки с корпоративными зеркалами (с 2026-10-08: `central` переназначен на корпоративный прокси, и офлайновый Maven отвергает артефакты, скачанные прежде из `central`: «present, but unavailable … in offline mode»). Проект зовёт Maven **своим** файлом `tools/maven-settings.xml` (пустые настройки, локальный репозиторий прежний): `tools/reactor-test.sh` и `tools/stand/deploy-services.sh` подставляют его сами (`-s`, переопределяется `REACTOR_MVN_SETTINGS`), прямой вызов `mvn` — флагом `-s tools/maven-settings.xml` | `mvn -o -q -s tools/maven-settings.xml -pl services/common/model/domain validate` — проходит; без `-s` — «Non-resolvable parent POM» |
+| Сон посреди прогона | мак на батарее засыпает от бездействия и посреди долгого прогона; после пробуждения часы VM Docker отстают от хоста на длительность сна, `now()` базы субстрата уезжает в прошлое, и ящик краснеет на гейтах возраста (`DealPassBoxTest`: «Entry scan skipped: no anomaly detection pass observed…») — не на коде. `tools/reactor-test.sh` на маке держит `caffeinate -i` на время прогона; закрытая крышка его всё равно усыпит. Красное сразу после сна перепроверяется отдельным прогоном класса | журнал питания `pmset -g log`, строки сна и пробуждения 2026-10-08: сон 333 с внутри `UnavailableBrokerBoxTest`, `DealPassBoxTest` следом 19 красных, отдельно — зелён |
+| `grep -P` | **системный `grep` macOS (BSD) флага `-P` не знает**, GNU `grep` не установлен. Все команды вывода `tools/derive/*.sh` зовут `grep -P`, поэтому `py tools/population-derive-check.py` на маке отказывает кодом 2 («invalid option -- P»); остальной гейт инструментов корпуса от этого не зависит. Установка GNU `grep` — ход держателя | гейт 2026-10-08: `population-derive-check` — код 2 |
 | Лаунчер Python | `py` — шим в `/opt/homebrew/bin/py`, отбрасывает `-3` и зовёт Homebrew `python3.11`; системный `/usr/bin/python3` — 3.9 | `py -3 -c "import sys; print(sys.version)"` |
 | bash | Homebrew bash 5 первым на `PATH`: системный 3.2 не знает `mapfile` (`tools/stand/identity-client-secret.sh`) | `bash --version` |
 | `timeout` | в macOS нет; Homebrew `coreutils` даёт `gtimeout`, и цепочка сессий берёт его сама (`tools/session-loop.sh`, `tools/session-unattended.sh`); `date -d @эпоха` там же заменён разбором с откатом на BSD `date -r` | `bash tools/session-loop.sh 1 --dry-run` |
@@ -111,6 +114,8 @@ bash tools/reactor-test.sh --modules tests --classes ExitOrderPathTest,ExitJourn
 REACTOR_MVN_ARGS="verify -Dtest=<Класс>[,<Класс>] -Dsurefire.failIfNoSpecifiedTests=false" \
   bash tools/reactor-test.sh                 # точечный отбор при компиляции всего дерева; без флага
                                              # модуль без совпадений роняет реактор
+# прямой вызов mvn ниже — с `-s tools/maven-settings.xml` (строка «Настройки Maven»
+# фактов macOS: ~/.m2/settings.xml держателя не правится)
 mvn -o -am -pl services/trading-core test -Dtest='<Класс>[,<Класс>]' \
   -Dsurefire.failIfNoSpecifiedTests=false    # точечно; разделитель классов — запятая
 mvn -o -am -pl tests verify -Dtest='<Класс>' \

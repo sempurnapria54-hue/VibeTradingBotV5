@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Собственные настройки Maven проекта — пустые намеренно.
+
+  Сборка дерева идёт офлайн (-o) из локального репозитория ~/.m2/repository,
+  а пользовательский ~/.m2/settings.xml держателя принадлежит ему и правке не
+  подлежит: в нём могут стоять чужие зеркала (корпоративный nexus переназначает
+  central), и тогда офлайновый Maven отвергает артефакты, скачанные прежде из
+  central («present, but unavailable … in offline mode»).
+
+  Поэтому прогоны проекта зовут Maven с этим файлом (-s): tools/reactor-test.sh
+  подставляет его сам, прямой вызов mvn — флагом
+  `-s tools/maven-settings.xml`. Факт среды —
+  .claude/skills/environment-commands.md, строка «Настройки Maven».
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"/>

@@ -1,5 +1,6 @@
 package com.example.tradingcore.domain.command.executor;
 
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
@@ -18,6 +19,7 @@ import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.payload.RefreshAlgoOrderCommandPayload;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
 import com.example.tradingcore.exception.ControlledExchangeException;
+import com.example.tradingcore.exception.ExternalInvariantViolationException;
 import com.example.tradingcore.exception.ExternalNotFoundException;
 import com.example.tradingcore.exception.ExternalStatusException;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
@@ -54,6 +56,12 @@ import org.springframework.transaction.annotation.Transactional;
  * выбирается по словарю источника»). Списочная нога цикла роняется
  * целиком и на чужой записи — реакция всё равно биржевая, на весь счёт,
  * и сужать её было бы нечем.
+ *
+ * <p><b>Эхо найденной записи сверяется с нашей строкой первым ходом</b> —
+ * признак «только уменьшать», сторона, база каждой триггерной ноги;
+ * расхождение — контролируемый отказ чтения, и строка этим проходом не
+ * пишется вовсе (docs/models/mapping/AlgoOrder.md §«Сверка эха»). Из
+ * условия на строку садится одно поле — наблюдённый уровень трейлинга.
  *
  * <p><b>Отметку исхода транзакция сохраняет, хотя звено и бросает.</b>
  * Контролируемое исключение изъято из отката: без этого сущность
@@ -150,6 +158,10 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
      * терминальной заявки сохраняется только у заявки в {@code ERROR}:
      * у сработавшей и отменённой живость читает статус, и по
      * {@code notFoundPastLocalTerminal} у них не пишется ничего.
+     *
+     * <p><b>Исключение одно — запись, чьё эхо разошлось с нашей строкой:</b>
+     * живости она не пишет, потому что ответ, нарушивший контракт,
+     * наблюдением не является ({@link #requireEchoMatch}).
      */
     private AlgoOrder fetchOrFail(AlgoOrder algoOrder, DealContext dealContext) {
         AlgoOrder fetched;
@@ -163,6 +175,7 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
             algoOrderDataService.save(algoOrder);
             throw e;
         }
+        requireEchoMatch(algoOrder, fetched);
         algoOrder.observeOnVenue(fetched);
         if (nonNull(fetched) || isTrue(algoOrder.isNotSubmitted()) || isTrue(algoOrder.isLocallyTerminal())) {
             return fetched;
@@ -172,6 +185,28 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
         }
         throw new ExternalNotFoundException(
                 "Algo order not found after full evidence cycle: " + algoOrder.getInternalId());
+    }
+
+    /**
+     * Сверка эха найденной записи с нашей строкой — первым ходом над ней, до
+     * переноса фактов, применения статуса и наблюдённой живости: ожидаемое —
+     * наша строка, а коннектор её при чтении не видит. Оси сверки и правило
+     * пустоты держит модель ({@link AlgoOrder#matchesEcho}); перечень и довод —
+     * docs/models/mapping/AlgoOrder.md §«Сверка эха».
+     *
+     * <p><b>Расхождение — контролируемый отказ чтения, и строка этим проходом
+     * не пишется вовсе</b> — ни перенос, ни статус, ни живость: ответ,
+     * нарушивший контракт, наблюдением не является, а статус сущности класс
+     * отказа не меняет (docs/rules/controlled-exchange-exceptions.md).
+     */
+    private void requireEchoMatch(AlgoOrder algoOrder, AlgoOrder fetched) {
+        if (isNull(fetched) || isTrue(algoOrder.matchesEcho(fetched))) {
+            return;
+        }
+        throw new ExternalInvariantViolationException(
+                "Algo order echo diverges from our row on reduceOnly, side or trigger base: internalId="
+                + algoOrder.getInternalId() + " direction=" + algoOrder.getDirection() + "/" + fetched.getDirection()
+                + " reduceOnly=" + algoOrder.getPositionReducingOnly() + "/" + fetched.getPositionReducingOnly());
     }
 
     /** Заявка по идентификатору → ожидающие → история; обрыв на первом нашедшем. */
