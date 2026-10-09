@@ -86,6 +86,25 @@ final class Prologue {
         require(context, 200, "контекст субъекта");
         String tenant = String.valueOf(Json.object(context.body()).get("tenantId"));
         String key = "api-key-prologue-" + UUID.randomUUID();
+        String account = registeredAccount(trail, tenant, key);
+        trail.under(tenant, account, key);
+        trail.factSeriesStartedYesterday();
+        trail.commonPreconditions();
+        String definition = trail.activeDefinition();
+        String deal = trail.openDeal();
+        trail.relayCore();
+        return new Tenancy(tenant, account, definition, deal);
+    }
+
+    /**
+     * Регистрирует биржевой счёт тенанта у настоящего владельца реестра.
+     *
+     * @param trail  тропа периметра
+     * @param tenant тенант счёта
+     * @param key    ключ API счёта — свой у каждой регистрации
+     * @return идентичность счёта, выданная регистрацией
+     */
+    static String registeredAccount(Trail trail, String tenant, String key) {
         Answer registered = trail.call(Party.AUTH, "POST", REGISTER, null, """
                 {
                   "tenantInternalId": "%s",
@@ -98,14 +117,7 @@ final class Prologue {
                 }
                 """.formatted(tenant, Trail.CONTOUR, key));
         require(registered, 201, "регистрация биржевого счёта");
-        String account = String.valueOf(Json.object(registered.body()).get("internalId"));
-        trail.under(tenant, account, key);
-        trail.factSeriesStartedYesterday();
-        trail.commonPreconditions();
-        String definition = trail.activeDefinition();
-        String deal = trail.openDeal();
-        trail.relayCore();
-        return new Tenancy(tenant, account, definition, deal);
+        return String.valueOf(Json.object(registered.body()).get("internalId"));
     }
 
     private static void require(Answer answer, Integer status, String step) {

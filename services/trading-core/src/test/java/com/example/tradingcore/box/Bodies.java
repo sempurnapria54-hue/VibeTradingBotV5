@@ -28,18 +28,6 @@ final class Bodies {
                 """.formatted(haltClass, accountInternalId, instrumentInternalId);
     }
 
-    /** Снимок намерения держателя по числам риск-аппетита целиком. */
-    static String riskAppetite(String simultaneousPercent, String catastrophicMultiplier,
-                               String consecutiveLossLimit) {
-        return """
-                {
-                  "globalSimultaneousRiskPerDealPercent": %s,
-                  "globalCatastrophicRiskPerDealMultiplier": %s,
-                  "globalConsecutiveLossLimit": %s
-                }
-                """.formatted(simultaneousPercent, catastrophicMultiplier, consecutiveLossLimit);
-    }
-
     /** Снимок намерения держателя по настройкам пары: рабочее плечо. */
     static String pairSettings(Integer leverage) {
         return """

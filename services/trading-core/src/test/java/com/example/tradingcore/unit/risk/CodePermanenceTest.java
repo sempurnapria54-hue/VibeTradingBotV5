@@ -55,12 +55,20 @@ class CodePermanenceTest {
     }
 
     @Test
-    @DisplayName("U25.4 — три агрегатных потолка и катастрофический нотинал: временны́е")
+    @DisplayName("U25.4 — три агрегатных потолка и потолок нотинала: временны́е")
     void u25_4_theAggregateCeilingsAreTemporary() {
         assertTemporary(RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_EXCEEDED,
                 RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED,
                 RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED,
                 RiskCheckCode.DEAL_NOTIONAL_EXCEEDED);
+    }
+
+    @Test
+    @DisplayName("Глобальный кумулятивный потолок и потолки уровней счёта и тенанта: временны́е")
+    void theGlobalCumulativeAndTheLevelCeilingsAreTemporary() {
+        assertTemporary(RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED,
+                RiskCheckCode.RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED,
+                RiskCheckCode.RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED);
     }
 
     @Test

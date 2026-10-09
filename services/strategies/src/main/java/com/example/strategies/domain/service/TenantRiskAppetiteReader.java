@@ -11,13 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Добывает числа риск-аппетита тенанта у ядра и отвергает вызов, если их
- * нет (docs/rules/risk-policy.md §«Числа назначает держатель; пустое
- * место — отказ»).
+ * Добывает у ядра принятые им числа риск-аппетита и отвергает вызов, если
+ * хоть одного из трёх нет (docs/rules/risk-policy.md, правило о числах
+ * риск-аппетита: пустое место — отказ).
  *
  * <p><b>Один компонент на обе тропы — создание и активацию.</b> Копии
  * одного разбора разошлись бы первой же правкой: у создания и активации
- * операнд один и тот же, и вердикт «числа не назначены» обязан быть
+ * операнд один и тот же, и вердикт «числа не приняты» обязан быть
  * одинаковым.
  *
  * <p><b>Пустое число отвергает вызов ЗДЕСЬ, а не в обходе деталей.</b>
@@ -27,8 +27,8 @@ import org.springframework.web.server.ResponseStatusException;
  * считалось. Охрана внутри обхода при этом остаётся — она адресует
  * отказ конкретной детали.
  *
- * <p><b>Строки нет — тоже отказ.</b> Ядро о тенанте ещё не знает, и это
- * отличается от «числа назначены пустыми» лишь причиной, но не исходом.
+ * <p><b>Пустой ответ — тоже отказ.</b> Ядро чисел не отдало, и это
+ * отличается от «число пусто» лишь причиной, но не исходом.
  */
 @Service
 @RequiredArgsConstructor
@@ -36,16 +36,18 @@ public class TenantRiskAppetiteReader {
 
     private final TradingCoreReadClient tradingCoreReadClient;
 
-    /** Числа тенанта; не назначены — отказ вызова. */
-    public TenantRiskAppetite read(String tenantInternalId) {
-        RiskAppetiteCoreResponse response = tradingCoreReadClient.getRiskAppetite(tenantInternalId);
+    /** Принятые ядром числа; хоть одного нет — отказ вызова. */
+    public TenantRiskAppetite read() {
+        RiskAppetiteCoreResponse response = tradingCoreReadClient.getRiskAppetite();
         if (isNull(response)
                 || isNull(response.globalSimultaneousRiskPerDealPercent())
-                || isNull(response.globalCatastrophicRiskPerDealMultiplier())) {
+                || isNull(response.globalCumulativeRiskPerDealMultiplier())
+                || isNull(response.globalMaxLeverage())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "STRATEGY_RISK_APPETITE_NOT_CONFIGURED: числа риск-аппетита тенанта не назначены");
+                    "STRATEGY_RISK_APPETITE_NOT_CONFIGURED: числа риск-аппетита ядром не приняты");
         }
         return new TenantRiskAppetite(response.globalSimultaneousRiskPerDealPercent(),
-                response.globalCatastrophicRiskPerDealMultiplier());
+                response.globalCumulativeRiskPerDealMultiplier(),
+                response.globalMaxLeverage());
     }
 }

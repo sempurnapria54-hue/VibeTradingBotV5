@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -47,6 +48,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -72,6 +74,8 @@ class AnomalyPassTest {
     private static final String ACCOUNT_INTERNAL_ID = "ea-0001";
     private static final String EXCHANGE_CODE = "OKX";
     private static final String EXTERNAL_INSTRUMENT_ID = "ETH-USDT-SWAP";
+    private static final Long OTHER_INSTRUMENT_ID = 4L;
+    private static final String OTHER_EXTERNAL_INSTRUMENT_ID = "BTC-USDT-SWAP";
     private static final OffsetDateTime OPENED_AT =
             OffsetDateTime.of(2026, 9, 6, 9, 0, 0, 0, ZoneOffset.UTC);
     private static final OffsetDateTime PASS_STARTED_AT =
@@ -95,6 +99,7 @@ class AnomalyPassTest {
     private final HoldService holdService = mock(HoldService.class);
 
     private final ExchangeAccount account = newAccount();
+    private final Instrument instrument = newInstrument(INSTRUMENT_ID, EXTERNAL_INSTRUMENT_ID);
 
     // --- сбор среза --------------------------------------------------------
 
@@ -217,22 +222,53 @@ class AnomalyPassTest {
     }
 
     /**
-     * Упор выборки контура в окно засчитывается неполнотой прохода: обход
-     * по усечённому контуру объявил бы чужими строки среза, которым не
-     * хватило места в выборке.
+     * Контур шире страницы обходится ЦЕЛИКОМ, и детекция начинается после
+     * обхода: инструмент со второй страницы — в контуре, его позиция
+     * восстанавливается, а не объявляется чужой, и проход наблюдён. Размер
+     * каталога неполноты не производит.
      */
     @Test
-    void aContourHittingTheWindowCountsAsIncomplete() {
+    void aContourWiderThanAPageIsDetectedWhole() {
         givenAccount();
-        when(scanReader.read(ACCOUNT_INTERNAL_ID)).thenReturn(scan(true));
         AnomalyJobProperties narrow = properties();
-        narrow.setContourWindow(1);
-        when(instrumentDataService.findContourWithin(EXCHANGE_CODE, 1))
-                .thenReturn(new ArrayList<>(List.of(instrument())));
+        narrow.setContourPageSize(1);
+        givenContourPages(List.of(otherInstrument()), List.of(instrument()));
+        when(scanReader.read(ACCOUNT_INTERNAL_ID)).thenReturn(AnomalyScan.builder()
+                .positions(Map.of(EXTERNAL_INSTRUMENT_ID, List.of(position(new BigDecimal("5")))))
+                .orders(Map.of())
+                .algoOrders(Map.of())
+                .complete(true)
+                .build());
 
         job(narrow).tick();
 
+        verify(instrumentDataService).forEachContourPage(eq(EXCHANGE_CODE), eq(1), any());
+        verify(exchangeSideDetectors).detect(any(), eq(account()),
+                eq(Set.of(OTHER_EXTERNAL_INSTRUMENT_ID, EXTERNAL_INSTRUMENT_ID)));
+        verify(dealOpeningService).recoverDeal(eq(account()), eq(instrument()), eq(StrategyTradeDirection.LONG),
+                eq(OPENED_AT));
+        verify(passGate).apply(eq(Boolean.TRUE), eq(account()), any());
+    }
+
+    /**
+     * Отказ чтения страницы контура — единственная неполнота обхода: проход
+     * ненаблюдён, и детекторы молчат даже о страницах, прочитанных до
+     * отказа, — половина контура объявила бы чужими строки второй половины.
+     */
+    @Test
+    void aFailedContourPageMakesThePassIncomplete() {
+        givenAccount();
+        when(scanReader.read(ACCOUNT_INTERNAL_ID)).thenReturn(scan(true));
+        doAnswer(invocation -> {
+            Consumer<List<Instrument>> pageConsumer = invocation.getArgument(2);
+            pageConsumer.accept(new ArrayList<>(List.of(otherInstrument())));
+            throw new IllegalStateException("db is down");
+        }).when(instrumentDataService).forEachContourPage(eq(EXCHANGE_CODE), any(), any());
+
+        job().tick();
+
         verify(exchangeSideDetectors, never()).detect(any(), any(), any());
+        verify(dealInvariantDetectors, never()).detect(any(), any());
         verify(passGate).apply(eq(Boolean.FALSE), eq(account()), any());
     }
 
@@ -448,8 +484,19 @@ class AnomalyPassTest {
     }
 
     private void givenContour() {
-        when(instrumentDataService.findContourWithin(eq(EXCHANGE_CODE), any()))
-                .thenReturn(new ArrayList<>(List.of(instrument())));
+        givenContourPages(List.of(instrument()));
+    }
+
+    /** Обход контура отдаёт потребителю названные страницы по порядку. */
+    @SafeVarargs
+    private void givenContourPages(List<Instrument>... pages) {
+        doAnswer(invocation -> {
+            Consumer<List<Instrument>> pageConsumer = invocation.getArgument(2);
+            for (List<Instrument> page : pages) {
+                pageConsumer.accept(new ArrayList<>(page));
+            }
+            return null;
+        }).when(instrumentDataService).forEachContourPage(eq(EXCHANGE_CODE), any(), any());
     }
 
     /** Полный проход с одной живой позицией по инструменту контура. */
@@ -495,12 +542,25 @@ class AnomalyPassTest {
         return account;
     }
 
+    /**
+     * Инструмент контура — ОДИН экземпляр на тест, по тому же доводу, что у
+     * счёта: равенства по значению у доменной модели нет.
+     */
     private Instrument instrument() {
+        return instrument;
+    }
+
+    private static Instrument newInstrument(Long id, String externalId) {
         Instrument instrument = new Instrument();
-        instrument.setId(INSTRUMENT_ID);
-        instrument.setExternalId(EXTERNAL_INSTRUMENT_ID);
+        instrument.setId(id);
+        instrument.setExternalId(externalId);
         instrument.setExchangeCode(EXCHANGE_CODE);
         return instrument;
+    }
+
+    /** Инструмент первой страницы контура: живых сущностей на нём нет. */
+    private Instrument otherInstrument() {
+        return newInstrument(OTHER_INSTRUMENT_ID, OTHER_EXTERNAL_INSTRUMENT_ID);
     }
 
     private Position position(BigDecimal size) {

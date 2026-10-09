@@ -11,6 +11,7 @@ import com.example.tradingcore.mapping.DealMapper;
 import com.example.tradingcore.persistence.repository.DealRepository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -110,6 +111,21 @@ public class DealDataService {
     @Transactional(readOnly = true)
     public List<Deal> findNonTerminalByExchangeAccountId(Long exchangeAccountId) {
         return repository.findByExchangeAccountIdAndStatusNotIn(exchangeAccountId, TERMINAL_STATUSES).stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Нетерминальные сделки названных счетов — живые сделки уровней «счёт» и
+     * «тенант» у преконтроля (docs/components/RiskValidator.md §«Что
+     * читает»). Пустой перечень счетов — пустой ответ без запроса.
+     */
+    @Transactional(readOnly = true)
+    public List<Deal> findNonTerminalByExchangeAccountIds(Collection<Long> exchangeAccountIds) {
+        if (isEmpty(exchangeAccountIds)) {
+            return List.of();
+        }
+        return repository.findByExchangeAccountIdInAndStatusNotIn(exchangeAccountIds, TERMINAL_STATUSES).stream()
                 .map(mapper::persistenceToDomain)
                 .collect(Collectors.toList());
     }

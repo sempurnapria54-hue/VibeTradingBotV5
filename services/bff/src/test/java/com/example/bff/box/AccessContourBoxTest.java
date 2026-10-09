@@ -28,6 +28,15 @@ class AccessContourBoxTest extends SharedBffBox {
     /** Признаки устройства, которых в теле отказа быть не должно. */
     private static final List<String> INTERNALS = List.of("Exception", "com.example", "\tat ", "java.");
 
+    /** Поле состояния в ответе группы пробы. */
+    private static final String HEALTH_STATUS = "status";
+
+    /** Группа пробы живости: состояние процесса. */
+    private static final String LIVENESS_GROUP = "/actuator/health/liveness";
+
+    /** Группа пробы готовности: состояние процесса — базы у периметра нет. */
+    private static final String READINESS_GROUP = "/actuator/health/readiness";
+
     @Test
     @DisplayName("B9.1 — Умолчание контура закрыто")
     void b9_1_theContourDefaultIsClosed() {
@@ -77,6 +86,28 @@ class AccessContourBoxTest extends SharedBffBox {
         Answer metricsList = getAnonymously("/actuator/metrics");
         assertThat(metricsList.status()).isEqualTo(401);
         assertThat(metricsList.errorCode()).isEqualTo(UNAUTHENTICATED);
+    }
+
+    /**
+     * Группы проб развёртывания — подпути того же открытого исключения
+     * {@code /actuator/health/**}, а не новые открытые точки: открытых точек
+     * от них не становится больше трёх ({@code B9.2}). Манифест спрашивает
+     * именно их ({@code deploy/base/services/bff.yaml}), и закрытая группа
+     * гасила бы под отказом {@code 401}, а не состоянием.
+     */
+    @Test
+    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
+    void theProbeGroupsAreOpenAndAnswerWithState() {
+        Answer liveness = getAnonymously(LIVENESS_GROUP);
+        Answer readiness = getAnonymously(READINESS_GROUP);
+
+        assertThat(liveness.status()).isEqualTo(200);
+        assertThat(liveness.asObject().get(HEALTH_STATUS)).isEqualTo("UP");
+        assertThat(readiness.status()).isEqualTo(200);
+        assertThat(readiness.asObject().get(HEALTH_STATUS)).isEqualTo("UP");
+        assertThat(readiness.asObject())
+                .as("группа отвечает состоянием, а не составом компонентов")
+                .containsOnlyKeys(HEALTH_STATUS);
     }
 
     @Test

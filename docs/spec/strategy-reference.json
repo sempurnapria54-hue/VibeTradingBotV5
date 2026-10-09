@@ -16,10 +16,11 @@
     "feeRate": "прогнозная ставка комиссии — операнд величин уровня стопа, заимствованных у docs/spec/stop-distance.json вместе с её набором. Здесь он объявлен контрактом, а не подключением дома: одноимённая величина docs/spec/deal-risk-numbers.json — ДРУГАЯ ставка (обращённая из замороженных плановых чисел ноги), и подключение того дома подменило бы смысл",
     "steps[].actions[].replacedCoverageFractionPercents": "доля ДЕЙСТВУЮЩЕГО покрытия, которую адресует это REPLACE- либо CANCEL-действие: объявленная доля его цели, резолвимой по targetActionKey (цепочка замещений — docs/rules/replace-not-amend.md). Цель защитой не является (снятие тейка) — покрытия действие не забирает, доля 0. Пусто — цель не разрешена; тогда действие считается адресующим ВСЁ покрытие: неизвестность не должна выводить шаг из-под проверки. Резолв по ключу — работа валидатора создания; в этой форме join по ключу невыразим, поэтому свойства цели приходят операндом",
     "details[].tranches[].levelCount": "сколько одновременно живых траншей объявляет эта запись; умолчания нет — пустое место мажорировалось бы единицей, то есть в разрешающую сторону",
-    "steps[].actions[].allocationPercents": "объявленная доля базы под нотинал входного действия, проценты — операнд статической проверки запаса под катастрофическим потолком",
-    "notionalHeadroomShare": "доля катастрофического потолка, которая обязана остаться свободной после объявленного нотинала. КОНСТАНТА ПРАВИЛА (0.01), а не число риск-аппетита: она выведена из наблюдаемой величины проскока, а не назначена по вкусу, поля конфигурации не имеет и отказа при незаданности не даёт. Дом — docs/rules/risk-policy.md",
-    "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку — максимальный риск на сделку (конфигурация)",
-    "globalCatastrophicRiskPerDealMultiplier": "максимальный множитель катастрофического потолка (конфигурация)",
+    "steps[].actions[].allocationPercents": "объявленная доля базы под нотинал входного действия, проценты — операнд статической проверки запаса под потолком нотинала сделки",
+    "notionalHeadroomShare": "доля потолка нотинала сделки, которая обязана остаться свободной после объявленного нотинала. КОНСТАНТА ПРАВИЛА (0.01), а не число риск-аппетита: она выведена из наблюдаемой величины проскока, а не назначена по вкусу, поля конфигурации не имеет и отказа при незаданности не даёт. Дом — docs/rules/risk-policy.md",
+    "globalSimultaneousRiskPerDealPercent": "глобальный потолок одновременного риска на сделку — число риск-аппетита, ось окружения, принятая ядром (docs/rules/risk-policy.md)",
+    "globalCumulativeRiskPerDealMultiplier": "предел множителя кумулятивного потолка — число риск-аппетита, ось окружения, принятая ядром (docs/rules/risk-policy.md)",
+    "globalMaxLeverage": "предел плеча — число риск-аппетита, ось окружения, принятая ядром; он же потолок нотинала сделки в долях базы (docs/rules/risk-policy.md)",
     "details[].marketPhaseType": "тип рыночной фазы детали — BULL_TREND, BEAR_TREND, RANGE, UNKNOWN"
   },
   "values": [
@@ -42,7 +43,7 @@
     {
       "name": "hasRequiredRiskFields",
       "note": "У торгуемой детали риск-поля обязательны и умолчаний не имеют. Признак переоткрытия сюда не входит: он свойство транша.",
-      "expr": "notNull(?riskPerActionPercent) && notNull(?cumulativeRiskPerDealMultiplier) && notNull(?strategySimultaneousRiskPerDealPercent) && notNull(?strategyCatastrophicRiskPerDealMultiplier)"
+      "expr": "notNull(?riskPerActionPercent) && notNull(?cumulativeRiskPerDealMultiplier) && notNull(?strategySimultaneousRiskPerDealPercent)"
     },
     {
       "name": "detailTrancheCount",
@@ -169,14 +170,14 @@
       "expr": "strategySimultaneousRiskPerDealPercent <= globalSimultaneousRiskPerDealPercent"
     },
     {
-      "name": "catastrophicMultiplierWithinGlobal",
-      "note": "Третье неравенство создания: множитель катастрофического потолка не выше конфигурационного. Свой реджект — STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL.",
-      "expr": "strategyCatastrophicRiskPerDealMultiplier <= globalCatastrophicRiskPerDealMultiplier"
+      "name": "cumulativeMultiplierWithinGlobal",
+      "note": "Третье неравенство создания: множитель кумулятивного потолка стратегии не выше предела окружения. Свой реджект — STRATEGY_CUMULATIVE_MULTIPLIER_ABOVE_GLOBAL.",
+      "expr": "cumulativeRiskPerDealMultiplier <= globalCumulativeRiskPerDealMultiplier"
     },
     {
       "name": "riskChainHolds",
       "note": "Первое и третье неравенства создания, названные домом одной величиной (docs/rules/strategy-validation.md, перечень исключений). Реджекты у них РАЗНЫЕ, поэтому каждое стои́т отдельной величиной выше: адресует отказ тот конъюнкт, который ложен. Неравенство «поактный ≤ максимум стратегии» сюда не входит вовсе: это случай N_overlap = 1 второго неравенства, у которого свой операнд, свой реджект ..._UNSATISFIABLE и своя величина overlapRiskSatisfiable — слияние отобрало бы у отказа адресность.",
-      "expr": "strategyRiskWithinGlobal && catastrophicMultiplierWithinGlobal"
+      "expr": "strategyRiskWithinGlobal && cumulativeMultiplierWithinGlobal"
     },
     {
       "name": "detailsBreakingRiskChain",
@@ -203,11 +204,6 @@
       "where": "isTradableDetail && !overlapRiskSatisfiable"
     },
     {
-      "name": "ceilingShareOfBase",
-      "note": "Катастрофический потолок сделки в ДОЛЯХ базы: та же форма, что у docs/spec/risk-limits.json (catastrophicLossCeiling), но без множителя base — на создании стратегии база ещё не наблюдена, а отношение уже вычислимо. Обе величины стоят на одних и тех же двух числах, поэтому проверка создания и преконтроль рантайма меряют один потолок.",
-      "expr": "globalSimultaneousRiskPerDealPercent / 100 * strategyCatastrophicRiskPerDealMultiplier"
-    },
-    {
       "name": "trancheDeclaredNotionalShare",
       "note": "Нотинал, который объявляет один транш, в долях базы: объявленная доля аллокации входного действия. Больше одного входного объявления у транша не бывает (tranchesWithSingleEntry), поэтому сумма по объявлениям транша и есть его доля. Операнд читается СТРОГО: пустая доля отвергается своей проверкой (allocationNotDeclared) до всякого счёта, и подставлять вместо неё ноль означало бы читать «уровень не занял ничего» там, где автор просто забыл поле.",
       "op": "sum",
@@ -225,8 +221,8 @@
     },
     {
       "name": "notionalHeadroomSatisfied",
-      "note": "Объявленный нотинал детали укладывается в катастрофический потолок С ЗАПАСОМ, а не в равенство. Довод и число запаса — дом docs/rules/risk-policy.md: на границе запас округления нулевой, и проскок исполнения в считаные базисные пункты БЕССРОЧНО блокирует сопровождение — преконтроль отвергает всякое новое risk-creating действие сделки, а снять это состояние нечем, кроме выхода. Реджект создания — STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT.",
-      "expr": "detailDeclaredNotionalShare <= ceilingShareOfBase * (1 - notionalHeadroomShare)"
+      "note": "Объявленный нотинал детали укладывается в потолок нотинала сделки — предел плеча в долях базы — С ЗАПАСОМ, а не в равенство. Та же правая часть, что у docs/spec/risk-limits.json (dealNotionalCeiling), без множителя base: на создании стратегии база ещё не наблюдена, а отношение уже вычислимо. Довод и число запаса — дом docs/rules/risk-policy.md: на границе запас округления нулевой, и проскок исполнения в считаные базисные пункты БЕССРОЧНО блокирует сопровождение — преконтроль отвергает всякое новое risk-creating действие сделки, а снять это состояние нечем, кроме выхода. Реджект создания — STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT.",
+      "expr": "detailDeclaredNotionalShare <= globalMaxLeverage * (1 - notionalHeadroomShare)"
     },
     {
       "name": "detailsBreakingNotionalHeadroom",
@@ -1126,10 +1122,10 @@
       }
     },
     {
-      "case": "потолки эталона вложены: максимум стратегии не выше глобального, множитель не выше конфигурационного",
+      "case": "потолки эталона вложены: максимум стратегии не выше глобального, множитель кумулятивного не выше предела окружения",
       "state": {
         "globalSimultaneousRiskPerDealPercent": 1.0,
-        "globalCatastrophicRiskPerDealMultiplier": 150.0
+        "globalCumulativeRiskPerDealMultiplier": 2.0
       },
       "stateFrom": {
         "strategy": "services/strategies/src/test/resources/strategy-examples/trend-following-ema.json"
@@ -1142,22 +1138,22 @@
       "case": "поактный выше максимума стратегии адресуется вееру, а не цепочке: нарушение считает detailsBreakingOverlap, реджект — ..._UNSATISFIABLE",
       "state": {
         "globalSimultaneousRiskPerDealPercent": 1.0,
-        "globalCatastrophicRiskPerDealMultiplier": 150.0,
         "strategy": {
           "details": [
             {
               "phaseEntryPolicy": "FOLLOW_PHASE",
               "riskPerActionPercent": 1.0,
               "strategySimultaneousRiskPerDealPercent": 0.5,
-              "strategyCatastrophicRiskPerDealMultiplier": 100.0,
               "tranches": [
                 {
                   "levelCount": 1
                 }
-              ]
+              ],
+              "cumulativeRiskPerDealMultiplier": 2.0
             }
           ]
-        }
+        },
+        "globalCumulativeRiskPerDealMultiplier": 2.0
       },
       "expect": {
         "detailsBreakingRiskChain": 0,
@@ -1168,22 +1164,22 @@
       "case": "максимум стратегии выше конфигурационного ломает цепочку первым конъюнктом: реджект — ..._SIMULTANEOUS_RISK_ABOVE_GLOBAL",
       "state": {
         "globalSimultaneousRiskPerDealPercent": 1.0,
-        "globalCatastrophicRiskPerDealMultiplier": 150.0,
         "strategy": {
           "details": [
             {
               "phaseEntryPolicy": "FOLLOW_PHASE",
               "riskPerActionPercent": 1.0,
               "strategySimultaneousRiskPerDealPercent": 2.0,
-              "strategyCatastrophicRiskPerDealMultiplier": 100.0,
               "tranches": [
                 {
                   "levelCount": 1
                 }
-              ]
+              ],
+              "cumulativeRiskPerDealMultiplier": 2.0
             }
           ]
-        }
+        },
+        "globalCumulativeRiskPerDealMultiplier": 2.0
       },
       "expect": {
         "detailsBreakingRiskChain": 1,
@@ -1191,25 +1187,25 @@
       }
     },
     {
-      "case": "множитель катастрофического потолка выше конфигурационного ломает цепочку вторым конъюнктом: реджект — ..._CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL",
+      "case": "множитель кумулятивного потолка выше предела окружения ломает цепочку вторым конъюнктом: реджект — ..._CUMULATIVE_MULTIPLIER_ABOVE_GLOBAL",
       "state": {
         "globalSimultaneousRiskPerDealPercent": 1.0,
-        "globalCatastrophicRiskPerDealMultiplier": 150.0,
         "strategy": {
           "details": [
             {
               "phaseEntryPolicy": "FOLLOW_PHASE",
               "riskPerActionPercent": 1.0,
               "strategySimultaneousRiskPerDealPercent": 1.0,
-              "strategyCatastrophicRiskPerDealMultiplier": 200.0,
               "tranches": [
                 {
                   "levelCount": 1
                 }
-              ]
+              ],
+              "cumulativeRiskPerDealMultiplier": 3.0
             }
           ]
-        }
+        },
+        "globalCumulativeRiskPerDealMultiplier": 2.0
       },
       "expect": {
         "detailsBreakingRiskChain": 1,
@@ -1406,7 +1402,6 @@
         "riskPerActionPercent": 1.0,
         "cumulativeRiskPerDealMultiplier": 3.0,
         "strategySimultaneousRiskPerDealPercent": 3.0,
-        "strategyCatastrophicRiskPerDealMultiplier": 10.0,
         "phaseEntryPolicy": "FOLLOW_PHASE",
         "stepType": "EXIT",
         "actionType": "CREATE_ACTION",
@@ -1557,14 +1552,13 @@
       }
     },
     {
-      "case": "нотинал эталона укладывается в катастрофический потолок с запасом, а не в равенство: доля аллокации 95 % против потолка в одну базу",
+      "case": "нотинал эталона укладывается в потолок нотинала сделки с запасом, а не в равенство: доля аллокации 95 % против потолка в одну базу",
       "stateFrom": {
         "strategy": "services/strategies/src/test/resources/strategy-examples/trend-following-ema.json"
       },
       "state": {
-        "globalSimultaneousRiskPerDealPercent": 1.0,
-        "globalCatastrophicRiskPerDealMultiplier": 150.0,
-        "notionalHeadroomShare": 0.01
+        "notionalHeadroomShare": 0.01,
+        "globalMaxLeverage": 1.0
       },
       "expect": {
         "detailsBreakingNotionalHeadroom": 0
@@ -1573,8 +1567,6 @@
     {
       "case": "доля аллокации 100 % при потолке в одну базу упирается в равенство: запаса нет, и конфигурация отвергается созданием — контрпример, на котором предикат запаса и различает",
       "state": {
-        "globalSimultaneousRiskPerDealPercent": 1.0,
-        "globalCatastrophicRiskPerDealMultiplier": 150.0,
         "notionalHeadroomShare": 0.01,
         "strategy": {
           "details": [
@@ -1583,7 +1575,6 @@
               "riskPerActionPercent": 1.0,
               "cumulativeRiskPerDealMultiplier": 2.0,
               "strategySimultaneousRiskPerDealPercent": 1.0,
-              "strategyCatastrophicRiskPerDealMultiplier": 100.0,
               "tranches": [
                 {
                   "key": "t1",
@@ -1608,7 +1599,8 @@
               ]
             }
           ]
-        }
+        },
+        "globalMaxLeverage": 1.0
       },
       "expect": {
         "detailsBreakingNotionalHeadroom": 1
@@ -1617,8 +1609,6 @@
     {
       "case": "тот же расклад с долей 95 %: запас есть, конфигурация проходит — пара примеров и делает предикат различающим",
       "state": {
-        "globalSimultaneousRiskPerDealPercent": 1.0,
-        "globalCatastrophicRiskPerDealMultiplier": 150.0,
         "notionalHeadroomShare": 0.01,
         "strategy": {
           "details": [
@@ -1627,7 +1617,6 @@
               "riskPerActionPercent": 1.0,
               "cumulativeRiskPerDealMultiplier": 2.0,
               "strategySimultaneousRiskPerDealPercent": 1.0,
-              "strategyCatastrophicRiskPerDealMultiplier": 100.0,
               "tranches": [
                 {
                   "key": "t1",
@@ -1652,7 +1641,8 @@
               ]
             }
           ]
-        }
+        },
+        "globalMaxLeverage": 1.0
       },
       "expect": {
         "detailsBreakingNotionalHeadroom": 0
@@ -1661,8 +1651,6 @@
     {
       "case": "предикат запаса на плоском объявлении: потолок в одну базу, объявленный нотинал в одну базу — запаса нет",
       "state": {
-        "globalSimultaneousRiskPerDealPercent": 1.0,
-        "strategyCatastrophicRiskPerDealMultiplier": 100.0,
         "notionalHeadroomShare": 0.01,
         "tranches": [
           {
@@ -1682,10 +1670,10 @@
               ]
             }
           }
-        ]
+        ],
+        "globalMaxLeverage": 1.0
       },
       "expect": {
-        "ceilingShareOfBase": 1.0,
         "detailDeclaredNotionalShare": 1.0,
         "notionalHeadroomSatisfied": false
       }
@@ -1693,8 +1681,6 @@
     {
       "case": "то же плоское объявление с долей 95 %: запас есть — пара примеров и делает предикат различающим",
       "state": {
-        "globalSimultaneousRiskPerDealPercent": 1.0,
-        "strategyCatastrophicRiskPerDealMultiplier": 100.0,
         "notionalHeadroomShare": 0.01,
         "tranches": [
           {
@@ -1714,7 +1700,8 @@
               ]
             }
           }
-        ]
+        ],
+        "globalMaxLeverage": 1.0
       },
       "expect": {
         "detailDeclaredNotionalShare": 0.95,
@@ -1724,8 +1711,6 @@
     {
       "case": "два одновременно живых транша по 60 %: доля считается веером, а не одним объявлением — запас нарушен вдвое",
       "state": {
-        "globalSimultaneousRiskPerDealPercent": 1.0,
-        "strategyCatastrophicRiskPerDealMultiplier": 100.0,
         "notionalHeadroomShare": 0.01,
         "tranches": [
           {
@@ -1762,7 +1747,8 @@
               ]
             }
           }
-        ]
+        ],
+        "globalMaxLeverage": 1.0
       },
       "expect": {
         "detailDeclaredNotionalShare": 1.2,
@@ -1770,10 +1756,8 @@
       }
     },
     {
-      "case": "иные конфигурационные числа — иной потолок в долях базы: множитель 150 при глобальном проценте 1 даёт полторы базы, и доля 100 % в него укладывается с запасом",
+      "case": "иные конфигурационные числа — иной потолок в долях базы: предел плеча 1.5 даёт полторы базы, и доля 100 % в него укладывается с запасом",
       "state": {
-        "globalSimultaneousRiskPerDealPercent": 1.0,
-        "strategyCatastrophicRiskPerDealMultiplier": 150.0,
         "notionalHeadroomShare": 0.01,
         "tranches": [
           {
@@ -1793,10 +1777,10 @@
               ]
             }
           }
-        ]
+        ],
+        "globalMaxLeverage": 1.5
       },
       "expect": {
-        "ceilingShareOfBase": 1.5,
         "detailDeclaredNotionalShare": 1.0,
         "notionalHeadroomSatisfied": true
       }
@@ -2774,6 +2758,35 @@
         "rangeDetailsCount": 0,
         "unknownDetailsCount": 0,
         "detailPerPhaseExact": false
+      }
+    },
+    {
+      "case": "эталон на тестовых числах окружения проходит цепочку и запас: процент сделки 1, предел множителя кумулятивного 2, предел плеча 10",
+      "stateFrom": {
+        "strategy": "services/strategies/src/test/resources/strategy-examples/trend-following-ema.json"
+      },
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCumulativeRiskPerDealMultiplier": 2.0,
+        "globalMaxLeverage": 10.0,
+        "notionalHeadroomShare": 0.01
+      },
+      "expect": {
+        "detailsBreakingRiskChain": 0,
+        "detailsBreakingNotionalHeadroom": 0
+      }
+    },
+    {
+      "case": "эталон против предела множителя кумулятивного ниже его объявленного 2 ломает цепочку у обеих торгуемых деталей — реджект ..._CUMULATIVE_MULTIPLIER_ABOVE_GLOBAL",
+      "stateFrom": {
+        "strategy": "services/strategies/src/test/resources/strategy-examples/trend-following-ema.json"
+      },
+      "state": {
+        "globalSimultaneousRiskPerDealPercent": 1.0,
+        "globalCumulativeRiskPerDealMultiplier": 1.5
+      },
+      "expect": {
+        "detailsBreakingRiskChain": 2
       }
     }
   ],

@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  * — docs/rules/strategy-validation.md §«Исключения: неравенства,
  * проверяемые на создании»).
  *
- * <p><b>Число тенанта — операнд КАЖДОЙ торгуемой детали</b>, поэтому его
+ * <p><b>Число ядра — операнд КАЖДОЙ торгуемой детали</b>, поэтому его
  * мутация поднимает нарушение у обеих торгуемых деталей эталона, а
  * мутация дерева — у одной. Клетка называет счёт явно: иначе она была бы
  * зелена у валидатора, проверяющего только первую деталь.
@@ -33,7 +33,7 @@ class RiskWithinGlobalTest {
 
     private static final String SIMULTANEOUS_ABOVE = "STRATEGY_SIMULTANEOUS_RISK_ABOVE_GLOBAL";
 
-    private static final String CATASTROPHIC_ABOVE = "STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL";
+    private static final String CUMULATIVE_ABOVE = "STRATEGY_CUMULATIVE_MULTIPLIER_ABOVE_GLOBAL";
 
     /** Код незаданного конфигурационного числа — дом называет его с префиксом сущности (находка F2). */
     private static final String NOT_CONFIGURED = "STRATEGY_RISK_APPETITE_NOT_CONFIGURED";
@@ -45,7 +45,7 @@ class RiskWithinGlobalTest {
     @Test
     @DisplayName("U10.1 — объявленный максимум ниже конфигурационного: нарушений нет")
     void u10_1_aDeclaredCeilingBelowTheConfiguredOneIsLegal() {
-        assertThat(violations(reference(), appetite("2", "100"))).isEmpty();
+        assertThat(violations(reference(), appetite("2", "2", "1"))).isEmpty();
     }
 
     @Test
@@ -70,19 +70,19 @@ class RiskWithinGlobalTest {
     @DisplayName("U10.4 — объявленный множитель выше предела: код третьего неравенства")
     void u10_4_aDeclaredMultiplierAboveTheConfiguredLimitIsRejected() {
         CreateStrategyApiRequest request = reference();
-        bull(request).setStrategyCatastrophicRiskPerDealMultiplier(decimal("200"));
+        bull(request).setCumulativeRiskPerDealMultiplier(decimal("3"));
 
         assertThat(violations(request))
                 .singleElement()
                 .asString()
-                .contains("details[0].strategyCatastrophicRiskPerDealMultiplier " + CATASTROPHIC_ABOVE);
+                .contains("details[0].cumulativeRiskPerDealMultiplier " + CUMULATIVE_ABOVE);
     }
 
     @Test
     @DisplayName("U10.5 — объявленный множитель равен пределу: граница включена")
     void u10_5_theMultiplierBoundIsInclusiveToo() {
         CreateStrategyApiRequest request = reference();
-        bull(request).setStrategyCatastrophicRiskPerDealMultiplier(decimal("100"));
+        bull(request).setCumulativeRiskPerDealMultiplier(decimal("2"));
 
         assertThat(violations(request)).isEmpty();
     }
@@ -93,46 +93,48 @@ class RiskWithinGlobalTest {
         CreateStrategyApiRequest request = reference();
         StrategyDetailApiModel detail = bull(request);
         detail.setStrategySimultaneousRiskPerDealPercent(decimal("2"));
-        detail.setStrategyCatastrophicRiskPerDealMultiplier(decimal("200"));
+        detail.setCumulativeRiskPerDealMultiplier(decimal("3"));
 
         List<String> violations = violations(request);
 
         assertThat(violations).hasSize(2);
         assertThat(matching(violations, SIMULTANEOUS_ABOVE)).hasSize(1);
-        assertThat(matching(violations, CATASTROPHIC_ABOVE)).hasSize(1);
+        assertThat(matching(violations, CUMULATIVE_ABOVE)).hasSize(1);
     }
 
     @Test
     @DisplayName("U10.7 — конфигурационный потолок пуст: код с общим префиксом сущности")
     void u10_7_anUnconfiguredCeilingIsRejectedByItsNamedCode() {
-        List<String> violations = violations(reference(), appetite(null, "100"));
+        List<String> violations = violations(reference(), appetite(null, "2", "1"));
 
         assertThat(matching(violations, "details[0].strategySimultaneousRiskPerDealPercent " + NOT_CONFIGURED))
                 .as("код несёт общий префикс сущности")
                 .hasSize(1);
         assertThat(matching(violations, HEADROOM))
-                .as("запас нотинала на пустом конфигурационном числе не считается")
+                .as("запас нотинала от потолка одновременного риска не зависит")
                 .isEmpty();
     }
 
     @Test
     @DisplayName("U10.8 — конфигурационный предел множителя пуст: тот же код на своём пути")
     void u10_8_anUnconfiguredMultiplierLimitIsRejectedToo() {
-        List<String> violations = violations(reference(), appetite("1", null));
+        List<String> violations = violations(reference(), appetite("1", null, "1"));
 
         assertThat(matching(violations,
-                "details[0].strategyCatastrophicRiskPerDealMultiplier " + NOT_CONFIGURED)).hasSize(1);
+                "details[0].cumulativeRiskPerDealMultiplier " + NOT_CONFIGURED)).hasSize(1);
     }
 
     @Test
-    @DisplayName("U10.9 — пусты оба конфигурационных числа: по нарушению на путь у каждой детали")
-    void u10_9_bothUnconfiguredNumbersAreReportedPerDetail() {
-        List<String> violations = violations(reference(), appetite(null, null));
+    @DisplayName("U10.9 — пусты все три конфигурационных числа: по нарушению на путь у каждой детали")
+    void u10_9_allUnconfiguredNumbersAreReportedPerDetail() {
+        List<String> violations = violations(reference(), appetite(null, null, null));
 
         assertThat(matching(violations, NOT_CONFIGURED))
-                .as("две торгуемые детали, по два пути у каждой")
-                .hasSize(4);
-        assertThat(matching(violations, HEADROOM)).isEmpty();
+                .as("две торгуемые детали, по три пути у каждой: два объявленных числа и сама деталь")
+                .hasSize(6);
+        assertThat(matching(violations, HEADROOM))
+                .as("запас нотинала на пустом пределе плеча не считается")
+                .isEmpty();
     }
 
     @Test
@@ -141,7 +143,7 @@ class RiskWithinGlobalTest {
         CreateStrategyApiRequest request = reference();
         bull(request).setStrategySimultaneousRiskPerDealPercent(null);
 
-        List<String> violations = matching(violations(request, appetite(null, "100")), "details[0]");
+        List<String> violations = matching(violations(request, appetite(null, "2", "1")), "details[0]");
 
         assertThat(violations)
                 .singleElement()
@@ -150,9 +152,9 @@ class RiskWithinGlobalTest {
     }
 
     @Test
-    @DisplayName("U10.11 — оба конфигурационных числа пусты: охрана второго рубежа стои́т")
+    @DisplayName("U10.11 — все конфигурационные числа пусты: охрана второго рубежа стои́т")
     void u10_11_theSecondLineGuardRejectsAnUnconfiguredTenant() {
-        assertThat(violations(reference(), appetite(null, null)))
+        assertThat(violations(reference(), appetite(null, null, null)))
                 .as("достижимость исключена читателем чисел: он отвергает вызов своим кодом раньше")
                 .isNotEmpty();
     }

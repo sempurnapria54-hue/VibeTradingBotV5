@@ -56,9 +56,10 @@ public class StrategyDetail extends Auditable {
 
     /**
      * Множитель кумулятивного потолка: во сколько раз сделка за жизнь
-     * вправе превысить поактный потолок. Ни снизу, ни сверху не
-     * валидируется — выбор автора стратегии; при множителе меньше единицы
-     * первая же нога не проходит, и отказ громкий (docs/rules/risk-policy.md).
+     * вправе превысить поактный потолок. Снизу не валидируется — выбор
+     * автора стратегии; при множителе меньше единицы первая же нога не
+     * проходит, и отказ громкий. Сверху его держит предел окружения
+     * {@code globalCumulativeRiskPerDealMultiplier} (docs/rules/risk-policy.md).
      */
     private BigDecimal cumulativeRiskPerDealMultiplier;
 
@@ -68,13 +69,6 @@ public class StrategyDetail extends Auditable {
      * «стратегия ≤ конфигурация».
      */
     private BigDecimal strategySimultaneousRiskPerDealPercent;
-
-    /**
-     * Множитель катастрофического потолка сделки: во сколько раз
-     * растягивается максимальный риск на сделку. Сверяется с
-     * конфигурационным пределом на создании.
-     */
-    private BigDecimal strategyCatastrophicRiskPerDealMultiplier;
 
     /** High-level ориентир risk/reward. */
     private BigDecimal targetRiskRewardRatio;

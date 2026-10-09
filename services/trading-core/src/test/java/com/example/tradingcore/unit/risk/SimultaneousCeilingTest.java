@@ -90,7 +90,7 @@ class SimultaneousCeilingTest {
     void u14_6_withoutLiveRiskOnlyTheActSummandCounts() {
         harness.givenAppetite(appetite("10", 3));
         DealContext withoutLiveRisk = contextBuilder(emptyDeal())
-                .strategyDetail(detail("10", "3", "1", "300"))
+                .strategyDetail(detail("10", "3", "1"))
                 .build();
 
         assertThat(codes(harness.validate(entryAction(), withoutLiveRisk)))
@@ -113,7 +113,7 @@ class SimultaneousCeilingTest {
         deal.setPositions(List.of(episode("10", ANCHOR)));
         deal.setTranches(List.of(tranche(List.of(), List.of(protection(STOP.toPlainString())))));
         return contextBuilder(deal)
-                .strategyDetail(detail("10", "3", strategySimultaneousPercent, "300"))
+                .strategyDetail(detail("10", "3", strategySimultaneousPercent))
                 .build();
     }
 }

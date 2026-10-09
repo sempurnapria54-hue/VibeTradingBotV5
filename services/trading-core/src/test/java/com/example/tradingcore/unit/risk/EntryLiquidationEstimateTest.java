@@ -2,7 +2,7 @@ package com.example.tradingcore.unit.risk;
 
 import static com.example.tradingcore.unit.risk.RiskFixture.ANCHOR;
 import static com.example.tradingcore.unit.risk.RiskFixture.account;
-import static com.example.tradingcore.unit.risk.RiskFixture.appetite;
+import static com.example.tradingcore.unit.risk.RiskFixture.appetiteWithMaxLeverage;
 import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.contextBuilder;
 import static com.example.tradingcore.unit.risk.RiskFixture.deal;
@@ -74,7 +74,9 @@ class EntryLiquidationEstimateTest {
     @BeforeEach
     void givenSpecTiersAndRoomyCeilings() {
         harness.givenRules(rulesWithTiers(specTiers()));
-        harness.givenAppetite(appetite("10", 3));
+        // Предел плеча — сто: плечо пары клеток доходит до ста, а плечо выше
+        // предела у входа отвергается своим кодом и подмешивалось бы к предмету.
+        harness.givenAppetite(appetiteWithMaxLeverage("10", "100"));
     }
 
     @Test
@@ -288,7 +290,7 @@ class EntryLiquidationEstimateTest {
     private static DealContext roomy(Deal deal) {
         return contextBuilder(deal)
                 .exchangeAccount(account("1000000"))
-                .strategyDetail(detail("10", "3", "10", "300"))
+                .strategyDetail(detail("10", "3", "10"))
                 .build();
     }
 }

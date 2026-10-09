@@ -123,10 +123,18 @@ public class ExchangeAccountDataService {
                 .collect(Collectors.toList());
     }
 
-    /** Идентичности тенантов, у которых в проекции есть счёт. */
+    /**
+     * Счета тенанта в статусе {@code ACTIVE} — популяция базы потолка живого
+     * риска тенанта (docs/rules/risk-policy.md §«Потолки живого риска счёта и
+     * тенанта»). Наблюдённость базы и её валюту отбирает читатель: это
+     * условия уровня, а не выборки.
+     */
     @Transactional(readOnly = true)
-    public List<String> findTenantInternalIds() {
-        return repository.findDistinctTenantInternalIds();
+    public List<ExchangeAccount> findActiveByTenantInternalId(String tenantInternalId) {
+        return repository.findByTenantInternalIdAndStatus(tenantInternalId, ExchangeAccount.Status.ACTIVE.name())
+                .stream()
+                .map(mapper::persistenceToDomain)
+                .collect(Collectors.toList());
     }
 
     /**

@@ -52,6 +52,15 @@ class AccessContourBoxTest extends SharedStrategiesBox {
     /** Таблица следа отказов доступа. */
     private static final String DENIALS_TABLE = "access_denials";
 
+    /** Поле состояния в ответе группы пробы. */
+    private static final String HEALTH_STATUS = "status";
+
+    /** Группа пробы живости: состояние процесса. */
+    private static final String LIVENESS_GROUP = "/actuator/health/liveness";
+
+    /** Группа пробы готовности: процесс плюс база. */
+    private static final String READINESS_GROUP = "/actuator/health/readiness";
+
     @Test
     @DisplayName("B8.1 — Умолчание закрыто: вызов без токена отвергается")
     void b8_1_theDefaultIsClosedAndACallWithoutATokenIsRefused() {
@@ -114,6 +123,29 @@ class AccessContourBoxTest extends SharedStrategiesBox {
         assertThat(answer.body())
                 .as("ни одного определения в ответе")
                 .doesNotContain(internalId);
+    }
+
+    /**
+     * Группы проб развёртывания — подпути того же открытого исключения
+     * {@code /actuator/health/**}, а не новые открытые точки. Манифест
+     * спрашивает именно их ({@code deploy/base/services/strategies.yaml}), и
+     * закрытая группа гасила бы под отказом {@code 401}, а не состоянием.
+     * Готовность включает базу: в ящике она поднята, и группа отвечает
+     * {@code UP}.
+     */
+    @Test
+    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
+    void theProbeGroupsAreOpenAndAnswerWithState() {
+        Answer liveness = getAnonymously(LIVENESS_GROUP);
+        Answer readiness = getAnonymously(READINESS_GROUP);
+
+        assertThat(liveness.status()).isEqualTo(200);
+        assertThat(liveness.asObject().get(HEALTH_STATUS)).isEqualTo("UP");
+        assertThat(readiness.status()).isEqualTo(200);
+        assertThat(readiness.asObject().get(HEALTH_STATUS)).isEqualTo("UP");
+        assertThat(readiness.asObject())
+                .as("группа отвечает состоянием, а не подробностями о базе")
+                .containsOnlyKeys(HEALTH_STATUS);
     }
 
     @Test

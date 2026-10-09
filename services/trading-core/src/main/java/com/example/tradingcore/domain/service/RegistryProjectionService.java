@@ -16,7 +16,6 @@ import com.example.tradingcore.mapping.ExchangeAccountMapper;
 import com.example.tradingcore.mapping.InstrumentMapper;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -51,14 +50,14 @@ public class RegistryProjectionService {
     private final MarketDataReadClient marketDataReadClient;
     private final ExchangeAccountDataService accountDataService;
     private final InstrumentDataService instrumentDataService;
-    private final TenantRiskAppetiteDataService riskAppetiteDataService;
     private final ExchangeAccountMapper accountMapper;
     private final InstrumentMapper instrumentMapper;
     private final ProjectionSyncProperties properties;
 
     /**
-     * Сводит проекцию реестра счетов с {@code auth} и заводит место под
-     * числа риск-аппетита тенантов, у которых счёт появился.
+     * Сводит проекцию реестра счетов с {@code auth}. Строк риск-аппетита тик
+     * не заводит: числа — конфигурация окружения, а не строка тенанта
+     * (docs/components/RegistryProjectionJob.md §Границы).
      *
      * <p>Отказ одной строки стоит одну строку, отказ чтения реестра — проход
      * (docs/components/RegistryProjectionJob.md §«Отказ одной строки стоит
@@ -82,7 +81,6 @@ public class RegistryProjectionService {
                 log.error("Exchange account projection failed for {}", response.getInternalId(), e);
             }
         }
-        accountDataService.findTenantInternalIds().forEach(riskAppetiteDataService::ensureRow);
         return projected;
     }
 

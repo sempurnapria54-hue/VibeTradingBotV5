@@ -45,8 +45,8 @@ import org.junit.jupiter.api.Test;
  * мерит. Момент ставится В ДАННЫХ — так его и называет сам кейс.
  *
  * <p><b>Клетки, чей предмет есть положение оси конфигурации, живут своими
- * классами:</b> выключатель тика — {@link DisabledDetectionBoxTest}, окно
- * выборки контура — {@link DetectionContourWindowBoxTest}.
+ * классами:</b> выключатель тика — {@link DisabledDetectionBoxTest}, размер
+ * страницы обхода контура — {@link DetectionContourPagingBoxTest}.
  */
 class ProactiveDetectionBoxTest extends SharedLiveDealBox {
 
@@ -558,8 +558,6 @@ class ProactiveDetectionBoxTest extends SharedLiveDealBox {
      */
     private String standTerminalOrder() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
-        assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("5", "10", "4")).status())
-                .isEqualTo(200);
         assignLeverage(ACCOUNT, INSTRUMENT);
         connector.answers(feeRatePath(ACCOUNT), Feed.array(Feed.tradeFeeRate()));
         tick(Tick.TRADE_FEE_RATES);

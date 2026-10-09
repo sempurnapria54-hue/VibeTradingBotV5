@@ -3,6 +3,7 @@ package com.example.tradingcore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -33,8 +34,11 @@ import com.example.tradingcore.persistence.service.TradeFeeRateDataService;
 import com.example.tradingcore.util.Constants;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -451,6 +455,12 @@ class TradeFeeRateRegistryTest {
      * комиссионных группах: {@code BTC-USDT-SWAP} — группа «1»,
      * {@code ETH-USDT-SWAP} — группа «2». Навесы настоящие, чтение
      * проекции подменено.
+     *
+     * <p><b>Контур отдаётся ДВУМЯ страницами</b> по инструменту: второй
+     * инструмент лежит за первой страницей, и всякая клетка, ждущая на нём
+     * ступени, заодно мерит, что детектор обходит контур до конца, а не
+     * отрезает хвост окном. Навесы читаются пачкой на страницу — стаб
+     * репозитория отдаёт ровно запрошенные строки.
      */
     private TradeFeeRateSyncService detectingSyncService(ExchangeOperationsClient client) {
         ExchangeAccountDataService accountDataService = mock(ExchangeAccountDataService.class);
@@ -458,12 +468,21 @@ class TradeFeeRateRegistryTest {
         InstrumentRepository instrumentRepository = mock(InstrumentRepository.class);
         when(accountDataService.findTradingAccounts()).thenReturn(List.of(tradingAccount()));
         when(instrumentDataService.findDistinctExternalTypes()).thenReturn(List.of(INSTRUMENT_TYPE));
-        when(instrumentDataService.findContourWithin(any(), any())).thenReturn(List.of(
-                contourInstrument(INSTRUMENT_ID, "BTC-USDT-SWAP"),
-                contourInstrument(OTHER_INSTRUMENT_ID, "ETH-USDT-SWAP")));
-        when(instrumentRepository.findAllById(any())).thenReturn(List.of(
-                instrumentRow(INSTRUMENT_ID, rulesJson(GROUP_ID)),
-                instrumentRow(OTHER_INSTRUMENT_ID, rulesJson(OTHER_GROUP_ID))));
+        doAnswer(invocation -> {
+            Consumer<List<Instrument>> pageConsumer = invocation.getArgument(2);
+            pageConsumer.accept(List.of(contourInstrument(INSTRUMENT_ID, "BTC-USDT-SWAP")));
+            pageConsumer.accept(List.of(contourInstrument(OTHER_INSTRUMENT_ID, "ETH-USDT-SWAP")));
+            return null;
+        }).when(instrumentDataService).forEachContourPage(any(), any(), any());
+        Map<Long, InstrumentEntity> projection = Map.of(
+                INSTRUMENT_ID, instrumentRow(INSTRUMENT_ID, rulesJson(GROUP_ID)),
+                OTHER_INSTRUMENT_ID, instrumentRow(OTHER_INSTRUMENT_ID, rulesJson(OTHER_GROUP_ID)));
+        when(instrumentRepository.findAllById(any())).thenAnswer(invocation -> {
+            Iterable<Long> requested = invocation.getArgument(0);
+            List<InstrumentEntity> found = new ArrayList<>();
+            requested.forEach(id -> found.add(projection.get(id)));
+            return found;
+        });
         InstrumentExternalRulesDataService rulesDataService = new InstrumentExternalRulesDataService(
                 instrumentRepository,
                 new InstrumentExternalRulesJsonConverter(new com.fasterxml.jackson.databind.ObjectMapper()),

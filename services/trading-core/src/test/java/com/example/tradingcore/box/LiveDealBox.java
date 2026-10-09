@@ -23,7 +23,8 @@ import org.awaitility.Awaitility;
  *
  * <p><b>Тропа строится ЦЕЛИКОМ тропами ящика</b>, как у отправки входа:
  * проекции — тиком синка, ставка комиссии — тиком её синка, числа
- * риск-аппетита и плечо — своей поверхностью, сделка — тиком отбора
+ * риск-аппетита — осями конфигурации контекста, плечо — своей
+ * поверхностью, сделка — тиком отбора
  * входа, создание и отправка ноги — проходами сопровождения. Налив
  * наблюдается ТОЙ ЖЕ тропой, какой он наблюдается в проде: обработчик
  * отправленного входа отдаёт добычу ноги вместе с позицией, а стаб
@@ -101,12 +102,6 @@ abstract class LiveDealBox extends TradingCoreBox {
     private static final Duration PASS_HORIZON = Duration.ofSeconds(90);
 
     /**
-     * Предел серии убыточных закрытий, которым сборка назначает числа
-     * риск-аппетита; клетка о серии ставит свой до открытия сделки.
-     */
-    protected String consecutiveLossLimit = "4";
-
-    /**
      * Сделка с траншем в предвходовой проверке, чей вход доходит до
      * команды: все входы расчёта и преконтроля поставлены тропами ящика, а
      * снимок средств снят первым тиком сопровождения.
@@ -115,7 +110,6 @@ abstract class LiveDealBox extends TradingCoreBox {
      */
     protected void openCommandDeal(Strategy definition) {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
-        assignRiskAppetite();
         assignLeverage(ACCOUNT, INSTRUMENT);
         syncFeeRate();
         marketData.answers(featuresPath(INSTRUMENT),
@@ -609,12 +603,6 @@ abstract class LiveDealBox extends TradingCoreBox {
                     tick(Tick.DEAL_ORCHESTRATOR);
                     return reached.call();
                 });
-    }
-
-    /** Числа риск-аппетита тенанта: операнды преконтроля, своей поверхностью. */
-    protected void assignRiskAppetite() {
-        assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("5", "10", consecutiveLossLimit))
-                .status()).isEqualTo(200);
     }
 
     /** Ставка комиссии комиссионного уровня счёта: тиком её синка. */

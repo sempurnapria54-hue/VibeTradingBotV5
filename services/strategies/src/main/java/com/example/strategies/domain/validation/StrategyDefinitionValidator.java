@@ -515,33 +515,37 @@ public class StrategyDefinitionValidator {
 
     /**
      * Пятое статическое неравенство создания: объявленный нотинал детали
-     * укладывается в катастрофический потолок С ЗАПАСОМ
+     * укладывается в потолок нотинала сделки С ЗАПАСОМ —
+     * {@code Σ (allocationPercents / 100 × levelCount) ≤
+     * (1 − notionalHeadroomShare) × globalMaxLeverage}
      * (docs/rules/risk-policy.md §«Нотинал укладывается в потолок с
      * запасом, а не в границу», исполнимая форма —
      * docs/spec/strategy-reference.json §{@code notionalHeadroomSatisfied}).
      *
-     * <p>Потолок берётся в долях базы: на создании стратегии база ещё не
-     * наблюдена, а отношение уже вычислимо. Запас — константа правила, не
-     * число конфигурации.
+     * <p>Потолок нотинала сделки — предел плеча: брутто-плечо сделки к базе и
+     * есть отношение её нотинала к базе, поэтому предел в долях базы
+     * вычислим на создании, когда база ещё не наблюдена
+     * (.claude/decisions/deal-leverage-ceiling.md). Запас — константа
+     * правила, не число конфигурации.
+     *
+     * <p>Пустой предел плеча здесь молчит: отказ «не принят» адресует
+     * проверка риск-чисел детали, и второй отказ того же класса на той же
+     * детали был бы дублем.
      */
     private void validateNotionalHeadroom(StrategyDetailApiModel detail, String path,
                                           TenantRiskAppetite appetite, List<String> violations) {
         if (isFalse(tradableDetail(detail))) {
             return;
         }
-        BigDecimal multiplier = detail.getStrategyCatastrophicRiskPerDealMultiplier();
-        BigDecimal globalSimultaneous = appetite.globalSimultaneousRiskPerDealPercent();
+        BigDecimal maxLeverage = appetite.globalMaxLeverage();
         BigDecimal declaredShare = declaredNotionalShare(detail);
-        if (isNull(multiplier) || isNull(globalSimultaneous) || isNull(declaredShare)) {
+        if (isNull(maxLeverage) || isNull(declaredShare)) {
             return;
         }
-        BigDecimal ceilingShare = globalSimultaneous
-                .divide(Constants.Risk.FULL_COVERAGE_PERCENTS, DomainMath.CONTEXT)
-                .multiply(multiplier);
-        BigDecimal allowed = ceilingShare.multiply(BigDecimal.ONE.subtract(Constants.Risk.NOTIONAL_HEADROOM_SHARE));
+        BigDecimal allowed = maxLeverage.multiply(BigDecimal.ONE.subtract(Constants.Risk.NOTIONAL_HEADROOM_SHARE));
         if (declaredShare.compareTo(allowed) > 0) {
             violations.add(path + " STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT: объявленный нотинал детали ("
-                    + declaredShare + " базы) не оставляет запаса под катастрофическим потолком (допустимо "
+                    + declaredShare + " базы) не оставляет запаса под потолком нотинала сделки (допустимо "
                     + allowed + ")");
         }
     }
@@ -855,17 +859,20 @@ public class StrategyDefinitionValidator {
     }
 
     /**
-     * Риск-числа торгуемой детали: объявлены все четыре, и два из них
-     * вложены в конфигурационный риск-аппетит
-     * (docs/spec/strategy-reference.json, величины
-     * {@code hasRequiredRiskFields}, {@code strategyRiskWithinGlobal},
-     * {@code catastrophicMultiplierWithinGlobal}).
+     * Риск-числа торгуемой детали: объявлены все три, и два из них
+     * вложены в конфигурационный риск-аппетит — неравенства 1 и 3
+     * (docs/rules/strategy-validation.md §«Исключения: неравенства,
+     * проверяемые на создании»; docs/spec/strategy-reference.json, величины
+     * {@code hasRequiredRiskFields}, {@code riskChainHolds},
+     * {@code cumulativeMultiplierWithinGlobal}).
      *
      * <p><b>Незаданное конфигурационное число отвергает создание, а не
      * пропускает его:</b> сверять объявление автора не с чем, и
      * пропуск был бы разрешающей ошибкой ровно там, где стои́т охрана.
-     * Реджекты у неравенств РАЗНЫЕ — адресует отказ тот конъюнкт,
-     * который ложен (П3).
+     * Пустой предел плеча — операнд пятого неравенства, а не объявления
+     * автора, — отвергается здесь же, на пути детали: неравенство запаса
+     * на нём молчит. Реджекты у неравенств РАЗНЫЕ — адресует отказ тот
+     * конъюнкт, который ложен (П3).
      */
     private void validateRiskNumbers(StrategyDetailApiModel detail, String path,
                                      TenantRiskAppetite appetite, List<String> violations) {
@@ -877,18 +884,20 @@ public class StrategyDefinitionValidator {
                 path + ".cumulativeRiskPerDealMultiplier", violations);
         requireDeclared(detail.getStrategySimultaneousRiskPerDealPercent(),
                 path + ".strategySimultaneousRiskPerDealPercent", violations);
-        requireDeclared(detail.getStrategyCatastrophicRiskPerDealMultiplier(),
-                path + ".strategyCatastrophicRiskPerDealMultiplier", violations);
         validateWithinGlobal(detail.getStrategySimultaneousRiskPerDealPercent(),
                 appetite.globalSimultaneousRiskPerDealPercent(),
                 path + ".strategySimultaneousRiskPerDealPercent",
                 "STRATEGY_SIMULTANEOUS_RISK_ABOVE_GLOBAL",
                 "максимум одновременного риска стратегии выше конфигурационного", violations);
-        validateWithinGlobal(detail.getStrategyCatastrophicRiskPerDealMultiplier(),
-                appetite.globalCatastrophicRiskPerDealMultiplier(),
-                path + ".strategyCatastrophicRiskPerDealMultiplier",
-                "STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL",
-                "множитель катастрофического потолка выше конфигурационного предела", violations);
+        validateWithinGlobal(detail.getCumulativeRiskPerDealMultiplier(),
+                appetite.globalCumulativeRiskPerDealMultiplier(),
+                path + ".cumulativeRiskPerDealMultiplier",
+                "STRATEGY_CUMULATIVE_MULTIPLIER_ABOVE_GLOBAL",
+                "множитель кумулятивного потолка выше конфигурационного предела", violations);
+        if (isNull(appetite.globalMaxLeverage())) {
+            violations.add(path + " STRATEGY_RISK_APPETITE_NOT_CONFIGURED: предел плеча не задан — "
+                    + "объявленный нотинал детали сверять не с чем");
+        }
     }
 
     /** Деталь торгуема: политика фазы объявлена и она не NO_TRADE. */

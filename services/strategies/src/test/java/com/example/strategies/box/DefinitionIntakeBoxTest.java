@@ -33,6 +33,9 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
     /** Класс отказа, которым отвечают все броски поверхности владельца. */
     private static final String REJECTED = "STRATEGY_REQUEST_REJECTED";
 
+    /** Предел плеча клеток запаса: потолок нотинала сделки в одну базу. */
+    private static final String UNIT_MAX_LEVERAGE = "1";
+
     @Test
     @DisplayName("B1.1 — Штатное создание заводит черновик и ничего не публикует")
     void b1_1_theRegularCreationDraftsAndPublishesNothing() {
@@ -54,8 +57,8 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
                 .as("у черновика писателя события нет: строки outbox не заводится")
                 .isZero();
         assertThat(peer.paths())
-                .as("к ядру ушли ровно два чтения — разрешимость ссылок и числа тенанта")
-                .containsExactly(PEER_PAIR_CHECKS, PEER_RISK_APPETITES + "/" + TENANT);
+                .as("к ядру ушли ровно два чтения — разрешимость ссылок и числа ядра")
+                .containsExactly(PEER_PAIR_CHECKS, PEER_RISK_APPETITE);
     }
 
     @Test
@@ -184,8 +187,8 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
     @DisplayName("B1.8 — Неназначенные числа риск-аппетита отвергают создание")
     void b1_8_unassignedRiskAppetiteNumbersRejectTheCreation() {
         peerResolvesEverything();
-        peer.answers(PEER_RISK_APPETITES + "/" + TENANT,
-                Feed.riskAppetite(TENANT, null, GLOBAL_CATASTROPHIC_MULTIPLIER));
+        peer.answers(PEER_RISK_APPETITE,
+                Feed.riskAppetite(null, GLOBAL_CUMULATIVE_MULTIPLIER, GLOBAL_MAX_LEVERAGE));
 
         Answer answer = post(STRATEGIES, TENANT, Bodies.reference());
 
@@ -201,7 +204,7 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
     @DisplayName("B1.9 — Пустая строка чисел у ядра от пустого числа не отличается")
     void b1_9_anAbsentRowOfNumbersIsIndistinguishableFromAnEmptyNumber() {
         peerResolvesEverything();
-        peer.answers(PEER_RISK_APPETITES + "/" + TENANT, "");
+        peer.answers(PEER_RISK_APPETITE, "");
 
         Answer answer = post(STRATEGIES, TENANT, Bodies.reference());
 
@@ -309,6 +312,7 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
     @DisplayName("B1.16 — Нулевой запас нотинала отвергается созданием")
     void b1_16_zeroNotionalHeadroomIsRejectedOnCreation() {
         peerResolvesEverything();
+        peerCeilsTheNotionalAtOneBase();
 
         Answer answer = post(STRATEGIES, TENANT, Bodies.withEntryAllocation(new BigDecimal("100")));
 
@@ -321,12 +325,13 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
     @DisplayName("B1.17 — Доля запаса приходит константой правила, а не числом тенанта")
     void b1_17_theHeadroomShareIsARuleConstantNotATenantNumber() {
         peerResolvesEverything();
+        peerCeilsTheNotionalAtOneBase();
 
         Answer answer = post(STRATEGIES, TENANT, Bodies.withEntryAllocation(new BigDecimal("99.5")));
 
         assertThat(answer.status()).isEqualTo(400);
         assertThat(answer.errorMessage())
-                .as("запас считается и БЕЗ третьего числа в ответе соседа")
+                .as("доля 0.995 базы ниже предела плеча 1, и отвергает её только запас — доли запаса в ответе соседа нет")
                 .contains("STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT")
                 .doesNotContain("STRATEGY_RISK_APPETITE_NOT_CONFIGURED");
         assertThat(rows.count(STRATEGIES_TABLE)).isZero();
@@ -397,5 +402,19 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
         Object actionId = rows.row("strategy_actions", "key", "bull_protection_oco").get("id");
         assertThat(rows.row("strategy_algo_order_actions", "id", actionId))
                 .containsEntry("trigger_price_type", "MARK");
+    }
+
+    /**
+     * Ядро отдаёт предел плеча 1 — потолок нотинала сделки в одну базу.
+     *
+     * <p>Доля аллокации действия не выше ста процентов, поэтому одна нога не
+     * достаёт до штатного предела 10: нулевой и неполный запас наблюдаемы
+     * только при потолке в одну базу (неравенство 5,
+     * docs/rules/strategy-validation.md; примеры 41 и 42
+     * docs/spec/strategy-reference.json).
+     */
+    private void peerCeilsTheNotionalAtOneBase() {
+        peer.answers(PEER_RISK_APPETITE,
+                Feed.riskAppetite(GLOBAL_SIMULTANEOUS_PERCENT, GLOBAL_CUMULATIVE_MULTIPLIER, UNIT_MAX_LEVERAGE));
     }
 }

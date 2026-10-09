@@ -6,10 +6,9 @@ import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.domain.command.DealContext;
+import com.example.tradingcore.domain.service.RiskAppetiteService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,7 +39,7 @@ import org.springframework.stereotype.Service;
 public class LossStreakCounter {
 
     private final ExchangeAccountDataService exchangeAccountDataService;
-    private final TenantRiskAppetiteDataService tenantRiskAppetiteDataService;
+    private final RiskAppetiteService riskAppetiteService;
 
     /**
      * Применить исход сделки к счётчику серии и ответить, достигнут ли
@@ -59,13 +58,13 @@ public class LossStreakCounter {
         ExchangeAccount account = dealContext.getExchangeAccount();
         Integer countBefore = zeroIfNull(account.getConsecutiveLossCount());
         if (isNull(priceResult) || priceResult.signum() == 0) {
-            return haltTriggered(account, countBefore);
+            return haltTriggered(countBefore);
         }
         boolean loss = priceResult.signum() < 0;
         exchangeAccountDataService.applyLossStreak(account.getId(), loss);
         Integer countAfter = loss ? countBefore + 1 : 0;
         account.setConsecutiveLossCount(countAfter);
-        return haltTriggered(account, countAfter);
+        return haltTriggered(countAfter);
     }
 
     /**
@@ -86,14 +85,13 @@ public class LossStreakCounter {
     }
 
     /**
-     * Предел достигнут. Порог не задан — срабатывать нечему: торговля уже
-     * отвергнута преконтролем кодом незаданного числа риск-аппетита, и
-     * провизорное значение здесь не подставляется.
+     * Предел достигнут. Предел — число риск-аппетита, принятое ядром из
+     * конфигурации окружения, одно на все счета. Порог не принят —
+     * срабатывать нечему: торговля уже отвергнута преконтролем кодом
+     * незаданного числа, и провизорное значение здесь не подставляется.
      */
-    private Boolean haltTriggered(ExchangeAccount account, Integer countAfter) {
-        Integer limit = tenantRiskAppetiteDataService.findByTenantInternalId(account.getTenantId())
-                .map(Tenant::getGlobalConsecutiveLossLimit)
-                .orElse(null);
+    private Boolean haltTriggered(Integer countAfter) {
+        Integer limit = riskAppetiteService.getAccepted().getGlobalConsecutiveLossLimit();
         return nonNull(limit) && countAfter >= limit;
     }
 

@@ -41,21 +41,27 @@ final class Feed {
     }
 
     /**
-     * Числа риск-аппетита тенанта; {@code null} — держатель числа не
-     * назначил.
+     * Принятые ядром числа риск-аппетита — все шесть, как их отдаёт ядро;
+     * {@code null} — ядро числа не приняло.
      *
-     * @param tenantInternalId                        идентичность тенанта
-     * @param simultaneousPercent                     потолок одновременного риска на сделку
-     * @param catastrophicMultiplier                  предел множителя катастрофического потолка
+     * <p><b>Три числа преконтроля ядра едут постоянными:</b> владелец
+     * определений их не читает, и в ответе они стоят ради формы — лишние
+     * ключи разбор не роняют. Значения — числа тестового окружения.
+     *
+     * @param simultaneousPercent  потолок одновременного риска на сделку
+     * @param cumulativeMultiplier предел множителя кумулятивного потолка
+     * @param maxLeverage          предел плеча
      */
-    static String riskAppetite(String tenantInternalId, String simultaneousPercent,
-                               String catastrophicMultiplier) {
+    static String riskAppetite(String simultaneousPercent, String cumulativeMultiplier, String maxLeverage) {
         return """
                 {
-                  "tenantInternalId": "%s",
                   "globalSimultaneousRiskPerDealPercent": %s,
-                  "globalCatastrophicRiskPerDealMultiplier": %s
+                  "globalSimultaneousRiskPerAccountPercent": 10,
+                  "globalSimultaneousRiskPerTenantPercent": 30,
+                  "globalCumulativeRiskPerDealMultiplier": %s,
+                  "globalMaxLeverage": %s,
+                  "globalConsecutiveLossLimit": 3
                 }
-                """.formatted(tenantInternalId, simultaneousPercent, catastrophicMultiplier);
+                """.formatted(simultaneousPercent, cumulativeMultiplier, maxLeverage);
     }
 }

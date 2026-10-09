@@ -17,6 +17,7 @@ import com.example.strategy.engine.calc.CalculatedStrategyAction;
 import com.example.strategy.engine.calc.PriceMode;
 import com.example.strategy.engine.calc.ResolvedStopLossPrice;
 import com.example.strategy.engine.calc.ResolvedTakeProfitPrice;
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.aggregate.strategy.StrategyDetail;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyAction;
@@ -32,7 +33,6 @@ import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRul
 import com.example.tradingbot.domain.model.core.instrument.PositionTier;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingbot.domain.util.DomainMath;
 import com.example.tradingbot.domain.util.RiskMath;
 import com.example.tradingcore.config.DealContextProperties;
@@ -40,13 +40,22 @@ import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
+import com.example.tradingcore.domain.deal.DealContextService;
+import com.example.tradingcore.domain.model.RiskAppetite;
+import com.example.tradingcore.domain.service.RiskAppetiteService;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
+import com.example.tradingcore.persistence.service.DealDataService;
+import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentExternalRulesDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -57,20 +66,22 @@ import org.springframework.stereotype.Component;
  * (docs/components/RiskValidator.md). Нужные метрики считает сам; статус
  * сделки не меняет и команд не создаёт.
  *
- * <p><b>Три операнда валидатор читает СВОЕЙ тропой, а не аргументом:</b>
+ * <p><b>Четыре операнда валидатор читает СВОЕЙ тропой, а не аргументом:</b>
  * справочные правила инструмента (со ставкой, налитой границей навеса),
- * состояние пары «счёт, инструмент» и числа риск-аппетита тенанта.
- * Гидрация ставки в фабрике контекста расчёта накрыла бы только тропу
- * калькуляторов, и преконтроль блокировал бы каждый вход отсутствием
- * ставки.
+ * состояние пары «счёт, инструмент», принятые ядром числа риск-аппетита и
+ * живые сделки уровней «счёт» и «тенант» с базами счетов тенанта. Гидрация
+ * ставки в фабрике контекста расчёта накрыла бы только тропу калькуляторов,
+ * и преконтроль блокировал бы каждый вход отсутствием ставки.
  *
  * <p><b>Снимок средств приходит контекстом, а срок его годности —
  * конфигурацией прохода:</b> проверки средств счёта меряются тем же
  * предикатом свежести, по которому обработчик предвходовой проверки
  * заказывает добычу, и с той же толерантностью.
  *
- * <p><b>Делитель ВСЕХ ЧЕТЫРЁХ потолков один</b> — база риска: снимок
- * сделки, если он есть, иначе живая база счёта. Развилка не
+ * <p><b>Делитель ВСЕХ потолков сделки один</b> — база риска: снимок
+ * сделки, если он есть, иначе живая база счёта. Потолки счёта и тенанта
+ * делят не его, а капитал своего уровня (docs/rules/risk-policy.md
+ * §«Потолки живого риска счёта и тенанта»). Развилка не
  * стилистическая: снимок пишет создатель ноги той же транзакцией, что
  * заводит ногу, а преконтроль идёт ДО неё — на ПЕРВОМ действии сделки
  * делителя-снимка не существует (docs/spec/risk-limits.json, величина
@@ -83,7 +94,7 @@ import org.springframework.stereotype.Component;
  * подменяется.
  *
  * <p><b>Незаданное число ОТКАЗЫВАЕТ вычислением, а не пропускает
- * действие.</b> Правило общее и на числа риск-аппетита тенанта, и на
+ * действие.</b> Правило общее и на числа риск-аппетита окружения, и на
  * числа, объявленные деталью стратегии: неравенство, которое не на чем
  * посчитать, не проверено, а непроверенное благоприятным умолчанием не
  * читается (docs/concept.md П1).
@@ -96,7 +107,10 @@ public class RiskValidator {
 
     private final InstrumentExternalRulesDataService rulesDataService;
     private final AccountInstrumentStateDataService accountInstrumentStateDataService;
-    private final TenantRiskAppetiteDataService tenantRiskAppetiteDataService;
+    private final RiskAppetiteService riskAppetiteService;
+    private final ExchangeAccountDataService exchangeAccountDataService;
+    private final DealDataService dealDataService;
+    private final DealContextService dealContextService;
     private final DealContextProperties properties;
 
     /**
@@ -151,16 +165,14 @@ public class RiskValidator {
             return blockedResult(checks, RiskCheckCode.BALANCE_INVALID,
                     "Risk base is missing or non-positive");
         }
-        Tenant appetite = tenantRiskAppetiteDataService
-                .findByTenantInternalId(account.getTenantId())
-                .orElse(new Tenant());
+        RiskAppetite appetite = riskAppetiteService.getAccepted();
         if (isNull(appetite.getGlobalConsecutiveLossLimit())) {
             return blockedResult(checks, RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED,
-                    "globalConsecutiveLossLimit is not assigned for tenant " + account.getTenantId());
+                    "globalConsecutiveLossLimit is not accepted from the environment configuration");
         }
         if (isNull(appetite.getGlobalSimultaneousRiskPerDealPercent())) {
             return blockedResult(checks, RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "globalSimultaneousRiskPerDealPercent is not assigned for tenant " + account.getTenantId());
+                    "globalSimultaneousRiskPerDealPercent is not accepted from the environment configuration");
         }
 
         AccountInstrumentState pairState = accountInstrumentStateDataService
@@ -173,7 +185,7 @@ public class RiskValidator {
         checkInstrumentLive(rules, calculatedAction, tranche, direction, checks);
         checkMarginMode(pairState, checks);
         checkSizeBounds(rules, sizeContracts, price, checks);
-        checkLeverage(calculatedAction.getSourceAction(), pairState, rules, checks);
+        checkLeverage(calculatedAction.getSourceAction(), pairState, rules, appetite, checks);
         checkFeeRate(touchesStopLevel(price), rules, dealContext, checks);
         Balance settlement = checkAccountFunds(dealContext, checks);
         if (nonNull(settlement)) {
@@ -208,14 +220,16 @@ public class RiskValidator {
      * на свежем снимке, стоящая ступень, потолки и последним — покрытие
      * транша после снятия. Класс действия ни одного неравенства не
      * выключает (docs/rules/risk-policy.md, риск акта по классу действия):
-     * катастрофическое неравенство, выключенное на снятии, пропускало бы
+     * неравенство потолка нотинала, выключенное на снятии, пропускало бы
      * ослабление защиты сверх потолка.
      *
      * <p><b>Потолки считаются при нулевых слагаемых акта и ДОАКТНОМ
      * уровне</b> — снимаемая защита ещё действует, и уровень берётся
      * наименее благоприятный среди действующих, её включая. Поактный
-     * тривиально истинен и не считается; кумулятивный, оба одновременных и
-     * катастрофический сравнивают с потолком уже взятое и уже живое.
+     * тривиально истинен и не считается; кумулятивные, одновременные сделки
+     * и потолок нотинала сравнивают с потолком уже взятое и уже живое;
+     * потолки счёта и тенанта меряют прирост живого риска сделки, а он при
+     * доактном уровне нулевой.
      * <b>Это не вторая точка входа:</b> там отсутствие операнда — молчание,
      * здесь — отказ, как на всяком проверяемом действии.
      *
@@ -256,16 +270,14 @@ public class RiskValidator {
             return blockedResult(checks, RiskCheckCode.BALANCE_INVALID,
                     "Risk base is missing or non-positive");
         }
-        Tenant appetite = tenantRiskAppetiteDataService
-                .findByTenantInternalId(account.getTenantId())
-                .orElse(new Tenant());
+        RiskAppetite appetite = riskAppetiteService.getAccepted();
         if (isNull(appetite.getGlobalConsecutiveLossLimit())) {
             return blockedResult(checks, RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED,
-                    "globalConsecutiveLossLimit is not assigned for tenant " + account.getTenantId());
+                    "globalConsecutiveLossLimit is not accepted from the environment configuration");
         }
         if (isNull(appetite.getGlobalSimultaneousRiskPerDealPercent())) {
             return blockedResult(checks, RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "globalSimultaneousRiskPerDealPercent is not assigned for tenant " + account.getTenantId());
+                    "globalSimultaneousRiskPerDealPercent is not accepted from the environment configuration");
         }
 
         AccountInstrumentState pairState = accountInstrumentStateDataService
@@ -274,7 +286,7 @@ public class RiskValidator {
 
         checkInstrumentLiveForRemoval(rules, checks);
         checkMarginMode(pairState, checks);
-        checkLeverage(null, pairState, rules, checks);
+        checkLeverage(null, pairState, rules, appetite, checks);
         checkFeeRate(false, rules, dealContext, checks);
         checkAccountFunds(dealContext, checks);
         if (isTrue(pairState.hasStandingSafetyRung())) {
@@ -320,7 +332,7 @@ public class RiskValidator {
      * все потолки, прочие числа — только свой.
      */
     private void checkCeilingsWithoutActOperands(DealContext dealContext, InstrumentExternalRules rules,
-                                                 Tenant appetite, BigDecimal base, BigDecimal entryAnchor,
+                                                 RiskAppetite appetite, BigDecimal base, BigDecimal entryAnchor,
                                                  List<RiskCheckResult> checks) {
         StrategyDetail detail = dealContext.getStrategyDetail();
         if (isNull(detail) || isNull(detail.getRiskPerActionPercent())) {
@@ -328,11 +340,14 @@ public class RiskValidator {
                     "riskPerActionPercent is not declared by the pinned strategy detail", null));
             return;
         }
+        Deal deal = dealContext.getDeal();
         BigDecimal perAction = percentOf(detail.getRiskPerActionPercent(), base);
+        BigDecimal liveRisk = liveRiskNow(deal, rules, entryAnchor, deal.currentStopLevel());
         checkCumulative(dealContext, detail, ZERO, perAction, checks);
-        checkSimultaneous(dealContext, detail, appetite, rules, base, entryAnchor, ZERO,
-                dealContext.getDeal().currentStopLevel(), checks);
-        checkCatastrophicNotional(dealContext, detail, appetite, rules, base, entryAnchor, ZERO, checks);
+        checkGlobalCumulative(deal, appetite, base, ZERO, checks);
+        checkSimultaneous(detail, appetite, base, liveRisk, ZERO, checks);
+        checkDealNotional(dealContext, appetite, rules, base, entryAnchor, ZERO, checks);
+        checkLevelCeilings(dealContext, appetite, liveRisk, liveRisk, ZERO, checks);
     }
 
     /**
@@ -349,16 +364,18 @@ public class RiskValidator {
      * {@code actRisk = 0} и {@code actNotional = 0}. Второй дом у любой из
      * форм был бы копией, расходящейся первой же правкой.
      *
-     * <p><b>Поактный и накопленный потолки в перечень НЕ входят</b> — оба
+     * <p><b>Поактный и накопленные потолки в перечень НЕ входят</b> — все
      * меряют акт, которого здесь нет: при нулевом акте они истинны
-     * тождественно, и включение их в набор давало бы детектору две
-     * заведомо молчащие проверки.
+     * тождественно. <b>Потолки счёта и тенанта не входят тоже:</b> при
+     * нулевом акте прирост живого риска сделки нулевой
+     * ({@code ownLiveRiskRaised}), и они истинны тождественно.
      *
      * <p><b>Отсутствие операнда — молчание, а не находка.</b> Неполный
      * граф, нерезолвенные правила инструмента, пустая база риска,
      * незаявленное число — всё это означает «не проверено», а
      * непроверенное нарушением не читается: ложный триггер остановил бы
-     * входы по инструменту без основания.
+     * входы по инструменту без основания. Молчание поштучное: непринятый
+     * предел плеча снимает только потолок нотинала.
      *
      * @return нарушенные неравенства; пусто — нарушений нет либо проверка
      *         не проводилась
@@ -373,40 +390,37 @@ public class RiskValidator {
         InstrumentExternalRules rules = rulesDataService
                 .findByInstrumentId(dealContext.getInstrument().getId(), account.getId())
                 .orElse(null);
-        Tenant appetite = tenantRiskAppetiteDataService
-                .findByTenantInternalId(account.getTenantId())
-                .orElse(new Tenant());
+        RiskAppetite appetite = riskAppetiteService.getAccepted();
         if (isNull(rules) || isNull(appetite.getGlobalSimultaneousRiskPerDealPercent())
-                || isNull(detail.getStrategySimultaneousRiskPerDealPercent())
-                || isNull(detail.getStrategyCatastrophicRiskPerDealMultiplier())) {
+                || isNull(detail.getStrategySimultaneousRiskPerDealPercent())) {
             return List.of();
         }
-        BigDecimal entryAnchor = entryAnchor(dealContext.getDeal().livePosition(), null);
-        BigDecimal livePositionRisk = livePositionRiskAtStop(dealContext, rules, entryAnchor,
-                dealContext.getDeal().currentStopLevel());
-        if (isNull(livePositionRisk)) {
+        Deal deal = dealContext.getDeal();
+        BigDecimal entryAnchor = entryAnchor(deal.livePosition(), null);
+        BigDecimal liveRiskNow = liveRiskNow(deal, rules, entryAnchor, deal.currentStopLevel());
+        if (isNull(liveRiskNow)) {
             // Уровня защиты нет вовсе — это ПОТЕРЯ ПОКРЫТИЯ, и её реакцию
             // поднимает свой триггер, а не этот: одно состояние не получает
             // двух ответов (docs/rules/instrument-hold.md).
             return List.of();
         }
         List<RiskCheckResult> checks = new ArrayList<>();
-        BigDecimal liveRiskNow = unfilledPlannedRisk(dealContext).add(livePositionRisk);
         checkAgainst(liveRiskNow, percentOf(detail.getStrategySimultaneousRiskPerDealPercent(), base),
                 RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED, "strategy simultaneous ceiling", checks);
         checkAgainst(liveRiskNow, percentOf(appetite.getGlobalSimultaneousRiskPerDealPercent(), base),
                 RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED, "global simultaneous ceiling", checks);
-        checkAgainst(dealNotional(dealContext, rules, entryAnchor),
-                percentOf(appetite.getGlobalSimultaneousRiskPerDealPercent(), base)
-                        .multiply(detail.getStrategyCatastrophicRiskPerDealMultiplier()),
-                RiskCheckCode.DEAL_NOTIONAL_EXCEEDED, "catastrophic notional ceiling", checks);
+        if (nonNull(appetite.getGlobalMaxLeverage())) {
+            checkAgainst(dealNotional(deal, rules, entryAnchor), dealNotionalCeiling(appetite, base),
+                    RiskCheckCode.DEAL_NOTIONAL_EXCEEDED, "deal notional ceiling", checks);
+        }
         return checks;
     }
 
     /**
-     * Четыре потолка риска и катастрофический потолок нотинала. Все пять
-     * неравенств считаются от ОДНОЙ базы и от операндов, взятых по графу в
-     * точке проверки (docs/spec/risk-limits.json).
+     * Потолки риска сделки, потолок нотинала и потолки живого риска счёта и
+     * тенанта. Потолки сделки считаются от ОДНОЙ базы и от операндов, взятых
+     * по графу в точке проверки (docs/spec/risk-limits.json); потолки уровней
+     * делят капитал своего уровня.
      *
      * <p><b>Слагаемое проверяемого акта обязательно</b>: без него первый
      * вход сравнивал бы с потолком ноль и проходил любым размером —
@@ -414,7 +428,7 @@ public class RiskValidator {
      * где решается размер.
      */
     private void checkCeilings(CalculatedStrategyAction calculatedAction, DealContext dealContext,
-                               InstrumentExternalRules rules, Tenant appetite, BigDecimal base,
+                               InstrumentExternalRules rules, RiskAppetite appetite, BigDecimal base,
                                BigDecimal entryAnchor, List<RiskCheckResult> checks) {
         StrategyDetail detail = dealContext.getStrategyDetail();
         if (isNull(detail) || isNull(detail.getRiskPerActionPercent())) {
@@ -433,15 +447,20 @@ public class RiskValidator {
                     "Act price is not resolved: act notional is unmeasured", null));
             return;
         }
+        Deal deal = dealContext.getDeal();
         BigDecimal actRisk = actRisk(calculatedAction, dealContext, rules, entryAnchor);
         BigDecimal actNotional = actNotional(calculatedAction, rules);
         BigDecimal perAction = percentOf(detail.getRiskPerActionPercent(), base);
+        BigDecimal liveRiskAfterAct = liveRiskNow(deal, rules, entryAnchor,
+                stopPriceAfterAct(calculatedAction, dealContext));
 
         checkPerAction(actRisk, perAction, calculatedAction, rules, checks);
         checkCumulative(dealContext, detail, actRisk, perAction, checks);
-        checkSimultaneous(dealContext, detail, appetite, rules, base, entryAnchor, actRisk,
-                stopPriceAfterAct(calculatedAction, dealContext), checks);
-        checkCatastrophicNotional(dealContext, detail, appetite, rules, base, entryAnchor, actNotional, checks);
+        checkGlobalCumulative(deal, appetite, base, actRisk, checks);
+        checkSimultaneous(detail, appetite, base, liveRiskAfterAct, actRisk, checks);
+        checkDealNotional(dealContext, appetite, rules, base, entryAnchor, actNotional, checks);
+        checkLevelCeilings(dealContext, appetite, liveRiskNow(deal, rules, entryAnchor, deal.currentStopLevel()),
+                liveRiskAfterAct, actRisk, checks);
     }
 
     /**
@@ -471,7 +490,7 @@ public class RiskValidator {
                 "per-action risk ceiling exceeded: " + actRisk + " > " + perAction, actRisk));
     }
 
-    /** Кумулятивный потолок: взятое сделкой за жизнь плюс риск акта. */
+    /** Кумулятивный потолок стратегии: взятое сделкой за жизнь плюс риск акта. */
     private void checkCumulative(DealContext dealContext, StrategyDetail detail, BigDecimal actRisk,
                                  BigDecimal perAction, List<RiskCheckResult> checks) {
         if (isNull(detail.getCumulativeRiskPerDealMultiplier())) {
@@ -485,8 +504,35 @@ public class RiskValidator {
     }
 
     /**
-     * Одновременный потолок в двух вложенных редакциях — стратегии и
-     * риск-аппетита.
+     * Глобальная редакция кумулятивного потолка: взятое сделкой за жизнь
+     * плюс риск акта — не выше предела множителя, помноженного на процент
+     * сделки (docs/spec/risk-limits.json, величина
+     * {@code withinGlobalCumulative}).
+     *
+     * <p><b>Рантайм-редакция нужна рядом со статической.</b> Множитель
+     * стратегии сверяется с пределом на создании и активации, но смена чисел
+     * активные определения не ревалидирует: без этой проверки пониженный
+     * предел остался бы без энфорсера у уже активной стратегии
+     * (.claude/decisions/global-cumulative-risk-ceiling.md). Непринятый
+     * предел отказывает вычислением, а не пропускает действие.
+     */
+    private void checkGlobalCumulative(Deal deal, RiskAppetite appetite, BigDecimal base, BigDecimal actRisk,
+                                       List<RiskCheckResult> checks) {
+        BigDecimal multiplier = appetite.getGlobalCumulativeRiskPerDealMultiplier();
+        if (isNull(multiplier)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
+                    "globalCumulativeRiskPerDealMultiplier is not accepted from the environment configuration",
+                    null));
+            return;
+        }
+        BigDecimal ceiling = percentOf(appetite.getGlobalSimultaneousRiskPerDealPercent(), base).multiply(multiplier);
+        checkAgainst(zeroIfNull(deal.getPlannedRiskAmount()).add(actRisk), ceiling,
+                RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED, "global cumulative risk ceiling", checks);
+    }
+
+    /**
+     * Одновременный потолок сделки в двух вложенных редакциях — стратегии
+     * и риск-аппетита.
      *
      * <p><b>Живое слагаемое считается по уровню, ДЕЙСТВУЮЩЕМУ ПОСЛЕ
      * АКТА.</b> Преконтроль зовётся до создания команды, поэтому среди
@@ -500,50 +546,255 @@ public class RiskValidator {
      * защиту и своей не ставит — уровня после акта нет, риск живого
      * эпизода ничем не ограничен, и считать его по снятому уровню значило
      * бы мерить то, чего после акта не будет.
+     *
+     * @param liveRiskAfterAct живой риск сделки по уровню после акта; пусто —
+     *                         уровня после акта нет
      */
-    private void checkSimultaneous(DealContext dealContext, StrategyDetail detail, Tenant appetite,
-                                   InstrumentExternalRules rules, BigDecimal base, BigDecimal entryAnchor,
-                                   BigDecimal actRisk, BigDecimal stopAfterAct,
+    private void checkSimultaneous(StrategyDetail detail, RiskAppetite appetite, BigDecimal base,
+                                   BigDecimal liveRiskAfterAct, BigDecimal actRisk,
                                    List<RiskCheckResult> checks) {
-        BigDecimal livePositionRisk = livePositionRiskAtStop(dealContext, rules, entryAnchor, stopAfterAct);
-        if (isNull(livePositionRisk)) {
+        if (isNull(liveRiskAfterAct)) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.PROTECTION_COVERAGE_REDUCED,
                     "No stop level remains after the act while the episode is live", null));
             return;
         }
-        BigDecimal liveRiskNow = unfilledPlannedRisk(dealContext).add(livePositionRisk);
         if (isNull(detail.getStrategySimultaneousRiskPerDealPercent())) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
                     "strategySimultaneousRiskPerDealPercent is not declared by the pinned strategy detail", null));
         } else {
-            checkAgainst(liveRiskNow.add(actRisk),
+            checkAgainst(liveRiskAfterAct.add(actRisk),
                     percentOf(detail.getStrategySimultaneousRiskPerDealPercent(), base),
                     RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED, "strategy simultaneous ceiling", checks);
         }
-        checkAgainst(liveRiskNow.add(actRisk),
+        checkAgainst(liveRiskAfterAct.add(actRisk),
                 percentOf(appetite.getGlobalSimultaneousRiskPerDealPercent(), base),
                 RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED, "global simultaneous ceiling", checks);
     }
 
     /**
-     * Катастрофический потолок: максимальный риск на сделку, растянутый
-     * множителем стратегии; он же кэп суммарного номинала — худший
-     * мыслимый ход принят равным 100 %. Незаявленный множитель ОТКАЗЫВАЕТ
+     * Потолок нотинала сделки: нотинал неисполненной доли живых ног, живого
+     * эпизода и акта — не выше предела плеча, помноженного на базу
+     * (docs/spec/risk-limits.json, величины {@code dealNotionalCeiling} и
+     * {@code withinDealNotional}). Брутто-плечо сделки к базе и есть
+     * отношение её нотинала к базе, поэтому «плечо сделки не выше предела»
+     * исполняется этим неравенством (.claude/decisions/deal-leverage-ceiling.md).
+     * Худшего убытка оно не утверждает. Непринятый предел ОТКАЗЫВАЕТ
      * вычислением, а не пропускает действие.
      */
-    private void checkCatastrophicNotional(DealContext dealContext, StrategyDetail detail, Tenant appetite,
-                                           InstrumentExternalRules rules, BigDecimal base,
-                                           BigDecimal entryAnchor, BigDecimal actNotional,
-                                           List<RiskCheckResult> checks) {
-        if (isNull(detail.getStrategyCatastrophicRiskPerDealMultiplier())) {
+    private void checkDealNotional(DealContext dealContext, RiskAppetite appetite, InstrumentExternalRules rules,
+                                   BigDecimal base, BigDecimal entryAnchor, BigDecimal actNotional,
+                                   List<RiskCheckResult> checks) {
+        if (isNull(appetite.getGlobalMaxLeverage())) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "strategyCatastrophicRiskPerDealMultiplier is not declared by the pinned strategy detail", null));
+                    "globalMaxLeverage is not accepted from the environment configuration", null));
             return;
         }
-        BigDecimal ceiling = percentOf(appetite.getGlobalSimultaneousRiskPerDealPercent(), base)
-                .multiply(detail.getStrategyCatastrophicRiskPerDealMultiplier());
-        checkAgainst(dealNotional(dealContext, rules, entryAnchor).add(actNotional), ceiling,
-                RiskCheckCode.DEAL_NOTIONAL_EXCEEDED, "catastrophic notional ceiling", checks);
+        checkAgainst(dealNotional(dealContext.getDeal(), rules, entryAnchor).add(actNotional),
+                dealNotionalCeiling(appetite, base),
+                RiskCheckCode.DEAL_NOTIONAL_EXCEEDED, "deal notional ceiling", checks);
+    }
+
+    /** Правая часть потолка нотинала: предел плеча, помноженный на базу. */
+    private BigDecimal dealNotionalCeiling(RiskAppetite appetite, BigDecimal base) {
+        return appetite.getGlobalMaxLeverage().multiply(base);
+    }
+
+    /**
+     * Потолки живого риска биржевого счёта и тенанта
+     * (docs/rules/risk-policy.md §«Потолки живого риска счёта и тенанта»;
+     * формы — docs/spec/risk-limits.json, величины
+     * {@code withinAccountSimultaneous} и {@code withinTenantSimultaneous}).
+     *
+     * <p><b>Неравенство уровня применяется, когда акт ПОВЫШАЕТ живой риск
+     * своей сделки</b> ({@code ownLiveRiskRaised}): операнд уровня — чужие
+     * сделки, и без различителя неизмеренный сосед запирал бы постановку
+     * защиты этой сделки. Гейт стои́т на измеренном приросте, а не на классе
+     * действия: ремодел защиты дальше от цены прирост даёт и проверяется.
+     * Соседей поэтому грузят только тогда, когда прирост есть.
+     *
+     * <p><b>Живой риск после акта пуст — уровни молчат:</b> его пустота уже
+     * отказ своим кодом у одновременного потолка сделки, и второй код о том
+     * же операнде диагностики не добавил бы.
+     *
+     * <p><b>Неизмеренный сосед — отказ кодом уровня</b>: неизмеренный уровень
+     * выполненным не читается (docs/concept.md П1).
+     *
+     * @param liveRiskBeforeAct живой риск сделки до акта; пусто — не измерен,
+     *                          и прирост не исключён
+     * @param liveRiskAfterAct  живой риск сделки по уровню после акта
+     */
+    private void checkLevelCeilings(DealContext dealContext, RiskAppetite appetite, BigDecimal liveRiskBeforeAct,
+                                    BigDecimal liveRiskAfterAct, BigDecimal actRisk,
+                                    List<RiskCheckResult> checks) {
+        if (isNull(liveRiskAfterAct)) {
+            return;
+        }
+        BigDecimal ownAfterAct = liveRiskAfterAct.add(actRisk);
+        if (isFalse(ownLiveRiskRaised(liveRiskBeforeAct, ownAfterAct))) {
+            return;
+        }
+        BigDecimal accountPercent = appetite.getGlobalSimultaneousRiskPerAccountPercent();
+        BigDecimal tenantPercent = appetite.getGlobalSimultaneousRiskPerTenantPercent();
+        if (isNull(accountPercent)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
+                    "globalSimultaneousRiskPerAccountPercent is not accepted from the environment configuration",
+                    null));
+        }
+        if (isNull(tenantPercent)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
+                    "globalSimultaneousRiskPerTenantPercent is not accepted from the environment configuration",
+                    null));
+        }
+        if (isNull(accountPercent) && isNull(tenantPercent)) {
+            return;
+        }
+        ExchangeAccount account = dealContext.getExchangeAccount();
+        List<ExchangeAccount> tenantAccounts = tenantBaseAccounts(account);
+        Map<Long, List<BigDecimal>> peerRisks = peerLiveRisks(dealContext.getDeal(), account, tenantAccounts);
+        if (nonNull(accountPercent)) {
+            checkAccountCeiling(account, accountPercent, peerRisks, ownAfterAct, checks);
+        }
+        if (nonNull(tenantPercent)) {
+            checkTenantCeiling(account, tenantPercent, tenantAccounts, peerRisks, ownAfterAct, checks);
+        }
+    }
+
+    /**
+     * Акт повышает живой риск своей сделки: живой риск после акта вместе с
+     * риском акта больше доактного; доактный не измерен — повышение не
+     * исключено (docs/spec/risk-limits.json, величина
+     * {@code ownLiveRiskRaised}).
+     */
+    private Boolean ownLiveRiskRaised(BigDecimal liveRiskBeforeAct, BigDecimal ownAfterAct) {
+        return isNull(liveRiskBeforeAct) || ownAfterAct.compareTo(liveRiskBeforeAct) > 0;
+    }
+
+    /**
+     * Потолок счёта: прочие живые сделки счёта плюс эта после акта — не выше
+     * процента счёта от ЖИВОЙ базы счёта, а не снимка сделки: уровень мерит
+     * капитал счёта.
+     */
+    private void checkAccountCeiling(ExchangeAccount account, BigDecimal accountPercent,
+                                     Map<Long, List<BigDecimal>> peerRisks, BigDecimal ownAfterAct,
+                                     List<RiskCheckResult> checks) {
+        if (isNull(account.getRiskBase())) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.BALANCE_INVALID,
+                    "Account risk base is missing: account live risk ceiling is unmeasured", null));
+            return;
+        }
+        BigDecimal peers = sumPeers(peerRisks, Set.of(account.getId()));
+        if (isNull(peers)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED,
+                    "Live risk of a peer deal on the account is not measured", null));
+            return;
+        }
+        checkAgainst(peers.add(ownAfterAct), percentOf(accountPercent, account.getRiskBase()),
+                RiskCheckCode.RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED, "account live risk ceiling", checks);
+    }
+
+    /**
+     * Потолок тенанта: прочие живые сделки тенанта на счетах базы тенанта
+     * плюс эта после акта — не выше процента тенанта от базы тенанта.
+     * Неизмеренная база тенанта (валюта базы счёта сделки не известна) —
+     * отказ кодом уровня, как неизмеренный сосед.
+     */
+    private void checkTenantCeiling(ExchangeAccount account, BigDecimal tenantPercent,
+                                    List<ExchangeAccount> tenantAccounts, Map<Long, List<BigDecimal>> peerRisks,
+                                    BigDecimal ownAfterAct, List<RiskCheckResult> checks) {
+        if (isNull(account.getRiskBaseCurrency())) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED,
+                    "Tenant risk base is not measured: risk base currency of the account is unknown", null));
+            return;
+        }
+        Set<Long> accountIds = tenantAccounts.stream()
+                .map(ExchangeAccount::getId)
+                .collect(Collectors.toSet());
+        BigDecimal peers = sumPeers(peerRisks, accountIds);
+        if (isNull(peers)) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED,
+                    "Live risk of a peer deal of the tenant is not measured", null));
+            return;
+        }
+        BigDecimal tenantBase = tenantAccounts.stream()
+                .map(ExchangeAccount::getRiskBase)
+                .reduce(ZERO, BigDecimal::add);
+        checkAgainst(peers.add(ownAfterAct), percentOf(tenantPercent, tenantBase),
+                RiskCheckCode.RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED, "tenant live risk ceiling", checks);
+    }
+
+    /**
+     * Счета базы тенанта: в статусе {@code ACTIVE}, с наблюдённой базой и той
+     * же валютой базы, что у счёта проверяемой сделки
+     * (docs/spec/risk-limits.json, операнд {@code tenantRiskBase}). Разные
+     * валюты без курса не складываются. Валюта счёта сделки не известна —
+     * пусто.
+     */
+    private List<ExchangeAccount> tenantBaseAccounts(ExchangeAccount account) {
+        if (isNull(account.getRiskBaseCurrency())) {
+            return List.of();
+        }
+        return exchangeAccountDataService.findActiveByTenantInternalId(account.getTenantId()).stream()
+                .filter(candidate -> nonNull(candidate.getRiskBase()))
+                .filter(candidate -> Objects.equals(account.getRiskBaseCurrency(), candidate.getRiskBaseCurrency()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Живой риск ПРОЧИХ живых сделок счёта сделки и счетов базы тенанта —
+     * одной выборкой на все счета: ключ счёта → {@code liveRiskNow} его
+     * соседних сделок при нулевом акте и действующей защите; пустой член —
+     * живой риск соседа не измерен. Проверяемая сделка в перечень не входит:
+     * её слагаемое — живой риск после акта.
+     */
+    private Map<Long, List<BigDecimal>> peerLiveRisks(Deal deal, ExchangeAccount account,
+                                                      List<ExchangeAccount> tenantAccounts) {
+        Set<Long> accountIds = new HashSet<>();
+        accountIds.add(account.getId());
+        tenantAccounts.forEach(tenantAccount -> accountIds.add(tenantAccount.getId()));
+        Map<Long, List<BigDecimal>> risks = new HashMap<>();
+        dealDataService.findNonTerminalByExchangeAccountIds(accountIds).stream()
+                .filter(peer -> isFalse(Objects.equals(deal.getId(), peer.getId())))
+                .forEach(peer -> risks.computeIfAbsent(peer.getExchangeAccountId(), key -> new ArrayList<>())
+                        .add(peerLiveRisk(peer)));
+        return risks;
+    }
+
+    /**
+     * {@code liveRiskNow} соседней сделки при нулевом акте и действующей
+     * защите — та же форма, что у проверяемой; второй формы живого риска не
+     * заводится. Граф соседа перечитывается тем же ходом, что у прохода;
+     * неполный граф, нематериализованные правила инструмента либо живая
+     * экспозиция без действующего уровня — не измерен.
+     */
+    private BigDecimal peerLiveRisk(Deal peer) {
+        dealContextService.reloadRuntimeGraph(peer);
+        if (isNotTrue(peer.graphComplete()) || isNull(peer.getInstrumentId())) {
+            return null;
+        }
+        InstrumentExternalRules rules = rulesDataService
+                .findByInstrumentId(peer.getInstrumentId(), peer.getExchangeAccountId())
+                .orElse(null);
+        if (isNull(rules)) {
+            return null;
+        }
+        return liveRiskNow(peer, rules, entryAnchor(peer.livePosition(), null), peer.currentStopLevel());
+    }
+
+    /**
+     * Сумма живого риска соседей на названных счетах; пусто — хоть один из
+     * них не измерен, и нулём он не подменяется.
+     */
+    private BigDecimal sumPeers(Map<Long, List<BigDecimal>> peerRisks, Set<Long> accountIds) {
+        BigDecimal sum = ZERO;
+        for (Long accountId : accountIds) {
+            for (BigDecimal risk : peerRisks.getOrDefault(accountId, List.of())) {
+                if (isNull(risk)) {
+                    return null;
+                }
+                sum = sum.add(risk);
+            }
+        }
+        return sum;
     }
 
     /**
@@ -559,9 +810,25 @@ public class RiskValidator {
         return dealContext.getDeal().currentStopLevel();
     }
 
+    /**
+     * Живой риск сделки по названному уровню: неисполненная доля живых ног
+     * плюс живой эпизод до уровня (docs/spec/risk-limits.json, величина
+     * {@code liveRiskNow}). Форма одна на проверяемую сделку — до акта и
+     * после него — и на соседей уровня. Пусто — уровня нет при живом
+     * эпизоде, и величина отказывает вычислением.
+     */
+    private BigDecimal liveRiskNow(Deal deal, InstrumentExternalRules rules, BigDecimal entryAnchor,
+                                   BigDecimal stopLevel) {
+        BigDecimal livePositionRisk = livePositionRiskAtStop(deal, rules, entryAnchor, stopLevel);
+        if (isNull(livePositionRisk)) {
+            return null;
+        }
+        return unfilledPlannedRisk(deal).add(livePositionRisk);
+    }
+
     /** Что ещё может встать под удар: неисполненная доля живых входных ног. */
-    private BigDecimal unfilledPlannedRisk(DealContext dealContext) {
-        return liveEntryLegs(dealContext).stream()
+    private BigDecimal unfilledPlannedRisk(Deal deal) {
+        return liveEntryLegs(deal).stream()
                 .map(RiskValidator::legUnfilledRisk)
                 .reduce(ZERO, BigDecimal::add);
     }
@@ -584,9 +851,9 @@ public class RiskValidator {
      * гасит СВОЁ слагаемое, а не чужие. Пусто — уровня после акта нет, и
      * величина отказывает вычислением.
      */
-    private BigDecimal livePositionRiskAtStop(DealContext dealContext, InstrumentExternalRules rules,
+    private BigDecimal livePositionRiskAtStop(Deal deal, InstrumentExternalRules rules,
                                               BigDecimal entryAnchor, BigDecimal stopAfterAct) {
-        Position live = dealContext.getDeal().livePosition();
+        Position live = deal.livePosition();
         if (isNull(live) || isNull(live.getExternalSize()) || live.getExternalSize().signum() == 0) {
             return ZERO;
         }
@@ -595,26 +862,24 @@ public class RiskValidator {
             return null;
         }
         BigDecimal risk = RiskMath
-                .lossAtStopPerUnit(dealContext.getDeal().getDirection(), entryAnchor, stopAfterAct,
-                        rules.takerFeeRate())
+                .lossAtStopPerUnit(deal.getDirection(), entryAnchor, stopAfterAct, rules.takerFeeRate())
                 .multiply(live.getExternalSize())
                 .multiply(rules.contractValue());
         return risk.signum() > 0 ? risk : ZERO;
     }
 
     /** Экспозиция сделки ДО акта: неисполненная доля живых ног плюс живой эпизод. */
-    private BigDecimal dealNotional(DealContext dealContext, InstrumentExternalRules rules,
-                                    BigDecimal entryAnchor) {
+    private BigDecimal dealNotional(Deal deal, InstrumentExternalRules rules, BigDecimal entryAnchor) {
         if (isNull(rules.contractValue())) {
             return ZERO;
         }
-        BigDecimal legs = liveEntryLegs(dealContext).stream()
+        BigDecimal legs = liveEntryLegs(deal).stream()
                 .map(leg -> zeroIfNull(leg.getPlannedSizeContracts())
                         .subtract(zeroIfNull(leg.getAccumulatedFillSize()))
                         .multiply(rules.contractValue())
                         .multiply(zeroIfNull(leg.getPlannedEntryPrice())))
                 .reduce(ZERO, BigDecimal::add);
-        Position live = dealContext.getDeal().livePosition();
+        Position live = deal.livePosition();
         if (isNull(live) || isNull(live.getExternalSize()) || isNull(entryAnchor)) {
             return legs;
         }
@@ -631,8 +896,8 @@ public class RiskValidator {
      * инварианта неприписанного живого риска, не потолков
      * (docs/models/domain/aggregate/Deal.md §Структура).
      */
-    private List<Order> liveEntryLegs(DealContext dealContext) {
-        return emptyIfNull(dealContext.getDeal().getTranches()).stream()
+    private List<Order> liveEntryLegs(Deal deal) {
+        return emptyIfNull(deal.getTranches()).stream()
                 .flatMap(tranche -> emptyIfNull(tranche.getOrders()).stream())
                 .filter(order -> isTrue(order.isLive()))
                 .filter(order -> isTrue(order.isEntryLeg()))
@@ -670,7 +935,7 @@ public class RiskValidator {
      * Нотинал проверяемого акта; risk-weakening контрактов не создаёт.
      *
      * <p><b>Цена — плановая цена САМОГО акта, а не якорь живого эпизода</b>
-     * (docs/rules/risk-policy.md, правило катастрофического потолка и
+     * (docs/rules/risk-policy.md, правило потолка нотинала сделки и
      * таблица «Риск акта зависит от класса действия»). Средняя цена эпизода
      * прайсит уже налитые контракты — своё слагаемое экспозиции сделки;
      * контракты акта налиться по ней не могут, и нотинал добора по средней
@@ -995,7 +1260,7 @@ public class RiskValidator {
      */
     private BigDecimal legsUnreflectedNotional(DealContext dealContext, InstrumentExternalRules rules) {
         OffsetDateTime snapshotAt = dealContext.getBalanceContainer().getExternalUpdatedAt();
-        return liveEntryLegs(dealContext).stream()
+        return liveEntryLegs(dealContext.getDeal()).stream()
                 .filter(leg -> isNull(leg.getExternalCreatedAt()) || leg.getExternalCreatedAt().isAfter(snapshotAt))
                 .map(leg -> zeroIfNull(leg.getPlannedSizeContracts())
                         .multiply(rules.contractValue())
@@ -1073,14 +1338,27 @@ public class RiskValidator {
      * риска не создающее, пустым плечом не отвергается: плеча оно площадке
      * не пишет, а отказ переносу защиты оставил бы позицию без него.
      *
+     * <p><b>Плечо выше предела плеча конфигурации у акта, создающего риск, —
+     * тот же код.</b> Назначение выше предела отвергает поверхность, но предел
+     * мог понизиться после назначения, и назначенное значение перестало быть
+     * допустимым: исход меняется тем же ходом — назначением плеча. Непринятый
+     * предел здесь не сверяется: его пустоту отвергает потолок нотинала своим
+     * кодом.
+     *
      * <p>Пустой биржевой максимум сверять не с чем: его охраняет площадка.
      */
     private void checkLeverage(StrategyAction action, AccountInstrumentState pairState,
-                               InstrumentExternalRules rules, List<RiskCheckResult> checks) {
+                               InstrumentExternalRules rules, RiskAppetite appetite,
+                               List<RiskCheckResult> checks) {
         if (isNull(pairState.getLeverage()) && isTrue(isRiskCreatingEntry(action))) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.LEVERAGE_NOT_CONFIGURED,
                     "Leverage is not assigned for the account on the instrument", null));
             return;
+        }
+        if (isTrue(isRiskCreatingEntry(action)) && isTrue(appetite.leverageAboveLimit(pairState.getLeverage()))) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.LEVERAGE_NOT_CONFIGURED,
+                    "Leverage above the configured max leverage " + appetite.getGlobalMaxLeverage(),
+                    new BigDecimal(pairState.getLeverage())));
         }
         BigDecimal maxLeverage = rules.maxLeverage();
         if (isNull(pairState.getLeverage()) || isNull(maxLeverage)) {
@@ -1392,11 +1670,11 @@ public class RiskValidator {
      * Размер позиции, которую сделка будет держать, когда нальются её живые
      * ноги и проверяемый акт: неисполненные контракты живых ног входа, живой
      * эпизод и акт (docs/spec/risk-limits.json, величина
-     * {@code postActContracts}). Слагаемые те же, что у нотинала
-     * катастрофического потолка, и по той же причине не пересекаются.
+     * {@code postActContracts}). Слагаемые те же, что у потолка нотинала
+     * сделки, и по той же причине не пересекаются.
      */
     private BigDecimal postActContracts(CalculatedStrategyAction calculatedAction, DealContext dealContext) {
-        BigDecimal legs = liveEntryLegs(dealContext).stream()
+        BigDecimal legs = liveEntryLegs(dealContext.getDeal()).stream()
                 .map(RiskValidator::legUnfilledContracts)
                 .reduce(ZERO, BigDecimal::add);
         Position live = dealContext.getDeal().livePosition();
@@ -1405,7 +1683,7 @@ public class RiskValidator {
     }
 
     /**
-     * Нотинал той же позиции — левая сторона катастрофического неравенства
+     * Нотинал той же позиции — левая сторона неравенства потолка нотинала
      * (docs/spec/risk-limits.json, величина {@code postActNotional}):
      * экспозиция сделки до акта плюс нотинал акта. Второй суммы не
      * заводится — слагаемые считают те же формы, что у потолка.
@@ -1416,7 +1694,7 @@ public class RiskValidator {
      */
     private BigDecimal postActNotional(CalculatedStrategyAction calculatedAction, DealContext dealContext,
                                        InstrumentExternalRules rules, BigDecimal entryAnchor) {
-        return dealNotional(dealContext, rules, entryAnchor).add(actNotional(calculatedAction, rules));
+        return dealNotional(dealContext.getDeal(), rules, entryAnchor).add(actNotional(calculatedAction, rules));
     }
 
     /**

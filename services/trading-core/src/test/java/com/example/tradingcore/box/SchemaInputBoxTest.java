@@ -33,7 +33,7 @@ class SchemaInputBoxTest extends SharedLiveDealBox {
 
     /** Версии миграций дерева: перечень закрыт каталогом `db/migration`. */
     private static final List<String> MIGRATIONS = List.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
-            "15", "16", "17", "18");
+            "15", "16", "17", "18", "19");
 
     /** Движение, чей сырой тип отображение контура знает. */
     private static final String MAPPED_BILL = "bill-close-1";
@@ -130,11 +130,9 @@ class SchemaInputBoxTest extends SharedLiveDealBox {
         insertOutbox("E1");
         assertThatThrownBy(() -> insertOutbox("E1"))
                 .hasMessageContaining("База субстрата не ответила");
-
-        // 3. Вторая строка чисел риск-аппетита того же тенанта.
-        assertThatThrownBy(() -> rows.insert(
-                "insert into tenant_risk_appetites (tenant_internal_id) values (?) returning id", TENANT))
-                .hasMessageContaining("База субстрата не ответила");
+        // Третьим инвариантом стояла единственность строки чисел
+        // риск-аппетита тенанта; таблица снята вместе с переездом чисел в
+        // конфигурацию окружения (миграция V19).
     }
 
     /**

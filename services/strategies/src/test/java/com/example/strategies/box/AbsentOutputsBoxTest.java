@@ -117,7 +117,7 @@ class AbsentOutputsBoxTest extends SharedStrategiesBox {
 
         assertThat(distinct(peer.paths()))
                 .as("к ядру ушли ровно два пути: проверка пары и числа риск-аппетита")
-                .containsExactlyInAnyOrder(PEER_PAIR_CHECKS, PEER_RISK_APPETITES + "/" + TENANT);
+                .containsExactlyInAnyOrder(PEER_PAIR_CHECKS, PEER_RISK_APPETITE);
         assertThat(marketData.count())
                 .as("стаб владельца рыночных данных не получил ни одного: история приезжает фазой 4")
                 .isZero();

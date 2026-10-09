@@ -93,7 +93,7 @@ public class StrategyLifecycleService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Strategy tree disappeared before activation: " + definition.getInternalId()));
         validator.validateRiskInequalities(mapper.domainToApi(snapshot).getDetails(),
-                riskAppetiteReader.read(tenantInternalId));
+                riskAppetiteReader.read());
         return commitActivation(snapshot);
     }
 

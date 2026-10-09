@@ -83,9 +83,12 @@ export JAVA_HOME="$STAND_JDK"
 export MAVEN_HOME="$STAND_MAVEN"
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
+# Без аргументов выкладываются все восемь единиц окружения: прежний список
+# по умолчанию держал четыре первых развёртывания, и выкладка «всего» молча
+# оставляла половину стенда на старых образах (замер 2026-10-09).
 SERVICES=("$@")
 if [ ${#SERVICES[@]} -eq 0 ]; then
-  SERVICES=(auth connector-okx market-data trading-core)
+  SERVICES=(auth connector-okx market-data trading-core strategies audit statistics bff)
 fi
 
 SHA="$(git -C "$ROOT" rev-parse --short HEAD)"

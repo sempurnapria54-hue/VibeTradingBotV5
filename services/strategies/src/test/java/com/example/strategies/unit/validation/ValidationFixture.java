@@ -61,11 +61,17 @@ final class ValidationFixture {
     /** Эталонное определение репозитория — вход всех кейсов предмета. */
     static final String REFERENCE_DEFINITION = "strategy-examples/trend-following-ema.json";
 
-    /** Потолок одновременного риска тенанта базовой пары, проценты базы. */
+    /** Потолок одновременного риска на сделку базового набора, проценты базы. */
     static final String BASE_SIMULTANEOUS = "1";
 
-    /** Предел множителя катастрофического потолка базовой пары. */
-    static final String BASE_CATASTROPHIC = "100";
+    /** Предел множителя кумулятивного потолка базового набора. */
+    static final String BASE_CUMULATIVE = "2";
+
+    /**
+     * Предел плеча базового набора — потолок нотинала сделки в одну базу:
+     * самый тесный целый, под которым эталон с долей 95 % ещё проходит запас.
+     */
+    static final String BASE_LEVERAGE = "1";
 
     /** Срок свежести подложенной настройки рыночных данных — любой разбираемый. */
     private static final String NEW_SETTING_EXPIRATION = "PT1H";
@@ -94,14 +100,14 @@ final class ValidationFixture {
         }
     }
 
-    /** Числа тенанта: пустое поле означает «держатель числа не назначил». */
-    static TenantRiskAppetite appetite(String simultaneous, String catastrophic) {
-        return new TenantRiskAppetite(decimal(simultaneous), decimal(catastrophic));
+    /** Принятые ядром числа: пустое поле означает «ядро числа не приняло». */
+    static TenantRiskAppetite appetite(String simultaneous, String cumulative, String leverage) {
+        return new TenantRiskAppetite(decimal(simultaneous), decimal(cumulative), decimal(leverage));
     }
 
-    /** Базовая пара — самая тесная, которую эталон ещё проходит. */
+    /** Базовый набор — самый тесный, который эталон ещё проходит. */
     static TenantRiskAppetite baseAppetite() {
-        return appetite(BASE_SIMULTANEOUS, BASE_CATASTROPHIC);
+        return appetite(BASE_SIMULTANEOUS, BASE_CUMULATIVE, BASE_LEVERAGE);
     }
 
     /**

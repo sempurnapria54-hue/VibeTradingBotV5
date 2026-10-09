@@ -11,6 +11,7 @@ import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -149,30 +150,36 @@ class OwnerReadPathTest {
         assertDataOwnersUntouched("E2.7", List.of(Party.TRADING_CORE, Party.AUDIT));
     }
 
+    /**
+     * Командой пользователя служит назначение плеча пары: прежняя команда —
+     * простановка чисел риск-аппетита тенанта — снята вместе с самой
+     * операцией (числа стали осью окружения,
+     * .claude/decisions/risk-appetite-environment-config.md). Строка пары
+     * принадлежит тенанту через его счёт, поэтому счёт тенанта регистрируется
+     * у владельца реестра и доезжает до проекции ядра раньше хода.
+     */
     @Test
     @DisplayName("E2.8 — Команда пользователя: владелец присваивает полученного тенанта своей строке")
     void e2_8_aUserCommandIsAssignedToTheDerivedTenant() {
-        String body = """
-                {
-                  "globalSimultaneousRiskPerDealPercent": 5,
-                  "globalCatastrophicRiskPerDealMultiplier": 100,
-                  "globalConsecutiveLossLimit": 4
-                }
-                """;
-        List<Object> before = appetiteOwners();
+        String account = Prologue.registeredAccount(trail, tenant, "api-key-owner-read-" + UUID.randomUUID());
+        trail.tick(Party.TRADING_CORE, "/registry-projections", "Manual RegistryProjectionJob trigger finished");
+        String pairSettings = Trail.CORE + "/pair-settings/" + account + "/" + Trail.INSTRUMENT;
+        List<Object> before = pairOwners();
         trail.forgetTraces();
 
-        Answer answer = viaPerimeter("PUT", Trail.CORE + "/risk-appetites/" + tenant, body);
+        Answer answer = viaPerimeter("PUT", pairSettings, """
+                {"leverage": 5}
+                """);
 
         assertThat(answer.status()).as("E2.8: команда принята владельцем — " + answer.body()).isEqualTo(200);
-        List<Object> added = new ArrayList<>(appetiteOwners());
+        List<Object> added = new ArrayList<>(pairOwners());
         before.forEach(added::remove);
-        assertThat(added).as("E2.8: строка риск-аппетита завелась именно этому тенанту, чужому не завелось")
+        assertThat(added).as("E2.8: строка пары завелась на счёте именно этого тенанта, чужому не завелось")
                 .containsExactly(tenant);
         List<Side.Access> core = trail.accesses(Party.TRADING_CORE);
         assertThat(core).as("E2.8: глагол и путь ушли владельцу как есть, повтора нет ни одного")
                 .extracting(Side.Access::method, Side.Access::path)
-                .containsExactly(tuple("PUT", Trail.CORE + "/risk-appetites/" + tenant));
+                .containsExactly(tuple("PUT", pairSettings));
         assertDataOwnersUntouched("E2.8", List.of(Party.TRADING_CORE));
     }
 
@@ -208,12 +215,17 @@ class OwnerReadPathTest {
     }
 
     /**
-     * Тенанты строк риск-аппетита у ядра — все, а не условием тенанта: условие
-     * над выборкой, чей ассерт — сам тенант, сделало бы его тавтологией.
-     * Стенд общий, и строки прежних классов разводит разность до и после хода.
+     * Тенанты строк пар с назначенным плечом у ядра — все, а не условием
+     * тенанта: условие над выборкой, чей ассерт — сам тенант, сделало бы его
+     * тавтологией. Стенд общий, и строки прежних классов разводит разность до
+     * и после хода; строка без плеча — след ленивого читателя пары, а не
+     * команды.
      */
-    private static List<Object> appetiteOwners() {
-        return trail.database(Party.TRADING_CORE).query("select tenant_internal_id from tenant_risk_appetites")
+    private static List<Object> pairOwners() {
+        return trail.database(Party.TRADING_CORE).query("select exchange_accounts.tenant_internal_id"
+                        + " from account_instrument_states join exchange_accounts"
+                        + " on exchange_accounts.id = account_instrument_states.exchange_account_id"
+                        + " where account_instrument_states.leverage is not null")
                 .stream()
                 .map(row -> row.get("tenant_internal_id"))
                 .toList();

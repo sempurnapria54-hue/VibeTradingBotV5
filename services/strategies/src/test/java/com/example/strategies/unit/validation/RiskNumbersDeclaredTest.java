@@ -14,7 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Четыре риск-числа торгуемой детали — группа {@code U9} документа
+ * Три риск-числа торгуемой детали — группа {@code U9} документа
  * `.claude/tests/cases/strategy-definition-validation.md` (дом —
  * docs/rules/risk-policy.md §«Числа назначает держатель; пустое место —
  * отказ»).
@@ -40,8 +40,8 @@ class RiskNumbersDeclaredTest {
     private static final String HEADROOM = "STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT";
 
     @Test
-    @DisplayName("U9.1 — базовая сборка: все четыре числа объявлены")
-    void u9_1_theReferenceDeclaresAllFourNumbers() {
+    @DisplayName("U9.1 — базовая сборка: все три числа объявлены")
+    void u9_1_theReferenceDeclaresAllThreeNumbers() {
         assertThat(matching(violations(reference()), NOT_DECLARED)).isEmpty();
     }
 
@@ -61,15 +61,18 @@ class RiskNumbersDeclaredTest {
     }
 
     @Test
-    @DisplayName("U9.3 — множитель кумулятивного потолка опущен: в неравенствах создания его нет")
-    void u9_3_theCumulativeMultiplierTakesPartInNoInequality() {
+    @DisplayName("U9.3 — множитель кумулятивного потолка опущен: сверка с конфигурационным пределом не считается")
+    void u9_3_anAbsentCumulativeMultiplierSilencesTheThirdInequality() {
         CreateStrategyApiRequest request = reference();
         bull(request).setCumulativeRiskPerDealMultiplier(null);
 
-        assertThat(violations(request))
+        List<String> violations = violations(request);
+
+        assertThat(violations)
                 .singleElement()
                 .asString()
                 .contains("details[0].cumulativeRiskPerDealMultiplier " + NOT_DECLARED);
+        assertThat(matching(violations, ABOVE_GLOBAL)).isEmpty();
     }
 
     @Test
@@ -89,37 +92,21 @@ class RiskNumbersDeclaredTest {
     }
 
     @Test
-    @DisplayName("U9.5 — множитель катастрофического потолка опущен: запас нотинала не считается")
-    void u9_5_anAbsentCatastrophicMultiplierSilencesTheHeadroom() {
-        CreateStrategyApiRequest request = reference();
-        bull(request).setStrategyCatastrophicRiskPerDealMultiplier(null);
-
-        List<String> violations = violations(request);
-
-        assertThat(violations)
-                .singleElement()
-                .asString()
-                .contains("details[0].strategyCatastrophicRiskPerDealMultiplier " + NOT_DECLARED);
-        assertThat(matching(violations, HEADROOM)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("U9.6 — опущены все четыре: четыре пути в порядке проверки, неравенств нет")
-    void u9_6_allFourNumbersAreReportedInCheckOrder() {
+    @DisplayName("U9.6 — опущены все три: три пути в порядке проверки, неравенств нет")
+    void u9_6_allThreeNumbersAreReportedInCheckOrder() {
         CreateStrategyApiRequest request = reference();
         StrategyDetailApiModel detail = bull(request);
         detail.setRiskPerActionPercent(null);
         detail.setCumulativeRiskPerDealMultiplier(null);
         detail.setStrategySimultaneousRiskPerDealPercent(null);
-        detail.setStrategyCatastrophicRiskPerDealMultiplier(null);
 
         List<String> violations = violations(request);
 
-        assertThat(violations).hasSize(4);
+        assertThat(violations).hasSize(3);
         assertThat(violations.get(0)).contains("details[0].riskPerActionPercent");
         assertThat(violations.get(1)).contains("details[0].cumulativeRiskPerDealMultiplier");
         assertThat(violations.get(2)).contains("details[0].strategySimultaneousRiskPerDealPercent");
-        assertThat(violations.get(3)).contains("details[0].strategyCatastrophicRiskPerDealMultiplier");
+        assertThat(matching(violations, HEADROOM)).isEmpty();
     }
 
     @Test

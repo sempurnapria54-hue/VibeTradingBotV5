@@ -25,16 +25,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Неравенство 5: объявленный нотинал под катастрофическим потолком —
+ * Неравенство 5: объявленный нотинал под потолком нотинала сделки —
  * группа {@code U12} документа
  * `.claude/tests/cases/strategy-definition-validation.md` (дом —
  * docs/rules/risk-policy.md §«Нотинал укладывается в потолок с запасом,
  * а не в границу»; исполнимая форма —
  * docs/spec/strategy-reference.json, величина
- * {@code notionalHeadroomSatisfied}).
+ * {@code notionalHeadroomSatisfied}). Потолок — предел плеча в долях базы
+ * (.claude/decisions/deal-leverage-ceiling.md); у базового набора он равен
+ * одной базе.
  *
  * <p><b>Запас — КОНСТАНТА ПРАВИЛА, а не число конфигурации.</b> При
- * долях {@code 99} и {@code 100} под одними и теми же числами тенанта
+ * долях {@code 99} и {@code 100} под одними и теми же числами ядра
  * исход разный, и это наблюдаемо только парой: одиночный прогон не
  * отличил бы «запас есть» от «потолок не считается».
  *
@@ -48,8 +50,6 @@ class NotionalHeadroomTest {
     private static final String FAN = "STRATEGY_SIMULTANEOUS_RISK_UNSATISFIABLE";
 
     private static final String ALLOCATION_NOT_DECLARED = "STRATEGY_ACTION_ALLOCATION_NOT_DECLARED";
-
-    private static final String NOT_DECLARED = "STRATEGY_RISK_NUMBER_NOT_DECLARED";
 
     private static final String NOT_CONFIGURED = "RISK_APPETITE_NOT_CONFIGURED";
 
@@ -78,7 +78,7 @@ class NotionalHeadroomTest {
                 .singleElement()
                 .asString()
                 .contains("details[0] " + HEADROOM)
-                .contains("базы) не оставляет запаса под катастрофическим потолком (допустимо");
+                .contains("базы) не оставляет запаса под потолком нотинала сделки (допустимо");
     }
 
     @Test
@@ -113,28 +113,16 @@ class NotionalHeadroomTest {
     }
 
     @Test
-    @DisplayName("U12.6 — множитель катастрофического потолка опущен: запас не считается")
-    void u12_6_anAbsentMultiplierSilencesTheHeadroom() {
-        CreateStrategyApiRequest request = reference();
-        StrategyDetailApiModel detail = bull(request);
-        detail.setStrategyCatastrophicRiskPerDealMultiplier(null);
-        entryAction(detail).setAllocationPercents(decimal("100"));
-
-        List<String> violations = violations(request);
-
-        assertThat(matching(violations, NOT_DECLARED)).hasSize(1);
-        assertThat(matching(violations, HEADROOM)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("U12.7 — конфигурационный потолок пуст: запас не считается")
+    @DisplayName("U12.7 — конфигурационный предел плеча пуст: запас не считается")
     void u12_7_anUnconfiguredCeilingSilencesTheHeadroom() {
         CreateStrategyApiRequest request = reference();
         entryAction(bull(request)).setAllocationPercents(decimal("100"));
 
-        List<String> violations = violations(request, appetite(null, "100"));
+        List<String> violations = violations(request, appetite("1", "2", null));
 
-        assertThat(matching(violations, NOT_CONFIGURED)).isNotEmpty();
+        assertThat(matching(violations, "details[0] STRATEGY_" + NOT_CONFIGURED))
+                .as("отказ адресует деталь: объявленного числа под пределом плеча у неё нет")
+                .hasSize(1);
         assertThat(matching(violations, HEADROOM)).isEmpty();
     }
 
@@ -170,7 +158,6 @@ class NotionalHeadroomTest {
     void u12_10_theHeadroomIsNotCheckedOnANonTradingDetail() {
         CreateStrategyApiRequest request = reference();
         StrategyDetailApiModel detail = range(request);
-        detail.setStrategyCatastrophicRiskPerDealMultiplier(decimal("100"));
         tranches(detail).add(entryTranche("range_main", "100"));
 
         List<String> violations = violations(request);

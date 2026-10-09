@@ -52,7 +52,7 @@ public class StrategyCreationService {
      */
     public Strategy create(CreateStrategyApiRequest request, String tenantInternalId) {
         validateReferences(request, tenantInternalId);
-        validator.validateCreate(request, riskAppetiteReader.read(tenantInternalId));
+        validator.validateCreate(request, riskAppetiteReader.read());
         Strategy definition = mapper.apiToDomain(request);
         definition.applyProtectiveTriggerDefaults();
         definition.setInternalId(InternalIdFactory.forInternalEntity());

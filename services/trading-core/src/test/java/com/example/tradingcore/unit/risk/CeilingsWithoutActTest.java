@@ -4,6 +4,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.ANCHOR;
 import static com.example.tradingcore.unit.risk.RiskFixture.STOP;
 import static com.example.tradingcore.unit.risk.RiskFixture.account;
 import static com.example.tradingcore.unit.risk.RiskFixture.appetite;
+import static com.example.tradingcore.unit.risk.RiskFixture.appetiteWithMaxLeverage;
 import static com.example.tradingcore.unit.risk.RiskFixture.codesOf;
 import static com.example.tradingcore.unit.risk.RiskFixture.contextBuilder;
 import static com.example.tradingcore.unit.risk.RiskFixture.deal;
@@ -35,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка</b> — живая сделка: эпизод в десять контрактов по
  * цене 3000 и действующий уровень защиты 2910, то есть живой риск равен
  * 92.955, а экспозиция сделки — 3000. Граф предъявлен целиком, оба числа
- * детали объявлены, строка тенанта несёт максимальный риск на сделку.
+ * детали объявлены, максимальный риск на сделку и предел плеча приняты.
  *
  * <p><b>Отсутствие операнда — МОЛЧАНИЕ, а не находка</b>: у клеток
  * U18.6-U18.13 пустой перечень означает «не проверялось», и отличить его
@@ -47,29 +48,30 @@ class CeilingsWithoutActTest {
     private final RiskHarness harness = new RiskHarness();
 
     @BeforeEach
-    void givenAnAssignedTenantNumber() {
+    void givenAcceptedRiskAppetiteNumbers() {
         harness.givenAppetite(appetite("10", 3));
     }
 
     @Test
     @DisplayName("U18.1 — живая сделка укладывается в потолки: перечень нарушений пуст")
     void u18_1_aLiveDealWithinTheCeilingsBreachesNothing() {
-        assertThat(harness.ceilingsBreachedWithoutAct(liveContext("10", "300"))).isEmpty();
+        assertThat(harness.ceilingsBreachedWithoutAct(liveContext("10"))).isEmpty();
     }
 
     @Test
     @DisplayName("U18.2 — живой риск выше потолка стратегии: ровно одно нарушение")
     void u18_2_onlyTheStrategyEditionIsBreached() {
-        assertThat(codesOf(harness.ceilingsBreachedWithoutAct(liveContext("0.9", "300"))))
+        assertThat(codesOf(harness.ceilingsBreachedWithoutAct(liveContext("0.9"))))
                 .containsExactly(RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED);
     }
 
     @Test
     @DisplayName("U18.3 — нарушены все три: перечень в порядке проверок")
     void u18_3_allThreeBreachesComeInTheOrderOfChecks() {
-        harness.givenAppetite(appetite("0.9", 3));
+        harness.givenAppetite(appetiteWithMaxLeverage("9", "2.999"));
 
-        assertThat(codesOf(harness.ceilingsBreachedWithoutAct(liveContext("0.9", "10"))))
+        assertThat(codesOf(harness.ceilingsBreachedWithoutAct(smallBaseContext("9"))))
+                .as("живой риск 92.955 против 90 обеих редакций, экспозиция 3000 против 2.999 × 1000")
                 .containsExactly(RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED,
                         RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED,
                         RiskCheckCode.DEAL_NOTIONAL_EXCEEDED);
@@ -78,7 +80,7 @@ class CeilingsWithoutActTest {
     @Test
     @DisplayName("U18.4 — поактный потолок в набор не входит: его нет ни при каком входе")
     void u18_4_thePerActionCeilingIsNotInTheSet() {
-        DealContext impossiblyTightPerAction = liveContextWithDetail(detail("0.0001", "3", "10", "300"));
+        DealContext impossiblyTightPerAction = liveContextWithDetail(detail("0.0001", "3", "10"));
 
         assertThat(codesOf(harness.ceilingsBreachedWithoutAct(impossiblyTightPerAction)))
                 .doesNotContain(RiskCheckCode.RISK_PER_ACTION_EXCEEDED,
@@ -91,7 +93,7 @@ class CeilingsWithoutActTest {
         Deal dealWithHugeRiskTaken = liveDeal();
         dealWithHugeRiskTaken.setPlannedRiskAmount(new BigDecimal("100000"));
         DealContext dealContext = contextBuilder(dealWithHugeRiskTaken)
-                .strategyDetail(detail("10", "0.0001", "10", "300"))
+                .strategyDetail(detail("10", "0.0001", "10"))
                 .build();
 
         assertThat(codesOf(harness.ceilingsBreachedWithoutAct(dealContext)))
@@ -103,7 +105,7 @@ class CeilingsWithoutActTest {
     void u18_6_anIncompleteGraphIsSilence() {
         DealContext dealContext = contextBuilder(liveDeal())
                 .graphComplete(false)
-                .strategyDetail(detail("0.9", "3", "0.9", "10"))
+                .strategyDetail(detail("0.9", "3", "0.9"))
                 .build();
 
         assertThat(harness.ceilingsBreachedWithoutAct(dealContext)).isEmpty();
@@ -131,27 +133,32 @@ class CeilingsWithoutActTest {
     void u18_9_unmaterializedRulesAreSilence() {
         harness.givenRules(null);
 
-        assertThat(harness.ceilingsBreachedWithoutAct(liveContext("0.9", "10"))).isEmpty();
+        assertThat(harness.ceilingsBreachedWithoutAct(liveContext("0.9"))).isEmpty();
     }
 
     @Test
-    @DisplayName("U18.10 — максимальный риск на сделку не назначен: незаданное число молчит")
-    void u18_10_anUnassignedTenantNumberIsSilence() {
+    @DisplayName("U18.10 — максимальный риск на сделку не принят: незаданное число молчит")
+    void u18_10_anUnacceptedDealPercentIsSilence() {
         harness.givenAppetite(appetite(null, 3));
 
-        assertThat(harness.ceilingsBreachedWithoutAct(liveContext("0.9", "10"))).isEmpty();
+        assertThat(harness.ceilingsBreachedWithoutAct(liveContext("0.9"))).isEmpty();
     }
 
     @Test
     @DisplayName("U18.11 — процент одновременного риска деталью не объявлен: перечень пуст")
     void u18_11_anUndeclaredStrategyPercentIsSilence() {
-        assertThat(harness.ceilingsBreachedWithoutAct(liveContext(null, "10"))).isEmpty();
+        assertThat(harness.ceilingsBreachedWithoutAct(liveContext(null))).isEmpty();
     }
 
     @Test
-    @DisplayName("U18.12 — множитель катастрофического потолка не объявлен: перечень пуст")
-    void u18_12_anUndeclaredCatastrophicMultiplierIsSilence() {
-        assertThat(harness.ceilingsBreachedWithoutAct(liveContext("0.9", null))).isEmpty();
+    @DisplayName("U18.12 — предел плеча не принят: молчит потолок нотинала, а не весь перечень")
+    void u18_12_anUnacceptedMaxLeverageSilencesOnlyTheNotionalCeiling() {
+        harness.givenAppetite(appetiteWithMaxLeverage("9", null));
+
+        assertThat(codesOf(harness.ceilingsBreachedWithoutAct(smallBaseContext("9"))))
+                .as("экспозиция 3000 потолком нотинала не мерится, одновременные — мерятся")
+                .containsExactly(RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED,
+                        RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED);
     }
 
     @Test
@@ -161,7 +168,7 @@ class CeilingsWithoutActTest {
         withoutProtection.setPositions(List.of(episode("10", ANCHOR)));
         withoutProtection.setTranches(List.of(tranche(List.of(), List.of())));
         DealContext dealContext = contextBuilder(withoutProtection)
-                .strategyDetail(detail("0.9", "3", "0.9", "10"))
+                .strategyDetail(detail("0.9", "3", "0.9"))
                 .build();
 
         assertThat(harness.ceilingsBreachedWithoutAct(dealContext)).isEmpty();
@@ -173,7 +180,7 @@ class CeilingsWithoutActTest {
         Deal withoutRisk = deal(BigDecimal.ZERO, null);
         withoutRisk.setTranches(List.of(tranche(List.of(), List.of())));
         DealContext dealContext = contextBuilder(withoutRisk)
-                .strategyDetail(detail("0.0001", "3", "0.0001", "0.0001"))
+                .strategyDetail(detail("0.0001", "3", "0.0001"))
                 .build();
 
         assertThat(harness.ceilingsBreachedWithoutAct(dealContext)).isEmpty();
@@ -182,7 +189,7 @@ class CeilingsWithoutActTest {
     @Test
     @DisplayName("U18.15 — состояния пары вторая точка входа не читает: блок-сет в её набор не входит")
     void u18_15_thePairStateIsNeverRead() {
-        harness.ceilingsBreachedWithoutAct(liveContext("0.9", "10"));
+        harness.ceilingsBreachedWithoutAct(liveContext("0.9"));
 
         verifyNoInteractions(harness.pairStateBoundary());
     }
@@ -211,9 +218,21 @@ class CeilingsWithoutActTest {
         return deal;
     }
 
-    /** Контекст живой сделки с названными процентом стратегии и катастрофическим множителем. */
-    private static DealContext liveContext(String strategyPercent, String catastrophicMultiplier) {
-        return liveContextWithDetail(detail("10", "3", strategyPercent, catastrophicMultiplier));
+    /** Контекст живой сделки с названным процентом одновременного риска стратегии. */
+    private static DealContext liveContext(String strategyPercent) {
+        return liveContextWithDetail(detail("10", "3", strategyPercent));
+    }
+
+    /**
+     * Контекст живой сделки на базе в тысячу: экспозиция 3000 перебирает
+     * потолок нотинала при пределе плеча ниже трёх, и предел остаётся в
+     * области приёма (не меньше единицы).
+     */
+    private static DealContext smallBaseContext(String strategyPercent) {
+        return contextBuilder(liveDeal())
+                .exchangeAccount(account("1000"))
+                .strategyDetail(detail("10", "3", strategyPercent))
+                .build();
     }
 
     /** Контекст живой сделки с названной деталью стратегии. */
@@ -223,14 +242,14 @@ class CeilingsWithoutActTest {
 
     /** Контекст названной сделки с процентом одновременного риска стратегии. */
     private static DealContext withDetail(Deal deal, String strategyPercent) {
-        return contextBuilder(deal).strategyDetail(detail("10", "3", strategyPercent, "300")).build();
+        return contextBuilder(deal).strategyDetail(detail("10", "3", strategyPercent)).build();
     }
 
     /** Контекст живой сделки с названной живой базой счёта. */
     private static DealContext baseContext(String riskBase) {
         return contextBuilder(liveDeal())
                 .exchangeAccount(account(riskBase))
-                .strategyDetail(detail("0.9", "3", "0.9", "10"))
+                .strategyDetail(detail("0.9", "3", "0.9"))
                 .build();
     }
 }

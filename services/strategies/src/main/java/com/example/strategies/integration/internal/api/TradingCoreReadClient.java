@@ -9,12 +9,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 /**
- * Чтение у торгового ядра: числа риск-аппетита тенанта и разрешимость
+ * Чтение у торгового ядра: принятые им числа риск-аппетита и разрешимость
  * ссылок определения (docs/architecture/contracts.md §«Синхронные
  * вызовы»).
  *
  * <p><b>Проекции этих величин у владельца определений не заводится.</b>
- * Числа принадлежат тенанту и живут на его строке в базе ядра; копия
+ * Числа — конфигурация окружения, и принимает её одно ядро; копия
  * потолка, устарев, ошибалась бы <b>в разрешающую</b> сторону —
  * пропускала бы стратегию, которую живой потолок отвергнет
  * (docs/rules/strategy-validation.md).
@@ -41,10 +41,13 @@ public class TradingCoreReadClient {
         this.clientRegistrationId = properties.getTradingCore().getClientRegistrationId();
     }
 
-    /** Числа риск-аппетита тенанта — операнд трёх из пяти неравенств создания. */
-    public RiskAppetiteCoreResponse getRiskAppetite(String tenantInternalId) {
-        return PeerCall.execute(PEER, "risk-appetites", () -> restClient.get()
-                .uri("/api/v1/trading-core/risk-appetites/{tenantInternalId}", tenantInternalId)
+    /**
+     * Принятые ядром числа риск-аппетита — операнд трёх из пяти неравенств
+     * создания. Тенанта в пути нет: числа одинаковы для всего окружения.
+     */
+    public RiskAppetiteCoreResponse getRiskAppetite() {
+        return PeerCall.execute(PEER, "risk-appetite", () -> restClient.get()
+                .uri("/api/v1/trading-core/risk-appetite")
                 .header(HttpHeaders.AUTHORIZATION, bearer())
                 .retrieve()
                 .body(RiskAppetiteCoreResponse.class));

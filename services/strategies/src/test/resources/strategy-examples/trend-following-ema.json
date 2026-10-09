@@ -155,7 +155,6 @@
       "riskPerActionPercent": 1.0,
       "cumulativeRiskPerDealMultiplier": 2.0,
       "strategySimultaneousRiskPerDealPercent": 1.0,
-      "strategyCatastrophicRiskPerDealMultiplier": 100.0,
       "targetRiskRewardRatio": 2.5,
       "tranches": [
         {
@@ -394,7 +393,6 @@
       "riskPerActionPercent": 1.0,
       "cumulativeRiskPerDealMultiplier": 2.0,
       "strategySimultaneousRiskPerDealPercent": 1.0,
-      "strategyCatastrophicRiskPerDealMultiplier": 100.0,
       "targetRiskRewardRatio": 2.5,
       "tranches": [
         {

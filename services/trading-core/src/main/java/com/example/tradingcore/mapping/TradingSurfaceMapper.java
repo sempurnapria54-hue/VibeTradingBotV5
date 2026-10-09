@@ -4,15 +4,14 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.api.model.AccountInstrumentStateApiRequest;
 import com.example.tradingcore.api.model.AccountInstrumentStateApiResponse;
 import com.example.tradingcore.api.model.DealApiResponse;
 import com.example.tradingcore.api.model.DealTrancheApiResponse;
-import com.example.tradingcore.api.model.RiskAppetiteApiRequest;
 import com.example.tradingcore.api.model.RiskAppetiteApiResponse;
 import com.example.tradingcore.api.model.SafetyStateApiResponse;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
+import com.example.tradingcore.domain.model.RiskAppetite;
 import java.util.Map;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -39,16 +38,8 @@ public interface TradingSurfaceMapper {
     @Mapping(target = "exposure", expression = "java(tranche.exposure())")
     DealTrancheApiResponse domainToApi(DealTranche tranche);
 
-    /**
-     * Назначение чисел риск-аппетита в доменную модель тенанта.
-     * Идентичность тенанта приходит путём вызова, а не телом: она адресует
-     * ресурс, а не описывает его.
-     */
-    Tenant apiToDomain(RiskAppetiteApiRequest request);
-
-    /** Числа риск-аппетита в модель ответа. */
-    @Mapping(target = "tenantInternalId", source = "internalId")
-    RiskAppetiteApiResponse domainToApi(Tenant tenant);
+    /** Принятые ядром числа риск-аппетита в модель ответа. */
+    RiskAppetiteApiResponse domainToApi(RiskAppetite appetite);
 
     /**
      * Торговое состояние счёта в модель ответа. Ступени пар маппером не

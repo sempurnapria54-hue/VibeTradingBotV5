@@ -38,7 +38,7 @@ public class StrategyDetailApiModel {
 
     @Positive
     @Schema(description = "Множитель кумулятивного потолка: во сколько раз сделка за жизнь вправе "
-            + "превысить поактный потолок")
+            + "превысить поактный потолок; сверяется с конфигурационным пределом на создании")
     private BigDecimal cumulativeRiskPerDealMultiplier;
 
     @Positive
@@ -46,11 +46,6 @@ public class StrategyDetailApiModel {
     @Schema(description = "Максимум ОДНОВРЕМЕННОГО риска сделки, % базы риска; вкладывается в "
             + "конфигурационный максимум риск-аппетита")
     private BigDecimal strategySimultaneousRiskPerDealPercent;
-
-    @Positive
-    @Schema(description = "Множитель катастрофического потолка сделки; сверяется с конфигурационным "
-            + "пределом на создании")
-    private BigDecimal strategyCatastrophicRiskPerDealMultiplier;
 
     @Positive
     @Schema(description = "High-level ориентир risk/reward")

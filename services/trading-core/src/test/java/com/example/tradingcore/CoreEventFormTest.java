@@ -28,7 +28,6 @@ import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import com.example.tradingcore.config.AnomalyReportProperties;
 import com.example.tradingcore.config.ExchangeContourProperties;
@@ -53,6 +52,7 @@ import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.deal.DealOpeningService;
 import com.example.tradingcore.domain.deal.DealStatusEdgeService;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
+import com.example.tradingcore.domain.model.RiskAppetite;
 import com.example.tradingcore.domain.safety.AnomalyReport;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldRung;
@@ -65,6 +65,7 @@ import com.example.tradingcore.domain.safety.ManualHaltClass;
 import com.example.tradingcore.domain.safety.ManualHaltService;
 import com.example.tradingcore.domain.safety.PositionSliceReader;
 import com.example.tradingcore.domain.safety.SafetyHoldCoordinator;
+import com.example.tradingcore.domain.service.RiskAppetiteService;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
 import com.example.tradingcore.integration.internal.event.CoreEventWriter;
 import com.example.tradingcore.mapping.CoreEventMessageMapper;
@@ -81,7 +82,6 @@ import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.OrderDataService;
 import com.example.tradingcore.persistence.service.OutboxDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import com.example.tradingcore.util.Constants;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -93,7 +93,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -187,7 +186,7 @@ class CoreEventFormTest {
     private final DealActionStateDataService actionStates = mock(DealActionStateDataService.class);
     private final AnomalyReportService reports = mock(AnomalyReportService.class);
     private final ExchangeAccountDataService accounts = mock(ExchangeAccountDataService.class);
-    private final TenantRiskAppetiteDataService tenants = mock(TenantRiskAppetiteDataService.class);
+    private final RiskAppetiteService tenants = mock(RiskAppetiteService.class);
     private final StrategyDataService strategies = mock(StrategyDataService.class);
     private final InstrumentDataService instruments = mock(InstrumentDataService.class);
 
@@ -713,7 +712,7 @@ class CoreEventFormTest {
                 new DealReconciliationCalculator(contourProperties, new PnlReconciliationProperties());
         DealTerminalFeaturesWriter featuresWriter =
                 new DealTerminalFeaturesWriter(reconciliationCalculator, contourProperties, reports);
-        when(tenants.findByTenantInternalId(anyString())).thenReturn(Optional.<Tenant>empty());
+        when(tenants.getAccepted()).thenReturn(RiskAppetite.builder().build());
         // Терминальное ребро применилось: умолчание мока обратное, и факт
         // на неприменившемся ребре не публикуется по построению.
         when(dealDataService.applyTerminalEdge(any(), any())).thenReturn(true);

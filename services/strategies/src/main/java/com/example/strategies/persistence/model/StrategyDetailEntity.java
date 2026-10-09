@@ -58,9 +58,6 @@ public class StrategyDetailEntity extends AuditableEntity {
     @Column(name = "strategy_simultaneous_risk_per_deal_percent", precision = 36, scale = 18)
     private BigDecimal strategySimultaneousRiskPerDealPercent;
 
-    @Column(name = "strategy_catastrophic_risk_per_deal_multiplier", precision = 36, scale = 18)
-    private BigDecimal strategyCatastrophicRiskPerDealMultiplier;
-
     @Column(name = "target_risk_reward_ratio", precision = 36, scale = 18)
     private BigDecimal targetRiskRewardRatio;
 

@@ -133,15 +133,22 @@ spec:
               memory: 256Mi
             limits:
               memory: 512Mi
+          # Пробы смотрят на РАЗНЫЕ группы здоровья, и это несущее: общий
+          # /actuator/health включает базу, и при её недоступности проверка
+          # соединения ждала дольше таймаута пробы живости — kubelet гасил бы
+          # под по кругу вместо «не готов». Живость — только состояние
+          # процесса; готовность — процесс плюс база. Состав групп —
+          # services/audit/src/main/resources/application.yaml; раскладка —
+          # docs/architecture/platform.md, пункт «Пробы развёртывания».
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: http
             initialDelaySeconds: 60
             periodSeconds: 20

@@ -23,7 +23,6 @@ import com.example.tradingcore.mapping.InstrumentMapper;
 import com.example.tradingcore.mapping.InstrumentMapperImpl;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -55,15 +54,13 @@ class InstrumentProjectionPassTest {
     private final MarketDataReadClient marketDataReadClient = mock(MarketDataReadClient.class);
     private final ExchangeAccountDataService accountDataService = mock(ExchangeAccountDataService.class);
     private final InstrumentDataService instrumentDataService = mock(InstrumentDataService.class);
-    private final TenantRiskAppetiteDataService riskAppetiteDataService =
-            mock(TenantRiskAppetiteDataService.class);
     private final ExchangeAccountMapper accountMapper = new ExchangeAccountMapperImpl();
     private final InstrumentMapper instrumentMapper = new InstrumentMapperImpl();
     private final ProjectionSyncProperties properties = projectionSync();
 
     private final RegistryProjectionService service = new RegistryProjectionService(
             authReadClient, marketDataReadClient, accountDataService, instrumentDataService,
-            riskAppetiteDataService, accountMapper, instrumentMapper, properties);
+            accountMapper, instrumentMapper, properties);
 
     @Test
     void ownerUnavailableStopsThePass() {

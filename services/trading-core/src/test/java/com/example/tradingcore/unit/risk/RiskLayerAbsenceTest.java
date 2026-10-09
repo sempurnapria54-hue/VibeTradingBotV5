@@ -12,6 +12,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.episode;
 import static com.example.tradingcore.unit.risk.RiskFixture.protection;
 import static com.example.tradingcore.unit.risk.RiskFixture.tranche;
 import static com.example.tradingcore.unit.risk.RiskFixture.workingContext;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -29,9 +30,12 @@ import com.example.tradingcore.domain.command.risk.RiskValidationResult;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
 import com.example.tradingcore.domain.command.risk.RiskValidator;
 import com.example.tradingcore.domain.command.strategy.ActionRiskGate;
+import com.example.tradingcore.domain.deal.DealContextService;
+import com.example.tradingcore.domain.service.RiskAppetiteService;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
+import com.example.tradingcore.persistence.service.DealDataService;
+import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentExternalRulesDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
@@ -64,6 +68,9 @@ class RiskLayerAbsenceTest {
     /** Дерево исходников ядра: базовый каталог прогона — модуль. */
     private static final Path MAIN_SOURCES = Path.of("src", "main", "java");
 
+    /** Пакет границ хранилища своей базы ядра. */
+    private static final String OWN_STORE_PACKAGE = "com.example.tradingcore.persistence.service";
+
     /** Коды, которые преконтроль заводит фабрикой отказа. */
     private static final String FACTORY_CALL = "RiskCheckCode.";
 
@@ -90,10 +97,18 @@ class RiskLayerAbsenceTest {
     void u29_2_theValidatorHasNoCommandCreatingCollaborator() {
         assertThat(collaboratorTypes(RiskValidator.class))
                 .containsExactlyInAnyOrder(InstrumentExternalRulesDataService.class,
-                        AccountInstrumentStateDataService.class, TenantRiskAppetiteDataService.class,
+                        AccountInstrumentStateDataService.class, RiskAppetiteService.class,
+                        ExchangeAccountDataService.class, DealDataService.class, DealContextService.class,
                         DealContextProperties.class);
     }
 
+    /**
+     * Граница хранилища своей базы биржевой границей не является, хотя имя
+     * сущности её и несёт: проекция реестра счетов
+     * ({@code ExchangeAccountDataService}) — операнд потолков уровней у
+     * преконтроля, а не вызов площадки. Признак границы площадки поэтому
+     * сужен пакетом хранилища, а не снят.
+     */
     @Test
     @DisplayName("U29.3 — на биржу не ходит ни один класс предмета: коллабораторов границы у них нет")
     void u29_3_noSubjectClassHoldsAnExchangeCollaborator() {
@@ -101,9 +116,15 @@ class RiskLayerAbsenceTest {
                         DealRiskNumbersService.class)
                 .forEach(subject -> assertThat(collaboratorTypes(subject))
                         .as("коллабораторы %s", subject.getSimpleName())
-                        .noneMatch(type -> type.getName().contains("exchange")
-                                || type.getSimpleName().contains("Exchange")
-                                || type.getSimpleName().contains("Client")));
+                        .noneMatch(RiskLayerAbsenceTest::exchangeBoundary));
+    }
+
+    /** Коллаборатор — граница площадки: имя её называет, и он не граница своей базы. */
+    private static boolean exchangeBoundary(Class<?> type) {
+        boolean namesTheExchange = type.getName().contains("exchange")
+                || type.getSimpleName().contains("Exchange")
+                || type.getSimpleName().contains("Client");
+        return namesTheExchange && isFalse(OWN_STORE_PACKAGE.equals(type.getPackageName()));
     }
 
     @Test

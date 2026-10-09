@@ -228,12 +228,9 @@ class PerimeterIntegrityPathTest {
                 .as("E8.3: ни одно чтение через периметр не изменило ни одной строки ни у одного владельца")
                 .isEmpty();
 
-        Answer command = viaPerimeter("PUT", Trail.CORE + "/risk-appetites/" + prologue.tenant(), """
-                {
-                  "globalSimultaneousRiskPerDealPercent": 4,
-                  "globalCatastrophicRiskPerDealMultiplier": 100,
-                  "globalConsecutiveLossLimit": 4
-                }
+        Answer command = viaPerimeter("PUT",
+                Trail.CORE + "/pair-settings/" + prologue.account() + "/" + Trail.INSTRUMENT, """
+                {"leverage": 5}
                 """);
         assertThat(command.status()).as("E8.3: команда пользователя принята — " + command.body()).isEqualTo(200);
         Database statistics = trail.database(Party.STATISTICS);
@@ -253,9 +250,9 @@ class PerimeterIntegrityPathTest {
         assertThat(changed.getOrDefault(Party.STRATEGIES.module(), Set.of()))
                 .as("E8.3: у владельца определений не изменилось ничего").isEmpty();
         assertThat(changed.get(Party.TRADING_CORE.module()))
-                .as("E8.3: у ядра — числа риск-аппетита команды и след прохода хода E3.1: сделка и состояния её "
+                .as("E8.3: у ядра — плечо пары команды и след прохода хода E3.1: сделка и состояния её "
                         + "действий, зеркало заявки и её защиты, снимок средств, строка outbox; копии определений нет")
-                .containsExactlyInAnyOrder("public.tenant_risk_appetites", "public.deals",
+                .containsExactlyInAnyOrder("public.account_instrument_states", "public.deals",
                         "public.deal_strategy_action_states", "public.deal_system_action_states", "public.orders",
                         "public.attached_algo_orders", "public.balances", "public.balance_containers",
                         "public.exchange_accounts", "public.outbox_events");
@@ -419,7 +416,7 @@ class PerimeterIntegrityPathTest {
         Map<String, String> answers = new LinkedHashMap<>();
         for (String path : List.of(journalPath(), ROWS + "?grain=INCIDENT&from=" + day + "&to=" + day,
                 Trail.STRATEGIES, Trail.CORE + "/deals?exchangeAccountInternalId=" + prologue.account(),
-                Trail.CORE + "/risk-appetites/" + prologue.tenant(), Trail.PEER_INSTRUMENTS)) {
+                Trail.CORE + "/risk-appetite", Trail.PEER_INSTRUMENTS)) {
             Answer answer = viaPerimeter("GET", path, null);
             assertThat(answer.status()).as(label + ": чтение " + path + " — " + answer.body()).isEqualTo(200);
             answers.put(path, Json.tree(answer.body()).toString());

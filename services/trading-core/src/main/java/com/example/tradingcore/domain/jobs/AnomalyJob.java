@@ -29,6 +29,7 @@ import com.example.tradingcore.persistence.service.InstrumentDataService;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -63,7 +64,8 @@ import org.springframework.stereotype.Component;
  * <p><b>Статусные ворота отбора входа здесь НЕ стоят:</b> риск уже живой,
  * и пропуск заблокированного инструмента оставил бы его вне модели.
  * Блокировка гасит новые входы, а не учёт уже существующего — поэтому
- * контур читается ЦЕЛИКОМ.
+ * контур читается ЦЕЛИКОМ: постраничным обходом всего каталога площадки в
+ * проекции, где страница — единица чтения, а не предел выборки.
  *
  * <p><b>На неполном проходе прочие детекторы МОЛЧАТ</b>, а проход
  * отмечается ПОСЛЕ детекции: отметка «полон» до обхода сбрасывала бы счёт
@@ -165,12 +167,10 @@ public class AnomalyJob {
      */
     private Boolean observe(ExchangeAccount account, OffsetDateTime passStartedAt) {
         AnomalyScan scan = scanReader.read(account.getInternalId());
-        List<Instrument> contour = instrumentDataService.findContourWithin(account.getExchangeCode(),
-                properties.getContourWindow());
-        if (isFalse(scan.getComplete()) || isFalse(withinWindow(contour.size()))) {
+        if (isFalse(scan.getComplete())) {
             return false;
         }
-        detect(scan, account, contour);
+        detect(scan, account, readContour(account.getExchangeCode()));
         anomalyReaction.breakUnobservedSeries(account, passStartedAt);
         return true;
     }
@@ -201,18 +201,24 @@ public class AnomalyJob {
     }
 
     /**
-     * Выборка контура уложилась в окно. Упор в окно означает «возможно,
-     * есть ещё», и засчитывается неполнотой прохода — тем же ходом, что и
-     * неполученный срез: обход по усечённому контуру объявил бы чужими
-     * строки среза, которым не хватило места в выборке.
+     * Контур площадки ЦЕЛИКОМ — постраничным обходом проекции каталога
+     * (docs/components/AnomalyJob.md, обход контура).
+     *
+     * <p><b>Размер каталога неполноты не производит.</b> Страница — единица
+     * чтения, а не предел: усечённый контур объявил бы чужими строки среза,
+     * которым не хватило места, поэтому обход идёт до последней страницы.
+     * Неполнота бывает только отказом чтения страницы — исключение уходит в
+     * ловец прохода и даёт ненаблюдённый проход, а детекторы молчат.
+     *
+     * <p><b>Детекция начинается после обхода, а не постранично:</b> операнд
+     * детектора «живой риск по инструменту вне контура» — имена ВСЕГО
+     * контура, и детектор на половине контура сработал бы на нашем
+     * собственном инструменте со следующей страницы.
      */
-    private Boolean withinWindow(int size) {
-        if (size < properties.getContourWindow()) {
-            return true;
-        }
-        log.warn("Contour selection hit the window ({}): the pass counts as incomplete",
-                properties.getContourWindow());
-        return false;
+    private List<Instrument> readContour(String exchangeCode) {
+        List<Instrument> contour = new ArrayList<>();
+        instrumentDataService.forEachContourPage(exchangeCode, properties.getContourPageSize(), contour::addAll);
+        return contour;
     }
 
     /** Биржевые имена инструментов контура — граница «модель против счёта». */

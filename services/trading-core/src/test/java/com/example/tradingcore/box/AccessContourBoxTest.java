@@ -75,14 +75,14 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
 
         Answer deals = get(DEALS + "?exchangeAccountInternalId=" + ACCOUNT);
         Answer halt = post(HALTS, Bodies.halt("FREEZE", ACCOUNT));
-        Answer appetite = put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("1.5", "2", "3"));
+        Answer appetite = get(RISK_APPETITE);
         Answer job = post(JOBS + "/entry-scanner", "");
 
         // Приняты — то есть не отвергнуты контуром доступа: различать при
         // одном субъекте некого.
         assertThat(deals.status()).isEqualTo(200);
         assertThat(halt.status()).isNotIn(401, 403);
-        assertThat(appetite.status()).isNotIn(401, 403);
+        assertThat(appetite.status()).isEqualTo(200);
         assertThat(job.status()).isNotIn(401, 403);
     }
 
@@ -94,6 +94,26 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
 
         assertThat(health.status()).isEqualTo(200);
         assertThat(metrics.status()).isNotEqualTo(200);
+    }
+
+    /**
+     * Группы проб развёртывания — подпути того же открытого исключения
+     * {@code /actuator/health/**}, а не новые открытые точки. Манифест
+     * спрашивает именно их ({@code deploy/base/services/trading-core.yaml}),
+     * и закрытая группа гасила бы под отказом {@code 401}, а не состоянием.
+     * Метки клетка не несёт — её назначает документ кейсов.
+     */
+    @Test
+    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
+    void theProbeGroupsAreOpenAndAnswerWithState() {
+        Answer liveness = getAnonymously(HEALTH + "/liveness");
+        Answer readiness = getAnonymously(HEALTH + "/readiness");
+
+        assertThat(liveness.status()).isEqualTo(200);
+        assertThat(liveness.body()).contains("UP");
+        assertThat(readiness.status()).isEqualTo(200);
+        assertThat(readiness.body()).contains("UP");
+        assertThat(readiness.body()).doesNotContain("tenant", "exchangeAccount", "internalId");
     }
 
     @Test

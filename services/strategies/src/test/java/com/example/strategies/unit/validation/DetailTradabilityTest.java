@@ -68,7 +68,6 @@ class DetailTradabilityTest {
         detail.setRiskPerActionPercent(decimal("1"));
         detail.setCumulativeRiskPerDealMultiplier(decimal("2"));
         detail.setStrategySimultaneousRiskPerDealPercent(decimal("1"));
-        detail.setStrategyCatastrophicRiskPerDealMultiplier(decimal("100"));
 
         assertThat(violations(request)).isEmpty();
     }

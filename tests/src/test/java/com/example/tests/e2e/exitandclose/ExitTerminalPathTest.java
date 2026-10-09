@@ -50,9 +50,9 @@ import static com.example.tests.e2e.exitandclose.ExitTrail.exchangeTriggersAttac
 import static com.example.tests.e2e.exitandclose.ExitTrail.expiringFirstTrancheDefinition;
 import static com.example.tests.e2e.exitandclose.ExitTrail.exchangeMirrorsProtection;
 import static com.example.tests.e2e.exitandclose.ExitTrail.filledSize;
+import static com.example.tests.e2e.exitandclose.ExitTrail.lossLimitIs;
 import static com.example.tests.e2e.exitandclose.ExitTrail.passUntilLeaves;
 import static com.example.tests.e2e.exitandclose.ExitTrail.raiseHalt;
-import static com.example.tests.e2e.exitandclose.ExitTrail.riskAppetiteIs;
 import static com.example.tests.e2e.exitandclose.ExitTrail.standAtExposure;
 import static com.example.tests.e2e.exitandclose.ExitTrail.walkToFilledEntry;
 import static com.example.tests.e2e.exitandclose.ExitTrail.walkToRecoveredDeal;
@@ -564,7 +564,7 @@ class ExitTerminalPathTest {
                 .getFirst().get("id");
         definition = activeDefinition();
         trail.passUntil("движения добыты", () -> nonNull(dealRow().get("bills_fetched_through")));
-        riskAppetiteIs(trail, "5", lossLimit);
+        lossLimitIs(trail, lossLimit);
         trail.relayCore();
         dealFacts = trail.rows(Party.STATISTICS, "deal_facts");
         trail.forgetTraces();

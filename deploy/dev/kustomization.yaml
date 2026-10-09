@@ -22,21 +22,21 @@ resources:
 # нет: он описывает продвинутое, а не построенное.
 images:
   - name: registry.invalid/vibetrading/bff
-    newTag: 0.0.1-2f9b7b7a-20261004235056
+    newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/strategies
-    newTag: 0.0.1-2f9b7b7a-20261004235056
+    newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/statistics
-    newTag: 0.0.1-2f9b7b7a-20261004235056
+    newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/audit
-    newTag: 0.0.1-2f9b7b7a-20261004235056
+    newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/trading-core
-    newTag: 0.0.1-2f9b7b7a-20261004235056
+    newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/market-data
-    newTag: 0.0.1-2f9b7b7a-20261004235056
+    newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/connector-okx
-    newTag: 0.0.1-2f9b7b7a-20261004235056
+    newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/auth
-    newTag: 0.0.1-2f9b7b7a-20261004235056
+    newTag: 0.0.1-40bb9b8b-20261009123404
 patches:
   # Имя хоста ингресса — ось различия окружений
   # (docs/architecture/platform.md §«Чем различаются окружения»).

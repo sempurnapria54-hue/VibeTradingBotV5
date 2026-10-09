@@ -125,7 +125,7 @@ class SafetyRungBlockSetTest {
         harness.givenPairState(pairState(Instrument.SafetyRung.ENTRY_BLOCKED));
 
         assertThat(codes(harness.validate(entryAction(), contextBuilder(emptyDeal())
-                .strategyDetail(detail("0.9295", "3", "10", "300"))
+                .strategyDetail(detail("0.9295", "3", "10"))
                 .build())))
                 .containsExactly(RiskCheckCode.INSTRUMENT_SAFETY_HOLD,
                         RiskCheckCode.RISK_PER_ACTION_EXCEEDED);

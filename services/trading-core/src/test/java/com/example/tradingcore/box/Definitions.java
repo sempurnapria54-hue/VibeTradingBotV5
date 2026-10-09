@@ -272,7 +272,7 @@ final class Definitions {
      * отказывает {@code MISSING_STOP_PRICE_FOR_SIZING}: вход без
      * известного худшего выхода не сайзится долей аллокации вовсе
      * (docs/concept.md П1). Доля аллокации — второй кандидат размера, и
-     * без неё отказ {@code MISSING_ALLOCATION}. Четыре числа потолков на
+     * без неё отказ {@code MISSING_ALLOCATION}. Три числа потолков на
      * детали — операнды преконтроля, и незаявленное каждое из них даёт
      * реджект {@code RISK_APPETITE_NOT_CONFIGURED}
      * (docs/rules/risk-policy.md).
@@ -684,7 +684,7 @@ final class Definitions {
     }
 
     /**
-     * Потолки риска на закреплённой детали: все четыре, которых требует
+     * Потолки риска на закреплённой детали: все три, которых требует
      * преконтроль. Незаявленный потолок он отвергает, а не пропускает
      * (docs/processes/risk-evaluation.md).
      */
@@ -692,7 +692,6 @@ final class Definitions {
         detail.setRiskPerActionPercent(new BigDecimal("1"));
         detail.setCumulativeRiskPerDealMultiplier(new BigDecimal("3"));
         detail.setStrategySimultaneousRiskPerDealPercent(new BigDecimal("2"));
-        detail.setStrategyCatastrophicRiskPerDealMultiplier(new BigDecimal("10"));
         detail.setTargetRiskRewardRatio(new BigDecimal("2"));
     }
 

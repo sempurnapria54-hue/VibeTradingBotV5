@@ -87,8 +87,8 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     /** Отсутствие ступени пары: рабочее состояние. */
     private static final String NO_PAIR_RUNG = "ACTIVE";
 
-    /** Код отказа преконтроля по незаданным числам риск-аппетита. */
-    private static final String APPETITE_NOT_CONFIGURED = "RISK_APPETITE_NOT_CONFIGURED";
+    /** След отказа преконтроля в журнале приложения и в строках исполнения. */
+    private static final String PRECHECK_BLOCKED = "Risk precheck blocked action";
 
     /** Мягкая ступень пары «счёт, инструмент». */
     private static final String ENTRY_BLOCKED = "ENTRY_BLOCKED";
@@ -167,7 +167,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     @Test
     @DisplayName("B4.1 — преконтроль спрашивается у создающего риск действия")
     void thePrecheckIsAskedAtTheRiskCreatingActionAndReadsItsThreeOperands() {
-        assignRiskAppetite();
         openGatedDeal(workingDefinition());
 
         tick(Tick.DEAL_ORCHESTRATOR);
@@ -182,13 +181,13 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     @DisplayName("B4.1 (контроль) — без ставки комиссии то же действие не исполняется")
     void theSameRiskCreatingActionDoesNotRunWithoutTheFeeRateOperand() {
         // Три операнда преконтроля снимаются по одному, и каждый снимает
-        // СВОЯ клетка: снимок средств — B4.3, числа тенанта — B4.9, ставка
+        // СВОЯ клетка: снимок средств — B4.3, числа риск-аппетита — B4.9
+        // (своим контекстом, UnconfiguredRiskAppetiteBoxTest), ставка
         // комиссии — эта. Три клетки вместе и закрывают вторую половину
         // ожидания B4.1 («без ставки, снимка средств и чисел действие не
         // исполняется»); свести их в одну значило бы трижды опустошать
         // базу внутри клетки, то есть прогонять три клетки под одним
         // именем.
-        assignRiskAppetite();
         openGatedDeal(workingDefinition(), NO_FEE_RATE, FRESH_BALANCE);
 
         tick(Tick.DEAL_ORCHESTRATOR);
@@ -203,7 +202,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         // Четвёртый операнд снимается своей клеткой, как три прежних у
         // B4.1 (контроль): плечо назначено предусловием и снято назначением
         // пустого тела — той же поверхностью, которой его ставит держатель.
-        assignRiskAppetite();
         openGatedDeal(workingDefinition());
         assertThat(put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT, "{}").status()).isEqualTo(200);
 
@@ -221,7 +219,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         // построением больше не держится (docs/rules/trading-constraints.md).
         // Код бессрочен, живого риска у транша нет — реакция та же, что у
         // B4.4, и различает их только операнд.
-        assignRiskAppetite();
         openGatedDeal(workingDefinition(), WITH_FEE_RATE,
                 balanceBody(OffsetDateTime.now(ZoneOffset.UTC), MULTI_CURRENCY_MARGIN),
                 Feed.featuresWithPrice(PHASE.name(), LAST_PRICE));
@@ -244,7 +241,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         // инвариант «ликвидация за стопом» выполненным не читается
         // (docs/rules/risk-policy.md, правило о ликвидации до входа), и
         // отказ бессрочен — реакция та же, что у B4.4.
-        assignRiskAppetite();
         openGatedDeal(workingDefinition());
         marketData.answers(PEER_INSTRUMENTS + "/" + INSTRUMENT + "/rules",
                 Feed.instrumentRulesWithoutTiers(EXTERNAL_INSTRUMENT));
@@ -265,11 +261,13 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     @DisplayName("B4.2 — преконтроль не спрашивается у добычи, выхода, дочистки и safety")
     void thePrecheckIsNotAskedOnTheExitPath() {
         openLiveDeal();
-        // Числа риск-аппетита сняты ПОСЛЕ входа: пустая строка чисел есть
-        // отказ всякого действия, которое преконтроль спрашивает, и выход
-        // проходит ровно тогда, когда его не спрашивают.
-        assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("null", "null", "null")).status())
-                .isEqualTo(200);
+        // Плечо пары снято ПОСЛЕ входа: пустое плечо отвергает всякое
+        // действие, создающее риск, которое преконтроль спрашивает. Прежде
+        // операндом были снятые числа риск-аппетита — пустые числа
+        // отвергали ЛЮБОЕ спрошенное действие, — но числа теперь ось
+        // окружения, принимаемая ядром при старте, и внутри клетки их не
+        // снять (docs/rules/risk-policy.md, правило о числах риск-аппетита).
+        assertThat(put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT, "{}").status()).isEqualTo(200);
         standExchangeFollowingCommands("-5");
         Integer mark = AppLog.mark();
 
@@ -281,19 +279,18 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         assertThat(connector.requests(closurePath(ACCOUNT))).hasSize(1);
         assertThat(connector.requests(attachedCancellationPath(ACCOUNT))).hasSize(1);
         assertThat(dealStatus()).isEqualTo("CLOSED");
-        // Отказа по незаданным числам на этой тропе нет ни в одном
-        // носителе: ни в строках исполнения, ни в журнале происшествий, ни
-        // в журнале приложения.
-        assertThat(rows.all("deal_strategy_action_states").toString()).doesNotContain(APPETITE_NOT_CONFIGURED);
-        assertThat(rows.all("deal_system_action_states").toString()).doesNotContain(APPETITE_NOT_CONFIGURED);
+        // Отказа преконтроля на этой тропе нет ни в одном носителе: ни в
+        // строках исполнения, ни в журнале происшествий, ни в журнале
+        // приложения.
+        assertThat(rows.all("deal_strategy_action_states").toString()).doesNotContain(PRECHECK_BLOCKED);
+        assertThat(rows.all("deal_system_action_states").toString()).doesNotContain(PRECHECK_BLOCKED);
         assertThat(rows.count("anomaly_reports")).isZero();
-        assertThat(AppLog.since(mark)).doesNotContain(APPETITE_NOT_CONFIGURED);
+        assertThat(AppLog.since(mark)).doesNotContain(PRECHECK_BLOCKED);
     }
 
     @Test
     @DisplayName("B4.3 — несвежий снимок средств заказывает добычу, а не отказ")
     void theStaleBalanceSnapshotOrdersAFetchInsteadOfRefusingTheAction() {
-        assignRiskAppetite();
         openGatedDeal(workingDefinition(), WITH_FEE_RATE, STALE_BALANCE);
 
         tick(Tick.DEAL_ORCHESTRATOR);
@@ -324,7 +321,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     @Test
     @DisplayName("B4.4 — бессрочный вердикт на `PRECHECK` закрывает транш, а не сделку в аварию")
     void thePermanentVerdictBeforeLiveRiskClosesTheTrancheAndNotTheDealIntoError() {
-        assignRiskAppetite();
         openGatedDeal(tightStopDefinition());
 
         tick(Tick.DEAL_ORCHESTRATOR);
@@ -351,7 +347,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         // Разница с B4.4 одна — граф, и потому клетка различает «риск не
         // позволил» от «контекст не загрузился» на единственной стадии, где
         // схема реакции вообще ставит эту причину.
-        assignRiskAppetite();
         openGatedDeal(tightStopDefinition());
         // Граф неполон по конъюнкту ног: нижняя граница окна линковки
         // движений стоит, а ни одной ноги у сделки нет
@@ -374,7 +369,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     @Test
     @DisplayName("B4.5 — временный вердикт действие откладывает, а транш оставляет ждать")
     void theTemporaryVerdictDefersTheActionAndLeavesTheTrancheWaiting() {
-        assignRiskAppetite();
         openGatedDeal(workingDefinition());
         // Мягкая ступень ПАРЫ ставится после отбора входа: под стоящей
         // ступенью сканер пару пропускает вовсе (клетка B1.6).
@@ -404,44 +398,8 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     }
 
     @Test
-    @DisplayName("B4.9 — незаданные числа риск-аппетита отказывают на действии, а не на старте")
-    void theUnassignedRiskAppetiteRefusesAtTheActionAndNotAtStartup() {
-        // Контекст поднялся при пустых числах — стартового обхода их нет
-        // вовсе, и поверхность отвечает.
-        assertThat(get(HEALTH).status()).isEqualTo(200);
-        openGatedDeal(workingDefinition());
-        assertThat(rows.row("tenant_risk_appetites", "tenant_internal_id", TENANT)
-                .get("global_consecutive_loss_limit")).isNull();
-        Integer mark = AppLog.mark();
-
-        tick(Tick.DEAL_ORCHESTRATOR);
-
-        // Отказ приходит НА ДЕЙСТВИИ и называет, какое именно число пусто.
-        // Код — `LOSS_LIMIT_NOT_CONFIGURED`, а не названный кейсом
-        // `RISK_APPETITE_NOT_CONFIGURED`: пустая строка чисел нарушает
-        // ПЕРВУЮ из двух охран порядка проверок валидатора, и имя кода
-        // поправлено по коду (оба кода — временные и оба в карв-ауте, то
-        // есть род реакции у них один).
-        String written = AppLog.since(mark);
-        assertThat(written).contains("Risk precheck blocked action");
-        assertThat(written).contains("LOSS_LIMIT_NOT_CONFIGURED");
-        assertThat(written).contains("globalConsecutiveLossLimit is not assigned for tenant " + TENANT);
-        assertThat(rows.count("orders")).isEqualTo(0L);
-        // Сделка в аварию не уходит: код в карв-ауте исчерпанного бюджета.
-        assertThat(dealStatus()).isNotEqualTo("ERROR");
-
-        // ВТОРАЯ охрана того же семейства (`RISK_APPETITE_NOT_CONFIGURED`
-        // на незаданном проценте) этой клеткой не наблюдается, и это не
-        // пропуск: дойти до неё можно только назначив первое число, а к
-        // тому моменту транш был закрыт временным вердиктом первой охраны
-        // (находка F1). С её закрытием транш ждёт, и вторая охрана
-        // достижима — клетка её пока не мерит.
-    }
-
-    @Test
     @DisplayName("B4.13 — отказ расчёта по стороне уровня — отказ шага, не авария")
     void theRefusalByTheSideOfTheStopLevelFailsTheStepAndNotTheDeal() {
-        assignRiskAppetite();
         openGatedDeal(structureStopDefinition(), WITH_FEE_RATE, FRESH_BALANCE,
                 Feed.featuresWithStructure(PHASE.name(), LAST_PRICE, SWING_LOW_ABOVE_ANCHOR));
         Integer mark = AppLog.mark();
@@ -499,7 +457,6 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
     @Test
     @DisplayName("B4.11 — заблокированное действие шага останавливает остальные действия того же шага")
     void theBlockedActionHaltsTheRestOfItsStepPackage() {
-        assignRiskAppetite();
         openGatedDeal(Definitions.withTwoActionEntryCommandOnPhase(DEFINITION, ACCOUNT, INSTRUMENT, PHASE));
         assertThat(post(HALTS, Bodies.halt("SOFT", ACCOUNT, INSTRUMENT)).status()).isEqualTo(204);
 

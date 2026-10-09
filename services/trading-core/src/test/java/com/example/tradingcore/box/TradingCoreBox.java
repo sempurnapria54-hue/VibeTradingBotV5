@@ -84,8 +84,8 @@ abstract class TradingCoreBox {
     /** Ручное снятие ступени. */
     protected static final String HALT_CLEARANCES = ROOT + "/safety/halt-clearances";
 
-    /** Числа риск-аппетита тенанта. */
-    protected static final String RISK_APPETITES = ROOT + "/risk-appetites";
+    /** Принятые ядром числа риск-аппетита окружения. */
+    protected static final String RISK_APPETITE = ROOT + "/risk-appetite";
 
     /** Назначение торговых настроек счёта на инструменте. */
     protected static final String PAIR_SETTINGS = ROOT + "/pair-settings";

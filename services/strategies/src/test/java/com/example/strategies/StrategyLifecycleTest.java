@@ -76,7 +76,7 @@ class StrategyLifecycleTest {
         Strategy definition = definition(Strategy.Status.CREATED);
         givenDefinition(definition);
         givenReferencesResolve();
-        givenRiskAppetite(new BigDecimal("2"), new BigDecimal("3"));
+        givenRiskAppetite(new BigDecimal("2"), new BigDecimal("3"), new BigDecimal("10"));
 
         Strategy moved = service.applyStatus(STRATEGY, TENANT, Strategy.Status.ACTIVE);
 
@@ -86,16 +86,16 @@ class StrategyLifecycleTest {
     }
 
     /**
-     * Числа риск-аппетита не назначены — активация отвергается.
+     * Числа риск-аппетита ядром не приняты — активация отвергается.
      *
      * <p>Без них неравенства создания не считаются вовсе, и разрешение
      * было бы выдано определению, которого никто не проверял.
      */
     @Test
-    void activationIsRefusedWhenTheTenantRiskNumbersAreNotAssigned() {
+    void activationIsRefusedWhenTheRiskNumbersAreNotAccepted() {
         givenDefinition(definition(Strategy.Status.CREATED));
         givenReferencesResolve();
-        givenRiskAppetite(null, null);
+        givenRiskAppetite(null, null, null);
 
         assertThatThrownBy(() -> service.applyStatus(STRATEGY, TENANT, Strategy.Status.ACTIVE))
                 .isInstanceOf(ResponseStatusException.class)
@@ -187,9 +187,9 @@ class StrategyLifecycleTest {
                 .thenReturn(new PairCheckCoreResponse(true, true, true));
     }
 
-    private void givenRiskAppetite(BigDecimal simultaneous, BigDecimal catastrophic) {
-        when(coreClient.getRiskAppetite(TENANT))
-                .thenReturn(new RiskAppetiteCoreResponse(TENANT, simultaneous, catastrophic));
+    private void givenRiskAppetite(BigDecimal simultaneous, BigDecimal cumulative, BigDecimal leverage) {
+        when(coreClient.getRiskAppetite())
+                .thenReturn(new RiskAppetiteCoreResponse(simultaneous, cumulative, leverage));
     }
 
     /**

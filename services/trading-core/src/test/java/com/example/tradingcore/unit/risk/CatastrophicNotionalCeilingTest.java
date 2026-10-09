@@ -2,7 +2,8 @@ package com.example.tradingcore.unit.risk;
 
 import static com.example.tradingcore.unit.risk.RiskFixture.ANCHOR;
 import static com.example.tradingcore.unit.risk.RiskFixture.STOP;
-import static com.example.tradingcore.unit.risk.RiskFixture.appetite;
+import static com.example.tradingcore.unit.risk.RiskFixture.account;
+import static com.example.tradingcore.unit.risk.RiskFixture.appetiteWithMaxLeverage;
 import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.contextBuilder;
 import static com.example.tradingcore.unit.risk.RiskFixture.deal;
@@ -11,6 +12,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.emptyDeal;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryAction;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryLeg;
 import static com.example.tradingcore.unit.risk.RiskFixture.episode;
+import static com.example.tradingcore.unit.risk.RiskFixture.pairStateWithLeverage;
 import static com.example.tradingcore.unit.risk.RiskFixture.protection;
 import static com.example.tradingcore.unit.risk.RiskFixture.rules;
 import static com.example.tradingcore.unit.risk.RiskFixture.tranche;
@@ -31,29 +33,44 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Катастрофический потолок нотинала — группа {@code U15} документа
+ * Потолок нотинала сделки — группа {@code U15} документа
  * `.claude/tests/cases/trading-core-risk.md` (дом —
  * docs/spec/risk-limits.json, величина {@code withinDealNotional}; сам
- * потолок — там же, величина {@code catastrophicLossCeiling}).
+ * потолок — там же, величина {@code dealNotionalCeiling}: предел плеча,
+ * помноженный на базу).
  *
  * <p><b>Базовая сборка</b> — U13.1: эпизод в десять контрактов по цене
  * 3000 даёт нотинал эпизода 3000, вход на десять контрактов — нотинал
- * акта 3000. Потолок равен {@code 10 % × 10000 × множитель}, то есть
- * тысяче, умноженной на множитель: клетка задаёт его так, чтобы граница
- * проходила ровно по проверяемому числу. Процент риск-аппетита поднят до
- * десяти намеренно — при единице глобальная редакция одновременного
- * потолка срабатывала бы на каждой клетке группы.
+ * акта 3000. <b>База группы — тысяча</b>, поэтому потолок равен
+ * {@code предел плеча × 1000}: клетка задаёт предел так, чтобы граница
+ * проходила ровно по проверяемому числу, и предел остаётся в области
+ * приёма (не меньше единицы). Прежняя редакция держала потолок
+ * произведением процента сделки на множитель катастрофического потолка
+ * стратегии; множитель снят (.claude/decisions/deal-leverage-ceiling.md), а
+ * граничные числа клеток те же.
  *
- * <p>Ноги группы несут ЗАЯВЛЕННЫЙ РИСК ноль: предмет здесь нотинал, а
- * ненулевая доля риска подмешивала бы к нему одновременный потолок.
+ * <p>Проценты одновременного риска сделки и стратегии подняты до ста
+ * намеренно — при базе в тысячу меньший процент срабатывал бы на каждой
+ * клетке группы. Ноги группы несут ЗАЯВЛЕННЫЙ РИСК ноль: предмет здесь
+ * нотинал, а ненулевая доля риска подмешивала бы к нему одновременный
+ * потолок.
  */
 class CatastrophicNotionalCeilingTest {
 
+    /** База группы: потолок нотинала равен пределу плеча, помноженному на тысячу. */
+    private static final String GROUP_BASE = "1000";
+
     private final RiskHarness harness = new RiskHarness();
 
+    /**
+     * Плечо пары — единица: предел плеча клеток бывает ниже рабочего плеча
+     * базовой сборки, а плечо пары выше предела у акта, создающего риск,
+     * отвергается своим кодом (docs/rules/trading-constraints.md) — он
+     * подмешивался бы к предмету группы.
+     */
     @BeforeEach
-    void givenARoomySimultaneousCeiling() {
-        harness.givenAppetite(appetite("10", 3));
+    void givenAPairLeverageWithinEveryCellLimit() {
+        harness.givenPairState(pairStateWithLeverage(1));
     }
 
     @Test
@@ -66,7 +83,7 @@ class CatastrophicNotionalCeilingTest {
     @DisplayName("U15.2 — сумма РАВНА потолку: граница включена")
     void u15_2_aSumExactlyAtTheCeilingPasses() {
         assertThat(codes(harness.validate(entryAction(), liveContext("6"))))
-                .as("3000 + 3000 = 6000 ровно в потолок 1000 × 6")
+                .as("3000 + 3000 = 6000 ровно в потолок 6 × 1000")
                 .isEmpty();
     }
 
@@ -80,8 +97,8 @@ class CatastrophicNotionalCeilingTest {
     }
 
     @Test
-    @DisplayName("U15.4 — множитель не объявлен: неравенство не считается")
-    void u15_4_anUndeclaredMultiplierStopsTheInequality() {
+    @DisplayName("U15.4 — предел плеча не принят: неравенство не считается")
+    void u15_4_anUnacceptedMaxLeverageStopsTheInequality() {
         assertThat(codes(harness.validate(entryAction(), liveContext(null))))
                 .containsExactly(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
     }
@@ -90,7 +107,7 @@ class CatastrophicNotionalCeilingTest {
     @DisplayName("U15.5 — первый вход сделки: операнд — только нотинал акта")
     void u15_5_theFirstEntryCountsOnlyItsOwnNotional() {
         assertThat(codes(harness.validate(entryAction(), emptyContext("3"))))
-                .as("нотинал акта 3000 ровно в потолок 1000 × 3")
+                .as("нотинал акта 3000 ровно в потолок 3 × 1000")
                 .isEmpty();
         assertThat(codes(harness.validate(entryAction(), emptyContext("2.999"))))
                 .as("потолок на волос ниже — и тот же вход его перебирает")
@@ -121,11 +138,11 @@ class CatastrophicNotionalCeilingTest {
     @DisplayName("U15.8 — эпизод жив, якорь пуст: нотинал эпизода не входит, нотинал ног входит")
     void u15_8_anEmptyAnchorDropsTheEpisodeNotionalOnly() {
         DealContext exact = contextWith(episode("10", null), List.of(freeLeg("100", "50")), "15");
-        DealContext aHairBelow = contextWith(episode("10", null), List.of(freeLeg("100", "50")), "14.999");
-
         assertThat(codes(harness.validate(weakeningAction(), exact)))
                 .as("нотинал ног 15000 ровно в потолок; нотинала эпизода без якоря нет")
                 .containsExactly(RiskCheckCode.PROTECTION_COVERAGE_REDUCED);
+
+        DealContext aHairBelow = contextWith(episode("10", null), List.of(freeLeg("100", "50")), "14.999");
         assertThat(codes(harness.validate(weakeningAction(), aHairBelow)))
                 .containsExactly(RiskCheckCode.PROTECTION_COVERAGE_REDUCED,
                         RiskCheckCode.DEAL_NOTIONAL_EXCEEDED);
@@ -135,7 +152,7 @@ class CatastrophicNotionalCeilingTest {
     @DisplayName("U15.9 — стоимость контракта пуста: экспозиция не измерена, отказ до потолков")
     void u15_9_anAbsentContractValueRefusesBeforeTheCeilings() {
         harness.givenRules(rules(null, "1", "1", "0.0005"));
-        DealContext dealContext = contextWith(episode("10", ANCHOR), List.of(freeLeg("100", "50")), "0.00001");
+        DealContext dealContext = contextWith(episode("10", ANCHOR), List.of(freeLeg("100", "50")), "1");
 
         assertThat(codes(harness.validate(weakeningAction(), dealContext)))
                 .as("нулевая экспозиция была бы благоприятным умолчанием")
@@ -157,8 +174,8 @@ class CatastrophicNotionalCeilingTest {
 
     /**
      * Нотинал акта прайсится ЕГО плановой ценой, а не средней живого
-     * эпизода (docs/rules/risk-policy.md, правило катастрофического
-     * потолка): средняя прайсит только налитые контракты. Пара «ровно / на
+     * эпизода (docs/rules/risk-policy.md, правило потолка нотинала
+     * сделки): средняя прайсит только налитые контракты. Пара «ровно / на
      * волос ниже» различает формы — по средней сумма была бы 6000 и прошла
      * бы обе границы.
      */
@@ -168,7 +185,7 @@ class CatastrophicNotionalCeilingTest {
         CalculatedStrategyAction addAbove = entryAction("10", new BigDecimal("3300"), STOP.toPlainString());
 
         assertThat(codes(harness.validate(addAbove, liveContext("6.3"))))
-                .as("3000 эпизода + 3300 акта = 6300 ровно в потолок 1000 × 6.3")
+                .as("3000 эпизода + 3300 акта = 6300 ровно в потолок 6.3 × 1000")
                 .isEmpty();
         assertThat(codes(harness.validate(addAbove, liveContext("6.299"))))
                 .as("потолок на волос ниже перебирается нотиналом акта по его цене")
@@ -180,25 +197,34 @@ class CatastrophicNotionalCeilingTest {
         return entryLeg(Order.Status.ACTIVE, "0", plannedSize, filled);
     }
 
-    /** Контекст базовой сборки группы с названным катастрофическим множителем. */
-    private static DealContext liveContext(String catastrophicMultiplier) {
-        return contextWith(episode("10", ANCHOR), List.of(), catastrophicMultiplier);
+    /** Контекст базовой сборки группы с названным пределом плеча; пусто — предел не принят. */
+    private DealContext liveContext(String maxLeverage) {
+        return contextWith(episode("10", ANCHOR), List.of(), maxLeverage);
     }
 
     /** Контекст без эпизода и без ног: первый вход сделки. */
-    private static DealContext emptyContext(String catastrophicMultiplier) {
+    private DealContext emptyContext(String maxLeverage) {
+        harness.givenAppetite(appetiteWithMaxLeverage("100", maxLeverage));
         return contextBuilder(emptyDeal())
-                .strategyDetail(detail("10", "3", "10", catastrophicMultiplier))
+                .exchangeAccount(account(GROUP_BASE))
+                .strategyDetail(detail("10", "3", "100"))
                 .build();
     }
 
-    /** Контекст с названными эпизодом, живыми ногами и катастрофическим множителем. */
-    private static DealContext contextWith(Position episode, List<Order> legs, String catastrophicMultiplier) {
+    /**
+     * Контекст с названными эпизодом, живыми ногами и пределом плеча.
+     * Предел — число окружения, а не детали: он ставится стабом
+     * принимающего звена, и последний собранный контекст называет его для
+     * следующего вызова преконтроля.
+     */
+    private DealContext contextWith(Position episode, List<Order> legs, String maxLeverage) {
+        harness.givenAppetite(appetiteWithMaxLeverage("100", maxLeverage));
         Deal deal = deal(BigDecimal.ZERO, null);
         deal.setPositions(List.of(episode));
         deal.setTranches(List.of(tranche(legs, List.of(protection(STOP.toPlainString())))));
         return contextBuilder(deal)
-                .strategyDetail(detail("10", "3", "10", catastrophicMultiplier))
+                .exchangeAccount(account(GROUP_BASE))
+                .strategyDetail(detail("10", "3", "100"))
                 .build();
     }
 }

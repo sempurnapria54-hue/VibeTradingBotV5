@@ -1,0 +1,50 @@
+package com.example.tradingcore.config;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+/**
+ * Числа риск-аппетита — оси окружения, какими их приносит манифест
+ * (docs/rules/risk-policy.md §«Числа назначает держатель; пустое место —
+ * отказ»; оси — docs/architecture/platform.md). Принимает их
+ * {@link com.example.tradingcore.domain.service.RiskAppetiteService} при
+ * старте; здесь только сырая форма.
+ *
+ * <p><b>Поля строковые намеренно.</b> Значение, которое не читается числом,
+ * — опечатка манифеста, то есть число вне области определения, и правило
+ * приёма его НЕ ПРИНИМАЕТ, а не роняет ядро: падение при старте оставило бы
+ * живые сделки без сопровождения
+ * (.claude/decisions/risk-appetite-environment-config.md). Числовое поле
+ * свойства уронило бы контекст на связывании раньше, чем правило приёма
+ * успело бы что-то решить.
+ *
+ * <p><b>Пустое значение — штатное состояние</b> окружения, для которого
+ * держатель чисел не назвал: манифест несёт ключ с пустой строкой, и приём
+ * читает её как «число не задано».
+ */
+@Getter
+@Setter
+@Component
+@ConfigurationProperties(prefix = "risk-appetite")
+public class RiskAppetiteProperties {
+
+    /** Потолок одновременного риска сделки, проценты базы риска сделки. */
+    private String globalSimultaneousRiskPerDealPercent;
+
+    /** Потолок живого риска биржевого счёта, проценты живой базы счёта. */
+    private String globalSimultaneousRiskPerAccountPercent;
+
+    /** Потолок живого риска тенанта, проценты базы тенанта. */
+    private String globalSimultaneousRiskPerTenantPercent;
+
+    /** Предел множителя кумулятивного потолка сделки. */
+    private String globalCumulativeRiskPerDealMultiplier;
+
+    /** Предел плеча: брутто-плечо сделки к базе и верхняя граница плеча пары. */
+    private String globalMaxLeverage;
+
+    /** Сколько подряд ценово-убыточных закрытых сделок останавливают торговлю счёта. */
+    private String globalConsecutiveLossLimit;
+}

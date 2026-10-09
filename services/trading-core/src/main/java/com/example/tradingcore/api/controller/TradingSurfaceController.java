@@ -10,7 +10,6 @@ import com.example.tradingcore.api.model.AccountInstrumentStateApiResponse;
 import com.example.tradingcore.api.model.DealApiResponse;
 import com.example.tradingcore.api.model.PairCheckApiRequest;
 import com.example.tradingcore.api.model.PairCheckApiResponse;
-import com.example.tradingcore.api.model.RiskAppetiteApiRequest;
 import com.example.tradingcore.api.model.RiskAppetiteApiResponse;
 import com.example.tradingcore.api.model.SafetyStateApiResponse;
 import com.example.tradingcore.domain.model.PairCheck;
@@ -36,8 +35,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Чтения торгового состояния, назначение чисел риск-аппетита и плеча
- * пары.
+ * Чтения торгового состояния и принятых чисел риск-аппетита, назначение
+ * плеча пары.
  *
  * <p><b>Путь-параметр — {@code internalId}, не ключ БД</b>
  * (.claude/rules/codestyle.md §«Идентичность наружу»): числовой ключ
@@ -117,44 +116,35 @@ public class TradingSurfaceController {
         return response;
     }
 
-    @Operation(summary = "Числа риск-аппетита тенанта")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Числа отданы"),
-            @ApiResponse(responseCode = "400", description = "Строки риск-аппетита тенанта ещё нет")})
-    @GetMapping("/risk-appetites/{tenantInternalId}")
-    public RiskAppetiteApiResponse getRiskAppetite(@PathVariable String tenantInternalId) {
-        return mapper.domainToApi(tradingSurfaceService.getRiskAppetite(tenantInternalId));
-    }
-
     /**
-     * Назначение — {@code PUT}, а не {@code PATCH}: тело есть снимок
-     * намерения держателя ЦЕЛИКОМ, и непереданное поле стирает прежнее
-     * число. Частичная правка сделала бы «не прислал» неотличимым от
-     * «снял», а оба ведут к отказу risk-creating действия по разным
-     * поводам.
+     * Числа риск-аппетита, принятые ядром при старте. Единственный
+     * вызывающий — владелец определений стратегий: операнды неравенств
+     * создания и активации (docs/architecture/contracts.md §«Синхронные
+     * вызовы»). Конфигурацию окружения он не читает сам: принимающее звено
+     * одно (docs/rules/risk-policy.md, правило о числах риск-аппетита).
      */
-    @Operation(summary = "Назначить числа риск-аппетита тенанта")
+    @Operation(summary = "Принятые ядром числа риск-аппетита окружения")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Числа назначены"),
-            @ApiResponse(responseCode = "400", description = "Негодное тело запроса")})
-    @PutMapping("/risk-appetites/{tenantInternalId}")
-    public RiskAppetiteApiResponse applyRiskAppetite(@PathVariable String tenantInternalId,
-                                                     @Valid @RequestBody RiskAppetiteApiRequest request) {
-        return mapper.domainToApi(tradingSurfaceService.applyRiskAppetite(tenantInternalId,
-                mapper.apiToDomain(request)));
+            @ApiResponse(responseCode = "200", description = "Числа отданы; пустое поле — число не принято")})
+    @GetMapping("/risk-appetite")
+    public RiskAppetiteApiResponse getRiskAppetite() {
+        return mapper.domainToApi(tradingSurfaceService.getRiskAppetite());
     }
 
     /**
      * Назначение плеча счёта на инструменте — ручная статичная настройка
      * держателя (docs/rules/trading-constraints.md). Пока плеча нет,
-     * risk-creating действие по паре отвергается; форма назначения — та же,
-     * что у чисел риск-аппетита: {@code PUT} снимком намерения целиком.
+     * risk-creating действие по паре отвергается. Форма назначения —
+     * {@code PUT} снимком намерения целиком: непереданное поле стирает
+     * прежнее значение. Плечо выше предела конфигурации и всякое плечо при
+     * пустом пределе отвергаются.
      */
     @Operation(summary = "Назначить торговые настройки счёта на инструменте")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Настройки назначены"),
-            @ApiResponse(responseCode = "400", description = "Негодное тело запроса либо счёт или инструмент"
-                    + " с такой идентичностью не найдены")})
+            @ApiResponse(responseCode = "400", description = "Негодное тело запроса, плечо выше предела плеча"
+                    + " конфигурации либо предел не принят, либо счёт или инструмент с такой идентичностью"
+                    + " не найдены")})
     @PutMapping("/pair-settings/{exchangeAccountInternalId}/{instrumentInternalId}")
     public AccountInstrumentStateApiResponse applyPairSettings(
             @PathVariable String exchangeAccountInternalId, @PathVariable String instrumentInternalId,

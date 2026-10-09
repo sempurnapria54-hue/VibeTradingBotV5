@@ -449,15 +449,13 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
      *
      * <p><b>Все входы расчёта поставлены тропами ящика:</b> проекции —
      * тиком синка, ставка комиссии — тиком её синка, числа риск-аппетита —
-     * своей поверхностью, сделка — тиком отбора входа, снимок средств —
+     * осями конфигурации контекста, сделка — тиком отбора входа, снимок средств —
      * первым тиком сопровождения. Нога создаётся вторым тиком и на
      * площадку ещё не уходила: решение о заявке принимается раньше её
      * отправки.
      */
     private void openDealWithLiveLeg() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
-        assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("5", "10", "4")).status())
-                .isEqualTo(200);
         assignLeverage(ACCOUNT, INSTRUMENT);
         connector.answers(feeRatePath(ACCOUNT), Feed.array(Feed.tradeFeeRate()));
         tick(Tick.TRADE_FEE_RATES);

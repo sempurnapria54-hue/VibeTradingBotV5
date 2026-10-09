@@ -32,12 +32,12 @@ import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRul
 import com.example.tradingbot.domain.model.core.instrument.PositionTier;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
+import com.example.tradingcore.domain.model.RiskAppetite;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -87,7 +87,7 @@ final class RiskFixture {
     /** Соседний транш той же сделки — операнд агрегатности потолков. */
     static final Long NEIGHBOUR_TRANCHE_ID = 11L;
 
-    /** Тенант-владелец счёта: по нему резолвятся числа риск-аппетита. */
+    /** Тенант-владелец счёта: по нему собираются счета базы тенанта. */
     static final String TENANT = "tn-0001";
 
     /** Якорь себестоимости базовой сборки — плановая цена действия. */
@@ -194,19 +194,48 @@ final class RiskFixture {
         return state;
     }
 
-    /** Строка риск-аппетита тенанта: оба числа назначены. */
-    static Tenant workingAppetite() {
+    /** Принятые числа риск-аппетита базовой сборки: все шесть приняты. */
+    static RiskAppetite workingAppetite() {
         return appetite("1", 3);
     }
 
-    /** Строка риск-аппетита с названными процентом одновременного риска и порогом серии. */
-    static Tenant appetite(String simultaneousPercent, Integer lossLimit) {
-        Tenant tenant = new Tenant();
-        tenant.setInternalId(TENANT);
-        tenant.setGlobalSimultaneousRiskPerDealPercent(decimal(simultaneousPercent));
-        tenant.setGlobalCatastrophicRiskPerDealMultiplier(new BigDecimal("300"));
-        tenant.setGlobalConsecutiveLossLimit(lossLimit);
-        return tenant;
+    /**
+     * Принятые числа с названными процентом одновременного риска сделки и
+     * порогом серии; пусто — число не принято.
+     *
+     * <p><b>Прочие четыре числа не связывают кейсов прежних групп:</b>
+     * потолки счёта и тенанта — по сто процентов, предел кумулятивного
+     * множителя — тысяча, предел плеча — тридцать (потолок нотинала
+     * {@code 30 × 10000}). Свой предмет каждое из них получает своей группой
+     * явными числами ({@link #appetiteWithMaxLeverage}, {@link #levelAppetite}).
+     */
+    static RiskAppetite appetite(String simultaneousPercent, Integer lossLimit) {
+        return RiskAppetite.builder()
+                .globalSimultaneousRiskPerDealPercent(decimal(simultaneousPercent))
+                .globalSimultaneousRiskPerAccountPercent(new BigDecimal("100"))
+                .globalSimultaneousRiskPerTenantPercent(new BigDecimal("100"))
+                .globalCumulativeRiskPerDealMultiplier(new BigDecimal("1000"))
+                .globalMaxLeverage(new BigDecimal("30"))
+                .globalConsecutiveLossLimit(lossLimit)
+                .build();
+    }
+
+    /** Принятые числа с названными процентом сделки и пределом плеча; пусто — предел не принят. */
+    static RiskAppetite appetiteWithMaxLeverage(String simultaneousPercent, String maxLeverage) {
+        return appetite(simultaneousPercent, 3).toBuilder()
+                .globalMaxLeverage(decimal(maxLeverage))
+                .build();
+    }
+
+    /**
+     * Принятые числа тестового окружения держателя для потолков уровней:
+     * сделка 1 %, счёт 10 %, тенант 30 %; пусто — число не принято.
+     */
+    static RiskAppetite levelAppetite(String accountPercent, String tenantPercent) {
+        return appetite("1", 3).toBuilder()
+                .globalSimultaneousRiskPerAccountPercent(decimal(accountPercent))
+                .globalSimultaneousRiskPerTenantPercent(decimal(tenantPercent))
+                .build();
     }
 
     // ------------------------------------------------------------------
@@ -215,28 +244,33 @@ final class RiskFixture {
 
     /** Закреплённая деталь стратегии: все её числа объявлены. */
     static StrategyDetail workingDetail() {
-        return detail("1", "3", "1", "300");
+        return detail("1", "3", "1");
     }
 
-    /** Деталь с названными процентом на действие и тремя множителями; пусто — не объявлено. */
-    static StrategyDetail detail(String perAction, String cumulativeMultiplier, String strategySimultaneous,
-                                 String catastrophicMultiplier) {
+    /** Деталь с названными процентом на действие, множителем и процентом стратегии; пусто — не объявлено. */
+    static StrategyDetail detail(String perAction, String cumulativeMultiplier, String strategySimultaneous) {
         StrategyDetail detail = new StrategyDetail();
         detail.setId(21L);
         detail.setRiskPerActionPercent(decimal(perAction));
         detail.setCumulativeRiskPerDealMultiplier(decimal(cumulativeMultiplier));
         detail.setStrategySimultaneousRiskPerDealPercent(decimal(strategySimultaneous));
-        detail.setStrategyCatastrophicRiskPerDealMultiplier(decimal(catastrophicMultiplier));
         return detail;
     }
 
-    /** Биржевой счёт с названной живой базой риска. */
+    /** Биржевой счёт с названной живой базой риска в расчётной валюте базовой сборки. */
     static ExchangeAccount account(String riskBase) {
+        return account(ACCOUNT_ID, riskBase);
+    }
+
+    /** Биржевой счёт тенанта базовой сборки с названными ключом и живой базой риска. */
+    static ExchangeAccount account(Long id, String riskBase) {
         ExchangeAccount account = new ExchangeAccount();
-        account.setId(ACCOUNT_ID);
-        account.setInternalId("ea-0001");
+        account.setId(id);
+        account.setInternalId("ea-000" + id);
         account.setTenantId(TENANT);
+        account.setStatus(ExchangeAccount.Status.ACTIVE);
         account.setRiskBase(decimal(riskBase));
+        account.setRiskBaseCurrency(SETTLEMENT_CURRENCY);
         return account;
     }
 

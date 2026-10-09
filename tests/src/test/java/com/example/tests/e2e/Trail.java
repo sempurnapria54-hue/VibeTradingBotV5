@@ -72,9 +72,16 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
  * сквозной набор»).
  *
  * <p><b>Предусловия ставятся ходами тропы</b> — тиком синка проекций,
- * простановкой чисел поверхностью ядра, тиком синка ставок, — а не
+ * назначением плеча поверхностью ядра, тиком синка ставок, — а не
  * записью в базу, и каждое помнит, поставлено ли оно, чтобы кейс брал
  * ровно те, которые называет.
+ *
+ * <p><b>Числа риск-аппетита — конфигурация ядра, а не ход.</b> Они ось
+ * окружения, и принимает их ядро при старте
+ * (.claude/decisions/risk-appetite-environment-config.md): ядро стенда
+ * поднимается с числами тропы ({@link #RISK_APPETITE}), а кейс, которому
+ * нужны иные либо пустые, поднимает ядро заново с перекрытыми ключами — тем
+ * же ходом, каким держатель меняет их в окружении.
  *
  * <p><b>Ходы изолированы парой «тенант, счёт», а не пересозданием
  * стороны.</b> Ответы площадки и чтение её журнала — в области ключа счёта
@@ -159,6 +166,44 @@ public final class Trail implements AutoCloseable {
     /** Заголовок подписанного запроса площадке, называющий ключ счёта: им стаб площадки разводит счета. */
     public static final String ACCESS_KEY = "OK-ACCESS-KEY";
 
+    /** Ключ конфигурации ядра: потолок живого риска сделки, % базы. */
+    public static final String RISK_DEAL_PERCENT = "risk-appetite.global-simultaneous-risk-per-deal-percent";
+
+    /** Ключ конфигурации ядра: потолок живого риска счёта, % базы. */
+    public static final String RISK_ACCOUNT_PERCENT = "risk-appetite.global-simultaneous-risk-per-account-percent";
+
+    /** Ключ конфигурации ядра: потолок живого риска тенанта, % базы. */
+    public static final String RISK_TENANT_PERCENT = "risk-appetite.global-simultaneous-risk-per-tenant-percent";
+
+    /** Ключ конфигурации ядра: предел множителя кумулятивного потолка сделки. */
+    public static final String RISK_CUMULATIVE_MULTIPLIER = "risk-appetite.global-cumulative-risk-per-deal-multiplier";
+
+    /** Ключ конфигурации ядра: предел плеча. */
+    public static final String RISK_MAX_LEVERAGE = "risk-appetite.global-max-leverage";
+
+    /** Ключ конфигурации ядра: предел серии убытков подряд. */
+    public static final String RISK_LOSS_LIMIT = "risk-appetite.global-consecutive-loss-limit";
+
+    /**
+     * Числа риск-аппетита, с которыми поднимается ядро стенда.
+     *
+     * <p>Потолок сделки — 5 %: определения тропы поднимают потолок детали до
+     * двух действий, и меньшее число отвергло бы их создание. Предел плеча
+     * равен плечу, которое тропа назначает паре ({@link #leverageAssigned()}):
+     * плечо пары выше предела отвергалось бы. Потолки счёта и тенанта —
+     * сотня процентов: сделки прежних пар на стенде живут, и тесный потолок
+     * тенанта закрыл бы вход посреди чужого кейса; цепочка
+     * «сделка ≤ счёт ≤ тенант» при этом выполнена. Множитель кумулятивного
+     * потолка равен объявленному эталоном.
+     */
+    public static final Map<String, String> RISK_APPETITE = Map.of(
+            RISK_DEAL_PERCENT, "5",
+            RISK_ACCOUNT_PERCENT, "100",
+            RISK_TENANT_PERCENT, "100",
+            RISK_CUMULATIVE_MULTIPLIER, "2",
+            RISK_MAX_LEVERAGE, "10",
+            RISK_LOSS_LIMIT, "4");
+
     private static final String NEVER = "0 0 0 1 1 *";
 
     /** Допуск возраста наблюдения детекцией у ядра стенда: заведомо длиннее прогона. */
@@ -206,7 +251,6 @@ public final class Trail implements AutoCloseable {
     private final Map<String, Supplier<String>> startedSeries = new LinkedHashMap<>();
     private Integer freshPairs = 0;
     private Boolean projectionsSynced = Boolean.FALSE;
-    private Boolean riskAppetiteSet = Boolean.FALSE;
     private Boolean leverageAssigned = Boolean.FALSE;
     private Boolean feeRatesSynced = Boolean.FALSE;
     private Boolean detectionObserved = Boolean.FALSE;
@@ -353,7 +397,6 @@ public final class Trail implements AutoCloseable {
         start(party);
         if (Objects.equals(party, Party.TRADING_CORE)) {
             projectionsSynced = Boolean.FALSE;
-            riskAppetiteSet = Boolean.FALSE;
             leverageAssigned = Boolean.FALSE;
             feeRatesSynced = Boolean.FALSE;
             detectionObserved = Boolean.FALSE;
@@ -385,7 +428,6 @@ public final class Trail implements AutoCloseable {
         exchange.scope(ACCESS_KEY, accessKey);
         exchangeServesAccount();
         projectionsSynced = Boolean.FALSE;
-        riskAppetiteSet = Boolean.FALSE;
         leverageAssigned = Boolean.FALSE;
         feeRatesSynced = Boolean.FALSE;
         detectionObserved = Boolean.FALSE;
@@ -535,11 +577,32 @@ public final class Trail implements AutoCloseable {
         }
     }
 
-    /** Чисел риск-аппетита у ядра нет: тем же способом, что {@link #withoutProjections()}. */
+    /**
+     * Чисел риск-аппетита у ядра нет: ядро поднято заново с пустыми ключами
+     * на своей базе — так выглядит окружение, для которого держатель чисел не
+     * назвал.
+     */
     public void withoutRiskAppetite() {
-        if (isTrue(riskAppetiteSet)) {
-            renew(Party.TRADING_CORE);
+        Map<String, String> empty = new HashMap<>();
+        RISK_APPETITE.keySet().forEach(key -> empty.put(key, ""));
+        riskAppetiteIs(empty);
+    }
+
+    /**
+     * Ядро поднято заново на своей базе с названными числами риск-аппетита
+     * поверх чисел тропы; ключи, которых кейс не назвал, — числа тропы.
+     *
+     * @param overrides ключи чисел ({@link #RISK_APPETITE}) и их значения
+     */
+    public void riskAppetiteIs(Map<String, String> overrides) {
+        Map<String, String> wanted = new HashMap<>(RISK_APPETITE);
+        wanted.putAll(overrides);
+        Map<String, String> current = side(Party.TRADING_CORE).settings();
+        if (wanted.entrySet().stream()
+                .allMatch(entry -> Objects.equals(entry.getValue(), current.get(entry.getKey())))) {
+            return;
         }
+        restartWith(Party.TRADING_CORE, overrides);
     }
 
     /**
@@ -566,23 +629,13 @@ public final class Trail implements AutoCloseable {
         projectionsSynced = Boolean.TRUE;
     }
 
-    /** Числа риск-аппетита тенанта проставлены поверхностью ядра. */
+    /**
+     * Ядро держит числа риск-аппетита тропы: кейс, поднявший его с иными
+     * либо пустыми, возвращает подъёмные. Числа одни на окружение, поэтому
+     * смена тенанта или счёта ходов их не снимает.
+     */
     public void riskAppetiteSet() {
-        if (isTrue(riskAppetiteSet)) {
-            return;
-        }
-        Answer answer = call(Party.TRADING_CORE, "PUT", CORE + "/risk-appetites/" + tenant, null, """
-                {
-                  "globalSimultaneousRiskPerDealPercent": 5,
-                  "globalCatastrophicRiskPerDealMultiplier": 100,
-                  "globalConsecutiveLossLimit": 4
-                }
-                """);
-        if (answer.status() != 200) {
-            throw new IllegalStateException("Предусловие не поставлено: числа риск-аппетита — "
-                    + answer.status() + " " + answer.body());
-        }
-        riskAppetiteSet = Boolean.TRUE;
+        riskAppetiteIs(Map.of());
     }
 
     /**
@@ -1603,6 +1656,7 @@ public final class Trail implements AutoCloseable {
                 // возраста наблюдения длиннее жизни пары, иначе вход закрывал
                 // бы не стык, а время прогона класса.
                 values.put("entry-scanner.observation-max-age", OBSERVATION_MAX_AGE);
+                values.putAll(RISK_APPETITE);
             }
             case CONNECTOR -> {
                 values.putAll(vault());

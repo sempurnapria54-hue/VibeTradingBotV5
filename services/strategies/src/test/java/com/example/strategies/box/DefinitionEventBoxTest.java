@@ -260,8 +260,8 @@ class DefinitionEventBoxTest extends SharedStrategiesBox {
         peer.answers(PEER_PAIR_CHECKS, Feed.pairCheck(Boolean.TRUE, Boolean.FALSE, Boolean.TRUE));
         rejected.add(moveTo(unresolvable, TENANT, "ACTIVE"));
         peerResolvesEverything();
-        peer.answers(PEER_RISK_APPETITES + "/" + TENANT,
-                Feed.riskAppetite(TENANT, GLOBAL_SIMULTANEOUS_PERCENT, null));
+        peer.answers(PEER_RISK_APPETITE,
+                Feed.riskAppetite(GLOBAL_SIMULTANEOUS_PERCENT, GLOBAL_CUMULATIVE_MULTIPLIER, null));
         rejected.add(moveTo(withoutNumbers, TENANT, "ACTIVE"));
         peerResolvesEverything();
         peer.answers(PEER_PAIR_CHECKS, 503, "{}");

@@ -1,7 +1,6 @@
 package com.example.tradingcore.unit.safety;
 
 import static com.example.tradingcore.unit.safety.SafetyFixture.ACCOUNT_ID;
-import static com.example.tradingcore.unit.safety.SafetyFixture.TENANT_ID;
 import static com.example.tradingcore.unit.safety.SafetyFixture.account;
 import static com.example.tradingcore.unit.safety.SafetyFixture.deal;
 import static com.example.tradingcore.unit.safety.SafetyFixture.position;
@@ -16,15 +15,14 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.domain.command.DealContext;
+import com.example.tradingcore.domain.model.RiskAppetite;
 import com.example.tradingcore.domain.safety.LossStreakCounter;
+import com.example.tradingcore.domain.service.RiskAppetiteService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,8 +47,7 @@ class LossStreakCounterTest {
     private static final Integer LIMIT = 3;
 
     private final ExchangeAccountDataService accounts = mock(ExchangeAccountDataService.class);
-    private final TenantRiskAppetiteDataService appetites =
-            mock(TenantRiskAppetiteDataService.class);
+    private final RiskAppetiteService appetites = mock(RiskAppetiteService.class);
 
     private LossStreakCounter counter;
 
@@ -60,10 +57,9 @@ class LossStreakCounterTest {
         limit(LIMIT);
     }
 
+    /** Принятый ядром предел серии; пусто — не принят. */
     private void limit(Integer value) {
-        Tenant tenant = new Tenant();
-        tenant.setGlobalConsecutiveLossLimit(value);
-        when(appetites.findByTenantInternalId(TENANT_ID)).thenReturn(Optional.of(tenant));
+        when(appetites.getAccepted()).thenReturn(RiskAppetite.builder().globalConsecutiveLossLimit(value).build());
     }
 
     private DealContext context(BigDecimal resultProfit, Boolean graphComplete,
@@ -194,18 +190,18 @@ class LossStreakCounterTest {
 
     /** Провизорное значение не подставляется. */
     @Test
-    @DisplayName("U14.10 — порог у тенанта не назначен: предел не достигнут")
+    @DisplayName("U14.10 — порог не принят: предел не достигнут")
     void u14_10_anUnsetLimitNeverTriggers() {
         limit(null);
 
         assertThat(counter.applyTerminal(lossContext(10))).isFalse();
     }
 
-    /** Строки риск-аппетита нет вовсе — тот же исход. */
+    /** Ни одно число риск-аппетита не принято — тот же исход. */
     @Test
-    @DisplayName("U14.11 — строки риск-аппетита у тенанта нет вовсе: тот же исход")
-    void u14_11_anAbsentAppetiteRowNeverTriggers() {
-        when(appetites.findByTenantInternalId(TENANT_ID)).thenReturn(Optional.empty());
+    @DisplayName("U14.11 — ни одно число риск-аппетита не принято: тот же исход")
+    void u14_11_anEmptyAcceptedAppetiteNeverTriggers() {
+        when(appetites.getAccepted()).thenReturn(RiskAppetite.builder().build());
 
         assertThat(counter.applyTerminal(lossContext(10))).isFalse();
     }

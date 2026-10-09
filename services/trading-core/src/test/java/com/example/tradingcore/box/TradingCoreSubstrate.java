@@ -1,6 +1,7 @@
 package com.example.tradingcore.box;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.kafka.KafkaContainer;
@@ -156,11 +157,27 @@ final class TradingCoreSubstrate {
     /** Ключ пола допуска сверки: его правит вторая половина клетки {@code B13.7}. */
     static final String TOLERANCE_FLOOR_KEY = "pnl-reconciliation.floor";
 
-    /** Ключ окна выборки контура у прохода проактивной детекции. */
-    static final String CONTOUR_WINDOW_KEY = "anomaly-job.contour-window";
+    /** Ключ размера страницы обхода контура у прохода проактивной детекции. */
+    static final String CONTOUR_PAGE_SIZE_KEY = "anomaly-job.contour-page-size";
 
     /** Ключ адреса брокера: им перекрывается тропа публикации. */
     static final String BROKER_ADDRESS_KEY = "broker.bootstrap-servers";
+
+    /** Ключ предела серии убыточных закрытий — оси окружения, принимаемой ядром при старте. */
+    static final String LOSS_LIMIT_KEY = "risk-appetite.global-consecutive-loss-limit";
+
+    /**
+     * Ключи шести чисел риск-аппетита в порядке оси окружения: процент сделки,
+     * процент счёта, процент тенанта, предел кумулятивного множителя, предел
+     * плеча, предел серии.
+     */
+    static final List<String> RISK_APPETITE_KEYS = List.of(
+            "risk-appetite.global-simultaneous-risk-per-deal-percent",
+            "risk-appetite.global-simultaneous-risk-per-account-percent",
+            "risk-appetite.global-simultaneous-risk-per-tenant-percent",
+            "risk-appetite.global-cumulative-risk-per-deal-multiplier",
+            "risk-appetite.global-max-leverage",
+            LOSS_LIMIT_KEY);
 
     /** Выражение такта, до которого прогон не доживает: тик подаёт кейс. */
     static final String NEVER = "0 0 0 1 1 *";
@@ -249,6 +266,31 @@ final class TradingCoreSubstrate {
         values.put("neighbours.market-data.base-url", PeerStub.marketData().baseUrl());
         values.put(BROKER_ADDRESS_KEY, BROKER.getBootstrapServers());
         values.putAll(silentSchedule());
+        values.putAll(riskAppetite());
+        return values;
+    }
+
+    /**
+     * Числа риск-аппетита ящика — оси окружения, а не операция поверхности:
+     * ядро принимает их при старте контекста. Процент сделки пять, счёта
+     * десять, тенанта тридцать, предел кумулятивного множителя два, предел
+     * плеча десять — не ниже рабочего плеча пары, которое назначают кейсы, —
+     * предел серии четыре. Цепочка процентов {@code сделка ≤ счёт ≤ тенант}
+     * соблюдена, и приём принимает все шесть.
+     */
+    static Map<String, String> riskAppetite() {
+        List<String> numbers = List.of("5", "10", "30", "2", "10", "4");
+        Map<String, String> values = new LinkedHashMap<>();
+        for (int index = 0; index < RISK_APPETITE_KEYS.size(); index++) {
+            values.put(RISK_APPETITE_KEYS.get(index), numbers.get(index));
+        }
+        return values;
+    }
+
+    /** Те же оси пустыми: окружение, для которого держатель чисел не назвал. */
+    static Map<String, String> emptyRiskAppetite() {
+        Map<String, String> values = new LinkedHashMap<>();
+        RISK_APPETITE_KEYS.forEach(key -> values.put(key, ""));
         return values;
     }
 

@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * Группа {@code B5} — ступени защиты: автоматика, каскад, снятие риска.
@@ -47,8 +49,20 @@ import org.junit.jupiter.api.Test;
  * <p><b>Сделка радиуса ставится тиком отбора входа</b>
  * ({@link #openActiveDeal}): каскаду нужна активная сделка счёта, и
  * наблюдается он её статусом и причиной остановки.
+ *
+ * <p><b>Контекст у группы свой, и вход у него один — предел серии
+ * убыточных закрытий.</b> Предел есть число риск-аппетита, ось окружения,
+ * которую ядро принимает при старте (docs/rules/risk-policy.md), — клетке
+ * его не назначить операцией. Клетки о серии ({@code B5.11}, {@code B5.12})
+ * доводят счёт до ступени двумя убытками, поэтому предел группы — два;
+ * прочие клетки закрывают не больше одной убыточной сделки и предела не
+ * достигают. Своя группа потребителя и своя тема — довод у шапки
+ * {@link TradingCoreSubstrate}.
  */
-class DealSafetyRungBoxTest extends SharedLiveDealBox {
+class DealSafetyRungBoxTest extends LiveDealBox {
+
+    /** Имя одиночки: им названы и её группа потребителя, и её тема. */
+    private static final String NAME = "box-safety-rung";
 
     /** Причина снятия, которой ступень метит снимаемые сущности. */
     private static final String KILL_SWITCH = "KILL_SWITCH";
@@ -81,7 +95,7 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
     /** Код отчёта расхождения сверки результата сделки. */
     private static final String RECONCILIATION_MISMATCH = "PNL_RECONCILIATION_MISMATCH";
 
-    /** Предел серии убыточных закрытий, назначаемый клетками о серии. */
+    /** Предел серии убыточных закрытий контекста группы. */
     private static final String STREAK_LIMIT = "2";
 
     /** Код отчёта о достигнутом пределе серии. */
@@ -131,6 +145,17 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
 
     /** Причина пометки ноги, чей статус площадки не разобран. */
     private static final String UNKNOWN_EXTERNAL_STATUS = "UNKNOWN_EXTERNAL_STATUS";
+
+    @DynamicPropertySource
+    static void substrate(DynamicPropertyRegistry registry) {
+        TradingCoreSubstrate.registerOwn(registry, NAME, Map.of(TradingCoreSubstrate.LOSS_LIMIT_KEY, STREAK_LIMIT));
+    }
+
+    /** Своя тема владельца определений — довод у шапки субстрата. */
+    @Override
+    protected String strategyTopic() {
+        return TradingCoreSubstrate.ownStrategyTopic(NAME);
+    }
 
     @Test
     @DisplayName("B5.1 — порядок полной реакции: статус, отчёт, снятие риска, терминал отчёта, каскад")
@@ -319,8 +344,6 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
     @Test
     @DisplayName("B5.11 — серия убыточных закрытий доводит счёт до мягкой ступени")
     void theLosingStreakBringsTheAccountToTheSoftRung() {
-        consecutiveLossLimit = STREAK_LIMIT;
-
         closeLiveDealWith("S-STREAK-1", LOSS);
         assertThat(accountRung()).isEqualTo(NO_RUNG);
         // Прибыльное закрытие до предела счётчик обнуляет: следующий убыток
@@ -357,7 +380,6 @@ class DealSafetyRungBoxTest extends SharedLiveDealBox {
     @Test
     @DisplayName("B5.12 — снятие ступени счётчик серии не обнуляет")
     void clearingTheRungDoesNotResetTheStreak() {
-        consecutiveLossLimit = STREAK_LIMIT;
         closeLiveDealWith("S-CLEAR-1", LOSS);
         closeLiveDealWith("S-CLEAR-2", LOSS);
         assertThat(accountRung()).isEqualTo(HOLD);

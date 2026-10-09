@@ -2,6 +2,7 @@ package com.example.tradingcore.box;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -9,7 +10,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Группа {@code B11} — поверхность чтения и числа риск-аппетита.
+ * Группа {@code B11} — поверхность чтения, принятые числа риск-аппетита и
+ * плечо пары.
  *
  * <p><b>Предмет группы — ВЫЗОВ, и выход его есть ТЕЛО ответа.</b> Поэтому
  * клетки читают {@link Answer#body()} дословно, а не только разобранный
@@ -24,7 +26,8 @@ import org.junit.jupiter.api.Test;
  * входа (группа {@code B1}); до неё писателя сделки ящик не имеет вовсе,
  * и область такой записи объявлена у {@link Rows#put}. Все прочие
  * предусловия группы ставятся тропой ящика: проекции — тиком синка,
- * ступени — ручной поверхностью остановки, числа — назначением.
+ * ступени — ручной поверхностью остановки; числа риск-аппетита — осями
+ * конфигурации контекста ({@link TradingCoreSubstrate#riskAppetite}).
  *
  * <p><b>Окно чтения пинится ЧИСЛОМ, потому что кейс о нём и есть.</b>
  * Дом величины — {@code TradingSurfaceService.DEAL_WINDOW}; снаружи она
@@ -158,75 +161,44 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
         assertThat(answer.body()).doesNotContain("\"id\":");
     }
 
+    /**
+     * Числа риск-аппетита — оси окружения, принятые ядром при старте
+     * (docs/rules/risk-policy.md, правило о числах риск-аппетита):
+     * поверхность их только отдаёт, одни на всех тенантов окружения. Прежние
+     * клетки о назначении чисел снимком намерения, о строке тенанта и о
+     * валидации тела назначения сняты вместе с операцией назначения.
+     */
     @Test
-    @DisplayName("B11.5 — числа риск-аппетита назначаются снимком намерения целиком")
-    void assigningTheRiskAppetiteErasesEveryFieldTheBodyDidNotCarry() {
-        provisionAccounts(ACCOUNT);
-        assertThat(put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("1.5", "3", "4")).status())
-                .isEqualTo(200);
+    @DisplayName("Принятые числа риск-аппетита отдаются все шесть, без тенанта в пути и в теле")
+    void theAcceptedRiskAppetiteIsReadWithAllSixNumbersAndNoTenant() {
+        Answer read = get(RISK_APPETITE);
 
-        Answer answer = put(RISK_APPETITES + "/" + TENANT, """
-                {"globalSimultaneousRiskPerDealPercent": 2, "globalConsecutiveLossLimit": 5}
-                """);
-
-        assertThat(answer.status()).isEqualTo(200);
-        // Непереданное поле СТЁРТО: тело есть снимок намерения держателя
-        // целиком, и «не прислал» не может значить «оставь как было» —
-        // иначе оно стало бы неотличимо от «снял»
-        // (docs/rules/risk-policy.md §«Числа назначает держатель; пустое
-        // место — отказ»).
-        assertThat(answer.asObject().get("globalCatastrophicRiskPerDealMultiplier")).isNull();
-        Answer read = get(RISK_APPETITES + "/" + TENANT);
         assertThat(read.status()).isEqualTo(200);
-        assertThat(read.asObject().get("globalCatastrophicRiskPerDealMultiplier")).isNull();
-        assertThat(read.asObject().get("globalConsecutiveLossLimit")).isEqualTo(5);
-        assertThat(read.asObject().get("tenantInternalId")).isEqualTo(TENANT);
-        assertThat(rows.row("tenant_risk_appetites", "tenant_internal_id", TENANT)
-                .get("global_catastrophic_risk_per_deal_multiplier")).isNull();
+        Map<String, Object> body = read.asObject();
+        assertThat(decimal(body.get("globalSimultaneousRiskPerDealPercent"))).isEqualByComparingTo("5");
+        assertThat(decimal(body.get("globalSimultaneousRiskPerAccountPercent"))).isEqualByComparingTo("10");
+        assertThat(decimal(body.get("globalSimultaneousRiskPerTenantPercent"))).isEqualByComparingTo("30");
+        assertThat(decimal(body.get("globalCumulativeRiskPerDealMultiplier"))).isEqualByComparingTo("2");
+        assertThat(decimal(body.get("globalMaxLeverage"))).isEqualByComparingTo("10");
+        assertThat(decimal(body.get("globalConsecutiveLossLimit"))).isEqualByComparingTo("4");
+        assertThat(read.body()).doesNotContain("tenant");
     }
 
     @Test
-    @DisplayName("B11.6 — отсутствие строки чисел отличается от пустых чисел")
-    void anAbsentRowOfNumbersIsNotTheSameAsARowOfEmptyNumbers() {
-        provisionAccounts(ACCOUNT);
+    @DisplayName("Плечо пары выше предела плеча конфигурации отвергается, строки не пишется")
+    void aLeverageAboveTheConfiguredLimitIsRefusedAndWritesNothing() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
 
-        Answer unknown = get(RISK_APPETITES + "/" + SECOND_TENANT);
-        Answer known = get(RISK_APPETITES + "/" + TENANT);
+        Answer above = put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT,
+                Bodies.pairSettings(WORKING_LEVERAGE + 1));
 
-        // Строки нет — ядро о тенанте не знает вовсе, и это негодный вход
-        // вызова, а не пустой ответ (docs/rules/absent-value-semantics.md).
-        assertThat(unknown.carriesErrorDto()).isTrue();
-        assertThat(unknown.errorCode()).isEqualTo(INVALID_REQUEST);
-        assertThat(unknown.status()).isEqualTo(400);
-        // Строка есть, числа пусты — назначения не было, и ответ об этом
-        // говорит: пустота есть отказ risk-creating действия, а не ноль.
-        assertThat(known.status()).isEqualTo(200);
-        assertThat(known.asObject().get("globalSimultaneousRiskPerDealPercent")).isNull();
-        assertThat(known.asObject().get("globalCatastrophicRiskPerDealMultiplier")).isNull();
-        assertThat(known.asObject().get("globalConsecutiveLossLimit")).isNull();
-    }
-
-    @Test
-    @DisplayName("B11.7 — негодное тело назначения чисел отвергается валидацией")
-    void aBodyOutsideTheDeclaredBoundsIsRefusedAndChangesNothing() {
-        provisionAccounts(ACCOUNT);
-        put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("1.5", "3", "4"));
-
-        // Ноль области определения процента не принадлежит: граница
-        // объявлена самим полем (@DecimalMin, inclusive = false).
-        Answer answer = put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("0", "3", "4"));
-
-        // Число пишет КОНТЕЙНЕР — нарушено объявленное ограничение поля, и
-        // дом называет его тем же контрактом.
-        assertThat(answer.status()).isEqualTo(400);
-        // Тело — единый error-DTO: отказ контейнера несёт его, как всякий
-        // отказ поверхности.
-        assertThat(answer.carriesErrorDto()).isTrue();
-        // Числа в базе не изменились: отказ дошёл до записи.
-        Map<String, Object> row = rows.row("tenant_risk_appetites", "tenant_internal_id", TENANT);
-        assertThat(String.valueOf(row.get("global_simultaneous_risk_per_deal_percent")))
-                .startsWith("1.5");
-        assertThat(row.get("global_consecutive_loss_limit")).isEqualTo(4);
+        // Предел плеча ящика — десять, рабочее плечо кейсов ровно на нём;
+        // назначение выше предела — невыполненное предусловие операции,
+        // то есть негодный вход вызова (docs/rules/trading-constraints.md).
+        assertThat(above.status()).isEqualTo(400);
+        assertThat(above.carriesErrorDto()).isTrue();
+        assertThat(above.errorCode()).isEqualTo(INVALID_REQUEST);
+        assertThat(rows.count("account_instrument_states")).isZero();
     }
 
     @Test
@@ -280,7 +252,6 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
         Long deal = insertActiveDeal("D1");
         insertTranche("TR1", deal, 1);
         post(HALTS, Bodies.halt("SOFT", ACCOUNT, INSTRUMENT));
-        put(RISK_APPETITES + "/" + TENANT, Bodies.riskAppetite("1.5", "3", "4"));
         connector.forgetRequests();
         Map<String, Long> before = rows.countsByTable();
 
@@ -442,13 +413,18 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
                 body.get("instrumentFound"));
     }
 
+    /** Число тела ответа: разбор отдаёт его своим типом, сравнение — по величине. */
+    private static BigDecimal decimal(Object value) {
+        return new BigDecimal(String.valueOf(value));
+    }
+
     /** Все читающие точки поверхности подряд, в объявленном порядке. */
     private List<Answer> readEveryPoint() {
         return List.of(
                 get(DEALS + "?exchangeAccountInternalId=" + ACCOUNT),
                 get(DEALS + "/D1"),
                 get(SAFETY_STATES + "/" + ACCOUNT),
-                get(RISK_APPETITES + "/" + TENANT),
+                get(RISK_APPETITE),
                 pairCheck(TENANT, ACCOUNT, INSTRUMENT));
     }
 }

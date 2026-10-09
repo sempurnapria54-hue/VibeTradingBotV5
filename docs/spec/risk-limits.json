@@ -24,12 +24,15 @@
     "limits.riskPerActionPercent": "StrategyDetail.riskPerActionPercent, проценты",
     "limits.cumulativeRiskPerDealMultiplier": "StrategyDetail.cumulativeRiskPerDealMultiplier (K)",
     "limits.strategySimultaneousRiskPerDealPercent": "StrategyDetail.strategySimultaneousRiskPerDealPercent, проценты",
-    "limits.globalSimultaneousRiskPerDealPercent": "globalSimultaneousRiskPerDealPercent — максимальный риск на сделку, проценты; умолчания нет",
-    "limits.strategyCatastrophicRiskPerDealMultiplier": "StrategyDetail.strategyCatastrophicRiskPerDealMultiplier — множитель катастрофического потолка; умолчания нет",
+    "limits.globalSimultaneousRiskPerDealPercent": "globalSimultaneousRiskPerDealPercent — потолок одновременного риска сделки, проценты базы; число риск-аппетита — ось окружения, принятая ядром при старте (docs/rules/risk-policy.md); умолчания нет",
+    "limits.globalSimultaneousRiskPerAccountPercent": "globalSimultaneousRiskPerAccountPercent — потолок живого риска биржевого счёта, проценты живой базы счёта; ось окружения, умолчания нет",
+    "limits.globalSimultaneousRiskPerTenantPercent": "globalSimultaneousRiskPerTenantPercent — потолок живого риска тенанта, проценты базы тенанта (tenantRiskBase); ось окружения, умолчания нет",
+    "limits.globalCumulativeRiskPerDealMultiplier": "globalCumulativeRiskPerDealMultiplier — предел множителя кумулятивного потолка: сделка за жизнь берёт не больше этого множителя процентов сделки; ось окружения, умолчания нет",
+    "limits.globalMaxLeverage": "globalMaxLeverage — предел плеча: правая часть потолка нотинала сделки в долях базы (брутто-плечо сделки к базе) и верхняя граница плеча пары; ось окружения, умолчания нет",
     "dealCollapsing": "сделка в окне сворачивания НА ТРОПЕ ПРЕКОНТРОЛЯ — её статус EXIT_PENDING. Ошибочное состояние в операнд не входит: risk-creating акт при deal.status = ERROR до преконтроля не доходит ни одной тропой (FSM траншей там не прогоняется, а на safety-, аварийных и восстановительных тропах преконтроль не вызывается), и обе половины окна закрыты разным — дом разведения docs/rules/exit-teardown-order.md. Операнд приходит контекстом прохода: преконтроль его не выводит",
     "actRiskCreating": "проверяемый акт создаёт риск: отправка входной заявки, добор объёма, замещение с увеличением. Определение — docs/rules/risk-policy.md",
     "actRisk": "риск акта: плановый риск ноги для risk-creating, 0 для risk-weakening; резолв — docs/spec/order-sizing.json, значение entryRiskAtStop",
-    "actNotional": "нотинал акта: плановый размер ноги × стоимость контракта × плановая цена входа для risk-creating, 0 для risk-weakening — новых контрактов такое действие не создаёт; резолв — CalculatedSize и CalculatedPrice проверяемого действия. Цена — плановая цена САМОГО акта и при живом эпизоде тоже: якорь эпизода (entryAnchor, его средняя цена) прайсит только налитые контракты — своим слагаемым livePositionNotional, — а контракты акта по ней налиться не могут. Одно значение читают оба потребителя — катастрофический потолок (withinDealNotional) и маржа акта (actRequiredMargin)",
+    "actNotional": "нотинал акта: плановый размер ноги × стоимость контракта × плановая цена входа для risk-creating, 0 для risk-weakening — новых контрактов такое действие не создаёт; резолв — CalculatedSize и CalculatedPrice проверяемого действия. Цена — плановая цена САМОГО акта и при живом эпизоде тоже: якорь эпизода (entryAnchor, его средняя цена) прайсит только налитые контракты — своим слагаемым livePositionNotional, — а контракты акта по ней налиться не могут. Одно значение читают оба потребителя — потолок нотинала сделки (withinDealNotional) и маржа акта (actRequiredMargin)",
     "unreflectedLegsNotional": "нотинал живых входных ног сделки, которых снимок средств счёта не отражает: площадка их не подтвердила либо подтвердила позже момента снимка; плановый размер × стоимость контракта × плановая цена входа. Нога, подтверждённая до момента снимка, в свободном остатке уже учтена",
     "pair.leverage": "рабочее плечо пары «счёт, инструмент» — AccountInstrumentState.leverage; пусто у акта, создающего риск, отвергается раньше кодом LEVERAGE_NOT_CONFIGURED (docs/rules/trading-constraints.md)",
     "balanceSnapshotFresh": "снимок средств счёта есть, и момент, на который площадка собрала сведения о счёте (BalanceContainer.externalUpdatedAt), позже рубежа «сейчас минус толерантность прохода» — тот же предикат и та же толерантность, по которым обработчик предвходовой проверки заказывает добычу (docs/components/TranchePrecheckHandler.md). Ложь — проверки средств счёта не меряются; акт, создающий риск, с таким снимком до преконтроля не доходит ни на какой стадии — его откладывают, — и ложь достаётся только действиям, риска не создающим (docs/components/RiskValidator.md, раздел проверок средств счёта)",
@@ -41,6 +44,10 @@
     "balanceSnapshotAfterTerminal": "снимок BalanceContainer сделан не раньше терминала сделки; false — снимок устарел относительно исхода",
     "riskBaseObservationCandidate": "доступный остаток строки расчётной валюты в приземляемом снимке средств — операнд первого наблюдения базы; пусто — строки расчётной валюты в снимке нет",
     "exchangeRiskBase": "ExchangeAccount.riskBase на момент проверки — живая база счёта, следующая за свободным остатком в обе стороны (величина riskBaseAfter ниже). Делитель первого действия сделки, у которого снимка ещё нет; пуст ⇒ BALANCE_INVALID (docs/components/RiskValidator.md)",
+    "tenantRiskBase": "база тенанта — сумма ExchangeAccount.riskBase его счетов в статусе ACTIVE с наблюдённой базой и той же riskBaseCurrency, что у счёта проверяемой сделки; собирает преконтроль (docs/components/RiskValidator.md). Сложения разных валют нет: уровень тенанта считается в валюте проверяемого счёта",
+    "liveRiskBeforeAct": "живой риск проверяемой сделки ДО акта: та же форма, что у величины liveRiskNow этой спеки, на доактном состоянии — нулевой акт и действующий уровень (liveStopPrice). Пусто — не измерен (неполный граф, живая экспозиция без действующего уровня)",
+    "accountPeersLiveRisk": "сумма liveRiskNow ПРОЧИХ живых сделок того же счёта при нулевом акте и действующей защите (форма — величина liveRiskNow этой спеки); пусто — у хотя бы одной из них живой риск не измерен. Сегодня ноль по построению: контур держит одну активную сделку на счёт (docs/rules/trading-constraints.md)",
+    "tenantPeersLiveRisk": "сумма liveRiskNow ПРОЧИХ живых сделок тенанта на счетах, вошедших в tenantRiskBase, при нулевом акте и действующей защите; пусто — у хотя бы одной из них живой риск не измерен",
     "instrumentSafetyRungStanding": "инструмент действия стоит в safety-ступени с блок-сетом — Instrument.safetyRung = ENTRY_BLOCKED либо TRADE_BLOCKED (энфорсмент ступени — docs/rules/instrument-hold.md). Рабочее состояние и онбординговые статусы значения не дают",
     "actProtective": "проверяемый акт — защитное действие: создаёт, переносит либо замещает уровень остановки убытка. Резолв — docs/spec/strategy-reference.json, величина isProtectiveAction: селектор читает тип условия, который действие ставит САМО, поэтому постановка уровня фиксации прибыли защитным действием не является. Снятие защиты этим операндом не выражается — у снимающего тип условия есть копия типа цели (там же), и у снятия свой операнд actRemovesProtection",
     "actRemovesProtection": "проверяемый акт — снятие защитной заявки при живой экспозиции, своим вызовом преконтроля (docs/rules/risk-validator-scope.md). Защитность снимаемого читается у цели, а не у снимающего действия (docs/rules/live-risk-protection.md). Teardown-отмена, аварийная дочистка и kill-switch преконтроля не проходят вовсе и значения не дают",
@@ -123,9 +130,9 @@
       "expr": "if(graphComplete, liveLegsNotional + livePositionNotional, null)"
     },
     {
-      "name": "catastrophicLossCeiling",
-      "note": "Катастрофический потолок потери сделки: максимальный риск на сделку, растянутый множителем стратегии. Он же кэп суммарного номинала — худший мыслимый ход принят равным 100 %.",
-      "expr": "limits.globalSimultaneousRiskPerDealPercent / 100 * base * limits.strategyCatastrophicRiskPerDealMultiplier"
+      "name": "dealNotionalCeiling",
+      "note": "Потолок нотинала сделки: предел плеча, помноженный на базу, — брутто-плечо сделки к базе не выше предела плеча конфигурации. Худшего убытка он не утверждает: худший убыток сделки — её стоповый риск, проскок за стопом — мера под наблюдением (docs/spec/stop-exit-slippage.json). Дом правила — docs/rules/risk-policy.md.",
+      "expr": "limits.globalMaxLeverage * base"
     },
     {
       "name": "baseOperandResolved",
@@ -134,7 +141,7 @@
     },
     {
       "name": "riskBaseAfter",
-      "note": "База счёта следует за свободным остатком расчётной валюты В ОБЕ СТОРОНЫ и автоматически: ни пола, ни потолка на ходу нет. Защиту от отыгрыша держат холды, предел серии убытков (docs/rules/loss-streak-halt.md) и катастрофический потолок, а не база. Внутри сделки база заморожена снимком первого сайзинга (Deal.plannedRiskEquityBase) — другой механизм с другим предметом. Дом правила — docs/rules/risk-policy.md.",
+      "note": "База счёта следует за свободным остатком расчётной валюты В ОБЕ СТОРОНЫ и автоматически: ни пола, ни потолка на ходу нет. Защиту от отыгрыша держат холды, предел серии убытков (docs/rules/loss-streak-halt.md) и потолок нотинала сделки, а не база. Внутри сделки база заморожена снимком первого сайзинга (Deal.plannedRiskEquityBase) — другой механизм с другим предметом. Дом правила — docs/rules/risk-policy.md.",
       "expr": "if(baseOperandResolved, freeBalanceAtFinalization, riskBaseBefore)"
     },
     {
@@ -200,7 +207,7 @@
     {
       "name": "liveRiskBlockReaction",
       "note": "Род реакции карты на отказ преконтроля при живом риске транша, покодово: код из перечня карв-аута — SKIP_ACTION (действие не исполняется, сделка остаётся в статусе и доживает под своей защитой), всякий иной — MOVE_DEAL_TO_ERROR. Отказ по неполноте графа уводит в ERROR на любой стадии и в перечне не стоит. Дом членства — таблица карв-аута docs/processes/risk-evaluation.md; эта величина — её исполнимая форма, и популяция ниже выводит своих членов из той таблицы и из перечня кодов, так что расхождение формы с таблицей роняет прогон.",
-      "expr": "if(in(blockingCode, 'SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET', 'RISK_PER_DEAL_CUMULATIVE_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED', 'DEAL_NOTIONAL_EXCEEDED', 'STOP_DISTANCE_BELOW_FLOOR', 'STOP_LOSS_INVALID_SIDE', 'STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION', 'STOP_LOSS_BEYOND_MARK_PRICE', 'PROTECTION_COVERAGE_REDUCED', 'LOSS_LIMIT_NOT_CONFIGURED', 'RISK_APPETITE_NOT_CONFIGURED', 'LEVERAGE_NOT_CONFIGURED', 'BALANCE_NOT_ENOUGH', 'RISK_CREATING_UNDER_COLLAPSE', 'INSTRUMENT_NOT_LIVE', 'INSTRUMENT_SAFETY_HOLD'), 'SKIP_ACTION', 'MOVE_DEAL_TO_ERROR')"
+      "expr": "if(in(blockingCode, 'SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET', 'RISK_PER_DEAL_CUMULATIVE_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED', 'RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED', 'RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED', 'RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED', 'DEAL_NOTIONAL_EXCEEDED', 'STOP_DISTANCE_BELOW_FLOOR', 'STOP_LOSS_INVALID_SIDE', 'STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION', 'STOP_LOSS_BEYOND_MARK_PRICE', 'PROTECTION_COVERAGE_REDUCED', 'LOSS_LIMIT_NOT_CONFIGURED', 'RISK_APPETITE_NOT_CONFIGURED', 'LEVERAGE_NOT_CONFIGURED', 'BALANCE_NOT_ENOUGH', 'RISK_CREATING_UNDER_COLLAPSE', 'INSTRUMENT_NOT_LIVE', 'INSTRUMENT_SAFETY_HOLD'), 'SKIP_ACTION', 'MOVE_DEAL_TO_ERROR')"
     },
     {
       "name": "actWithinPerAction",
@@ -211,6 +218,11 @@
       "expr": "dealRiskTaken + actRisk <= limits.cumulativeRiskPerDealMultiplier * limits.riskPerActionPercent / 100 * base"
     },
     {
+      "name": "withinGlobalCumulative",
+      "note": "Глобальная редакция кумулятивного потолка рядом со стратегийной, как у одновременного: сделка за жизнь берёт не больше предела множителя, помноженного на процент сделки. Статически множитель стратегии сверяется с пределом на создании и активации (docs/rules/strategy-validation.md), а смена чисел активные определения не ревалидирует — без рантайм-редакции пониженный предел остался бы без энфорсера. Реджект — RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED.",
+      "expr": "dealRiskTaken + actRisk <= limits.globalCumulativeRiskPerDealMultiplier * limits.globalSimultaneousRiskPerDealPercent / 100 * base"
+    },
+    {
       "name": "withinStrategySimultaneous",
       "expr": "liveRiskNow + actRisk <= limits.strategySimultaneousRiskPerDealPercent / 100 * base"
     },
@@ -219,9 +231,24 @@
       "expr": "liveRiskNow + actRisk <= limits.globalSimultaneousRiskPerDealPercent / 100 * base"
     },
     {
+      "name": "ownLiveRiskRaised",
+      "note": "Акт повышает живой риск своей сделки: живой риск после акта вместе с риском акта больше доактного. Доактный не измерен — повышение не исключено, и ответ «да». Различитель применимости потолков уровня (счёт, тенант): их операнд — чужие сделки, и акт, своего живого риска не повышающий, сумму уровня не ухудшает — блок его запирал бы постановку защиты этой сделки состоянием соседней. Гейт стои́т на измеренном приросте, а не на классе действия: ремодел защиты дальше от цены прирост даёт и проверяется. Дом правила — docs/rules/risk-policy.md.",
+      "expr": "isNull(?liveRiskBeforeAct) || liveRiskNow + actRisk > liveRiskBeforeAct"
+    },
+    {
+      "name": "withinAccountSimultaneous",
+      "note": "Потолок живого риска биржевого счёта: живой риск прочих живых сделок счёта, живой риск этой сделки после акта и риск акта — не выше процента счёта от ЖИВОЙ базы счёта (не снимка сделки: уровень мерит капитал счёта). Проверяется, когда акт повышает живой риск своей сделки; иначе истинен тривиально. Сумма прочих не измерена — ПУСТО, и акт отвергается тем же кодом: неизмеренный уровень выполненным не читается. Реджект — RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED.",
+      "expr": "if(!ownLiveRiskRaised, true, if(isNull(?accountPeersLiveRisk), null, accountPeersLiveRisk + liveRiskNow + actRisk <= limits.globalSimultaneousRiskPerAccountPercent / 100 * exchangeRiskBase))"
+    },
+    {
+      "name": "withinTenantSimultaneous",
+      "note": "Потолок живого риска тенанта: живой риск прочих живых сделок тенанта, живой риск этой сделки после акта и риск акта — не выше процента тенанта от базы тенанта (tenantRiskBase). Применимость и отказ на неизмеренном — те же, что у потолка счёта. Реджект — RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED.",
+      "expr": "if(!ownLiveRiskRaised, true, if(isNull(?tenantPeersLiveRisk) || isNull(?tenantRiskBase), null, tenantPeersLiveRisk + liveRiskNow + actRisk <= limits.globalSimultaneousRiskPerTenantPercent / 100 * tenantRiskBase))"
+    },
+    {
       "name": "withinDealNotional",
-      "note": "Слагаемое проверяемого акта обязательно: без него первый вход сравнивал бы с потолком ноль и проходил любым размером — потолок, заведённый против шокового хода, был бы инертен ровно там, где решается размер. Незаданное число риск-аппетита — множитель стратегии или максимальный риск на сделку — отказывает вычислением, а не пропускает действие.",
-      "expr": "dealNotional + actNotional <= catastrophicLossCeiling"
+      "note": "Слагаемое проверяемого акта обязательно: без него первый вход сравнивал бы с потолком ноль и проходил любым размером — потолок был бы инертен ровно там, где решается размер. Незаданный предел плеча отказывает вычислением, а не пропускает действие.",
+      "expr": "dealNotional + actNotional <= dealNotionalCeiling"
     },
     {
       "name": "legUnfilledContracts",
@@ -238,12 +265,12 @@
     },
     {
       "name": "postActContracts",
-      "note": "Размер позиции, которую сделка будет держать, когда нальются её живые ноги и проверяемый акт. Слагаемых три — те же, что у нотинала катастрофического потолка (dealNotional и actNotional), и по той же причине они не пересекаются. По этому размеру выбирается тир.",
+      "note": "Размер позиции, которую сделка будет держать, когда нальются её живые ноги и проверяемый акт. Слагаемых три — те же, что у потолка нотинала сделки (dealNotional и actNotional), и по той же причине они не пересекаются. По этому размеру выбирается тир.",
       "expr": "liveLegsContracts + if(hasLiveEpisode, position.externalSize, 0) + actContracts"
     },
     {
       "name": "postActNotional",
-      "note": "Нотинал той же позиции — левая сторона катастрофического неравенства (withinDealNotional); второй суммы не заводится. Пуст на неполном графе, как и dealNotional.",
+      "note": "Нотинал той же позиции — левая сторона неравенства потолка нотинала (withinDealNotional); второй суммы не заводится. Пуст на неполном графе, как и dealNotional.",
       "expr": "dealNotional + actNotional"
     },
     {
@@ -332,6 +359,24 @@
         {
           "member": [
             "RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED",
+            "SKIP_ACTION"
+          ]
+        },
+        {
+          "member": [
+            "RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED",
             "SKIP_ACTION"
           ]
         },
@@ -531,8 +576,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [
           {
@@ -580,8 +624,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [
           {
@@ -628,8 +671,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -668,8 +710,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [
           {
@@ -693,7 +734,7 @@
       }
     },
     {
-      "case": "все четыре потолка считаются от одной замороженной базы сделки",
+      "case": "все потолки сделки считаются от одной замороженной базы сделки",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -716,8 +757,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -760,8 +800,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -804,8 +843,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -848,8 +886,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -892,8 +929,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -936,8 +972,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -980,8 +1015,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1022,8 +1056,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1065,8 +1098,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1109,8 +1141,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1127,13 +1158,13 @@
       }
     },
     {
-      "case": "первый вход выше катастрофического потолка отвергается на создании: ни живых ног, ни эпизода, ни защиты ещё нет",
+      "case": "первый вход выше потолка нотинала отвергается на создании: размер поднят до минимального лота, ни живых ног, ни эпизода, ни защиты ещё нет",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
         "graphComplete": true,
         "actRisk": 92.955,
-        "actNotional": 10000,
+        "actNotional": 12000,
         "direction": "LONG",
         "deal": {
           "plannedRiskAmount": 0,
@@ -1151,7 +1182,7 @@
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 0.5,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalMaxLeverage": 1
         },
         "entryLegs": [],
         "entryAnchor": null,
@@ -1166,10 +1197,11 @@
         "livePositionRiskAtStop": 0,
         "liveRiskNow": 0,
         "dealNotional": 0,
-        "catastrophicLossCeiling": 5000,
+        "dealNotionalCeiling": 10000,
         "withinDealNotional": false,
         "withinStrategySimultaneous": true
-      }
+      },
+      "note": "Доля аллокации не выше ста процентов базы (docs/spec/strategy-reference.json), поэтому одиночный вход выходит за предел плеча не меньше единицы только подъёмом размера до минимального лота (docs/spec/order-sizing.json, величина entryWithinRiskBudget): у ветви подъёма верхней границы нет."
     },
     {
       "case": "первый вход ровно в потолок проходит границей — РАНТАЙМОМ; конфигурация с нулевым запасом до рантайма не доходит, её отвергает создание",
@@ -1196,7 +1228,7 @@
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalMaxLeverage": 1
         },
         "entryLegs": [],
         "entryAnchor": null,
@@ -1208,7 +1240,7 @@
       },
       "expect": {
         "dealNotional": 0,
-        "catastrophicLossCeiling": 10000,
+        "dealNotionalCeiling": 10000,
         "withinDealNotional": true
       }
     },
@@ -1237,7 +1269,7 @@
           "cumulativeRiskPerDealMultiplier": 20,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 300
+          "globalMaxLeverage": 3
         },
         "entryLegs": [
           {
@@ -1257,7 +1289,7 @@
       },
       "expect": {
         "dealNotional": 30000,
-        "catastrophicLossCeiling": 30000,
+        "dealNotionalCeiling": 30000,
         "withinDealNotional": false
       }
     },
@@ -1286,7 +1318,7 @@
           "cumulativeRiskPerDealMultiplier": 20,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 300
+          "globalMaxLeverage": 3
         },
         "entryLegs": [
           {
@@ -1308,7 +1340,7 @@
         "liveLegsNotional": 21000,
         "livePositionNotional": 9000,
         "dealNotional": 30000,
-        "catastrophicLossCeiling": 30000,
+        "dealNotionalCeiling": 30000,
         "withinDealNotional": true
       }
     },
@@ -1337,7 +1369,7 @@
           "cumulativeRiskPerDealMultiplier": 20,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 300
+          "globalMaxLeverage": 3
         },
         "entryLegs": [
           {
@@ -1387,7 +1419,7 @@
           "cumulativeRiskPerDealMultiplier": 20,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 300
+          "globalMaxLeverage": 3
         },
         "entryLegs": [
           {
@@ -1409,12 +1441,12 @@
         "liveLegsNotional": 21000,
         "livePositionNotional": 3000,
         "dealNotional": 24000,
-        "catastrophicLossCeiling": 30000,
+        "dealNotionalCeiling": 30000,
         "withinDealNotional": true
       }
     },
     {
-      "case": "веер живых ног при полной аллокации выходит за катастрофический потолок — рантайм-предел; статический запас такую конфигурацию отвергает раньше (docs/spec/strategy-reference.json)",
+      "case": "веер живых ног при полной аллокации выходит за потолок нотинала сделки — рантайм-предел; статический запас такую конфигурацию отвергает раньше (docs/spec/strategy-reference.json)",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -1438,7 +1470,7 @@
           "cumulativeRiskPerDealMultiplier": 20,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalMaxLeverage": 1
         },
         "entryLegs": [
           {
@@ -1460,12 +1492,12 @@
         "liveLegsNotional": 21000,
         "livePositionNotional": 9000,
         "dealNotional": 30000,
-        "catastrophicLossCeiling": 10000,
+        "dealNotionalCeiling": 10000,
         "withinDealNotional": false
       }
     },
     {
-      "case": "тот же веер при множителе, ровно покрывающем экспозицию, проходит границей",
+      "case": "тот же веер при пределе плеча, ровно покрывающем экспозицию, проходит границей",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -1489,7 +1521,7 @@
           "cumulativeRiskPerDealMultiplier": 20,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 300
+          "globalMaxLeverage": 3
         },
         "entryLegs": [
           {
@@ -1509,12 +1541,12 @@
       },
       "expect": {
         "dealNotional": 30000,
-        "catastrophicLossCeiling": 30000,
+        "dealNotionalCeiling": 30000,
         "withinDealNotional": true
       }
     },
     {
-      "case": "незаявленный множитель отказывает, а не пропускает действие",
+      "case": "незаданный предел плеча отказывает потолком нотинала, а не пропускает действие",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -1538,7 +1570,7 @@
           "cumulativeRiskPerDealMultiplier": 20,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": null
+          "globalMaxLeverage": null
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1549,8 +1581,8 @@
         "exchangeRiskBase": 10000
       },
       "expectRefusal": {
-        "catastrophicLossCeiling": "множитель стратегии не объявлен",
-        "withinDealNotional": "множитель стратегии не объявлен"
+        "dealNotionalCeiling": "предел плеча не задан",
+        "withinDealNotional": "предел плеча не задан"
       }
     },
     {
@@ -1578,7 +1610,7 @@
           "cumulativeRiskPerDealMultiplier": 20,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": null,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalCumulativeRiskPerDealMultiplier": 2
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1590,7 +1622,7 @@
       },
       "expectRefusal": {
         "withinGlobalSimultaneous": "максимальный риск на сделку не задан",
-        "withinDealNotional": "максимальный риск на сделку не задан"
+        "withinGlobalCumulative": "максимальный риск на сделку не задан"
       }
     },
     {
@@ -1617,8 +1649,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1658,8 +1689,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1674,8 +1704,8 @@
       }
     },
     {
-      "case": "ослабление защиты считается всеми четырьмя потолками: три проходят, катастрофическое отвергает — нотинал живого эпизода вырос проскоком входа выше одобренного преконтролем",
-      "note": "Конфигурация примера граничная: доля аллокации 100 при множителе 99 и глобальном потолке 1 % оставляет нулевой запас нотинала и создания при этих числах не проходит (docs/spec/strategy-reference.json, величина notionalHeadroomSatisfied). До рантайма такое состояние доходит тропой потолка, изменённого системой после приёма стратегии: стратегия принята, пока глобальный потолок тенанта держал запас (например 1.05 %), затем держатель снизил его до 1 %. Эталонная доля 95 на тех же числах до этого состояния проскоком не доходит: 31 контракт дают нотинал 9300, и превысить потолок 9900 можно лишь проскоком свыше 6 %. Механика неравенства: вход сайзится в 33 контракта (тесный стоп — связывает аллокация, docs/spec/order-sizing.json), его плановый риск 19.79505 укладывается в поактный бюджет 100, плановый нотинал 33 x 0.1 x 3000 = 9900 проходит катастрофический потолок 9900 равенством. Филл идёт по 3020 — проскок поднимает нотинал живого эпизода до 9966, и следующее действие, даже нулевое по риску и нотиналу, катастрофическим неравенством отвергается.",
+      "case": "ослабление защиты считается всеми потолками: стоповые проходят, потолок нотинала отвергает — нотинал живого эпизода вырос проскоком входа выше одобренного преконтролем",
+      "note": "Конфигурация примера граничная: доля аллокации 100 при пределе плеча 1 оставляет нулевой запас нотинала и создания при этих числах не проходит (docs/spec/strategy-reference.json, величина notionalHeadroomSatisfied). До рантайма такое состояние доходит тропой предела, изменённого системой после приёма стратегии: стратегия принята, пока предел плеча держал запас (например 1.05), затем держатель снизил его до 1. Механика неравенства: при базе 9900 вход сайзится в 33 контракта (тесный стоп — связывает аллокация, docs/spec/order-sizing.json), его плановый риск 19.79505 укладывается в поактный бюджет 99, плановый нотинал 33 x 0.1 x 3000 = 9900 проходит потолок нотинала 9900 равенством. Филл идёт по 3020 — проскок поднимает нотинал живого эпизода до 9966, и следующее действие, даже нулевое по риску и нотиналу, неравенством потолка нотинала отвергается.",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -1685,7 +1715,7 @@
         "direction": "LONG",
         "deal": {
           "plannedRiskAmount": 19.79505,
-          "plannedRiskEquityBase": 10000
+          "plannedRiskEquityBase": 9900
         },
         "hasLiveEpisode": true,
         "position": {
@@ -1699,7 +1729,7 @@
           "cumulativeRiskPerDealMultiplier": 2,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 99
+          "globalMaxLeverage": 1
         },
         "entryLegs": [
           {
@@ -1715,7 +1745,7 @@
         "actStopPrice": null,
         "liveStopPrice": 2997,
         "feeRate": 0.0005,
-        "exchangeRiskBase": 10000
+        "exchangeRiskBase": 9900
       },
       "expect": {
         "actWithinPerAction": true,
@@ -1723,7 +1753,7 @@
         "withinStrategySimultaneous": true,
         "withinGlobalSimultaneous": true,
         "dealNotional": 9966,
-        "catastrophicLossCeiling": 9900,
+        "dealNotionalCeiling": 9900,
         "withinDealNotional": false
       }
     },
@@ -1751,8 +1781,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -1769,7 +1798,7 @@
     },
     {
       "case": "нога сделки в контекст не попала: потолки, стоящие на графе, отказывают, а не разрешают",
-      "note": "Состояние достижимо: у сделки два веерных входа, второй транш в контекст прохода не попал, поэтому его нога невидима, а колонка Deal.plannedRiskAmount несёт прежние 100 — писатель четвёрки на этом же неполном графе её не переписывал (docs/spec/deal-context-load.json, plannedRiskWritten). Оба операнда занижены ровно на невидимую ногу, и по загруженному подмножеству все четыре неравенства прошли бы: 100 + 0 <= 100 у одновременного, 100 + 0 <= 300 у кумулятивного, 21000 + 0 <= 30000 у катастрофического. На полном графе вторая нога удваивает каждое левое слагаемое (200 против 100, 42000 против 30000), и те же три потолка отвергают действие. Направление ошибки неполноты РАЗРЕШАЮЩЕЕ, поэтому ответ подменяется отказом.",
+      "note": "Состояние достижимо: у сделки два веерных входа, второй транш в контекст прохода не попал, поэтому его нога невидима, а колонка Deal.plannedRiskAmount несёт прежние 100 — писатель четвёрки на этом же неполном графе её не переписывал (docs/spec/deal-context-load.json, plannedRiskWritten). Оба операнда занижены ровно на невидимую ногу, и по загруженному подмножеству все четыре неравенства прошли бы: 100 + 0 <= 100 у одновременного, 100 + 0 <= 300 у кумулятивного, 21000 + 0 <= 30000 у потолка нотинала. На полном графе вторая нога удваивает каждое левое слагаемое (200 против 100, 42000 против 30000), и те же три потолка отвергают действие. Направление ошибки неполноты РАЗРЕШАЮЩЕЕ, поэтому ответ подменяется отказом.",
       "state": {
         "dealCollapsing": false,
         "actRiskCreating": true,
@@ -1793,7 +1822,7 @@
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 300
+          "globalMaxLeverage": 3
         },
         "entryLegs": [
           {
@@ -1852,7 +1881,7 @@
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
           "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalMaxLeverage": 1
         },
         "entryLegs": [
           {
@@ -2600,8 +2629,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [
           {
@@ -2648,8 +2676,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [
           {
@@ -2697,8 +2724,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [
           {
@@ -2746,8 +2772,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -2785,8 +2810,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -2824,8 +2848,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -2864,8 +2887,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3001.125,
@@ -2906,8 +2928,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3001.125,
@@ -2948,8 +2969,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3001.125,
@@ -2994,8 +3014,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3001.125,
@@ -3034,8 +3053,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -3079,8 +3097,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -3123,8 +3140,7 @@
           "riskPerActionPercent": 1,
           "cumulativeRiskPerDealMultiplier": 3,
           "strategySimultaneousRiskPerDealPercent": 1,
-          "globalSimultaneousRiskPerDealPercent": 1,
-          "strategyCatastrophicRiskPerDealMultiplier": 100
+          "globalSimultaneousRiskPerDealPercent": 1
         },
         "entryLegs": [],
         "entryAnchor": 3000,
@@ -3778,6 +3794,405 @@
       },
       "expect": {
         "liveRiskBlockReaction": "MOVE_DEAL_TO_ERROR"
+      }
+    },
+    {
+      "case": "глобальный кумулятивный потолок отвергает добор, который стратегийный ещё пропускает: множитель стратегии принят при прежнем пределе, затем держатель понизил предел",
+      "note": "Достижимо тропой изменённого предела: стратегия с множителем 3 принята, пока предел окружения был 3, затем предел понижен до 2 — смена чисел активные определения не ревалидирует (docs/rules/strategy-validation.md). Взято 150, добор 60: 210 <= 3 x 1 % x 10000 = 300 стратегийно, 210 > 2 x 1 % x 10000 = 200 глобально.",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 60,
+        "actNotional": 0,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 150,
+          "plannedRiskEquityBase": 10000
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": null
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeRiskPerDealMultiplier": 3,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "globalCumulativeRiskPerDealMultiplier": 2
+        },
+        "entryLegs": [],
+        "entryAnchor": null,
+        "stopPrice": null,
+        "actStopPrice": null,
+        "liveStopPrice": null,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 10000
+      },
+      "expect": {
+        "dealRiskTaken": 150,
+        "withinCumulative": true,
+        "withinGlobalCumulative": false
+      }
+    },
+    {
+      "case": "тот же расклад с добором 40 укладывается в глобальный кумулятивный потолок",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 40,
+        "actNotional": 0,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 150,
+          "plannedRiskEquityBase": 10000
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": null
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "riskPerActionPercent": 1,
+          "cumulativeRiskPerDealMultiplier": 3,
+          "globalSimultaneousRiskPerDealPercent": 1,
+          "globalCumulativeRiskPerDealMultiplier": 2
+        },
+        "entryLegs": [],
+        "entryAnchor": null,
+        "stopPrice": null,
+        "actStopPrice": null,
+        "liveStopPrice": null,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 10000
+      },
+      "expect": {
+        "withinGlobalCumulative": true
+      }
+    },
+    {
+      "case": "потолок живого риска счёта отвергает акт, который его повышает сверх процента счёта от живой базы счёта",
+      "note": "Достижимо на одной сделке: у малой базы размер входа поднимается до минимального лота, и риск акта ветвью подъёма сверху не ограничен (docs/spec/order-sizing.json, величина entryWithinRiskBudget). На том же состоянии отказывают и потолки сделки — пример показывает предикат уровня, а не единственность отказа. Прочих живых сделок у счёта сегодня нет по построению контура.",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 15,
+        "actNotional": 1500,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 0,
+          "plannedRiskEquityBase": null
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": null
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "globalSimultaneousRiskPerAccountPercent": 10,
+          "globalSimultaneousRiskPerTenantPercent": 30
+        },
+        "entryLegs": [],
+        "entryAnchor": null,
+        "stopPrice": null,
+        "actStopPrice": null,
+        "liveStopPrice": null,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 100,
+        "liveRiskBeforeAct": 0,
+        "accountPeersLiveRisk": 0,
+        "tenantPeersLiveRisk": 0,
+        "tenantRiskBase": 100
+      },
+      "expect": {
+        "liveRiskNow": 0,
+        "ownLiveRiskRaised": true,
+        "withinAccountSimultaneous": false
+      }
+    },
+    {
+      "case": "акт с риском в пределах процента счёта потолок счёта проходит",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 8,
+        "actNotional": 800,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 0,
+          "plannedRiskEquityBase": null
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": null
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "globalSimultaneousRiskPerAccountPercent": 10,
+          "globalSimultaneousRiskPerTenantPercent": 30
+        },
+        "entryLegs": [],
+        "entryAnchor": null,
+        "stopPrice": null,
+        "actStopPrice": null,
+        "liveStopPrice": null,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 100,
+        "liveRiskBeforeAct": 0,
+        "accountPeersLiveRisk": 0,
+        "tenantPeersLiveRisk": 0,
+        "tenantRiskBase": 100
+      },
+      "expect": {
+        "withinAccountSimultaneous": true
+      }
+    },
+    {
+      "case": "потолок живого риска тенанта отвергает акт сверх процента тенанта от суммы баз его счетов",
+      "note": "Тенант с одним счётом: база тенанта равна базе счёта. Достижимость — та же ветвь подъёма до минимального лота, что у примера потолка счёта.",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 35,
+        "actNotional": 3500,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 0,
+          "plannedRiskEquityBase": null
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": null
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "globalSimultaneousRiskPerAccountPercent": 10,
+          "globalSimultaneousRiskPerTenantPercent": 30
+        },
+        "entryLegs": [],
+        "entryAnchor": null,
+        "stopPrice": null,
+        "actStopPrice": null,
+        "liveStopPrice": null,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 100,
+        "liveRiskBeforeAct": 0,
+        "accountPeersLiveRisk": 0,
+        "tenantPeersLiveRisk": 0,
+        "tenantRiskBase": 100
+      },
+      "expect": {
+        "withinTenantSimultaneous": false
+      }
+    },
+    {
+      "case": "тот же акт у тенанта с двумя счетами: база тенанта — сумма баз, и живой риск соседней сделки складывается с актом",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 35,
+        "actNotional": 3500,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 0,
+          "plannedRiskEquityBase": null
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": null
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "globalSimultaneousRiskPerAccountPercent": 10,
+          "globalSimultaneousRiskPerTenantPercent": 30
+        },
+        "entryLegs": [],
+        "entryAnchor": null,
+        "stopPrice": null,
+        "actStopPrice": null,
+        "liveStopPrice": null,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 100,
+        "liveRiskBeforeAct": 0,
+        "accountPeersLiveRisk": 0,
+        "tenantPeersLiveRisk": 1,
+        "tenantRiskBase": 200
+      },
+      "expect": {
+        "withinTenantSimultaneous": true
+      }
+    },
+    {
+      "case": "живой риск соседней сделки не измерен — потолки уровня при повышающем акте отказывают, а не пропускают",
+      "note": "Неполный граф соседней сделки либо её живая экспозиция без действующего уровня: сумма уровня занижена на неизвестную величину, и пропуск был бы ошибкой в разрешающую сторону.",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 5,
+        "actNotional": 500,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 0,
+          "plannedRiskEquityBase": null
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": null
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "globalSimultaneousRiskPerAccountPercent": 10,
+          "globalSimultaneousRiskPerTenantPercent": 30
+        },
+        "entryLegs": [],
+        "entryAnchor": null,
+        "stopPrice": null,
+        "actStopPrice": null,
+        "liveStopPrice": null,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 100,
+        "liveRiskBeforeAct": 0,
+        "accountPeersLiveRisk": null,
+        "tenantPeersLiveRisk": null,
+        "tenantRiskBase": 100
+      },
+      "expect": {
+        "ownLiveRiskRaised": true,
+        "withinAccountSimultaneous": null,
+        "withinTenantSimultaneous": null
+      }
+    },
+    {
+      "case": "подтяжка защиты ближе к цене живого риска своей сделки не повышает — потолки уровня проходят и при неизмеренном соседе",
+      "note": "Действие, своего живого риска не повышающее, сумму уровня не ухудшает; блок по неизмеренной соседней сделке запирал бы защиту этой — потолки уровня меряют прирост, а не класс действия (docs/rules/risk-policy.md).",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": false,
+        "graphComplete": true,
+        "actRisk": 0,
+        "actNotional": 0,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 100,
+          "plannedRiskEquityBase": 10000
+        },
+        "hasLiveEpisode": true,
+        "position": {
+          "externalSize": 10
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "globalSimultaneousRiskPerAccountPercent": 10,
+          "globalSimultaneousRiskPerTenantPercent": 30
+        },
+        "entryLegs": [],
+        "entryAnchor": 3000,
+        "stopPrice": 2910,
+        "actStopPrice": 2910,
+        "liveStopPrice": 2850,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 10000,
+        "liveRiskBeforeAct": 153,
+        "accountPeersLiveRisk": null,
+        "tenantPeersLiveRisk": null,
+        "tenantRiskBase": 10000
+      },
+      "expect": {
+        "livePositionRiskAtStop": 92.955,
+        "liveRiskNow": 92.955,
+        "ownLiveRiskRaised": false,
+        "withinAccountSimultaneous": true,
+        "withinTenantSimultaneous": true
+      }
+    },
+    {
+      "case": "доактный живой риск не измерен — повышение не исключено, и потолки уровня меряются",
+      "state": {
+        "dealCollapsing": false,
+        "actRiskCreating": true,
+        "graphComplete": true,
+        "actRisk": 5,
+        "actNotional": 500,
+        "direction": "LONG",
+        "deal": {
+          "plannedRiskAmount": 0,
+          "plannedRiskEquityBase": null
+        },
+        "hasLiveEpisode": false,
+        "position": {
+          "externalSize": null
+        },
+        "instrument": {
+          "contractValue": 0.1
+        },
+        "limits": {
+          "globalSimultaneousRiskPerAccountPercent": 10,
+          "globalSimultaneousRiskPerTenantPercent": 30
+        },
+        "entryLegs": [],
+        "entryAnchor": null,
+        "stopPrice": null,
+        "actStopPrice": null,
+        "liveStopPrice": null,
+        "feeRate": 0.0005,
+        "exchangeRiskBase": 100,
+        "liveRiskBeforeAct": null,
+        "accountPeersLiveRisk": 0,
+        "tenantPeersLiveRisk": 0,
+        "tenantRiskBase": 100
+      },
+      "expect": {
+        "ownLiveRiskRaised": true,
+        "withinAccountSimultaneous": true
+      }
+    },
+    {
+      "case": "отказ RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
+      }
+    },
+    {
+      "case": "отказ RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED при живом риске транша — карв-аут, действие не исполняется",
+      "state": {
+        "blockingCode": "RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED"
+      },
+      "expect": {
+        "liveRiskBlockReaction": "SKIP_ACTION"
       }
     }
   ]

@@ -1,5 +1,6 @@
 package com.example.tradingcore;
 
+import static java.util.Objects.isNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,17 +19,18 @@ import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.api.controller.TradingSurfaceController;
+import com.example.tradingcore.api.model.AccountInstrumentStateApiRequest;
 import com.example.tradingcore.api.model.DealApiResponse;
 import com.example.tradingcore.api.model.DealTrancheApiResponse;
-import com.example.tradingcore.api.model.RiskAppetiteApiRequest;
 import com.example.tradingcore.api.model.RiskAppetiteApiResponse;
 import com.example.tradingcore.api.model.SafetyStateApiResponse;
 import com.example.tradingcore.config.DealContextProperties;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.market.MarketFeatureService;
+import com.example.tradingcore.domain.model.RiskAppetite;
+import com.example.tradingcore.domain.service.RiskAppetiteService;
 import com.example.tradingcore.domain.service.TradingSurfaceService;
 import com.example.tradingcore.mapping.TradingSurfaceMapperImpl;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
@@ -43,17 +45,15 @@ import com.example.tradingcore.persistence.service.InstrumentDataService;
 import com.example.tradingcore.persistence.service.OrderDataService;
 import com.example.tradingcore.persistence.service.PositionDataService;
 import com.example.tradingcore.persistence.service.StrategyDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * Поверхность чтения торгового состояния и назначение чисел
- * риск-аппетита.
+ * Поверхность чтения торгового состояния и принятых чисел риск-аппетита,
+ * назначение плеча пары.
  *
  * <p><b>Что здесь проверяется по существу.</b> Наружу поверхность обязана
  * отдавать {@code internalId}, а не ключ БД: числовой ключ границу
@@ -61,8 +61,8 @@ import org.junit.jupiter.api.Test;
  * которого его уже не убрать. Резолв этих идентичностей обязан идти
  * ОДНОЙ раскладкой на выборку: чтение на строку окна — запрос в цикле
  * длиной в окно, и растёт он вместе с историей счёта, а не с нагрузкой.
- * Назначение чисел риск-аппетита обязано ехать в домен маппером, а не
- * api-моделью вглубь: сервис api-модели не видит вовсе.
+ * Принятые числа риск-аппетита обязаны ехать наружу маппером все шесть, а
+ * назначение плеча пары — сверяться с принятым пределом плеча.
  *
  * <p>Маппер — НАСТОЯЩИЙ (сгенерированный MapStruct), не подменённый:
  * предмет половины проверок — именно перенос полей. Сборка графа сделки —
@@ -76,7 +76,6 @@ class TradingSurfaceReadTest {
     private static final Long FIRST_INSTRUMENT_ID = 3L;
     private static final Long SECOND_INSTRUMENT_ID = 4L;
     private static final String ACCOUNT_INTERNAL_ID = "ea-0001";
-    private static final String TENANT_INTERNAL_ID = "tn-0001";
     private static final String FIRST_INSTRUMENT_INTERNAL_ID = "in-0001";
     private static final String SECOND_INSTRUMENT_INTERNAL_ID = "in-0002";
 
@@ -89,7 +88,7 @@ class TradingSurfaceReadTest {
     private final InstrumentDataService instruments = mock(InstrumentDataService.class);
     private final AccountInstrumentStateDataService pairStates =
             mock(AccountInstrumentStateDataService.class);
-    private final TenantRiskAppetiteDataService appetites = mock(TenantRiskAppetiteDataService.class);
+    private final RiskAppetiteService appetites = mock(RiskAppetiteService.class);
 
     private final DealContextService dealContext = new DealContextService(accounts, instruments,
             mock(StrategyDataService.class), orders, algoOrders, positions, tranches,
@@ -210,35 +209,84 @@ class TradingSurfaceReadTest {
     }
 
     /**
-     * Назначение чисел: тело едет в домен маппером, идентичность тенанта —
-     * путём вызова, а не телом.
+     * Чтение принятых чисел: все шесть едут наружу маппером, пустое число
+     * остаётся пустым, а не нулём.
      */
     @Test
-    void assigningTheAppetiteMapsTheBodyIntoTheDomain() {
-        RiskAppetiteApiRequest request = new RiskAppetiteApiRequest();
-        request.setGlobalSimultaneousRiskPerDealPercent(new BigDecimal("1.5"));
-        request.setGlobalConsecutiveLossLimit(3);
-        when(appetites.applyRiskAppetite(any(Tenant.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+    void theAcceptedAppetiteIsReadWithAllSixNumbers() {
+        when(appetites.getAccepted()).thenReturn(RiskAppetite.builder()
+                .globalSimultaneousRiskPerDealPercent(new BigDecimal("1"))
+                .globalSimultaneousRiskPerAccountPercent(new BigDecimal("10"))
+                .globalSimultaneousRiskPerTenantPercent(new BigDecimal("30"))
+                .globalCumulativeRiskPerDealMultiplier(new BigDecimal("2"))
+                .globalMaxLeverage(null)
+                .globalConsecutiveLossLimit(3)
+                .build());
 
-        RiskAppetiteApiResponse response = controller.applyRiskAppetite(TENANT_INTERNAL_ID, request);
+        RiskAppetiteApiResponse response = controller.getRiskAppetite();
 
-        assertThat(response.getTenantInternalId()).isEqualTo(TENANT_INTERNAL_ID);
-        assertThat(response.getGlobalSimultaneousRiskPerDealPercent())
-                .isEqualByComparingTo(new BigDecimal("1.5"));
+        assertThat(response.getGlobalSimultaneousRiskPerDealPercent()).isEqualByComparingTo("1");
+        assertThat(response.getGlobalSimultaneousRiskPerAccountPercent()).isEqualByComparingTo("10");
+        assertThat(response.getGlobalSimultaneousRiskPerTenantPercent()).isEqualByComparingTo("30");
+        assertThat(response.getGlobalCumulativeRiskPerDealMultiplier()).isEqualByComparingTo("2");
+        assertThat(response.getGlobalMaxLeverage()).as("не принятое число остаётся пустым").isNull();
         assertThat(response.getGlobalConsecutiveLossLimit()).isEqualTo(3);
     }
 
-    /**
-     * Строки риск-аппетита ещё нет — отказ адресный: «ядро о тенанте не
-     * знает» обязано отличаться от «числа назначены пустыми».
-     */
+    /** Плечо не выше предела назначается: граница включена. */
     @Test
-    void aMissingAppetiteRowIsRefusedAsABadRequest() {
-        when(appetites.findByTenantInternalId(TENANT_INTERNAL_ID)).thenReturn(Optional.empty());
+    void aLeverageAtTheLimitIsAssigned() {
+        givenAccount();
+        givenMaxLeverage("10");
+        when(instruments.getRequiredIdByInternalId(FIRST_INSTRUMENT_INTERNAL_ID)).thenReturn(FIRST_INSTRUMENT_ID);
+        when(pairStates.assignLeverage(ACCOUNT_ID, FIRST_INSTRUMENT_ID, 10))
+                .thenReturn(pairState(FIRST_INSTRUMENT_ID, Instrument.SafetyRung.ACTIVE));
 
-        assertThatThrownBy(() -> controller.getRiskAppetite(TENANT_INTERNAL_ID))
+        controller.applyPairSettings(ACCOUNT_INTERNAL_ID, FIRST_INSTRUMENT_INTERNAL_ID, leverageRequest(10));
+
+        verify(pairStates).assignLeverage(ACCOUNT_ID, FIRST_INSTRUMENT_ID, 10);
+    }
+
+    /** Плечо выше предела — негодный вход вызова, строка пары не трогается. */
+    @Test
+    void aLeverageAboveTheLimitIsRefusedAsABadRequest() {
+        givenAccount();
+        givenMaxLeverage("10");
+
+        assertThatThrownBy(() -> controller.applyPairSettings(ACCOUNT_INTERNAL_ID, FIRST_INSTRUMENT_INTERNAL_ID,
+                leverageRequest(11)))
                 .isInstanceOf(IllegalArgumentException.class);
+        verify(pairStates, never()).assignLeverage(any(), any(), any());
+    }
+
+    /** Предел не принят — назначать плечо не с чем сверять, отказ; снять плечо можно. */
+    @Test
+    void anyLeverageIsRefusedWhileTheLimitIsNotAcceptedButClearingIsNot() {
+        givenAccount();
+        givenMaxLeverage(null);
+        when(instruments.getRequiredIdByInternalId(FIRST_INSTRUMENT_INTERNAL_ID)).thenReturn(FIRST_INSTRUMENT_ID);
+        when(pairStates.assignLeverage(ACCOUNT_ID, FIRST_INSTRUMENT_ID, null))
+                .thenReturn(pairState(FIRST_INSTRUMENT_ID, Instrument.SafetyRung.ACTIVE));
+
+        assertThatThrownBy(() -> controller.applyPairSettings(ACCOUNT_INTERNAL_ID, FIRST_INSTRUMENT_INTERNAL_ID,
+                leverageRequest(1)))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        controller.applyPairSettings(ACCOUNT_INTERNAL_ID, FIRST_INSTRUMENT_INTERNAL_ID, leverageRequest(null));
+
+        verify(pairStates).assignLeverage(ACCOUNT_ID, FIRST_INSTRUMENT_ID, null);
+    }
+
+    private void givenMaxLeverage(String maxLeverage) {
+        when(appetites.getAccepted()).thenReturn(RiskAppetite.builder()
+                .globalMaxLeverage(isNull(maxLeverage) ? null : new BigDecimal(maxLeverage))
+                .build());
+    }
+
+    private static AccountInstrumentStateApiRequest leverageRequest(Integer leverage) {
+        AccountInstrumentStateApiRequest request = new AccountInstrumentStateApiRequest();
+        request.setLeverage(leverage);
+        return request;
     }
 
     private ExchangeAccount givenAccount() {

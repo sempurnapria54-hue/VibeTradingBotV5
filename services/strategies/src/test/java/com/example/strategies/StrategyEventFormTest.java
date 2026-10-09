@@ -348,8 +348,8 @@ class StrategyEventFormTest {
     }
 
     private void givenRiskAppetite() {
-        when(coreClient.getRiskAppetite(TENANT)).thenReturn(new RiskAppetiteCoreResponse(
-                TENANT, new BigDecimal("2"), new BigDecimal("3")));
+        when(coreClient.getRiskAppetite()).thenReturn(new RiskAppetiteCoreResponse(
+                new BigDecimal("2"), new BigDecimal("3"), new BigDecimal("10")));
     }
 
     /**

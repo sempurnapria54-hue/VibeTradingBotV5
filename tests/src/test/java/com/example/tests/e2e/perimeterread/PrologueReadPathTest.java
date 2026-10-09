@@ -171,7 +171,7 @@ class PrologueReadPathTest {
     @DisplayName("E2.4 — Чтение у ядра: тенант приезжает операндом вызова, а не заголовком")
     void e2_4_theCoreTakesTheTenantAsAnOperandNotAHeader() {
         String deals = Trail.CORE + "/deals?exchangeAccountInternalId=" + prologue.account();
-        String numbers = Trail.CORE + "/risk-appetites/" + prologue.tenant();
+        String numbers = Trail.CORE + "/risk-appetite";
         warmTheCache();
 
         Answer dealsThrough = viaPerimeter(deals);

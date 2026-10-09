@@ -107,15 +107,22 @@ spec:
               memory: 256Mi
             limits:
               memory: 512Mi
+          # Пробы смотрят на РАЗНЫЕ группы здоровья, а не на общий
+          # /actuator/health: живость мерит только состояние процесса,
+          # готовность — процесс (базы у периметра нет). Общее здоровье несёт
+          # сверх них индикаторы каркаса, и первый индикатор внешней
+          # зависимости вошёл бы в живость молча. Состав групп —
+          # services/bff/src/main/resources/application.yaml; раскладка —
+          # docs/architecture/platform.md, пункт «Пробы развёртывания».
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: http
             initialDelaySeconds: 60
             periodSeconds: 20

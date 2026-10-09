@@ -87,15 +87,16 @@ class DefinitionIntakePathTest {
         assertNoTraceBeyondOwnerAndCore("E1.4");
         Map<String, Object> numbers = object(trail.call(Party.TRADING_CORE, "GET", riskAppetite(), null, null));
         assertThat(numbers.get("globalSimultaneousRiskPerDealPercent"))
-                .as("E1.4: строка тенанта у ядра есть — её заводит синк проекций, — а чисел в ней нет").isNull();
-        assertThat(numbers.get("globalCatastrophicRiskPerDealMultiplier")).isNull();
+                .as("E1.4: ядро отвечает, а чисел в ответе нет — конфигурация окружения пуста").isNull();
+        assertThat(numbers.get("globalCumulativeRiskPerDealMultiplier")).isNull();
+        assertThat(numbers.get("globalMaxLeverage")).isNull();
 
         trail.riskAppetiteSet();
         trail.forgetTraces();
 
         Answer again = create();
 
-        assertThat(again.status()).as("E1.4: повтор после простановки чисел проходит").isEqualTo(201);
+        assertThat(again.status()).as("E1.4: повтор после подъёма ядра с числами проходит").isEqualTo(201);
         assertThat(trail.accesses(Party.TRADING_CORE)).as("E1.4: проекции чисел у владельца нет — он снова идёт к ядру")
                 .extracting(Side.Access::path, Side.Access::status)
                 .contains(tuple(riskAppetite(), 200));
@@ -233,9 +234,9 @@ class DefinitionIntakePathTest {
         assertThat(trail.published(Substrate.CORE_TOPIC)).as(label + ": в тему ядра — тоже").isEmpty();
     }
 
-    /** Числа риск-аппетита тенанта ходов у ядра — путь его поверхности: тенант у каждого класса свой. */
+    /** Принятые ядром числа риск-аппетита — путь его поверхности: тенанта в нём нет, числа одни на окружение. */
     private static String riskAppetite() {
-        return Trail.CORE + "/risk-appetites/" + trail.tenant();
+        return Trail.CORE + "/risk-appetite";
     }
 
     @SuppressWarnings("unchecked")

@@ -38,7 +38,7 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
     /** Третий счёт: им наблюдается, что обход идёт дальше негодной строки. */
     private static final String THIRD_ACCOUNT = "A3";
 
-    /** Тенант третьего счёта: его место под числа риск-аппетита заводит тот же проход. */
+    /** Тенант третьего счёта: его счёт стоит за негодной строкой реестра. */
     private static final String SECOND_TENANT = "T2";
 
     /** Контур, которого нет в доменном перечне: перевод строки реестра на нём отказывает. */
@@ -84,9 +84,6 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
         assertThat(marketData.count(PEER_INSTRUMENTS + "/" + INSTRUMENT + RULES)).isEqualTo(1);
         assertThat(marketData.count(PEER_INSTRUMENTS + "/" + SECOND_INSTRUMENT + RULES)).isEqualTo(1);
         assertThat(rows.row("instruments", "internal_id", INSTRUMENT).get("external_rules")).isNotNull();
-        // Под тенанта появившихся счетов заведено место под числа
-        // риск-аппетита — заводит его тот же проход.
-        assertThat(rows.countWhere("tenant_risk_appetites", "tenant_internal_id", TENANT)).isEqualTo(1L);
     }
 
     @Test
@@ -204,10 +201,6 @@ class ProjectionsBoxTest extends SharedTradingCoreBox {
         assertThat(rows.countWhere("exchange_accounts", "internal_id", ACCOUNT)).isEqualTo(1L);
         assertThat(rows.countWhere("exchange_accounts", "internal_id", SECOND_ACCOUNT)).isZero();
         assertThat(rows.countWhere("exchange_accounts", "internal_id", THIRD_ACCOUNT)).isEqualTo(1L);
-        // Место под числа риск-аппетита заводится после обхода — и
-        // заведено у тенанта, чей счёт стоял ЗА негодной строкой.
-        assertThat(rows.countWhere("tenant_risk_appetites", "tenant_internal_id", SECOND_TENANT))
-                .isEqualTo(1L);
         assertThat(AppLog.since(mark))
                 .contains("Exchange account projection failed for " + SECOND_ACCOUNT)
                 .doesNotContain("Exchange account projection sync failed");

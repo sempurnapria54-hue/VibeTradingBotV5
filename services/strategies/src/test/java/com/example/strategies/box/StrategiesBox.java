@@ -81,8 +81,8 @@ abstract class StrategiesBox {
     /** Проверка пары «счёт × инструмент» у соседа. */
     protected static final String PEER_PAIR_CHECKS = "/api/v1/trading-core/pair-checks";
 
-    /** Числа риск-аппетита тенанта у соседа: путь несёт идентичность тенанта. */
-    protected static final String PEER_RISK_APPETITES = "/api/v1/trading-core/risk-appetites";
+    /** Принятые ядром числа риск-аппетита: путь тенанта не несёт — числа одни на окружение. */
+    protected static final String PEER_RISK_APPETITE = "/api/v1/trading-core/risk-appetite";
 
     /** Тенант, которым ходит большинство кейсов. */
     protected static final String TENANT = "T1";
@@ -109,7 +109,7 @@ abstract class StrategiesBox {
     protected static final String DELETED = "STRATEGY_DELETED";
 
     /**
-     * Потолок одновременного риска тенанта штатного прогона.
+     * Потолок одновременного риска на сделку штатного прогона.
      *
      * <p>Совпадает с объявленным эталоном: годное определение обязано
      * проходить охрану создания, и число, назначенное «с запасом»,
@@ -117,8 +117,11 @@ abstract class StrategiesBox {
      */
     protected static final String GLOBAL_SIMULTANEOUS_PERCENT = "1.0";
 
-    /** Предел множителя катастрофического потолка тенанта штатного прогона. */
-    protected static final String GLOBAL_CATASTROPHIC_MULTIPLIER = "100.0";
+    /** Предел множителя кумулятивного потолка штатного прогона — тоже равен объявленному эталоном. */
+    protected static final String GLOBAL_CUMULATIVE_MULTIPLIER = "2.0";
+
+    /** Предел плеча штатного прогона — число тестового окружения. */
+    protected static final String GLOBAL_MAX_LEVERAGE = "10";
 
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -145,7 +148,7 @@ abstract class StrategiesBox {
     }
 
     /**
-     * Ставит штатные ответы соседа: ссылки разрешаются, числа назначены.
+     * Ставит штатные ответы соседа: ссылки разрешаются, числа приняты.
      *
      * <p><b>Заготовки, а не предусловие в базе:</b> операнды проверки
      * живут у соседа по построению, и подставленные в свою базу они
@@ -153,10 +156,8 @@ abstract class StrategiesBox {
      */
     protected void peerResolvesEverything() {
         peer.answers(PEER_PAIR_CHECKS, Feed.resolvingPairCheck());
-        peer.answers(PEER_RISK_APPETITES + "/" + TENANT,
-                Feed.riskAppetite(TENANT, GLOBAL_SIMULTANEOUS_PERCENT, GLOBAL_CATASTROPHIC_MULTIPLIER));
-        peer.answers(PEER_RISK_APPETITES + "/" + SECOND_TENANT,
-                Feed.riskAppetite(SECOND_TENANT, GLOBAL_SIMULTANEOUS_PERCENT, GLOBAL_CATASTROPHIC_MULTIPLIER));
+        peer.answers(PEER_RISK_APPETITE,
+                Feed.riskAppetite(GLOBAL_SIMULTANEOUS_PERCENT, GLOBAL_CUMULATIVE_MULTIPLIER, GLOBAL_MAX_LEVERAGE));
     }
 
     /**

@@ -7,6 +7,7 @@ import static com.example.strategies.unit.validation.ValidationFixture.baseAppet
 import static com.example.strategies.unit.validation.ValidationFixture.bear;
 import static com.example.strategies.unit.validation.ValidationFixture.bull;
 import static com.example.strategies.unit.validation.ValidationFixture.decimal;
+import static com.example.strategies.unit.validation.ValidationFixture.entryAction;
 import static com.example.strategies.unit.validation.ValidationFixture.entryStep;
 import static com.example.strategies.unit.validation.ValidationFixture.inequalityViolations;
 import static com.example.strategies.unit.validation.ValidationFixture.matching;
@@ -40,7 +41,7 @@ class RiskInequalitiesEntryTest {
 
     private static final String SIMULTANEOUS_ABOVE = "STRATEGY_SIMULTANEOUS_RISK_ABOVE_GLOBAL";
 
-    private static final String CATASTROPHIC_ABOVE = "STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL";
+    private static final String CUMULATIVE_ABOVE = "STRATEGY_CUMULATIVE_MULTIPLIER_ABOVE_GLOBAL";
 
     private static final String FAN = "STRATEGY_SIMULTANEOUS_RISK_UNSATISFIABLE";
 
@@ -63,7 +64,7 @@ class RiskInequalitiesEntryTest {
     void u30_2_theCheckStandsOnTheCurrentCeiling() {
         CreateStrategyApiRequest request = reference();
 
-        assertThat(matching(inequalityViolations(request.getDetails(), appetite("0.5", "100")),
+        assertThat(matching(inequalityViolations(request.getDetails(), appetite("0.5", "2", "1")),
                 SIMULTANEOUS_ABOVE)).isNotEmpty();
     }
 
@@ -72,16 +73,20 @@ class RiskInequalitiesEntryTest {
     void u30_3_theMultiplierLimitIsRecheckedToo() {
         CreateStrategyApiRequest request = reference();
 
-        assertThat(matching(inequalityViolations(request.getDetails(), appetite("1", "50")),
-                CATASTROPHIC_ABOVE)).isNotEmpty();
+        assertThat(matching(inequalityViolations(request.getDetails(), appetite("1", "1.5", "1")),
+                CUMULATIVE_ABOVE)).isNotEmpty();
     }
 
     @Test
     @DisplayName("U30.4 — потолок снижен так, что нотинал перестаёт оставлять запас: пятое неравенство")
     void u30_4_theNotionalHeadroomIsRecheckedOnCurrentNumbers() {
         CreateStrategyApiRequest request = reference();
+        entryAction(bull(request)).setAllocationPercents(decimal("100"));
 
-        assertThat(matching(inequalityViolations(request.getDetails(), appetite("0.95", "100")),
+        assertThat(matching(inequalityViolations(request.getDetails(), appetite("1", "2", "10")), HEADROOM))
+                .as("при пределе плеча 10 полная доля оставляет запас — дерево годно на числах создания")
+                .isEmpty();
+        assertThat(matching(inequalityViolations(request.getDetails(), appetite("1", "2", "1")),
                 HEADROOM)).isNotEmpty();
     }
 
@@ -141,7 +146,7 @@ class RiskInequalitiesEntryTest {
     @Test
     @DisplayName("U30.10 — список деталей пуст: охрана незаданных чисел стои́т ДО этой точки")
     void u30_10_anEmptyDetailListRejectsNothingHere() {
-        assertThat(inequalityViolations(List.of(), appetite(null, null)))
+        assertThat(inequalityViolations(List.of(), appetite(null, null, null)))
                 .as("иначе определение без торгуемых деталей прошло бы мимо охраны чисел")
                 .isEmpty();
     }

@@ -130,6 +130,13 @@ public class TradeFeeRateSyncService {
      * на группу, а не на инструмент: инструментов группы много, строка у
      * неё одна.
      *
+     * <p><b>Контур обходится постранично и ЦЕЛИКОМ</b> — весь каталог
+     * площадки в проекции; страница есть единица чтения и пачка навесов
+     * правил, а не предел. Прежнее окно отрезало хвост каталога по ключу, и
+     * одни и те же инструменты за его краем не проверялись никогда. Раскладка
+     * «группа → ставка» общая на все страницы: группа читается один раз за
+     * тик, на какой бы странице ни встретился её инструмент.
+     *
      * <p><b>Инструмент, чья группа не наблюдалась вовсе, сюда не
      * попадает:</b> несвежего числа у него нет, а действие с пустой ставкой
      * отвергает преконтроль кодом {@code FEE_RATE_UNAVAILABLE}
@@ -140,41 +147,39 @@ public class TradeFeeRateSyncService {
     private void holdStaleRates(ExchangeAccount account) {
         try {
             OffsetDateTime checkedAt = OffsetDateTime.now(ZoneOffset.UTC);
-            List<Instrument> contour = contourOf(account);
-            Map<Long, InstrumentExternalRules> rules = rulesDataService.findByInstrumentIds(contour.stream()
-                    .map(Instrument::getId)
-                    .collect(Collectors.toList()));
             Map<List<String>, Optional<TradeFeeRate>> currentByGroup = new HashMap<>();
-            for (Instrument instrument : contour) {
-                InstrumentExternalRules instrumentRules = rules.get(instrument.getId());
-                if (isNull(instrumentRules) || isBlank(instrumentRules.getExternalInstrumentType())
-                        || isBlank(instrumentRules.getExternalFeeGroupId())) {
-                    continue;
-                }
-                String instrumentType = instrumentRules.getExternalInstrumentType();
-                String feeGroupId = instrumentRules.getExternalFeeGroupId();
-                Optional<TradeFeeRate> current = currentByGroup.computeIfAbsent(
-                        List.of(instrumentType, feeGroupId),
-                        group -> feeRateDataService.findCurrent(account.getId(), instrumentType, feeGroupId));
-                if (current.isPresent()
-                        && isTrue(current.get().isStaleAt(checkedAt, properties.getFreshnessThreshold()))) {
-                    holdEntries(account, instrument, current.get());
-                }
-            }
+            instrumentDataService.forEachContourPage(account.getExchangeCode(), properties.getContourPageSize(),
+                    page -> holdStaleRatesOf(account, page, checkedAt, currentByGroup));
         } catch (RuntimeException failure) {
             log.error("Trade fee rate staleness check failed for account={}", account.getInternalId(), failure);
         }
     }
 
-    /** Контур площадки счёта ограниченным окном; упор в окно — в лог. */
-    private List<Instrument> contourOf(ExchangeAccount account) {
-        List<Instrument> contour = instrumentDataService.findContourWithin(account.getExchangeCode(),
-                properties.getContourWindow());
-        if (contour.size() >= properties.getContourWindow()) {
-            log.warn("Trade fee rate staleness check hit the contour window ({}) for account={}",
-                    properties.getContourWindow(), account.getInternalId());
+    /**
+     * Одна страница контура: навесы правил её инструментов — одной пачкой,
+     * ставка группы — из общей на тик раскладки.
+     */
+    private void holdStaleRatesOf(ExchangeAccount account, List<Instrument> page, OffsetDateTime checkedAt,
+                                  Map<List<String>, Optional<TradeFeeRate>> currentByGroup) {
+        Map<Long, InstrumentExternalRules> rules = rulesDataService.findByInstrumentIds(page.stream()
+                .map(Instrument::getId)
+                .collect(Collectors.toList()));
+        for (Instrument instrument : page) {
+            InstrumentExternalRules instrumentRules = rules.get(instrument.getId());
+            if (isNull(instrumentRules) || isBlank(instrumentRules.getExternalInstrumentType())
+                    || isBlank(instrumentRules.getExternalFeeGroupId())) {
+                continue;
+            }
+            String instrumentType = instrumentRules.getExternalInstrumentType();
+            String feeGroupId = instrumentRules.getExternalFeeGroupId();
+            Optional<TradeFeeRate> current = currentByGroup.computeIfAbsent(
+                    List.of(instrumentType, feeGroupId),
+                    group -> feeRateDataService.findCurrent(account.getId(), instrumentType, feeGroupId));
+            if (current.isPresent()
+                    && isTrue(current.get().isStaleAt(checkedAt, properties.getFreshnessThreshold()))) {
+                holdEntries(account, instrument, current.get());
+            }
         }
-        return contour;
     }
 
     /**

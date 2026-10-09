@@ -1,11 +1,14 @@
 package com.example.tradingcore.unit.risk;
 
 import static com.example.tradingcore.unit.risk.RiskFixture.STOP;
+import static com.example.tradingcore.unit.risk.RiskFixture.account;
+import static com.example.tradingcore.unit.risk.RiskFixture.appetiteWithMaxLeverage;
 import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.contextBuilder;
 import static com.example.tradingcore.unit.risk.RiskFixture.deal;
 import static com.example.tradingcore.unit.risk.RiskFixture.detail;
 import static com.example.tradingcore.unit.risk.RiskFixture.entryAction;
+import static com.example.tradingcore.unit.risk.RiskFixture.pairStateWithLeverage;
 import static com.example.tradingcore.unit.risk.RiskFixture.protectionAction;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -70,10 +73,19 @@ class CumulativeCeilingTest {
     }
 
     @Test
-    @DisplayName("U12.6 — множитель не объявлен: одновременный и катастрофический всё равно считаются")
+    @DisplayName("U12.6 — множитель не объявлен: одновременный и потолок нотинала всё равно считаются")
     void u12_6_anUndeclaredMultiplierDoesNotStopTheNeighbouringCeilings() {
+        // База клетки — тысяча: потолок нотинала стои́т на пределе плеча
+        // (2.999 × 1000 = 2999 против нотинала акта 3000), а предел ниже
+        // единицы вне области приёма. Поактный процент 10 и процент
+        // стратегии 9 дают 100 и 90 против риска акта 92.955; процент
+        // сделки окружения — сто, плечо пары — единица, чтобы их рабочие
+        // значения не подмешивали своих кодов.
+        harness.givenAppetite(appetiteWithMaxLeverage("100", "2.999"));
+        harness.givenPairState(pairStateWithLeverage(1));
         DealContext dealContext = contextBuilder(deal(BigDecimal.ZERO, null))
-                .strategyDetail(detail("1", null, "0.9", "29.99"))
+                .exchangeAccount(account("1000"))
+                .strategyDetail(detail("10", null, "9"))
                 .build();
 
         assertThat(codes(harness.validate(entryAction(), dealContext)))
@@ -92,7 +104,7 @@ class CumulativeCeilingTest {
 
     /** Контекст группы: взятое сделкой за жизнь и множитель кумулятивного потолка. */
     private static DealContext context(String dealRiskTaken, String cumulativeMultiplier) {
-        StrategyDetail detail = detail("1", cumulativeMultiplier, "10", "300");
+        StrategyDetail detail = detail("1", cumulativeMultiplier, "10");
         return contextBuilder(deal(RiskFixture.decimal(dealRiskTaken), null))
                 .strategyDetail(detail)
                 .build();

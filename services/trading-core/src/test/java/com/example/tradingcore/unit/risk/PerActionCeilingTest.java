@@ -35,13 +35,13 @@ import org.junit.jupiter.api.Test;
 class PerActionCeilingTest {
 
     /** Потолок 100: риск акта заметно ниже. */
-    private static final StrategyDetail ROOMY = detail("1", "3", "10", "300");
+    private static final StrategyDetail ROOMY = detail("1", "3", "10");
 
     /** Потолок 92.955: риск акта равен ему в точности. */
-    private static final StrategyDetail EXACTLY_AT_THE_CEILING = detail("0.92955", "3", "10", "300");
+    private static final StrategyDetail EXACTLY_AT_THE_CEILING = detail("0.92955", "3", "10");
 
     /** Потолок 92.95: риск акта его перебирает. */
-    private static final StrategyDetail A_HAIR_BELOW = detail("0.9295", "3", "10", "300");
+    private static final StrategyDetail A_HAIR_BELOW = detail("0.9295", "3", "10");
 
     private final RiskHarness harness = new RiskHarness();
 
@@ -97,7 +97,7 @@ class PerActionCeilingTest {
     @Test
     @DisplayName("U11.7 — процент риска на действие не объявлен: ни один из потолков не считается")
     void u11_7_anUndeclaredPerActionPercentStopsEveryCeiling() {
-        assertThat(codes(harness.validate(entryAction(), context(detail(null, "3", "10", "300")))))
+        assertThat(codes(harness.validate(entryAction(), context(detail(null, "3", "10")))))
                 .containsExactly(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
     }
 
@@ -120,7 +120,7 @@ class PerActionCeilingTest {
     @DisplayName("U11.10 — действие risk-weakening при нулевом потолке: слагаемое акта — ноль")
     void u11_10_aRiskWeakeningActPassesAZeroCeiling() {
         assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()),
-                context(detail("0", "3", "10", "300"))))).isEmpty();
+                context(detail("0", "3", "10"))))).isEmpty();
     }
 
     /** Контекст базовой сборки с названной деталью стратегии. */

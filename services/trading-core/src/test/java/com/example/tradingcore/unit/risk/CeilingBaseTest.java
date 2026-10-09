@@ -111,7 +111,7 @@ class CeilingBaseTest {
 
     /** Контекст группы: снимок базы у сделки и живая база счёта названы порознь. */
     private static DealContext context(String snapshotBase, String accountBase) {
-        StrategyDetail onlyPerActionIsTight = detail("1", "3", "10", "300");
+        StrategyDetail onlyPerActionIsTight = detail("1", "3", "10");
         return contextBuilder(deal(BigDecimal.ZERO, RiskFixture.decimal(snapshotBase)))
                 .exchangeAccount(account(accountBase))
                 .strategyDetail(onlyPerActionIsTight)

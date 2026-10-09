@@ -119,21 +119,63 @@ spec:
                 secretKeyRef:
                   name: postgres-role-trading-core
                   key: password
+            # Числа риск-аппетита — оси окружения: значение своё у каждого
+            # окружения, манифест сервиса одинаков во всех трёх. Принимает их
+            # ядро при старте; пустое значение оси — отказ набора риска, а не
+            # умолчание (docs/rules/risk-policy.md, правило о числах
+            # риск-аппетита). Ссылка на ключ обязательна, а не optional: ключ
+            # есть в каждом окружении, пустой там, где держатель числа не назвал.
+            - name: GLOBAL_SIMULTANEOUS_RISK_PER_DEAL_PERCENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: globalSimultaneousRiskPerDealPercent
+            - name: GLOBAL_SIMULTANEOUS_RISK_PER_ACCOUNT_PERCENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: globalSimultaneousRiskPerAccountPercent
+            - name: GLOBAL_SIMULTANEOUS_RISK_PER_TENANT_PERCENT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: globalSimultaneousRiskPerTenantPercent
+            - name: GLOBAL_CUMULATIVE_RISK_PER_DEAL_MULTIPLIER
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: globalCumulativeRiskPerDealMultiplier
+            - name: GLOBAL_MAX_LEVERAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: globalMaxLeverage
+            - name: GLOBAL_CONSECUTIVE_LOSS_LIMIT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment-axes
+                  key: globalConsecutiveLossLimit
           resources:
             requests:
               cpu: 200m
               memory: 768Mi
             limits:
               memory: 1536Mi
+          # Пробы — на группы актуатора, а не на общий /actuator/health:
+          # в общем лежит база, и при её недоступности проверка соединения
+          # ждёт дольше таймаута пробы — живость падала бы, и kubelet гасил
+          # бы под вместо «не готов». Живость — состояние процесса,
+          # готовность — процесс плюс база (группы — application.yaml,
+          # раскладка — docs/architecture/platform.md).
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: http
             initialDelaySeconds: 90
             periodSeconds: 20

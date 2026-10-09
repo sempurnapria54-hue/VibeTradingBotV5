@@ -1,6 +1,7 @@
 package com.example.tradingcore.persistence.service;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +35,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class InstrumentDataService {
+
+    /**
+     * Ключ «до первой строки» обхода контура: меньше всякого ключа проекции,
+     * и первая страница читается тем же запросом, что и следующие.
+     */
+    private static final Long BEFORE_FIRST_ID = Long.MIN_VALUE;
 
     private final InstrumentRepository repository;
     private final InstrumentMapper mapper;
@@ -164,13 +172,49 @@ public class InstrumentDataService {
     }
 
     /**
-     * Инструменты площадки целиком — популяция обхода детекции. Статус в
-     * отборе не участвует: обход идёт по факту живого риска, а не по
-     * готовности инструмента к торговле.
+     * Инструменты площадки ЦЕЛИКОМ, страница за страницей, — популяция
+     * обхода детекции и детектора несвежести ставки. Статус в отборе не
+     * участвует: обход идёт по факту живого риска, а не по готовности
+     * инструмента к торговле.
+     *
+     * <p><b>Размер страницы — не предел выборки.</b> Страницы читаются до
+     * первой неполной (либо пустой): контур есть весь каталог площадки в
+     * проекции, и усечённый обход объявил бы чужими строки среза, которым не
+     * хватило места. Неполнота обхода бывает только отказом чтения — он
+     * уходит вызывающему исключением.
+     *
+     * <p><b>Ключом, а не смещением.</b> Следующая страница — строки с ключом
+     * строго больше последнего прочитанного. Проекцию между страницами
+     * правит синк каталога: удалённая строка сдвинула бы смещение, и строка
+     * за ней выпала бы из обхода молча, а ключ от удалений не зависит. Новые
+     * строки получают ключ больше всех прежних и попадают в хвост обхода.
+     * Чтение страницы по ключу не дорожает с её номером — смещение
+     * перечитывало бы весь пройденный префикс.
+     *
+     * <p><b>Транзакции на обход нет намеренно.</b> Страница отдаётся
+     * потребителю между чтениями, и его запись (подъём ступени у детектора
+     * несвежести) в транзакции только для чтения не сбросилась бы в базу
+     * вовсе. Строка проекции связей не несёт, и перевод в домен вне
+     * транзакции ничего не догружает.
+     *
+     * @param exchangeCode код площадки
+     * @param pageSize     размер страницы
+     * @param pageConsumer потребитель каждой непустой страницы в порядке ключа
      */
-    @Transactional(readOnly = true)
-    public List<Instrument> findContourWithin(String exchangeCode, Integer limit) {
-        return repository.findContour(exchangeCode, PageRequest.of(0, limit)).stream()
+    public void forEachContourPage(String exchangeCode, Integer pageSize, Consumer<List<Instrument>> pageConsumer) {
+        List<Instrument> page = findContourAfter(exchangeCode, BEFORE_FIRST_ID, pageSize);
+        while (isNotEmpty(page)) {
+            pageConsumer.accept(page);
+            if (page.size() < pageSize) {
+                return;
+            }
+            page = findContourAfter(exchangeCode, page.getLast().getId(), pageSize);
+        }
+    }
+
+    /** Одна страница контура: строки площадки с ключом больше названного. */
+    private List<Instrument> findContourAfter(String exchangeCode, Long afterId, Integer pageSize) {
+        return repository.findContourAfter(exchangeCode, afterId, PageRequest.of(0, pageSize)).stream()
                 .map(mapper::persistenceToDomain)
                 .collect(Collectors.toList());
     }

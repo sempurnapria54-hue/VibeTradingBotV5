@@ -80,14 +80,18 @@ public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Lo
      * замыкая петлю «мягкая ступень → через тик жёсткая биржевая со
      * сносом по рынку».
      *
-     * <p>Окно обязательно, и упор в него засчитывается неполнотой прохода
-     * — тем же ходом, что и неполученный срез.
+     * <p><b>Читается страницами по ключу, а не смещением:</b> страница — строки
+     * с ключом строго больше последнего ключа предыдущей. Окно здесь есть
+     * размер страницы, а не предел выборки, — обходчик читает страницы до
+     * неполной (docs/components/AnomalyJob.md, обход контура).
      */
     @Query("""
             select i from InstrumentEntity i
-            where i.exchangeCode = :exchangeCode
+            where i.exchangeCode = :exchangeCode and i.id > :afterId
             order by i.id asc""")
-    List<InstrumentEntity> findContour(@Param("exchangeCode") String exchangeCode, Pageable pageable);
+    List<InstrumentEntity> findContourAfter(@Param("exchangeCode") String exchangeCode,
+                                            @Param("afterId") Long afterId,
+                                            Pageable pageable);
 
     /**
      * Сырые типы инструментов проекции — ПРОЕКЦИЕЙ колонки: перечень

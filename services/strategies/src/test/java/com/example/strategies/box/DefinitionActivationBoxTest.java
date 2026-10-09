@@ -59,8 +59,8 @@ class DefinitionActivationBoxTest extends SharedStrategiesBox {
                 .as("реле начинается там, где транзакция перехода закончилась")
                 .isNull();
         assertThat(peer.paths())
-                .as("к соседу ушли ровно два чтения — разрешимость ссылок и числа тенанта")
-                .containsExactly(PEER_PAIR_CHECKS, PEER_RISK_APPETITES + "/" + TENANT);
+                .as("к соседу ушли ровно два чтения — разрешимость ссылок и числа ядра")
+                .containsExactly(PEER_PAIR_CHECKS, PEER_RISK_APPETITE);
         OffsetDateTime written = (OffsetDateTime) event.get("occurred_at");
         assertThat(peer.requests().stream()
                 .map(request -> request.getLoggedDate().toInstant())
@@ -137,8 +137,8 @@ class DefinitionActivationBoxTest extends SharedStrategiesBox {
     void b5_5_theNumbersWereWithdrawnAfterTheCreation() {
         peerResolvesEverything();
         String internalId = given(TENANT);
-        peer.answers(PEER_RISK_APPETITES + "/" + TENANT,
-                Feed.riskAppetite(TENANT, GLOBAL_SIMULTANEOUS_PERCENT, null));
+        peer.answers(PEER_RISK_APPETITE,
+                Feed.riskAppetite(GLOBAL_SIMULTANEOUS_PERCENT, GLOBAL_CUMULATIVE_MULTIPLIER, null));
 
         Answer answer = moveTo(internalId, TENANT, "ACTIVE");
 
@@ -156,8 +156,8 @@ class DefinitionActivationBoxTest extends SharedStrategiesBox {
     void b5_6_aTightenedCeilingRejectsAnAlreadyCreatedDefinition() {
         peerResolvesEverything();
         String internalId = given(TENANT);
-        peer.answers(PEER_RISK_APPETITES + "/" + TENANT, Feed.riskAppetite(TENANT,
-                TIGHTENED_SIMULTANEOUS_PERCENT, GLOBAL_CATASTROPHIC_MULTIPLIER));
+        peer.answers(PEER_RISK_APPETITE, Feed.riskAppetite(
+                TIGHTENED_SIMULTANEOUS_PERCENT, GLOBAL_CUMULATIVE_MULTIPLIER, GLOBAL_MAX_LEVERAGE));
 
         Answer answer = moveTo(internalId, TENANT, "ACTIVE");
 
@@ -181,7 +181,7 @@ class DefinitionActivationBoxTest extends SharedStrategiesBox {
         assertThat(statusOf(internalId, TENANT)).isEqualTo("ACTIVE");
         assertThat(peer.paths())
                 .as("ни ступеней, ни статуса тенанта, ни статуса счёта сервис не спрашивает")
-                .containsExactly(PEER_PAIR_CHECKS, PEER_RISK_APPETITES + "/" + TENANT);
+                .containsExactly(PEER_PAIR_CHECKS, PEER_RISK_APPETITE);
     }
 
     @Test

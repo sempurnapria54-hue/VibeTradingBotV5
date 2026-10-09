@@ -21,6 +21,7 @@ import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
+import com.example.tradingcore.domain.model.RiskAppetite;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -144,7 +145,7 @@ class PrecheckInputGateTest {
     }
 
     @Test
-    @DisplayName("U1.14 — максимальный риск на сделку не назначен: ни одно неравенство не считается")
+    @DisplayName("U1.14 — максимальный риск на сделку не принят: ни одно неравенство не считается")
     void u1_14_anUnassignedRiskAppetiteNumberStopsThePass() {
         harness.givenAppetite(appetite(null, 3));
 
@@ -152,9 +153,9 @@ class PrecheckInputGateTest {
     }
 
     @Test
-    @DisplayName("U1.15 — строки риск-аппетита нет вовсе: первым мерится порог серии убытков")
-    void u1_15_anAbsentAppetiteRowFailsOnTheLossStreakLimitFirst() {
-        harness.givenAppetite(null);
+    @DisplayName("U1.15 — ни одно число риск-аппетита не принято: первым мерится порог серии убытков")
+    void u1_15_anEmptyAcceptedAppetiteFailsOnTheLossStreakLimitFirst() {
+        harness.givenAppetite(RiskAppetite.builder().build());
 
         assertSingleCode(workingContext(), RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED);
     }

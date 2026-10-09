@@ -14,7 +14,6 @@ import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.config.ExchangeContourProperties;
 import com.example.tradingcore.config.PnlReconciliationProperties;
 import com.example.tradingcore.domain.command.DealActionState;
@@ -32,20 +31,20 @@ import com.example.tradingcore.domain.command.executor.MarkDealClosedExecutor;
 import com.example.tradingcore.domain.command.executor.MarkDealEmergencyClosedExecutor;
 import com.example.tradingcore.domain.command.executor.MarkDealErrorExecutor;
 import com.example.tradingcore.domain.deal.DealTerminalGate;
+import com.example.tradingcore.domain.model.RiskAppetite;
 import com.example.tradingcore.domain.safety.AnomalyReportService;
 import com.example.tradingcore.domain.safety.HoldSignal;
 import com.example.tradingcore.domain.safety.LossStreakCounter;
+import com.example.tradingcore.domain.service.RiskAppetiteService;
 import com.example.tradingcore.persistence.service.DealActionStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import com.example.tradingcore.util.Constants;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -79,7 +78,7 @@ class DealTerminalEdgeTest {
     private final AnomalyReportService reports = mock(AnomalyReportService.class);
     private final CoreEventWriter coreEventWriter = mock(CoreEventWriter.class);
     private final ExchangeAccountDataService accounts = mock(ExchangeAccountDataService.class);
-    private final TenantRiskAppetiteDataService tenants = mock(TenantRiskAppetiteDataService.class);
+    private final RiskAppetiteService tenants = mock(RiskAppetiteService.class);
     private final ExchangeContourProperties contourProperties = new ExchangeContourProperties();
     private final PnlReconciliationProperties toleranceProperties = new PnlReconciliationProperties();
 
@@ -105,7 +104,7 @@ class DealTerminalEdgeTest {
                 new DealResultCalculator(contourProperties), reconciliationCalculator, featuresWriter,
                 terminalGate, lossStreakCounter, reports, coreEventWriter);
         errorExecutor = new MarkDealErrorExecutor(dealDataService, actionStates);
-        when(tenants.findByTenantInternalId(anyString())).thenReturn(Optional.empty());
+        when(tenants.getAccepted()).thenReturn(RiskAppetite.builder().build());
         // Ребро применилось — умолчание МОКА обратное, и это несущее:
         // непрослушанный гард даёт «сделка ушла из-под прохода», то есть
         // тест, забывший о нём, падает, а не проходит молча.
@@ -229,7 +228,7 @@ class DealTerminalEdgeTest {
         contour.setReconciliationExploratory(false);
         Deal deal = finalizedDeal(new BigDecimal("-10"), BigDecimal.ZERO);
         deal.setReconciliationStatus(Deal.ReconciliationStatus.MISMATCHED);
-        when(tenants.findByTenantInternalId(TENANT)).thenReturn(Optional.of(tenantWithLimit(1)));
+        when(tenants.getAccepted()).thenReturn(appetiteWithLossLimit(1));
 
         ServiceCommandExecutionResult result = closedExecutor.execute(command(), anchor(), context(deal, true));
 
@@ -475,10 +474,7 @@ class DealTerminalEdgeTest {
                 .build();
     }
 
-    private static Tenant tenantWithLimit(Integer limit) {
-        Tenant tenant = new Tenant();
-        tenant.setInternalId(TENANT);
-        tenant.setGlobalConsecutiveLossLimit(limit);
-        return tenant;
+    private static RiskAppetite appetiteWithLossLimit(Integer limit) {
+        return RiskAppetite.builder().globalConsecutiveLossLimit(limit).build();
     }
 }

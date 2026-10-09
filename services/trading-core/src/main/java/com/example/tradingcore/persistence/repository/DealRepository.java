@@ -66,7 +66,7 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      *
      * <p>Читатель — обход проактивной детекции: ему тот же вопрос нужен по
      * КАЖДОМУ инструменту контура, и вопрос по одной паре на итерацию дал
-     * бы запрос в цикле длиной в окно контура
+     * бы запрос в цикле длиной в контур площадки
      * (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность ради
      * одного поля»).
      */
@@ -88,6 +88,17 @@ public interface DealRepository extends JpaRepository<DealEntity, Long> {
      * полным: неподтверждённая сделка делает неподтверждённым весь каскад.
      */
     List<DealEntity> findByExchangeAccountIdAndStatusNotIn(Long exchangeAccountId, Collection<String> statuses);
+
+    /**
+     * Нетерминальные сделки названных счетов — живые сделки уровней «счёт» и
+     * «тенант» у преконтроля (docs/rules/risk-policy.md §«Потолки живого
+     * риска счёта и тенанта»). Одна выборка на пачку счетов, а не запрос на
+     * счёт. Окна нет по тому же построению, что у соседней выборки: слот пары
+     * держит не больше одной незакрытой сделки, а усечённый перечень занизил
+     * бы операнд уровня — то есть разрешил бы.
+     */
+    List<DealEntity> findByExchangeAccountIdInAndStatusNotIn(Collection<Long> exchangeAccountIds,
+                                                            Collection<String> statuses);
 
     /** Нетерминальные сделки пары «счёт, инструмент» — популяция радиуса пары. */
     List<DealEntity> findByExchangeAccountIdAndInstrumentIdAndStatusNotIn(Long exchangeAccountId,

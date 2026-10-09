@@ -68,18 +68,13 @@ public interface ExchangeAccountRepository extends JpaRepository<ExchangeAccount
     Optional<String> findSafetyRungById(@Param("id") Long id);
 
     /**
-     * Идентичности тенантов, у которых есть счёт.
-     *
-     * <p>Проекция поля, а не выборка строк: тик заводит место под числа
-     * риск-аппетита по тенантам счетов, и сами счета ему для этого не
-     * нужны (.claude/rules/codestyle.md §«Выборка данных: не тянем сущность
-     * ради одного поля»).
-     *
-     * <p>Запрос объявлен, а не выведен из имени: имя метода выбирает
-     * строки, а не колонку, — производная форма вернула бы сущности.
+     * Счета тенанта в названном реестровом статусе — популяция базы потолка
+     * живого риска тенанта (docs/spec/risk-limits.json, операнд
+     * {@code tenantRiskBase}). Строки целиком, а не проекция поля: читателю
+     * нужны и база, и её валюта, и ключ счёта — по нему собираются живые
+     * сделки уровня.
      */
-    @Query("select distinct a.tenantInternalId from ExchangeAccountEntity a")
-    List<String> findDistinctTenantInternalIds();
+    List<ExchangeAccountEntity> findByTenantInternalIdAndStatus(String tenantInternalId, String status);
 
     /**
      * <b>Write-once первого наблюдения базы риска.</b> Охрана стои́т в

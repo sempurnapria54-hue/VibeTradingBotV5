@@ -234,7 +234,7 @@ class StopLevelAfterActTest {
     /** Контекст группы: процент одновременного риска стратегии задаётся клеткой. */
     private static DealContext context(Deal deal, String strategySimultaneousPercent) {
         return contextBuilder(deal)
-                .strategyDetail(detail("10", "3", strategySimultaneousPercent, "300"))
+                .strategyDetail(detail("10", "3", strategySimultaneousPercent))
                 .build();
     }
 }

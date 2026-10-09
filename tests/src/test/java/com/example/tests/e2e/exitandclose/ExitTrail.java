@@ -78,6 +78,14 @@ public final class ExitTrail {
 
     private static final String OCO_SCENARIO = "oco";
 
+    /**
+     * Глобальный потолок одновременного риска сделки, под которым из двух
+     * входов проходит только нога с ближним стопом: выше её риска на стопе и
+     * ниже риска ноги, связанной поактным бюджетом
+     * ({@link #twoTrancheDefinition(Boolean)}).
+     */
+    private static final String HELD_BACK_DEAL_PERCENT = "0.75";
+
     private static final String ATTACHED_SCENARIO = "attached";
 
     private static final String ENTRY_SCENARIO = "entry";
@@ -253,12 +261,13 @@ public final class ExitTrail {
      * условием входа под сворачиванием заявки не выпускает», предусловия).
      *
      * <p><b>Второй транш удерживает его собственное действие, а не
-     * порядок прогона:</b> номинал его ноги выше катастрофического потолка
-     * сделки, а ноги соседа ниже, — и отказ держится, какой бы из траншей ни
-     * решался первым. Второй риск-создающий вход проходом не решается, и
-     * сосед, вошедший раньше, преконтролю удержанного виден. Отказ временный
-     * и в карв-ауте живого риска, строка исполнения остаётся живой, и транш
-     * стои́т в предвходовой проверке с истинным условием.
+     * порядок прогона:</b> риск на стопе его ноги выше глобального потолка
+     * одновременного риска сделки, а ноги соседа ниже, — и отказ держится,
+     * какой бы из траншей ни решался первым. Второй риск-создающий вход
+     * проходом не решается, и сосед, вошедший раньше, преконтролю удержанного
+     * виден. Отказ временный и в карв-ауте живого риска, строка исполнения
+     * остаётся живой, и транш стои́т в предвходовой проверке с истинным
+     * условием.
      *
      * @param trail   тропа
      * @param entered сколько траншей входит — два либо один
@@ -267,7 +276,7 @@ public final class ExitTrail {
     static String walkToTwoTranches(Trail trail, Integer entered) {
         return walkToTwoTranches(trail, twoTrancheDefinition(entered < 2), entered, () -> {
             if (entered < 2) {
-                riskAppetiteIs(trail, "1", 4);
+                trail.riskAppetiteIs(Map.of(Trail.RISK_DEAL_PERCENT, HELD_BACK_DEAL_PERCENT));
             }
         });
     }
@@ -275,7 +284,7 @@ public final class ExitTrail {
     /**
      * Пролог двух траншей по названному определению: тот же ход, что
      * {@link #walkToTwoTranches(Trail, Integer)}, с ходом после активации —
-     * числа тенанта, которые валидация создания не видит.
+     * числа ядра, которые валидация создания не видит.
      *
      * @param trail           тропа
      * @param definition      тело определения
@@ -330,27 +339,16 @@ public final class ExitTrail {
     }
 
     /**
-     * Глобальный потолок одновременного риска тенанта и порог серии убытков —
-     * поверхностью ядра; катастрофический множитель — тот же, что ставят
-     * общие предусловия.
+     * Порог серии убытков — конфигурацией ядра: ядро поднято заново на своей
+     * базе с названным порогом; прочие числа — числа тропы. Числа
+     * риск-аппетита — ось окружения, и меняются они подъёмом ядра, а не
+     * командой (.claude/decisions/risk-appetite-environment-config.md).
      *
      * @param trail     тропа
-     * @param percent   потолок в процентах
      * @param lossLimit порог серии убытков
      */
-    static void riskAppetiteIs(Trail trail, String percent, Integer lossLimit) {
-        Answer answer = trail.call(Party.TRADING_CORE, "PUT", Trail.CORE + "/risk-appetites/" + trail.tenant(), null,
-                """
-                {
-                  "globalSimultaneousRiskPerDealPercent": %s,
-                  "globalCatastrophicRiskPerDealMultiplier": 100,
-                  "globalConsecutiveLossLimit": %d
-                }
-                """.formatted(percent, lossLimit));
-        if (answer.status() != 200) {
-            throw new IllegalStateException("Предусловие не поставлено: риск-аппетит тенанта — "
-                    + answer.status() + " " + answer.body());
-        }
+    static void lossLimitIs(Trail trail, Integer lossLimit) {
+        trail.riskAppetiteIs(Map.of(Trail.RISK_LOSS_LIMIT, String.valueOf(lossLimit)));
     }
 
     /**
@@ -365,16 +363,22 @@ public final class ExitTrail {
      * одновременного риска детали поднят до двух действий — иначе веер
      * детали отвергла бы валидация создания.
      *
-     * <p><b>Удержание второго объявления — числа, а не правило:</b> стоп его
-     * входа ближе, и размер ноги упирается уже в долю аллокации (47 контрактов
-     * против 31 у соседа). Катастрофический множитель детали — 80: при
-     * глобальном потолке тенанта 1%, который пролог ставит после активации,
-     * потолок номинала сделки лежит между номиналами двух ног (8000 USDT
-     * против 6200 и 9400 при средствах 10000). Создание такой потолок не
-     * отвергает: валидация сверяет объявленный номинал детали с числами
-     * тенанта на момент создания.
+     * <p><b>Удержание второго объявления — числа, а не правило:</b> стоп
+     * входа ПЕРВОГО объявления ближе, и размер его ноги упирается уже в долю
+     * аллокации, а не в бюджет риска (47 контрактов против 31 у второго), —
+     * риск на стопе этой ноги около половины процента базы, тогда как нога
+     * второго, связанная бюджетом, берёт его почти целиком. Глобальный
+     * потолок одновременного риска сделки, который пролог ставит после
+     * активации ({@link #HELD_BACK_DEAL_PERCENT}), лежит между ними. Создание
+     * такой потолок не отвергает: валидация сверяет объявление с числами ядра
+     * на момент создания и активации.
      *
-     * @param secondHeldBack удержан ли вход второго объявления потолком номинала
+     * <p><b>Потолком номинала удержание больше не держится:</b> его правая
+     * часть — предел плеча, принимаемый ядром не ниже единицы, а нога не
+     * выходит за долю аллокации, то есть за одну базу; одна нога выше потолка
+     * номинала стала невыразима (.claude/decisions/deal-leverage-ceiling.md).
+     *
+     * @param secondHeldBack удержан ли вход второго объявления потолком риска сделки
      * @return тело определения
      */
     static String twoTrancheDefinition(Boolean secondHeldBack) {
@@ -397,8 +401,7 @@ public final class ExitTrail {
         entry.set("rules", rules);
         JsonNode second = Json.tree(main.toString().replace("bull_", "bull2_"));
         if (isTrue(secondHeldBack)) {
-            bull.put("strategyCatastrophicRiskPerDealMultiplier", new BigDecimal("80"));
-            ((ObjectNode) second.path("stepsByStatus").path("PRECHECK").get(0).path("actions").get(0)
+            ((ObjectNode) main.path("stepsByStatus").path("PRECHECK").get(0).path("actions").get(0)
                     .path("attachedProtection").path("stopLossSettings")).put("distancePercents", new BigDecimal("50"));
         }
         tranches.add(second);

@@ -52,8 +52,8 @@ class PolicyMatrixTest {
                 .as("деталь стала торгуемой: объявлений у неё нет")
                 .hasSize(1);
         assertThat(matching(violations, "STRATEGY_RISK_NUMBER_NOT_DECLARED"))
-                .as("и ни одного из четырёх риск-чисел")
-                .hasSize(4);
+                .as("и ни одного из трёх риск-чисел")
+                .hasSize(3);
     }
 
     @Test
@@ -87,8 +87,8 @@ class PolicyMatrixTest {
 
         assertThat(matching(violations, NOT_ALLOWED)).isEmpty();
         assertThat(violations)
-                .as("одно нарушение объявлений и четыре риск-числа")
-                .hasSize(5);
+                .as("одно нарушение объявлений и три риск-числа")
+                .hasSize(4);
     }
 
     @Test

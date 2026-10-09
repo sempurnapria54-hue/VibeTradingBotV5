@@ -1,19 +1,19 @@
 package com.example.tradingcore.domain.service;
 
 import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
-import com.example.tradingbot.domain.model.core.tenant.Tenant;
 import com.example.tradingcore.domain.account.AccountInstrumentState;
 import com.example.tradingcore.domain.deal.DealContextService;
 import com.example.tradingcore.domain.model.PairCheck;
+import com.example.tradingcore.domain.model.RiskAppetite;
 import com.example.tradingcore.persistence.service.AccountInstrumentStateDataService;
 import com.example.tradingcore.persistence.service.DealDataService;
 import com.example.tradingcore.persistence.service.ExchangeAccountDataService;
 import com.example.tradingcore.persistence.service.InstrumentDataService;
-import com.example.tradingcore.persistence.service.TenantRiskAppetiteDataService;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +25,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * Прикладной слой поверхности ядра: чтения торгового состояния,
- * назначение чисел риск-аппетита и плеча пары.
+ * Прикладной слой поверхности ядра: чтения торгового состояния и принятых
+ * чисел риск-аппетита, назначение плеча пары.
  *
  * <p><b>Отдаёт и принимает ДОМЕННЫЕ модели.</b> Перевод api ↔ domain
  * делает контроллер маппером — это граница слоёв, и сервис её не
@@ -55,7 +55,7 @@ public class TradingSurfaceService {
     private final ExchangeAccountDataService exchangeAccountDataService;
     private final InstrumentDataService instrumentDataService;
     private final AccountInstrumentStateDataService accountInstrumentStateDataService;
-    private final TenantRiskAppetiteDataService tenantRiskAppetiteDataService;
+    private final RiskAppetiteService riskAppetiteService;
 
     /** Биржевой счёт по идентичности; нет — негодный вход вызова. */
     public ExchangeAccount getAccount(String exchangeAccountInternalId) {
@@ -117,31 +117,33 @@ public class TradingSurfaceService {
     }
 
     /**
-     * Числа риск-аппетита тенанта; строки нет — ядро о тенанте ещё не
-     * знает, и пустой ответ отличается от ответа с пустыми числами.
+     * Числа риск-аппетита, принятые ядром при старте: одни на всех тенантов
+     * окружения (docs/rules/risk-policy.md, правило о числах риск-аппетита).
      */
-    public Tenant getRiskAppetite(String tenantInternalId) {
-        return tenantRiskAppetiteDataService.findByTenantInternalId(tenantInternalId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Tenant risk appetite row not found: " + tenantInternalId));
-    }
-
-    /**
-     * Назначить числа риск-аппетита тенанта. Снимок намерения целиком:
-     * непереданное поле стирает прежнее число.
-     */
-    public Tenant applyRiskAppetite(String tenantInternalId, Tenant appetite) {
-        appetite.setInternalId(tenantInternalId);
-        return tenantRiskAppetiteDataService.applyRiskAppetite(appetite);
+    public RiskAppetite getRiskAppetite() {
+        return riskAppetiteService.getAccepted();
     }
 
     /**
      * Назначить торговые настройки счёта на инструменте. Держатель
      * назначает только плечо (docs/rules/trading-constraints.md); прочие поля
      * пары пишут свои писатели, и из запрошенного состояния они не берутся.
+     *
+     * <p><b>Плечо не выше предела плеча конфигурации</b>, и пустой предел
+     * назначение отвергает — сверять не с чем. Снять плечо можно всегда.
+     * Отказ — негодный вход вызова (класс {@code INVALID_REQUEST},
+     * docs/rules/error-handling-policy.md): предусловие операции не
+     * выполнено, и чинить его — запросом либо пределом окружения. Это первая
+     * из двух проверок предела: вторая — преконтроль акта, создающего риск,
+     * на случай предела, пониженного после назначения.
      */
     public AccountInstrumentState applyPairSettings(Long exchangeAccountId, String instrumentInternalId,
                                                     AccountInstrumentState requested) {
+        RiskAppetite appetite = riskAppetiteService.getAccepted();
+        if (isFalse(appetite.leverageAssignable(requested.getLeverage()))) {
+            throw new IllegalArgumentException("Leverage " + requested.getLeverage()
+                    + " is not assignable: max leverage limit is " + appetite.getGlobalMaxLeverage());
+        }
         Long instrumentId = instrumentDataService.getRequiredIdByInternalId(instrumentInternalId);
         return accountInstrumentStateDataService.assignLeverage(exchangeAccountId, instrumentId,
                 requested.getLeverage());

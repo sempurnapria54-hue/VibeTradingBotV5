@@ -287,7 +287,7 @@ class StreamReconnectPathTest {
                 "/api/v1/statistics/aggregates/rows?grain=INCIDENT&from=" + day + "&to=" + day,
                 Trail.STRATEGIES,
                 Trail.CORE + "/deals?exchangeAccountInternalId=" + prologue.account(),
-                Trail.CORE + "/risk-appetites/" + prologue.tenant());
+                Trail.CORE + "/risk-appetite");
         Map<String, JsonNode> answers = new LinkedHashMap<>();
         for (String path : paths) {
             Answer answer = trail.callWith(token, Party.BFF, "GET", path, null, null);

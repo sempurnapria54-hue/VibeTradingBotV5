@@ -125,6 +125,12 @@ class AccessContourBoxTest extends SharedAuditBox {
      */
     private static final String HEALTH_GROUPS = "groups";
 
+    /** Группа пробы живости: состояние процесса. */
+    private static final String LIVENESS_GROUP = "/actuator/health/liveness";
+
+    /** Группа пробы готовности: процесс плюс база. */
+    private static final String READINESS_GROUP = "/actuator/health/readiness";
+
     /** Имена открытых точек: ими сверяется перечень экспозиции. */
     private static final List<String> EXPOSED_ENDPOINTS = List.of("health", "prometheus");
 
@@ -234,6 +240,29 @@ class AccessContourBoxTest extends SharedAuditBox {
         assertThat(rows.count(DENIALS_TABLE))
                 .as("открытая точка следа отказа не заводит")
                 .isZero();
+    }
+
+    /**
+     * Группы проб развёртывания — подпути того же открытого исключения
+     * {@code /actuator/health/**}, а не новые открытые точки. Манифест
+     * спрашивает именно их ({@code deploy/base/services/audit.yaml}), и
+     * закрытая группа гасила бы под отказом {@code 401}, а не состоянием.
+     * Готовность включает базу: в ящике она поднята, и группа отвечает
+     * {@code UP}.
+     */
+    @Test
+    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
+    void theProbeGroupsAreOpenAndAnswerWithState() {
+        Answer liveness = getAnonymously(LIVENESS_GROUP);
+        Answer readiness = getAnonymously(READINESS_GROUP);
+
+        assertThat(liveness.status()).isEqualTo(200);
+        assertThat(liveness.asObject().get(HEALTH_STATUS)).isEqualTo("UP");
+        assertThat(readiness.status()).isEqualTo(200);
+        assertThat(readiness.asObject().get(HEALTH_STATUS)).isEqualTo("UP");
+        assertThat(readiness.asObject())
+                .as("группа отвечает состоянием, а не подробностями о базе")
+                .containsOnlyKeys(HEALTH_STATUS);
     }
 
     @Test
