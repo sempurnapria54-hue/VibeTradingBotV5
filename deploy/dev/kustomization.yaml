@@ -30,7 +30,7 @@ images:
   - name: registry.invalid/vibetrading/audit
     newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/trading-core
-    newTag: 0.0.1-40bb9b8b-20261009123404
+    newTag: 0.0.1-a3fe2abf-20261009180311
   - name: registry.invalid/vibetrading/market-data
     newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/connector-okx

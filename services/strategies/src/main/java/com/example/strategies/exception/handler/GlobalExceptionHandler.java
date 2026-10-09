@@ -111,9 +111,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * Сосед отказал осознанно либо тропа к нему не настроена: наш дефект,
-     * повтором не лечится. Запись в журнале — по тому же доводу, что у
-     * недоступности.
+     * Сосед отказал осознанно, тропа к нему не настроена либо его ответ
+     * расходится с контрактом: наш дефект, повтором не лечится. Запись в
+     * журнале — по тому же доводу, что у недоступности.
      */
     @ExceptionHandler(PeerReadException.class)
     public ResponseEntity<ErrorApiResponse> onPeerRefused(PeerReadException failure, HttpServletRequest request) {

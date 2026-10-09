@@ -4,7 +4,6 @@ import static java.util.Objects.isNull;
 
 import com.example.strategy.engine.condition.ConditionEvaluationContext;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceSource;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.ConstantValueType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.IndicatorComponent;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
@@ -277,11 +276,10 @@ final class ConditionFixture {
         return operand;
     }
 
-    /** Ценовой операнд с объявленным источником. */
-    static StrategyConditionOperand price(StrategyPriceSource source) {
+    /** Ценовой операнд — последняя цена сделки; полей у него нет. */
+    static StrategyConditionOperand price() {
         StrategyConditionOperand operand = new StrategyConditionOperand();
         operand.setSourceType(StrategyConditionSourceType.PRICE);
-        operand.setPriceSource(source);
         return operand;
     }
 

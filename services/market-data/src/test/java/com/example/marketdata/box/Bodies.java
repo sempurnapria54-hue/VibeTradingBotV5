@@ -154,8 +154,38 @@ final class Bodies {
                         "level": 1,
                         "ruleType": "PRICE_COMPARE",
                         "operator": "%s",
-                        "leftOperand": {"sourceType": "PRICE", "priceSource": "LAST_PRICE"},
+                        "leftOperand": {"sourceType": "PRICE"},
                         "rightOperand": {"sourceType": "CONSTANT", "valueType": "NUMBER", "value": "%s"}
+                      }
+                    ]
+                  }
+                }
+                """.formatted(phaseType, operator, value);
+    }
+
+    /**
+     * Та же ценовая клауза, какой её сериализует ядро ДО сужения грамматики:
+     * правило несёт таймфрейм, ценовой операнд — источник цены, операнд-константа
+     * — тот же ключ пустым (умолчание включения пустых полей у провода ядра).
+     *
+     * <p><b>Ключи сняты из домена, а не переименованы:</b> у читателя им
+     * соответствовать нечему, и предмет клетки — что тело с ними принимается
+     * и отвечает тем же, что без них (docs/rules/strategy-condition-contract.md
+     * §«Грамматика объявляет только исполняемое»).
+     */
+    static String pricePhaseRuleWithRetiredKeys(String phaseType, String operator, String value) {
+        return """
+                {
+                  "type": "%s",
+                  "condition": {
+                    "rules": [
+                      {
+                        "level": 1,
+                        "ruleType": "PRICE_COMPARE",
+                        "timeframe": "ONE_MINUTE",
+                        "operator": "%s",
+                        "leftOperand": {"sourceType": "PRICE", "priceSource": "LAST_PRICE"},
+                        "rightOperand": {"sourceType": "CONSTANT", "priceSource": null, "valueType": "NUMBER", "value": "%s"}
                       }
                     ]
                   }

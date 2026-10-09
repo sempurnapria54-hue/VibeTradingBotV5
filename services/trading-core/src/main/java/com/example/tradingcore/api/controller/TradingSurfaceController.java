@@ -125,7 +125,7 @@ public class TradingSurfaceController {
      */
     @Operation(summary = "Принятые ядром числа риск-аппетита окружения")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Числа отданы; пустое поле — число не принято")})
+            @ApiResponse(responseCode = "200", description = "Числа отданы: все шесть заданы всегда")})
     @GetMapping("/risk-appetite")
     public RiskAppetiteApiResponse getRiskAppetite() {
         return mapper.domainToApi(tradingSurfaceService.getRiskAppetite());
@@ -136,15 +136,13 @@ public class TradingSurfaceController {
      * держателя (docs/rules/trading-constraints.md). Пока плеча нет,
      * risk-creating действие по паре отвергается. Форма назначения —
      * {@code PUT} снимком намерения целиком: непереданное поле стирает
-     * прежнее значение. Плечо выше предела конфигурации и всякое плечо при
-     * пустом пределе отвергаются.
+     * прежнее значение. Плечо выше предела конфигурации отвергается.
      */
     @Operation(summary = "Назначить торговые настройки счёта на инструменте")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Настройки назначены"),
             @ApiResponse(responseCode = "400", description = "Негодное тело запроса, плечо выше предела плеча"
-                    + " конфигурации либо предел не принят, либо счёт или инструмент с такой идентичностью"
-                    + " не найдены")})
+                    + " конфигурации либо счёт или инструмент с такой идентичностью не найдены")})
     @PutMapping("/pair-settings/{exchangeAccountInternalId}/{instrumentInternalId}")
     public AccountInstrumentStateApiResponse applyPairSettings(
             @PathVariable String exchangeAccountInternalId, @PathVariable String instrumentInternalId,

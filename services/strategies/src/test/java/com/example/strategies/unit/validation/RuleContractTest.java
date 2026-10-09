@@ -5,6 +5,7 @@ import static com.example.strategies.unit.validation.ValidationFixture.constantO
 import static com.example.strategies.unit.validation.ValidationFixture.decimal;
 import static com.example.strategies.unit.validation.ValidationFixture.entryStep;
 import static com.example.strategies.unit.validation.ValidationFixture.indicatorOperand;
+import static com.example.strategies.unit.validation.ValidationFixture.matching;
 import static com.example.strategies.unit.validation.ValidationFixture.newOperand;
 import static com.example.strategies.unit.validation.ValidationFixture.newRule;
 import static com.example.strategies.unit.validation.ValidationFixture.reference;
@@ -23,15 +24,12 @@ import org.junit.jupiter.api.Test;
  * Контракт по типу правила — группа {@code U28} документа
  * `.claude/tests/cases/strategy-definition-validation.md`.
  *
- * <p><b>Дома у группы нет, и это находка, а не умолчание</b>
- * ({@code F6}): минимальный набор операндов по типу правила не объявлен
- * ни одним доком, модель и контракт авторинга говорят обратное, а
- * javadoc предмета адресует файл, которого в корпусе не существует.
- * Носитель ожиданий поэтому — звено кода
- * {@code StrategyDefinitionValidator#validateRuleContract}.
- *
- * <p><b>Контракт инкрементален:</b> тип, которого он не описывает,
- * нарушения не даёт, и это утверждение о предмете, а не пропуск кейса.
+ * <p><b>Дом группы</b> — docs/rules/strategy-condition-contract.md
+ * §«Правило и операнды» и §«Грамматика объявляет только исполняемое»: тип
+ * правила задаёт его поля ТОЧНО — названное обязательно, неназванное
+ * отвергается ({@code STRATEGY_CONDITION_FIELD_NOT_READ}), а операнд
+ * сравнения и пересечения скалярен ({@code STRATEGY_CONDITION_OPERAND_NOT_SCALAR}).
+ * Тип, чья строка не называет ни одного поля, без полей нарушения не даёт.
  */
 class RuleContractTest {
 
@@ -40,6 +38,12 @@ class RuleContractTest {
 
     /** Реджект объёмного фильтра на неиндикаторном операнде. */
     private static final String VOLUME_NOT_INDICATOR = "STRATEGY_VOLUME_FILTER_OPERAND_NOT_INDICATOR";
+
+    /** Реджект поля, которого оценка типа не читает. */
+    private static final String FIELD_NOT_READ = "STRATEGY_CONDITION_FIELD_NOT_READ";
+
+    /** Реджект нескалярного операнда сравнения либо пересечения. */
+    private static final String NOT_SCALAR = "STRATEGY_CONDITION_OPERAND_NOT_SCALAR";
 
     @Test
     @DisplayName("U28.1 — базовая сборка: правила несут операторы и операнды своего типа")
@@ -80,18 +84,20 @@ class RuleContractTest {
      * (docs/rules/strategy-condition-contract.md §«Тип без операнда не
      * объявляется»). Прежнее имя отвергает создание разбором перечня — той
      * же ветвью, что всякое неизвестное (группа {@code U29}), а не
-     * контрактом типа.
+     * контрактом типа. Таймфрейм отвергается сам по себе: поля таймфрейма у
+     * правила нет независимо от типа.
      */
     @Test
-    @DisplayName("U28.5 — снятый тип закрытия свечи: имя вне перечня, контракт не считается")
+    @DisplayName("U28.5 — снятый тип закрытия свечи с таймфреймом: имя вне перечня и поле, которого нет")
     void u28_5_theRetiredCandleClosedNameIsAnUnknownRuleType() {
         StrategyConditionRuleApiModel rule = newRule("CANDLE_CLOSED");
         rule.setTimeframe("FIVE_MINUTES");
 
-        assertThat(violationsOfRule(rule))
-                .singleElement()
-                .asString()
-                .contains(".ruleType: unknown value CANDLE_CLOSED");
+        List<String> violations = violationsOfRule(rule);
+
+        assertThat(violations).hasSize(2);
+        assertThat(matching(violations, ".ruleType: unknown value CANDLE_CLOSED")).hasSize(1);
+        assertThat(matching(violations, ".timeframe " + FIELD_NOT_READ)).hasSize(1);
     }
 
     @Test
@@ -516,6 +522,174 @@ class RuleContractTest {
                 .contains(".ruleType: unknown value MOON_PHASE");
     }
 
+    @Test
+    @DisplayName("U28.42 — сравнение индикаторов с оператором CROSSED_ABOVE: оператор сравнения — одно из шести")
+    void u28_42_aComparisonAcceptsOnlyAComparisonOperator() {
+        StrategyConditionRuleApiModel rule = newRule("INDICATOR_COMPARE");
+        rule.setOperator("CROSSED_ABOVE");
+        rule.setLeftOperand(indicatorOperand("ema_fast_15m"));
+        rule.setRightOperand(indicatorOperand("ema_slow_15m"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("INDICATOR_COMPARE accepts only a comparison operator")
+                .contains("got CROSSED_ABOVE");
+    }
+
+    @Test
+    @DisplayName("U28.43 — сравнение индикатора с константой-перечнем: операнд не скалярен")
+    void u28_43_anEnumConstantIsNotAComparisonScalar() {
+        StrategyConditionRuleApiModel rule = newRule("INDICATOR_COMPARE");
+        rule.setOperator("GT");
+        rule.setLeftOperand(indicatorOperand("ema_fast_15m"));
+        rule.setRightOperand(constantOperand("ENUM", "BULL_TREND"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".rightOperand " + NOT_SCALAR);
+    }
+
+    @Test
+    @DisplayName("U28.44 — сравнение цены с операндом структуры: операнд не скалярен")
+    void u28_44_aStructureOperandIsNotAComparisonScalar() {
+        StrategyConditionRuleApiModel rule = newRule("PRICE_COMPARE");
+        rule.setOperator("GT");
+        rule.setLeftOperand(priceOperand());
+        rule.setRightOperand(structureOperand());
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".rightOperand " + NOT_SCALAR);
+    }
+
+    @Test
+    @DisplayName("U28.45 — пересечение индикатора с операндом фазы: операнд не скалярен")
+    void u28_45_aPhaseOperandIsNotACrossoverScalar() {
+        assertThat(violationsOfRule(crossover(indicatorOperand("ema_fast_15m"), newOperand("MARKET_PHASE"))))
+                .singleElement()
+                .asString()
+                .contains(".rightOperand " + NOT_SCALAR);
+    }
+
+    @Test
+    @DisplayName("U28.46 — утверждение о фазе с индикатором вместо операнда фазы: требуется операнд фазы")
+    void u28_46_aPhaseAssertionRequiresAPhaseOperand() {
+        StrategyConditionRuleApiModel rule = newRule("MARKET_PHASE_IS");
+        rule.setOperator("EQ");
+        rule.setLeftOperand(indicatorOperand("ema_fast_15m"));
+        rule.setRightOperand(constantOperand("ENUM", "BULL_TREND"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains("MARKET_PHASE_IS requires a MARKET_PHASE operand");
+    }
+
+    @Test
+    @DisplayName("U28.47 — объёмный фильтр с оператором и правым операндом: оба поля не читаются")
+    void u28_47_aVolumeFilterReadsNeitherOperatorNorRightOperand() {
+        StrategyConditionRuleApiModel rule = newRule("VOLUME_FILTER_PASSED");
+        rule.setOperator("GT");
+        rule.setLeftOperand(indicatorOperand("ema_fast_15m"));
+        rule.setRightOperand(constantOperand("NUMBER", "1"));
+
+        List<String> violations = violationsOfRule(rule);
+
+        assertThat(violations).hasSize(2);
+        assertThat(matching(violations, ".operator " + FIELD_NOT_READ)).hasSize(1);
+        assertThat(matching(violations, ".rightOperand " + FIELD_NOT_READ)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("U28.48 — смена тренда с операндом-константой фазы: операнд не читается")
+    void u28_48_aTrendChangeReadsNoOperand() {
+        StrategyConditionRuleApiModel rule = newRule("TREND_CHANGED");
+        rule.setLeftOperand(constantOperand("ENUM", "RANGE"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".leftOperand " + FIELD_NOT_READ);
+    }
+
+    @Test
+    @DisplayName("U28.49 — порог прибыли с процентом и операндом-константой: порог читается только полем")
+    void u28_49_aProfitThresholdReadsNoOperand() {
+        StrategyConditionRuleApiModel rule = newRule("PROFIT_PERCENTS_REACHED");
+        rule.setPercents(decimal("2"));
+        rule.setRightOperand(constantOperand("NUMBER", "2"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".rightOperand " + FIELD_NOT_READ);
+    }
+
+    @Test
+    @DisplayName("U28.50 — подтверждённый пробой с процентом: буфер — параметр резолвера, не поле условия")
+    void u28_50_aBreakoutReadsNoPercents() {
+        StrategyConditionRuleApiModel rule = newRule("RANGE_BREAKOUT_CONFIRMED");
+        rule.setOperator("EQ");
+        rule.setLeftOperand(structureOperand());
+        rule.setRightOperand(constantOperand("ENUM", "UP"));
+        rule.setPercents(decimal("0.5"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".percents " + FIELD_NOT_READ);
+    }
+
+    @Test
+    @DisplayName("U28.51 — годное сравнение индикаторов с таймфреймом правила: поля таймфрейма нет")
+    void u28_51_aRuleTimeframeIsNotRead() {
+        StrategyConditionRuleApiModel rule = newRule("INDICATOR_COMPARE");
+        rule.setOperator("GT");
+        rule.setLeftOperand(indicatorOperand("ema_fast_15m"));
+        rule.setRightOperand(indicatorOperand("ema_slow_15m"));
+        rule.setTimeframe("FIFTEEN_MINUTES");
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".timeframe " + FIELD_NOT_READ);
+    }
+
+    @Test
+    @DisplayName("U28.52 — индикаторный операнд с ключом структуры: поле не читается")
+    void u28_52_anIndicatorOperandReadsNoStructureKey() {
+        StrategyConditionOperandApiModel indicator = indicatorOperand("ema_fast_15m");
+        indicator.setStructureKey("phase_structure_1h");
+        StrategyConditionRuleApiModel rule = newRule("INDICATOR_COMPARE");
+        rule.setOperator("GT");
+        rule.setLeftOperand(indicator);
+        rule.setRightOperand(indicatorOperand("ema_slow_15m"));
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".leftOperand.structureKey " + FIELD_NOT_READ);
+    }
+
+    @Test
+    @DisplayName("U28.53 — операнд-константа с ключом индикатора: поле не читается")
+    void u28_53_aConstantOperandReadsNoIndicatorKey() {
+        StrategyConditionOperandApiModel constant = constantOperand("NUMBER", "50");
+        constant.setIndicatorKey("ema_slow_15m");
+        StrategyConditionRuleApiModel rule = newRule("INDICATOR_COMPARE");
+        rule.setOperator("GTE");
+        rule.setLeftOperand(indicatorOperand("ema_fast_15m"));
+        rule.setRightOperand(constant);
+
+        assertThat(violationsOfRule(rule))
+                .singleElement()
+                .asString()
+                .contains(".rightOperand.indicatorKey " + FIELD_NOT_READ);
+    }
+
     /** Нарушения дерева, у которого условие входного шага заменено названным правилом. */
     private List<String> violationsOfRule(StrategyConditionRuleApiModel rule) {
         CreateStrategyApiRequest request = reference();
@@ -539,9 +713,8 @@ class RuleContractTest {
         return operand;
     }
 
+    /** Ценовой операнд — последняя цена сделки; полей у него нет. */
     private StrategyConditionOperandApiModel priceOperand() {
-        StrategyConditionOperandApiModel operand = newOperand("PRICE");
-        operand.setPriceSource("LAST_PRICE");
-        return operand;
+        return newOperand("PRICE");
     }
 }

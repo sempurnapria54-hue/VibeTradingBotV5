@@ -1,7 +1,6 @@
 package com.example.tradingcore.domain.safety;
 
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.BooleanUtils.isNotTrue;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
@@ -86,13 +85,12 @@ public class LossStreakCounter {
 
     /**
      * Предел достигнут. Предел — число риск-аппетита, принятое ядром из
-     * конфигурации окружения, одно на все счета. Порог не принят —
-     * срабатывать нечему: торговля уже отвергнута преконтролем кодом
-     * незаданного числа, и провизорное значение здесь не подставляется.
+     * конфигурации окружения, одно на все счета; у работающего ядра оно
+     * задано всегда (docs/rules/risk-policy.md, правило о числах
+     * риск-аппетита).
      */
     private Boolean haltTriggered(Integer countAfter) {
-        Integer limit = riskAppetiteService.getAccepted().getGlobalConsecutiveLossLimit();
-        return nonNull(limit) && countAfter >= limit;
+        return countAfter >= riskAppetiteService.getAccepted().getGlobalConsecutiveLossLimit();
     }
 
     private Integer zeroIfNull(Integer value) {

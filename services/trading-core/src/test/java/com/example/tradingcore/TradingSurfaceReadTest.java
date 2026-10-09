@@ -1,6 +1,5 @@
 package com.example.tradingcore;
 
-import static java.util.Objects.isNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -208,10 +207,7 @@ class TradingSurfaceReadTest {
         return state;
     }
 
-    /**
-     * Чтение принятых чисел: все шесть едут наружу маппером, пустое число
-     * остаётся пустым, а не нулём.
-     */
+    /** Чтение принятых чисел: все шесть едут наружу маппером своими значениями. */
     @Test
     void theAcceptedAppetiteIsReadWithAllSixNumbers() {
         when(appetites.getAccepted()).thenReturn(RiskAppetite.builder()
@@ -219,7 +215,7 @@ class TradingSurfaceReadTest {
                 .globalSimultaneousRiskPerAccountPercent(new BigDecimal("10"))
                 .globalSimultaneousRiskPerTenantPercent(new BigDecimal("30"))
                 .globalCumulativeRiskPerDealMultiplier(new BigDecimal("2"))
-                .globalMaxLeverage(null)
+                .globalMaxLeverage(new BigDecimal("10"))
                 .globalConsecutiveLossLimit(3)
                 .build());
 
@@ -229,7 +225,7 @@ class TradingSurfaceReadTest {
         assertThat(response.getGlobalSimultaneousRiskPerAccountPercent()).isEqualByComparingTo("10");
         assertThat(response.getGlobalSimultaneousRiskPerTenantPercent()).isEqualByComparingTo("30");
         assertThat(response.getGlobalCumulativeRiskPerDealMultiplier()).isEqualByComparingTo("2");
-        assertThat(response.getGlobalMaxLeverage()).as("не принятое число остаётся пустым").isNull();
+        assertThat(response.getGlobalMaxLeverage()).isEqualByComparingTo("10");
         assertThat(response.getGlobalConsecutiveLossLimit()).isEqualTo(3);
     }
 
@@ -259,18 +255,14 @@ class TradingSurfaceReadTest {
         verify(pairStates, never()).assignLeverage(any(), any(), any());
     }
 
-    /** Предел не принят — назначать плечо не с чем сверять, отказ; снять плечо можно. */
+    /** Снять плечо можно всегда: снятие пределом не сверяется. */
     @Test
-    void anyLeverageIsRefusedWhileTheLimitIsNotAcceptedButClearingIsNot() {
+    void aLeverageCanAlwaysBeCleared() {
         givenAccount();
-        givenMaxLeverage(null);
+        givenMaxLeverage("10");
         when(instruments.getRequiredIdByInternalId(FIRST_INSTRUMENT_INTERNAL_ID)).thenReturn(FIRST_INSTRUMENT_ID);
         when(pairStates.assignLeverage(ACCOUNT_ID, FIRST_INSTRUMENT_ID, null))
                 .thenReturn(pairState(FIRST_INSTRUMENT_ID, Instrument.SafetyRung.ACTIVE));
-
-        assertThatThrownBy(() -> controller.applyPairSettings(ACCOUNT_INTERNAL_ID, FIRST_INSTRUMENT_INTERNAL_ID,
-                leverageRequest(1)))
-                .isInstanceOf(IllegalArgumentException.class);
 
         controller.applyPairSettings(ACCOUNT_INTERNAL_ID, FIRST_INSTRUMENT_INTERNAL_ID, leverageRequest(null));
 
@@ -279,7 +271,7 @@ class TradingSurfaceReadTest {
 
     private void givenMaxLeverage(String maxLeverage) {
         when(appetites.getAccepted()).thenReturn(RiskAppetite.builder()
-                .globalMaxLeverage(isNull(maxLeverage) ? null : new BigDecimal(maxLeverage))
+                .globalMaxLeverage(new BigDecimal(maxLeverage))
                 .build());
     }
 

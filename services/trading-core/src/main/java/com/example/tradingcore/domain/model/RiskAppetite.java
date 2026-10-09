@@ -13,9 +13,10 @@ import lombok.Value;
  * (docs/rules/risk-policy.md §«Числа назначает держатель; пустое место —
  * отказ»; основание формы — .claude/decisions/risk-appetite-environment-config.md).
  *
- * <p><b>Пустое поле — «число не принято»</b>: в окружении его нет либо приём
- * его отверг (область определения, цепочка процентов). Читается оно как
- * ОТКАЗ действия, на котором стоит, а не как ноль и не как умолчание.
+ * <p><b>Пустых полей у принятого набора не бывает:</b> число, которого в
+ * окружении нет либо которое приём отверг (область определения, цепочка
+ * процентов), роняет старт ядра, а не доезжает до читателей пустым. Пусто
+ * поле бывает только у кандидата внутри приёма — до его вердикта.
  *
  * <p><b>Значение одно на всех тенантов окружения</b> и живёт в памяти
  * процесса: носителя в базе у него нет, а наружу его переносит api-модель
@@ -63,9 +64,10 @@ public class RiskAppetite {
     /**
      * Цепочка процентов {@code сделка ≤ счёт ≤ тенант} нарушена — вложенность
      * потолков (docs/rules/risk-policy.md §«Четыре потолка на разные
-     * вопросы»). Сверяется каждая пара, у которой оба числа есть: пустое
-     * звено цепочку не рвёт, но и не скрывает нарушения между соседями
-     * через себя.
+     * вопросы»). Спрашивает его приём, у которого кандидат может нести
+     * пустое звено — непринятое по области; поэтому сверяется каждая пара, у
+     * которой оба числа есть: пустое звено цепочку не рвёт, но и не скрывает
+     * нарушения между соседями через себя.
      */
     public Boolean percentChainBroken() {
         return exceeds(globalSimultaneousRiskPerDealPercent, globalSimultaneousRiskPerAccountPercent)
@@ -74,38 +76,22 @@ public class RiskAppetite {
     }
 
     /**
-     * Тот же набор без трёх процентов — исход приёма при нарушенной цепочке:
-     * какой из них ошибочен, из отношения не выводится, и не принимается ни
-     * один.
-     */
-    public RiskAppetite withoutPercents() {
-        return toBuilder()
-                .globalSimultaneousRiskPerDealPercent(null)
-                .globalSimultaneousRiskPerAccountPercent(null)
-                .globalSimultaneousRiskPerTenantPercent(null)
-                .build();
-    }
-
-    /**
-     * Плечо выше принятого предела. Пустой предел и пустое плечо ответа
-     * «выше» не дают: их отсутствие отвергается своими кодами
-     * (docs/rules/trading-constraints.md).
+     * Плечо выше принятого предела. Пустое плечо ответа «выше» не даёт: его
+     * отсутствие отвергается своим кодом (docs/rules/trading-constraints.md).
      */
     public Boolean leverageAboveLimit(Integer leverage) {
-        return nonNull(globalMaxLeverage) && nonNull(leverage)
-                && new BigDecimal(leverage).compareTo(globalMaxLeverage) > 0;
+        return nonNull(leverage) && new BigDecimal(leverage).compareTo(globalMaxLeverage) > 0;
     }
 
     /**
      * Назначение плеча пары допустимо: снять плечо можно всегда, а
-     * назначить — только при принятом пределе и не выше него. Пустой предел
-     * отвергает назначение — сверять не с чем.
+     * назначить — не выше принятого предела.
      */
     public Boolean leverageAssignable(Integer leverage) {
         if (isNull(leverage)) {
             return true;
         }
-        return nonNull(globalMaxLeverage) && isFalse(leverageAboveLimit(leverage));
+        return isFalse(leverageAboveLimit(leverage));
     }
 
     private static boolean exceeds(BigDecimal lower, BigDecimal upper) {

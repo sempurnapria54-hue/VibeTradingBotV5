@@ -331,7 +331,7 @@ class ExchangeCommandsBoxTest extends SharedConnectorBox {
      * ({@code docs/models/mapping/Position.md} §«OKX close-position request body»).
      */
     @Test
-    @DisplayName("Закрытие позиции с режимом маржи записи уходит этим режимом")
+    @DisplayName("B2.16 — закрытие позиции с режимом маржи записи уходит этим режимом")
     void aPositionClosureWithAMarginModeTravelsWithThatMode() {
         exchange.answers(OkxConstants.TRADE_CLOSE_POSITION_PATH,
                 Okx.ok(Okx.acceptedAck("ord-close-1", "")));

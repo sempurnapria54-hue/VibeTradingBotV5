@@ -185,7 +185,7 @@ class KillSwitchOutsideDealsTest {
      * назначает документ кейсов.
      */
     @Test
-    @DisplayName("Кросс-запись на инструменте сделки: закрыта своим режимом, позиция сделки не тронута")
+    @DisplayName("U15.9 — кросс-запись на инструменте сделки: закрыта своим режимом, позиция сделки не тронута")
     void aForeignMarginModeRecordOnADealInstrumentIsClosedInItsOwnMode() {
         List<Deal> population = deals(deal(73L));
         when(instruments.findExternalIdsByIds(any())).thenReturn(new HashSet<>(Set.of(INSTRUMENT_EXTERNAL_ID)));
@@ -205,7 +205,7 @@ class KillSwitchOutsideDealsTest {
      * закрытие, держит радиус неподтверждённым. Метки клетка не несёт.
      */
     @Test
-    @DisplayName("Кросс-запись пережила закрытие: радиус не подтверждён")
+    @DisplayName("U15.10 — кросс-запись пережила закрытие: радиус не подтверждён")
     void aSurvivingForeignMarginModeRecordLeavesTheScopeUnconfirmed() {
         when(exchange.getPositions(ACCOUNT_INTERNAL_ID)).thenReturn(List.of(cross(FOREIGN_INSTRUMENT)));
 

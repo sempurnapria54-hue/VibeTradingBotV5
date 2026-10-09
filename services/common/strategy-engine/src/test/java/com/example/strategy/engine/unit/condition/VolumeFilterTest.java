@@ -13,7 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategy.engine.condition.ConditionEvaluationContext;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceSource;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperator;
@@ -99,7 +98,7 @@ class VolumeFilterTest {
     @Test
     @DisplayName("U6.6 — левый операнд — цена: ложь при любом прошлом")
     void u6_6_aPriceOperandHasNoPastForTheFilter() {
-        StrategyCondition condition = filter(price(StrategyPriceSource.LAST_PRICE), null, null);
+        StrategyCondition condition = filter(price(), null, null);
 
         assertThat(evaluator.evaluate(condition, priceContext("120", "100")))
                 .as("растущая цена фильтра не проходит: прошлого у неё нет")

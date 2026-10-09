@@ -27,8 +27,6 @@ import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Типы без исполнения: журнальная ветвь и константная истина — группа
@@ -85,20 +83,16 @@ class UnevaluableRuleTypeTest {
     }
 
     /**
-     * Три типа источника операнда, объявленных перечнем грамматики:
-     * создание разрешает их в клаузе фазы, интерпретатор не резолвит и о
-     * том НЕ сообщает — молчаливая ложь.
+     * Операнд фазы как СКАЛЯР сравнения не резолвится: его читает только
+     * равенство фазы, и о том интерпретатор не сообщает — молчаливая ложь.
      *
-     * <p>Поле момента оценки в контексте при этом не читает никто —
-     * находка `F-6`. <b>Охрана второго рубежа:</b> сравнивающему правилу
-     * создание требует операнд названного источника, и пара
-     * «нерезолвимый источник плюс константа» его не несёт.
+     * <p><b>Охрана второго рубежа:</b> операнд сравнения скалярен, и операнд
+     * фазы создание отвергает ({@code STRATEGY_CONDITION_OPERAND_NOT_SCALAR}).
      */
-    @ParameterizedTest(name = "тип источника {0}: ложь без записи журнала")
-    @EnumSource(value = StrategyConditionSourceType.class, names = {"TIME", "BALANCE", "MARKET_PHASE"})
-    @DisplayName("U12.5-U12.7 — три типа источника операнда: ложь БЕЗ записи журнала")
-    void u12_5_to_u12_7_theUnresolvedSourceTypesAreSilentlyFalse(StrategyConditionSourceType sourceType) {
-        assertUnresolvedSourceIsSilentlyFalse(sourceType);
+    @Test
+    @DisplayName("U12.7 — операнд фазы в сравнении: ложь БЕЗ записи журнала")
+    void u12_7_aPhaseOperandIsNotAComparisonScalar() {
+        assertUnresolvedSourceIsSilentlyFalse(StrategyConditionSourceType.MARKET_PHASE);
     }
 
     /** Структура есть, второго операнда нет — ложь без записи журнала. */
@@ -115,31 +109,17 @@ class UnevaluableRuleTypeTest {
         }
     }
 
-    /**
-     * Остальные типы источника того же класса: одна ветвь
-     * ({@code #resolveScalar}, {@code default}), шесть имён — три покрыты
-     * строками `U12.5`-`U12.7`.
-     *
-     * <p>Строка добрана под-шагом 3 по пробелу `G2`.
-     */
-    @ParameterizedTest(name = "U12.9 — тип источника {0}: ложь без записи журнала")
-    @EnumSource(value = StrategyConditionSourceType.class, names = {"POSITION", "ORDER", "ALGO_ORDER"})
-    @DisplayName("U12.9 — три оставшихся типа источника без исполнения: ложь БЕЗ записи журнала")
-    void u12_9_theRemainingUnresolvedSourceTypesAreSilentlyFalse(StrategyConditionSourceType sourceType) {
-        assertUnresolvedSourceIsSilentlyFalse(sourceType);
-    }
-
     private void assertUnresolvedSourceIsSilentlyFalse(StrategyConditionSourceType sourceType) {
         StrategyCondition condition = condition(rule(StrategyConditionRuleType.INDICATOR_COMPARE,
                 StrategyConditionOperator.GT, operandOfSource(sourceType), number("10")));
 
         try (EvaluatorLogCapture log = EvaluatorLogCapture.attach()) {
             assertThat(evaluator.evaluate(condition, context()))
-                    .as("тип источника %s объявлен перечнем и не резолвится", sourceType)
+                    .as("тип источника %s скаляром сравнения не резолвится", sourceType)
                     .isFalse();
 
             assertThat(log.messages())
-                    .as("о нерезолвленном источнике интерпретатор не сообщает — молчаливая ложь")
+                    .as("о нерезолвленном скаляре интерпретатор не сообщает — молчаливая ложь")
                     .isEmpty();
         }
     }

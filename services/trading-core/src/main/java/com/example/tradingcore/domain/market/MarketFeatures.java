@@ -73,9 +73,9 @@ public class MarketFeatures {
      * ровно при вводе нового рыночного операнда грамматики: половина
      * читателей оценивала бы условия на неполном контексте, и молча.
      *
-     * <p>Время оценки здесь не ставится: оно точка отсчёта
-     * {@code TIME}-операндов, то есть свойство момента РЕШЕНИЯ, и ставит
-     * его читатель.
+     * <p>Момента оценки контекст не несёт: ни одно правило грамматики часов
+     * не читает (docs/components/StrategyConditionEvaluator.md §«Контекст
+     * оценки»).
      */
     public ConditionEvaluationContext.ConditionEvaluationContextBuilder conditionOperands() {
         return ConditionEvaluationContext.builder()

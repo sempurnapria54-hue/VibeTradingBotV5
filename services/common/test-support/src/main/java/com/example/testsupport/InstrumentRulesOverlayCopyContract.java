@@ -4,15 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.tradingbot.domain.model.core.instrument.InstrumentExternalRules;
+import com.example.tradingbot.domain.model.core.instrument.PositionTier;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
  * Кейсы навеса справочных правил инструмента: группа `U7`, клетки `U10.3`,
- * `U11.7` и `U13.3` документа `.claude/tests/cases/jsonb-overlay-roundtrip.md`.
+ * `U11.7`, `U13.3` и `U13.6` документа
+ * `.claude/tests/cases/jsonb-overlay-roundtrip.md`.
  *
  * <p><b>Правило изъятия у копий одно, и ожидание объявлено один раз.</b>
  * {@code InstrumentExternalRulesJsonConverter} живёт двумя экземплярами, и
@@ -25,7 +30,10 @@ import org.junit.jupiter.api.Test;
  * предикат формы, а не поле; примесь хранилищного слоя его не задевает, и
  * изъят он на самой модели (§«Состав ключей строки задаёт не перечень
  * полей»). Состав строки пинится литеральным перечнем (`U13.3`): перечень,
- * выведенный из класса формы, уехал бы вместе с переименованием.
+ * выведенный из класса формы, уехал бы вместе с переименованием. Вложенная
+ * форма — строка позиционного тира — пинится своим перечнем (`U13.6`):
+ * пин словом действует на каждом уровне вложенности
+ * (docs/rules/persistence-representation.md §«Состав ключей строки навеса»).
  */
 public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayProbe {
 
@@ -198,7 +206,32 @@ public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayPro
                         "externalMaxStopSize",
                         "externalMaxLeverage",
                         "externalState",
-                        "externalFeeGroupId");
+                        "externalFeeGroupId",
+                        "positionTiers");
+    }
+
+    // --- U13.6: состав ключей вложенной формы — строки тира -------------
+
+    @Test
+    @DisplayName("U13.6 — тир со всеми полями: ключи строки тира равны литеральному перечню")
+    protected void u13_6_theKeysOfAFullPositionTierEqualTheLiteralList() {
+        String json = writeRules(everyFieldRules());
+
+        JsonNode tiers = readTree(json).get("positionTiers");
+
+        assertThat(tiers)
+                .as("U13.6: тиры заполнены — ключ перечня в строке есть")
+                .isNotNull();
+        assertThat(tiers.isArray())
+                .as("U13.6: тиры едут перечнем строк, а не значением")
+                .isTrue();
+        assertThat(keysOf(tiers.get(0).toString()))
+                .as("U13.6: строка позиционного тира — три поля данных записи; предикат "
+                        + "покрытия с параметром ключом не становится")
+                .containsExactlyInAnyOrder(
+                        "minSize",
+                        "maxSize",
+                        "maintenanceMarginRate");
     }
 
     // --- материал кейсов --------------------------------------------------
@@ -227,6 +260,8 @@ public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayPro
         rules.setExternalMaxLeverage("100");
         rules.setExternalState("live");
         rules.setExternalFeeGroupId("1");
+        rules.setPositionTiers(List.of(new PositionTier(
+                new BigDecimal("1"), new BigDecimal("1000"), new BigDecimal("0.004"))));
         return rules;
     }
 

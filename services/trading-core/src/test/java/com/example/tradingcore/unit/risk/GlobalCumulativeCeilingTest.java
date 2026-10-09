@@ -38,7 +38,8 @@ class GlobalCumulativeCeilingTest {
     private final RiskHarness harness = new RiskHarness();
 
     @Test
-    @DisplayName("Взятое плюс риск акта ровно в глобальный потолок: граница включена, сомножитель — процент сделки")
+    @DisplayName("U36.1 — взятое плюс риск акта ровно в глобальный потолок: граница включена, "
+            + "сомножитель — процент сделки")
     void theSumExactlyAtTheGlobalCeilingPasses() {
         givenGlobalMultiplier("2");
 
@@ -48,7 +49,7 @@ class GlobalCumulativeCeilingTest {
     }
 
     @Test
-    @DisplayName("Сумма выше глобального потолка, стратегийный пропускает: отказ своим кодом")
+    @DisplayName("U36.2 — сумма выше глобального потолка, стратегийный пропускает: отказ своим кодом")
     void theSumOverTheGlobalCeilingIsRejectedWhileTheStrategyEditionPasses() {
         givenGlobalMultiplier("2");
 
@@ -59,21 +60,13 @@ class GlobalCumulativeCeilingTest {
     }
 
     @Test
-    @DisplayName("Взятое само выше глобального потолка, риск акта ноль: класс действия неравенства не выключает")
+    @DisplayName("U36.3 — взятое само выше глобального потолка, риск акта ноль: "
+            + "класс действия неравенства не выключает")
     void theDealRiskAloneBreachesTheGlobalCeilingOnAProtectiveAct() {
         givenGlobalMultiplier("2");
 
         assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), context("250"))))
                 .containsExactly(RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED);
-    }
-
-    @Test
-    @DisplayName("Предел множителя не принят: неравенство отказывает вычислением")
-    void anUnacceptedMultiplierRefusesTheInequality() {
-        givenGlobalMultiplier(null);
-
-        assertThat(codes(harness.validate(entryAction(), context("0"))))
-                .containsExactly(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
     }
 
     /** Предел множителя кумулятивного потолка окружения; прочие числа — базовой сборки. */

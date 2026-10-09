@@ -287,7 +287,7 @@ final class TradingCoreSubstrate {
         return values;
     }
 
-    /** Те же оси пустыми: окружение, для которого держатель чисел не назвал. */
+    /** Те же оси пустыми: окружение, для которого держатель чисел не назвал, — ядро в нём не поднимается. */
     static Map<String, String> emptyRiskAppetite() {
         Map<String, String> values = new LinkedHashMap<>();
         RISK_APPETITE_KEYS.forEach(key -> values.put(key, ""));

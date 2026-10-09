@@ -36,12 +36,14 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка</b> — живая сделка: эпизод в десять контрактов по
  * цене 3000 и действующий уровень защиты 2910, то есть живой риск равен
  * 92.955, а экспозиция сделки — 3000. Граф предъявлен целиком, оба числа
- * детали объявлены, максимальный риск на сделку и предел плеча приняты.
+ * детали объявлены, числа риск-аппетита приняты.
  *
  * <p><b>Отсутствие операнда — МОЛЧАНИЕ, а не находка</b>: у клеток
- * U18.6-U18.13 пустой перечень означает «не проверялось», и отличить его
- * от «нарушений нет» второй точке входа нечем по построению — она отдаёт
- * один перечень.
+ * U18.6-U18.9 и U18.13 пустой перечень означает «не проверялось», и
+ * отличить его от «нарушений нет» второй точке входа нечем по построению —
+ * она отдаёт один перечень. Молчание поштучное: незаявленный процент детали
+ * глушит только свою редакцию (U18.11), а числа риск-аппетита окружения у
+ * работающего ядра заданы всегда.
  */
 class CeilingsWithoutActTest {
 
@@ -137,28 +139,14 @@ class CeilingsWithoutActTest {
     }
 
     @Test
-    @DisplayName("U18.10 — максимальный риск на сделку не принят: незаданное число молчит")
-    void u18_10_anUnacceptedDealPercentIsSilence() {
-        harness.givenAppetite(appetite(null, 3));
+    @DisplayName("U18.11 — процент одновременного риска деталью не объявлен: молчит только редакция стратегии")
+    void u18_11_anUndeclaredStrategyPercentSilencesOnlyTheStrategyEdition() {
+        harness.givenAppetite(appetiteWithMaxLeverage("9", "2.999"));
 
-        assertThat(harness.ceilingsBreachedWithoutAct(liveContext("0.9"))).isEmpty();
-    }
-
-    @Test
-    @DisplayName("U18.11 — процент одновременного риска деталью не объявлен: перечень пуст")
-    void u18_11_anUndeclaredStrategyPercentIsSilence() {
-        assertThat(harness.ceilingsBreachedWithoutAct(liveContext(null))).isEmpty();
-    }
-
-    @Test
-    @DisplayName("U18.12 — предел плеча не принят: молчит потолок нотинала, а не весь перечень")
-    void u18_12_anUnacceptedMaxLeverageSilencesOnlyTheNotionalCeiling() {
-        harness.givenAppetite(appetiteWithMaxLeverage("9", null));
-
-        assertThat(codesOf(harness.ceilingsBreachedWithoutAct(smallBaseContext("9"))))
-                .as("экспозиция 3000 потолком нотинала не мерится, одновременные — мерятся")
-                .containsExactly(RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED,
-                        RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED);
+        assertThat(codesOf(harness.ceilingsBreachedWithoutAct(smallBaseContext(null))))
+                .as("живой риск 92.955 против глобальных 90, экспозиция 3000 против 2.999 × 1000 — мерятся")
+                .containsExactly(RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED,
+                        RiskCheckCode.DEAL_NOTIONAL_EXCEEDED);
     }
 
     @Test

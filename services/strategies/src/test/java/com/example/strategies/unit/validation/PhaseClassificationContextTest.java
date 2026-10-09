@@ -30,13 +30,16 @@ import org.junit.jupiter.api.Test;
  * тип на шаге транша законен, и кейс предъявляет обе стороны: иначе он
  * был бы зелен у валидатора, запрещающего тип везде.
  *
- * <p><b>Контракт типа правила считается в ОБОИХ контекстах</b>, а
- * перечни оператора и таймфрейма — только у правила шага: ровно это
- * расхождение и предъявляют красные клетки группы (находка {@code F4}).
+ * <p><b>Правило клаузы проходит ту же тропу, что правило шага</b>: набор
+ * полей по типу, перечень оператора, снятый таймфрейм и контракт типа
+ * считаются в обоих контекстах, а белые списки — сверх них только здесь.
  */
 class PhaseClassificationContextTest {
 
     private static final String RULE_NOT_ALLOWED = "is not allowed in market phase classification context";
+
+    /** Реджект поля, которого оценка типа не читает. */
+    private static final String FIELD_NOT_READ = "STRATEGY_CONDITION_FIELD_NOT_READ";
 
     /** Клауза бычьего тренда — сравнение двух скользящих средних. */
     private static final int TREND_CLAUSE = 1;
@@ -64,8 +67,14 @@ class PhaseClassificationContextTest {
                 .contains(".ruleType: unknown value MOON_PHASE");
     }
 
+    /**
+     * Обход правила продолжается и после отказа белого списка: поля правила
+     * сверяются набором его типа. Порог прибыли операндов не читает, и
+     * унаследованные от клаузы оператор и операнды отвергаются как поля, а не
+     * разбираются внутрь — ссылка операнда поэтому не сверяется.
+     */
     @Test
-    @DisplayName("U26.3 — тип правила вне белого списка: операнды проверяются дальше")
+    @DisplayName("U26.3 — тип правила вне белого списка: поля правила проверяются дальше")
     void u26_3_aForbiddenRuleTypeDoesNotStopTheOperandTraversal() {
         CreateStrategyApiRequest request = reference();
         StrategyConditionRuleApiModel rule = phaseConditionRule(request, TREND_CLAUSE);
@@ -76,8 +85,8 @@ class PhaseClassificationContextTest {
         List<String> violations = violations(request);
 
         assertThat(matching(violations, ".ruleType PROFIT_PERCENTS_REACHED " + RULE_NOT_ALLOWED)).hasSize(1);
-        assertThat(matching(violations, "references unknown indicator setting key no_such_indicator"))
-                .hasSize(1);
+        assertThat(matching(violations, ".leftOperand " + FIELD_NOT_READ)).hasSize(1);
+        assertThat(matching(violations, "references unknown indicator setting key")).isEmpty();
     }
 
     @Test
@@ -87,6 +96,9 @@ class PhaseClassificationContextTest {
         StrategyConditionRuleApiModel rule = rules(entryStep(bull(request))).get(2);
         rule.setRuleType("PROFIT_PERCENTS_REACHED");
         rule.setPercents(decimal("1"));
+        rule.setOperator(null);
+        rule.setLeftOperand(null);
+        rule.setRightOperand(null);
 
         assertThat(violations(request)).isEmpty();
     }
@@ -104,28 +116,29 @@ class PhaseClassificationContextTest {
         assertThat(matching(violations, "references unknown indicator setting key")).hasSize(1);
     }
 
+    /**
+     * Сверх белого списка операнд фазы в сравнении нескаляр — его отвергает и
+     * контракт типа; предмет клетки — член белого списка.
+     */
     @Test
     @DisplayName("U26.6 — источник операнда — рыночная фаза: классификация не опирается на свой результат")
     void u26_6_theMarketPhaseSourceIsForbiddenInItsOwnClassification() {
         CreateStrategyApiRequest request = reference();
         phaseConditionRule(request, TREND_CLAUSE).setLeftOperand(newOperand("MARKET_PHASE"));
 
-        assertThat(violations(request))
-                .singleElement()
-                .asString()
-                .contains(".sourceType MARKET_PHASE " + RULE_NOT_ALLOWED);
+        assertThat(matching(violations(request), ".sourceType MARKET_PHASE " + RULE_NOT_ALLOWED)).hasSize(1);
     }
 
     @Test
-    @DisplayName("U26.7 — источник операнда — позиция сделки: runtime-состояние недоступно")
-    void u26_7_theRuntimeDealSourceIsForbiddenToo() {
+    @DisplayName("U26.7 — источник операнда — позиция сделки: значение вне перечня, белый список не считается")
+    void u26_7_theRuntimeDealSourceIsNotInTheGrammar() {
         CreateStrategyApiRequest request = reference();
         phaseConditionRule(request, TREND_CLAUSE).setLeftOperand(newOperand("POSITION"));
 
         assertThat(violations(request))
                 .singleElement()
                 .asString()
-                .contains(".sourceType POSITION " + RULE_NOT_ALLOWED);
+                .contains(".leftOperand.sourceType: unknown value POSITION");
     }
 
     @Test
@@ -142,16 +155,16 @@ class PhaseClassificationContextTest {
     }
 
     @Test
-    @DisplayName("U26.9 — таймфрейм правила классификации неизвестен: нарушение перечня")
-    void u26_9_theClauseTimeframeIsCheckedAgainstItsEnum() {
+    @DisplayName("U26.9 — таймфрейм правила классификации объявлен годной строкой: поля таймфрейма нет")
+    void u26_9_theClauseTimeframeIsNotRead() {
         CreateStrategyApiRequest request = reference();
-        phaseConditionRule(request, TREND_CLAUSE).setTimeframe("TEN_MINUTES");
+        phaseConditionRule(request, TREND_CLAUSE).setTimeframe("ONE_HOUR");
 
         assertThat(violations(request))
-                .as("перечень таймфреймов сверяется в обоих контекстах правила")
+                .as("поля таймфрейма у правила нет ни у одного типа и ни в одном контексте")
                 .singleElement()
                 .asString()
-                .contains(".timeframe: unknown value TEN_MINUTES");
+                .contains(".timeframe " + FIELD_NOT_READ);
     }
 
     /**
@@ -178,7 +191,6 @@ class PhaseClassificationContextTest {
         CreateStrategyApiRequest request = reference();
         StrategyConditionRuleApiModel rule = phaseConditionRule(request, TREND_CLAUSE);
         StrategyConditionOperandApiModel price = newOperand("PRICE");
-        price.setPriceSource("LAST_PRICE");
         StrategyConditionOperandApiModel constant = newOperand("CONSTANT");
         constant.setValueType("NUMBER");
         constant.setValue("100");
@@ -198,9 +210,7 @@ class PhaseClassificationContextTest {
     @DisplayName("U26.11 — утверждение о структуре без операнда-константы: контракт считается в обоих контекстах")
     void u26_11_theRuleContractIsEvaluatedInTheClauseContextToo() {
         CreateStrategyApiRequest request = reference();
-        StrategyConditionOperandApiModel price = newOperand("PRICE");
-        price.setPriceSource("LAST_PRICE");
-        phaseConditionRule(request, RANGE_CLAUSE).setRightOperand(price);
+        phaseConditionRule(request, RANGE_CLAUSE).setRightOperand(newOperand("PRICE"));
 
         assertThat(violations(request))
                 .singleElement()
@@ -208,19 +218,22 @@ class PhaseClassificationContextTest {
                 .contains("MARKET_STRUCTURE_IS requires a CONSTANT operand with the structure type");
     }
 
+    /**
+     * Ценовой операнд в сравнении клаузы законен — индикатор против цены, —
+     * и отказ один: источника цены у операнда нет ни в одном контексте.
+     */
     @Test
-    @DisplayName("U26.12 — ценовой операнд клаузы с индексной ценой: отказ недоступного источника и здесь")
-    void u26_12_anUnavailablePriceSourceIsRejectedInTheClauseContextToo() {
+    @DisplayName("U26.12 — ценовой операнд клаузы с индексной ценой: поля источника цены нет и здесь")
+    void u26_12_aPriceSourceIsNotReadInTheClauseContextToo() {
         CreateStrategyApiRequest request = reference();
         StrategyConditionOperandApiModel price = newOperand("PRICE");
         price.setPriceSource("INDEX_PRICE");
-        phaseConditionRule(request, RANGE_CLAUSE).setRightOperand(price);
+        phaseConditionRule(request, TREND_CLAUSE).setRightOperand(price);
 
-        // Контракт типа правила отказывает тем же операндом (U26.11); предмет
-        // клетки — второй член перечня, адресованный путём клаузы.
         assertThat(violations(request))
-                .anySatisfy(violation -> assertThat(violation)
-                        .contains("marketPhaseSetting.phaseRules[")
-                        .contains(".rightOperand.priceSource STRATEGY_PRICE_SOURCE_UNAVAILABLE"));
+                .singleElement()
+                .asString()
+                .contains("marketPhaseSetting.phaseRules[")
+                .contains(".rightOperand.priceSource " + FIELD_NOT_READ);
     }
 }

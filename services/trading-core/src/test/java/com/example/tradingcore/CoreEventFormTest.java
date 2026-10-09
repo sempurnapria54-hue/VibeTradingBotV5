@@ -712,7 +712,8 @@ class CoreEventFormTest {
                 new DealReconciliationCalculator(contourProperties, new PnlReconciliationProperties());
         DealTerminalFeaturesWriter featuresWriter =
                 new DealTerminalFeaturesWriter(reconciliationCalculator, contourProperties, reports);
-        when(tenants.getAccepted()).thenReturn(RiskAppetite.builder().build());
+        // Предел серии задан всегда; клетка формы события его не достигает.
+        when(tenants.getAccepted()).thenReturn(RiskAppetite.builder().globalConsecutiveLossLimit(1000).build());
         // Терминальное ребро применилось: умолчание мока обратное, и факт
         // на неприменившемся ребре не публикуется по построению.
         when(dealDataService.applyTerminalEdge(any(), any())).thenReturn(true);

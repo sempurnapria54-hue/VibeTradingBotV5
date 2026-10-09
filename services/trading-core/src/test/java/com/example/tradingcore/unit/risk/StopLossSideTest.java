@@ -115,7 +115,7 @@ class StopLossSideTest {
     }
 
     @Test
-    @DisplayName("Живой эпизод: стоп входа сетки в полосе над ценой своей ноги — отказ стороной")
+    @DisplayName("U6.10 — живой эпизод: стоп входа сетки в полосе над ценой своей ноги — отказ стороной")
     void aGridEntryStopInTheBandAboveItsOwnLegIsRejected() {
         RiskValidationResult result = harness.validate(entryAction("5", GRID_LEG_PRICE, "2901"),
                 liveEpisodeContext(StrategyTradeDirection.LONG));
@@ -127,7 +127,7 @@ class StopLossSideTest {
     }
 
     @Test
-    @DisplayName("Живой эпизод: тот же вход сетки со стопом за ценой своей ноги проходит сторону")
+    @DisplayName("U6.11 — живой эпизод: тот же вход сетки со стопом за ценой своей ноги проходит сторону")
     void aGridEntryStopBehindItsOwnLegPasses() {
         assertThat(codes(harness.validate(entryAction("5", GRID_LEG_PRICE, "2850"),
                 liveEpisodeContext(StrategyTradeDirection.LONG))))
@@ -135,7 +135,7 @@ class StopLossSideTest {
     }
 
     @Test
-    @DisplayName("Живой эпизод, короткая сделка: стоп входа сетки в полосе под ценой своей ноги — отказ")
+    @DisplayName("U6.12 — живой эпизод, короткая сделка: стоп входа сетки в полосе под ценой своей ноги — отказ")
     void aShortGridEntryStopInTheBandBelowItsOwnLegIsRejected() {
         RiskValidationResult result = harness.validate(entryAction("5", new BigDecimal("3100"), "3099"),
                 liveEpisodeContext(StrategyTradeDirection.SHORT));
@@ -145,7 +145,7 @@ class StopLossSideTest {
     }
 
     @Test
-    @DisplayName("Живой эпизод: защитное создание своей ноги не имеет — вторая мера не читается")
+    @DisplayName("U6.13 — живой эпизод: защитное создание своей ноги не имеет — вторая мера не читается")
     void aProtectiveCreationDoesNotReadTheOwnLegMeasure() {
         assertThat(codes(harness.validate(withPrice(protectionAction("2940"), price(GRID_LEG_PRICE, "2940")),
                 liveEpisodeContext(StrategyTradeDirection.LONG))))

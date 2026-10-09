@@ -97,13 +97,6 @@ class CatastrophicNotionalCeilingTest {
     }
 
     @Test
-    @DisplayName("U15.4 — предел плеча не принят: неравенство не считается")
-    void u15_4_anUnacceptedMaxLeverageStopsTheInequality() {
-        assertThat(codes(harness.validate(entryAction(), liveContext(null))))
-                .containsExactly(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
-    }
-
-    @Test
     @DisplayName("U15.5 — первый вход сделки: операнд — только нотинал акта")
     void u15_5_theFirstEntryCountsOnlyItsOwnNotional() {
         assertThat(codes(harness.validate(entryAction(), emptyContext("3"))))
@@ -197,7 +190,7 @@ class CatastrophicNotionalCeilingTest {
         return entryLeg(Order.Status.ACTIVE, "0", plannedSize, filled);
     }
 
-    /** Контекст базовой сборки группы с названным пределом плеча; пусто — предел не принят. */
+    /** Контекст базовой сборки группы с названным пределом плеча. */
     private DealContext liveContext(String maxLeverage) {
         return contextWith(episode("10", ANCHOR), List.of(), maxLeverage);
     }

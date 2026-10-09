@@ -60,7 +60,6 @@ public class RiskBlockResolver {
             RiskCheckCode.STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION,
             RiskCheckCode.STOP_LOSS_BEYOND_MARK_PRICE,
             RiskCheckCode.PROTECTION_COVERAGE_REDUCED,
-            RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED,
             RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
             RiskCheckCode.LEVERAGE_NOT_CONFIGURED,
             RiskCheckCode.BALANCE_NOT_ENOUGH,

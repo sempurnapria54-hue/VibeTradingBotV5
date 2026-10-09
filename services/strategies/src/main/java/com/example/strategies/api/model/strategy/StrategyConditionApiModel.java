@@ -12,7 +12,7 @@ import lombok.Setter;
 public class StrategyConditionApiModel {
 
     @Valid
-    @Schema(description = "Правила условия; проверяются по level ASC, истинны должны быть все. "
+    @Schema(description = "Правила условия; истинны должны быть все, порядок ответа не меняет. "
             + "Перечень непуст — непустоту проверяет валидатор с кодом STRATEGY_CONDITION_EMPTY, "
             + "а не аннотация: код с аннотацией был бы недостижим",
             requiredMode = Schema.RequiredMode.REQUIRED)

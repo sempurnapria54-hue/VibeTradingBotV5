@@ -20,8 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategies.api.model.request.CreateStrategyApiRequest;
 import com.example.strategies.api.model.strategy.StrategyAlgoOrderActionApiModel;
-import com.example.strategies.api.model.strategy.StrategyConditionOperandApiModel;
-import com.example.strategies.api.model.strategy.StrategyConditionRuleApiModel;
 import com.example.strategies.api.model.strategy.StrategyPricePlacementApiModel;
 import com.example.strategies.api.model.strategy.StrategyStepApiModel;
 import java.util.List;
@@ -102,21 +100,15 @@ class EnumDomainTest {
         assertThat(matching(violations, "strategy.marketStructureSettings")).hasSize(1);
     }
 
+    /** У правила поля таймфрейма нет вовсе — его отказ другим кодом, `U28.51`. */
     @Test
-    @DisplayName("U29.6 — таймфрейм: у параметров индикатора, у настройки структуры и у правила шага")
-    void u29_6_theTimeframeOfThreeCarriers() {
+    @DisplayName("U29.6 — таймфрейм: у параметров индикатора и у настройки структуры")
+    void u29_6_theTimeframeOfTwoCarriers() {
         CreateStrategyApiRequest request = reference();
         indicator(request, "atr_15m").getParams().setTimeframe("TEN_MINUTES");
         structure(request, "phase_structure_1h").setTimeframe("TEN_MINUTES");
-        List<StrategyConditionRuleApiModel> entryRules = rules(entryStep(bull(request)));
-        // Тип без контракта: таймфрейм правила сверяется перечнем при любом типе.
-        StrategyConditionRuleApiModel timeframed = new StrategyConditionRuleApiModel();
-        timeframed.setLevel(entryRules.size() + 1);
-        timeframed.setRuleType("TREND_CHANGED");
-        timeframed.setTimeframe("TEN_MINUTES");
-        entryRules.add(timeframed);
 
-        assertThat(matching(violations(request), "timeframe: " + UNKNOWN + " TEN_MINUTES")).hasSize(3);
+        assertThat(matching(violations(request), "timeframe: " + UNKNOWN + " TEN_MINUTES")).hasSize(2);
     }
 
     @Test
@@ -190,19 +182,16 @@ class EnumDomainTest {
         assertThat(matching(violations(request), ".sourceType: " + UNKNOWN + " ORACLE")).hasSize(1);
     }
 
+    /** У ценового операнда условия поля источника нет вовсе — его отказ другим кодом, `U27.16`. */
     @Test
-    @DisplayName("U29.14 — источник рыночной цены: у операнда и у размещения")
-    void u29_14_thePriceSourceOfTwoCarriers() {
+    @DisplayName("U29.14 — источник рыночной цены размещения")
+    void u29_14_thePlacementPriceSource() {
         CreateStrategyApiRequest request = reference();
-        StrategyConditionOperandApiModel operand = rules(entryStep(bull(request))).get(2).getLeftOperand();
-        operand.setIndicatorKey(null);
-        operand.setSourceType("PRICE");
-        operand.setPriceSource("ORACLE_PRICE");
         StrategyPricePlacementApiModel placement = newPlacement("MARKET_PRICE");
         placement.setPriceSource("ORACLE_PRICE");
         entryAction(bull(request)).setPlacement(placement);
 
-        assertThat(matching(violations(request), "priceSource: " + UNKNOWN + " ORACLE_PRICE")).hasSize(2);
+        assertThat(matching(violations(request), "priceSource: " + UNKNOWN + " ORACLE_PRICE")).hasSize(1);
     }
 
     @Test

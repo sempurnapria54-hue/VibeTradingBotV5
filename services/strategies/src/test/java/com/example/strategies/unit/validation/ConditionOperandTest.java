@@ -4,6 +4,7 @@ import static com.example.strategies.unit.validation.ValidationFixture.bull;
 import static com.example.strategies.unit.validation.ValidationFixture.entryStep;
 import static com.example.strategies.unit.validation.ValidationFixture.indicator;
 import static com.example.strategies.unit.validation.ValidationFixture.matching;
+import static com.example.strategies.unit.validation.ValidationFixture.phaseConditionRule;
 import static com.example.strategies.unit.validation.ValidationFixture.reference;
 import static com.example.strategies.unit.validation.ValidationFixture.rules;
 import static com.example.strategies.unit.validation.ValidationFixture.violations;
@@ -23,9 +24,15 @@ import org.junit.jupiter.api.Test;
  * `domain-model-predicates`).
  *
  * <p><b>Разбор операнда ветвится ИСТОЧНИКОМ</b>: у индикаторного
- * проверяются ссылка и компонент, у структурного — ссылка, у ценового —
- * перечень источника цены, у константы — тип значения и само значение.
- * Неразобранный источник выключает все четыре ветви разом.
+ * проверяются ссылка и компонент, у структурного — ссылка, у константы —
+ * тип значения и само значение; у ценового полей нет вовсе, и источник
+ * цены отвергается как поле, которого оценка не читает
+ * (docs/rules/strategy-condition-contract.md §«Грамматика объявляет только
+ * исполняемое»). Неразобранный источник выключает все ветви разом.
+ *
+ * <p><b>Структурный операнд несёт клауза диапазона</b> — утверждение о
+ * структуре: в сравнении он нескаляр, и его отказ заслонял бы предмет
+ * клетки.
  *
  * <p><b>Компонент проверяется от ТИПА разрешённого индикатора</b>:
  * неразрешённая ссылка выключает его целиком, и клетка называет это
@@ -38,6 +45,12 @@ class ConditionOperandTest {
 
     /** Правило сравнения с константой — носитель константного операнда. */
     private static final int CONSTANT_RULE = 3;
+
+    /** Клауза диапазона — утверждение о структуре, носитель структурного операнда. */
+    private static final int RANGE_CLAUSE = 0;
+
+    /** Реджект поля, которого оценка не читает. */
+    private static final String FIELD_NOT_READ = "STRATEGY_CONDITION_FIELD_NOT_READ";
 
     @Test
     @DisplayName("U27.1 — базовая сборка: операнды правил ссылаются на настройки стратегии")
@@ -96,22 +109,19 @@ class ConditionOperandTest {
     }
 
     @Test
-    @DisplayName("U27.6 — источник цена, источник цены не объявлен: сверка безусловна")
-    void u27_6_aPriceOperandChecksItsSourceUnconditionally() {
+    @DisplayName("U27.6 — источник цена, источник цены не объявлен: единственная форма ценового операнда")
+    void u27_6_aPriceOperandCarriesNoFields() {
         CreateStrategyApiRequest request = reference();
         StrategyConditionOperandApiModel operand = leftOf(request, COMPARE_RULE);
         operand.setIndicatorKey(null);
         operand.setSourceType("PRICE");
 
-        assertThat(violations(request))
-                .singleElement()
-                .asString()
-                .contains(".leftOperand.priceSource: unknown value null");
+        assertThat(violations(request)).isEmpty();
     }
 
     @Test
-    @DisplayName("U27.16 — ценовой операнд с марк-ценой: отказ кодом недоступного источника")
-    void u27_16_aMarkPricedOperandIsRejectedAsUnavailable() {
+    @DisplayName("U27.16 — ценовой операнд с марк-ценой: поля источника цены нет")
+    void u27_16_aMarkPricedOperandIsRejectedAsAnUnreadField() {
         CreateStrategyApiRequest request = reference();
         StrategyConditionOperandApiModel operand = leftOf(request, COMPARE_RULE);
         operand.setIndicatorKey(null);
@@ -121,28 +131,29 @@ class ConditionOperandTest {
         assertThat(violations(request))
                 .singleElement()
                 .asString()
-                .contains(".leftOperand.priceSource STRATEGY_PRICE_SOURCE_UNAVAILABLE");
+                .contains(".leftOperand.priceSource " + FIELD_NOT_READ);
     }
 
     @Test
-    @DisplayName("U27.17 — ценовой операнд с последней ценой: отказа нет")
-    void u27_17_aLastPricedOperandPasses() {
+    @DisplayName("U27.17 — ценовой операнд с последней ценой: поле отвергается, а не сверяется")
+    void u27_17_aLastPricedOperandIsRejectedToo() {
         CreateStrategyApiRequest request = reference();
         StrategyConditionOperandApiModel operand = leftOf(request, COMPARE_RULE);
         operand.setIndicatorKey(null);
         operand.setSourceType("PRICE");
         operand.setPriceSource("LAST_PRICE");
 
-        assertThat(violations(request)).isEmpty();
+        assertThat(violations(request))
+                .singleElement()
+                .asString()
+                .contains(".leftOperand.priceSource " + FIELD_NOT_READ);
     }
 
     @Test
     @DisplayName("U27.7 — источник структура, ключ структуры опущен: ссылка обязательна")
     void u27_7_aStructureOperandRequiresItsKey() {
         CreateStrategyApiRequest request = reference();
-        StrategyConditionOperandApiModel operand = leftOf(request, COMPARE_RULE);
-        operand.setIndicatorKey(null);
-        operand.setSourceType("MARKET_STRUCTURE");
+        phaseConditionRule(request, RANGE_CLAUSE).getLeftOperand().setStructureKey(null);
 
         assertThat(violations(request))
                 .singleElement()
@@ -154,10 +165,7 @@ class ConditionOperandTest {
     @DisplayName("U27.8 — ключ структуры не резолвится")
     void u27_8_anUnknownStructureKeyDoesNotResolve() {
         CreateStrategyApiRequest request = reference();
-        StrategyConditionOperandApiModel operand = leftOf(request, COMPARE_RULE);
-        operand.setIndicatorKey(null);
-        operand.setSourceType("MARKET_STRUCTURE");
-        operand.setStructureKey("no_such_structure");
+        phaseConditionRule(request, RANGE_CLAUSE).getLeftOperand().setStructureKey("no_such_structure");
 
         assertThat(violations(request))
                 .singleElement()

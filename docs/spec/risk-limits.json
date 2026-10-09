@@ -207,7 +207,7 @@
     {
       "name": "liveRiskBlockReaction",
       "note": "Род реакции карты на отказ преконтроля при живом риске транша, покодово: код из перечня карв-аута — SKIP_ACTION (действие не исполняется, сделка остаётся в статусе и доживает под своей защитой), всякий иной — MOVE_DEAL_TO_ERROR. Отказ по неполноте графа уводит в ERROR на любой стадии и в перечне не стоит. Дом членства — таблица карв-аута docs/processes/risk-evaluation.md; эта величина — её исполнимая форма, и популяция ниже выводит своих членов из той таблицы и из перечня кодов, так что расхождение формы с таблицей роняет прогон.",
-      "expr": "if(in(blockingCode, 'SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET', 'RISK_PER_DEAL_CUMULATIVE_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED', 'RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED', 'RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED', 'RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED', 'DEAL_NOTIONAL_EXCEEDED', 'STOP_DISTANCE_BELOW_FLOOR', 'STOP_LOSS_INVALID_SIDE', 'STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION', 'STOP_LOSS_BEYOND_MARK_PRICE', 'PROTECTION_COVERAGE_REDUCED', 'LOSS_LIMIT_NOT_CONFIGURED', 'RISK_APPETITE_NOT_CONFIGURED', 'LEVERAGE_NOT_CONFIGURED', 'BALANCE_NOT_ENOUGH', 'RISK_CREATING_UNDER_COLLAPSE', 'INSTRUMENT_NOT_LIVE', 'INSTRUMENT_SAFETY_HOLD'), 'SKIP_ACTION', 'MOVE_DEAL_TO_ERROR')"
+      "expr": "if(in(blockingCode, 'SIZE_MIN_LOT_EXCEEDS_RISK_BUDGET', 'RISK_PER_DEAL_CUMULATIVE_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED', 'RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED', 'RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED', 'RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED', 'RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED', 'DEAL_NOTIONAL_EXCEEDED', 'STOP_DISTANCE_BELOW_FLOOR', 'STOP_LOSS_INVALID_SIDE', 'STOP_LOSS_TOO_CLOSE_TO_LIQUIDATION', 'STOP_LOSS_BEYOND_MARK_PRICE', 'PROTECTION_COVERAGE_REDUCED', 'RISK_APPETITE_NOT_CONFIGURED', 'LEVERAGE_NOT_CONFIGURED', 'BALANCE_NOT_ENOUGH', 'RISK_CREATING_UNDER_COLLAPSE', 'INSTRUMENT_NOT_LIVE', 'INSTRUMENT_SAFETY_HOLD'), 'SKIP_ACTION', 'MOVE_DEAL_TO_ERROR')"
     },
     {
       "name": "actWithinPerAction",
@@ -533,12 +533,6 @@
         {
           "member": [
             "RISK_APPETITE_NOT_CONFIGURED",
-            "SKIP_ACTION"
-          ]
-        },
-        {
-          "member": [
-            "LOSS_LIMIT_NOT_CONFIGURED",
             "SKIP_ACTION"
           ]
         },
@@ -3773,15 +3767,6 @@
       "case": "отказ RISK_APPETITE_NOT_CONFIGURED при живом риске транша — карв-аут, действие не исполняется",
       "state": {
         "blockingCode": "RISK_APPETITE_NOT_CONFIGURED"
-      },
-      "expect": {
-        "liveRiskBlockReaction": "SKIP_ACTION"
-      }
-    },
-    {
-      "case": "отказ LOSS_LIMIT_NOT_CONFIGURED при живом риске транша — карв-аут, действие не исполняется",
-      "state": {
-        "blockingCode": "LOSS_LIMIT_NOT_CONFIGURED"
       },
       "expect": {
         "liveRiskBlockReaction": "SKIP_ACTION"

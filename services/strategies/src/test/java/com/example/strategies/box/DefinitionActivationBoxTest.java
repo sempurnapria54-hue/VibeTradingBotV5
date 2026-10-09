@@ -133,8 +133,8 @@ class DefinitionActivationBoxTest extends SharedStrategiesBox {
     }
 
     @Test
-    @DisplayName("B5.5 — Числа сняты после создания: активация отвергается")
-    void b5_5_theNumbersWereWithdrawnAfterTheCreation() {
+    @DisplayName("B5.5 — Ответ ядра без числа на активации: отказ чтения соседа")
+    void b5_5_aCoreAnswerWithoutARiskNumberRejectsTheActivation() {
         peerResolvesEverything();
         String internalId = given(TENANT);
         peer.answers(PEER_RISK_APPETITE,
@@ -143,9 +143,11 @@ class DefinitionActivationBoxTest extends SharedStrategiesBox {
         Answer answer = moveTo(internalId, TENANT, "ACTIVE");
 
         assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(answer.errorCode())
+                .as("операнд не добыт — класс отказа о нарушенном контракте соседа")
+                .isEqualTo("PEER_REFUSED");
         assertThat(answer.errorMessage())
-                .contains("STRATEGY_RISK_APPETITE_NOT_CONFIGURED")
-                .as("операнд не добыт — неравенства не считаются вовсе")
+                .as("неравенства не считаются вовсе")
                 .doesNotContain("_ABOVE_GLOBAL");
         assertThat(statusOf(internalId, TENANT)).isEqualTo("CREATED");
         assertThat(rows.count(OUTBOX_TABLE)).isZero();

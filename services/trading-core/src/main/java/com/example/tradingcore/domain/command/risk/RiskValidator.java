@@ -94,10 +94,14 @@ import org.springframework.stereotype.Component;
  * подменяется.
  *
  * <p><b>Незаданное число ОТКАЗЫВАЕТ вычислением, а не пропускает
- * действие.</b> Правило общее и на числа риск-аппетита окружения, и на
- * числа, объявленные деталью стратегии: неравенство, которое не на чем
- * посчитать, не проверено, а непроверенное благоприятным умолчанием не
- * читается (docs/concept.md П1).
+ * действие.</b> Неравенство, которое не на чем посчитать, не проверено, а
+ * непроверенное благоприятным умолчанием не читается (docs/concept.md П1).
+ *
+ * <p><b>Числа риск-аппетита окружения пустыми не бывают:</b> непринятый
+ * набор роняет старт ядра (docs/rules/risk-policy.md §«Числа назначает
+ * держатель; пустое место — отказ»), поэтому каждое неравенство на них
+ * мерится у всякого проверяемого действия. Пустым бывает только число,
+ * объявленное деталью стратегии, и его пустота отказывает всякому действию.
  */
 @Component
 @RequiredArgsConstructor
@@ -165,15 +169,8 @@ public class RiskValidator {
             return blockedResult(checks, RiskCheckCode.BALANCE_INVALID,
                     "Risk base is missing or non-positive");
         }
+        Boolean riskCreating = isRiskCreatingEntry(calculatedAction.getSourceAction());
         RiskAppetite appetite = riskAppetiteService.getAccepted();
-        if (isNull(appetite.getGlobalConsecutiveLossLimit())) {
-            return blockedResult(checks, RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED,
-                    "globalConsecutiveLossLimit is not accepted from the environment configuration");
-        }
-        if (isNull(appetite.getGlobalSimultaneousRiskPerDealPercent())) {
-            return blockedResult(checks, RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "globalSimultaneousRiskPerDealPercent is not accepted from the environment configuration");
-        }
 
         AccountInstrumentState pairState = accountInstrumentStateDataService
                 .getRequiredByPair(account.getId(), dealContext.getInstrument().getId());
@@ -201,7 +198,7 @@ public class RiskValidator {
         checkLiquidation(calculatedAction, dealContext, rules, pairState, entryAnchor, checks);
         checkCollapseWindow(calculatedAction, dealContext, checks);
         checkSafetyRung(calculatedAction, tranche, direction, pairState, checks);
-        checkCeilings(calculatedAction, dealContext, rules, appetite, base, entryAnchor, checks);
+        checkCeilings(calculatedAction, riskCreating, dealContext, rules, appetite, base, entryAnchor, checks);
 
         return aggregate(checks);
     }
@@ -271,14 +268,6 @@ public class RiskValidator {
                     "Risk base is missing or non-positive");
         }
         RiskAppetite appetite = riskAppetiteService.getAccepted();
-        if (isNull(appetite.getGlobalConsecutiveLossLimit())) {
-            return blockedResult(checks, RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED,
-                    "globalConsecutiveLossLimit is not accepted from the environment configuration");
-        }
-        if (isNull(appetite.getGlobalSimultaneousRiskPerDealPercent())) {
-            return blockedResult(checks, RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "globalSimultaneousRiskPerDealPercent is not accepted from the environment configuration");
-        }
 
         AccountInstrumentState pairState = accountInstrumentStateDataService
                 .getRequiredByPair(account.getId(), dealContext.getInstrument().getId());
@@ -374,8 +363,15 @@ public class RiskValidator {
      * граф, нерезолвенные правила инструмента, пустая база риска,
      * незаявленное число — всё это означает «не проверено», а
      * непроверенное нарушением не читается: ложный триггер остановил бы
-     * входы по инструменту без основания. Молчание поштучное: непринятый
-     * предел плеча снимает только потолок нотинала.
+     * входы по инструменту без основания. <b>Молчание поштучное:</b> операнд
+     * всех трёх неравенств — граф, база, правила, живой риск — снимает весь
+     * перечень, а число детали — только свою редакцию: незаявленный процент
+     * одновременного риска стратегии глушит её, а глобальная редакция и
+     * потолок нотинала мерятся — их числа есть риск-аппетит окружения,
+     * заданный у работающего ядра всегда. Детали нет вовсе — молчит весь
+     * перечень: сделка без закреплённой детали есть восстановленная, и её
+     * главная проверка — сверка экспозиции траншей с эпизодом
+     * (docs/components/DealActiveHandler.md).
      *
      * @return нарушенные неравенства; пусто — нарушений нет либо проверка
      *         не проводилась
@@ -390,11 +386,10 @@ public class RiskValidator {
         InstrumentExternalRules rules = rulesDataService
                 .findByInstrumentId(dealContext.getInstrument().getId(), account.getId())
                 .orElse(null);
-        RiskAppetite appetite = riskAppetiteService.getAccepted();
-        if (isNull(rules) || isNull(appetite.getGlobalSimultaneousRiskPerDealPercent())
-                || isNull(detail.getStrategySimultaneousRiskPerDealPercent())) {
+        if (isNull(rules)) {
             return List.of();
         }
+        RiskAppetite appetite = riskAppetiteService.getAccepted();
         Deal deal = dealContext.getDeal();
         BigDecimal entryAnchor = entryAnchor(deal.livePosition(), null);
         BigDecimal liveRiskNow = liveRiskNow(deal, rules, entryAnchor, deal.currentStopLevel());
@@ -405,14 +400,14 @@ public class RiskValidator {
             return List.of();
         }
         List<RiskCheckResult> checks = new ArrayList<>();
-        checkAgainst(liveRiskNow, percentOf(detail.getStrategySimultaneousRiskPerDealPercent(), base),
-                RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED, "strategy simultaneous ceiling", checks);
+        if (nonNull(detail.getStrategySimultaneousRiskPerDealPercent())) {
+            checkAgainst(liveRiskNow, percentOf(detail.getStrategySimultaneousRiskPerDealPercent(), base),
+                    RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_EXCEEDED, "strategy simultaneous ceiling", checks);
+        }
         checkAgainst(liveRiskNow, percentOf(appetite.getGlobalSimultaneousRiskPerDealPercent(), base),
                 RiskCheckCode.RISK_PER_DEAL_SIMULTANEOUS_GLOBAL_EXCEEDED, "global simultaneous ceiling", checks);
-        if (nonNull(appetite.getGlobalMaxLeverage())) {
-            checkAgainst(dealNotional(deal, rules, entryAnchor), dealNotionalCeiling(appetite, base),
-                    RiskCheckCode.DEAL_NOTIONAL_EXCEEDED, "deal notional ceiling", checks);
-        }
+        checkAgainst(dealNotional(deal, rules, entryAnchor), dealNotionalCeiling(appetite, base),
+                RiskCheckCode.DEAL_NOTIONAL_EXCEEDED, "deal notional ceiling", checks);
         return checks;
     }
 
@@ -426,23 +421,25 @@ public class RiskValidator {
      * вход сравнивал бы с потолком ноль и проходил любым размером —
      * потолок, заведённый против шокового хода, был бы инертен ровно там,
      * где решается размер.
+     *
+     * @param riskCreating проверяемый акт создаёт риск — его операнды
+     *                     (якорь, плановая цена) обязаны быть резолвлены
      */
-    private void checkCeilings(CalculatedStrategyAction calculatedAction, DealContext dealContext,
-                               InstrumentExternalRules rules, RiskAppetite appetite, BigDecimal base,
-                               BigDecimal entryAnchor, List<RiskCheckResult> checks) {
+    private void checkCeilings(CalculatedStrategyAction calculatedAction, Boolean riskCreating,
+                               DealContext dealContext, InstrumentExternalRules rules, RiskAppetite appetite,
+                               BigDecimal base, BigDecimal entryAnchor, List<RiskCheckResult> checks) {
         StrategyDetail detail = dealContext.getStrategyDetail();
         if (isNull(detail) || isNull(detail.getRiskPerActionPercent())) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
                     "riskPerActionPercent is not declared by the pinned strategy detail", null));
             return;
         }
-        if (isTrue(isRiskCreatingEntry(calculatedAction.getSourceAction())) && isNull(entryAnchor)) {
+        if (isTrue(riskCreating) && isNull(entryAnchor)) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.CALCULATED_ACTION_INVALID,
                     "Entry anchor is not resolved: act risk is unmeasured", null));
             return;
         }
-        if (isTrue(isRiskCreatingEntry(calculatedAction.getSourceAction()))
-                && isNull(calculatedAction.getCalculatedPrice().getRoundedPrice())) {
+        if (isTrue(riskCreating) && isNull(calculatedAction.getCalculatedPrice().getRoundedPrice())) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.CALCULATED_ACTION_INVALID,
                     "Act price is not resolved: act notional is unmeasured", null));
             return;
@@ -459,8 +456,8 @@ public class RiskValidator {
         checkGlobalCumulative(deal, appetite, base, actRisk, checks);
         checkSimultaneous(detail, appetite, base, liveRiskAfterAct, actRisk, checks);
         checkDealNotional(dealContext, appetite, rules, base, entryAnchor, actNotional, checks);
-        checkLevelCeilings(dealContext, appetite, liveRiskNow(deal, rules, entryAnchor, deal.currentStopLevel()),
-                liveRiskAfterAct, actRisk, checks);
+        checkLevelCeilings(dealContext, appetite,
+                liveRiskNow(deal, rules, entryAnchor, deal.currentStopLevel()), liveRiskAfterAct, actRisk, checks);
     }
 
     /**
@@ -513,19 +510,12 @@ public class RiskValidator {
      * стратегии сверяется с пределом на создании и активации, но смена чисел
      * активные определения не ревалидирует: без этой проверки пониженный
      * предел остался бы без энфорсера у уже активной стратегии
-     * (.claude/decisions/global-cumulative-risk-ceiling.md). Непринятый
-     * предел отказывает вычислением, а не пропускает действие.
+     * (.claude/decisions/global-cumulative-risk-ceiling.md).
      */
-    private void checkGlobalCumulative(Deal deal, RiskAppetite appetite, BigDecimal base, BigDecimal actRisk,
-                                       List<RiskCheckResult> checks) {
-        BigDecimal multiplier = appetite.getGlobalCumulativeRiskPerDealMultiplier();
-        if (isNull(multiplier)) {
-            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "globalCumulativeRiskPerDealMultiplier is not accepted from the environment configuration",
-                    null));
-            return;
-        }
-        BigDecimal ceiling = percentOf(appetite.getGlobalSimultaneousRiskPerDealPercent(), base).multiply(multiplier);
+    private void checkGlobalCumulative(Deal deal, RiskAppetite appetite, BigDecimal base,
+                                       BigDecimal actRisk, List<RiskCheckResult> checks) {
+        BigDecimal ceiling = percentOf(appetite.getGlobalSimultaneousRiskPerDealPercent(), base)
+                .multiply(appetite.getGlobalCumulativeRiskPerDealMultiplier());
         checkAgainst(zeroIfNull(deal.getPlannedRiskAmount()).add(actRisk), ceiling,
                 RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED, "global cumulative risk ceiling", checks);
     }
@@ -578,17 +568,11 @@ public class RiskValidator {
      * {@code withinDealNotional}). Брутто-плечо сделки к базе и есть
      * отношение её нотинала к базе, поэтому «плечо сделки не выше предела»
      * исполняется этим неравенством (.claude/decisions/deal-leverage-ceiling.md).
-     * Худшего убытка оно не утверждает. Непринятый предел ОТКАЗЫВАЕТ
-     * вычислением, а не пропускает действие.
+     * Худшего убытка оно не утверждает.
      */
-    private void checkDealNotional(DealContext dealContext, RiskAppetite appetite, InstrumentExternalRules rules,
-                                   BigDecimal base, BigDecimal entryAnchor, BigDecimal actNotional,
-                                   List<RiskCheckResult> checks) {
-        if (isNull(appetite.getGlobalMaxLeverage())) {
-            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "globalMaxLeverage is not accepted from the environment configuration", null));
-            return;
-        }
+    private void checkDealNotional(DealContext dealContext, RiskAppetite appetite,
+                                   InstrumentExternalRules rules, BigDecimal base, BigDecimal entryAnchor,
+                                   BigDecimal actNotional, List<RiskCheckResult> checks) {
         checkAgainst(dealNotional(dealContext.getDeal(), rules, entryAnchor).add(actNotional),
                 dealNotionalCeiling(appetite, base),
                 RiskCheckCode.DEAL_NOTIONAL_EXCEEDED, "deal notional ceiling", checks);
@@ -623,8 +607,8 @@ public class RiskValidator {
      *                          и прирост не исключён
      * @param liveRiskAfterAct  живой риск сделки по уровню после акта
      */
-    private void checkLevelCeilings(DealContext dealContext, RiskAppetite appetite, BigDecimal liveRiskBeforeAct,
-                                    BigDecimal liveRiskAfterAct, BigDecimal actRisk,
+    private void checkLevelCeilings(DealContext dealContext, RiskAppetite appetite,
+                                    BigDecimal liveRiskBeforeAct, BigDecimal liveRiskAfterAct, BigDecimal actRisk,
                                     List<RiskCheckResult> checks) {
         if (isNull(liveRiskAfterAct)) {
             return;
@@ -633,30 +617,13 @@ public class RiskValidator {
         if (isFalse(ownLiveRiskRaised(liveRiskBeforeAct, ownAfterAct))) {
             return;
         }
-        BigDecimal accountPercent = appetite.getGlobalSimultaneousRiskPerAccountPercent();
-        BigDecimal tenantPercent = appetite.getGlobalSimultaneousRiskPerTenantPercent();
-        if (isNull(accountPercent)) {
-            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "globalSimultaneousRiskPerAccountPercent is not accepted from the environment configuration",
-                    null));
-        }
-        if (isNull(tenantPercent)) {
-            checks.add(RiskCheckResult.blocked(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                    "globalSimultaneousRiskPerTenantPercent is not accepted from the environment configuration",
-                    null));
-        }
-        if (isNull(accountPercent) && isNull(tenantPercent)) {
-            return;
-        }
         ExchangeAccount account = dealContext.getExchangeAccount();
         List<ExchangeAccount> tenantAccounts = tenantBaseAccounts(account);
         Map<Long, List<BigDecimal>> peerRisks = peerLiveRisks(dealContext.getDeal(), account, tenantAccounts);
-        if (nonNull(accountPercent)) {
-            checkAccountCeiling(account, accountPercent, peerRisks, ownAfterAct, checks);
-        }
-        if (nonNull(tenantPercent)) {
-            checkTenantCeiling(account, tenantPercent, tenantAccounts, peerRisks, ownAfterAct, checks);
-        }
+        checkAccountCeiling(account, appetite.getGlobalSimultaneousRiskPerAccountPercent(), peerRisks, ownAfterAct,
+                checks);
+        checkTenantCeiling(account, appetite.getGlobalSimultaneousRiskPerTenantPercent(), tenantAccounts, peerRisks,
+                ownAfterAct, checks);
     }
 
     /**
@@ -1341,9 +1308,7 @@ public class RiskValidator {
      * <p><b>Плечо выше предела плеча конфигурации у акта, создающего риск, —
      * тот же код.</b> Назначение выше предела отвергает поверхность, но предел
      * мог понизиться после назначения, и назначенное значение перестало быть
-     * допустимым: исход меняется тем же ходом — назначением плеча. Непринятый
-     * предел здесь не сверяется: его пустоту отвергает потолок нотинала своим
-     * кодом.
+     * допустимым: исход меняется тем же ходом — назначением плеча.
      *
      * <p>Пустой биржевой максимум сверять не с чем: его охраняет площадка.
      */
@@ -1388,7 +1353,11 @@ public class RiskValidator {
         }
     }
 
-    /** Risk-creating вход — order-action, открывающий либо наращивающий позицию. */
+    /**
+     * Risk-creating вход — order-action, открывающий либо наращивающий
+     * позицию: класс «risk-creating / increasing» дома
+     * (docs/rules/risk-policy.md §«Риск акта зависит от класса действия»).
+     */
     private Boolean isRiskCreatingEntry(StrategyAction action) {
         if (action instanceof StrategyOrderAction orderAction) {
             return isNotTrue(orderAction.getPositionReducingOnly());

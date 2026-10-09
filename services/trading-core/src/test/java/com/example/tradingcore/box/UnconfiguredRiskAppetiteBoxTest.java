@@ -1,103 +1,73 @@
 package com.example.tradingcore.box;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
-import java.util.List;
+import com.example.tradingcore.TradingCoreApplication;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.boot.builder.SpringApplicationBuilder;
 
 /**
- * Окружение, для которого держатель чисел риск-аппетита не назвал, —
- * клетка {@code B4.9} группы риск-гейта ({@link DealRiskGateBoxTest}).
+ * Окружение, чей набор риск-аппетита ядро не принимает, — клетка {@code B4.9}
+ * двумя половинами, пустой и непринятой: ядро НЕ ПОДНИМАЕТСЯ (docs/rules/risk-policy.md §«Числа
+ * назначает держатель; пустое место — отказ»; основание —
+ * .claude/decisions/risk-appetite-environment-config.md).
  *
- * <p><b>Своя конфигурация контекста, и это ВХОД клетки:</b> числа
- * риск-аппетита — оси окружения, которые ядро принимает при старте
- * (docs/rules/risk-policy.md, правило о числах риск-аппетита), и пустыми
- * их делает только положение осей контекста, а не операция поверхности.
- * Все шесть осей пусты — штатное состояние {@code stage} и {@code prod}.
+ * <p><b>Без {@code @SpringBootTest}, и это следствие предмета:</b> ожидание
+ * клетки — что контекст НЕ поднимается, а поднятый контекст есть
+ * предусловие всякого кейса ящика. Подъём здесь — вход, и производит его
+ * сам кейс; форма та же, что у {@link UnconfiguredAccessContourTest}.
  *
- * <p><b>Плечо пары здесь не назначается:</b> при непринятом пределе плеча
- * назначение отвергает поверхность (docs/rules/trading-constraints.md), и
- * предусловие клетки обходится без него — первым отказом преконтроля
- * остаётся предел серии.
+ * <p><b>Оси подаются АРГУМЕНТАМИ и ЗАМЕНЯЮТ оси субстрата</b> — довод у
+ * шапки {@link UnconfiguredAccessContourTest}: умолчания ниже
+ * {@code application.yaml}, а повторённый ключ командной строки склеивается.
  *
- * <p><b>Своя группа потребителя и своя тема владельца определений</b> —
- * довод у шапки {@link TradingCoreSubstrate}.
+ * <p><b>Причина отказа пинится.</b> Засчитанный любой отказ позеленил бы
+ * клетку и на недоступной базе; здесь корневая причина — исключение
+ * принимающего звена, и его сообщение называет каждое непринятое число.
  */
-class UnconfiguredRiskAppetiteBoxTest extends LiveDealBox {
+class UnconfiguredRiskAppetiteBoxTest {
 
-    /** Имя одиночки: им названы и её группа потребителя, и её тема. */
-    private static final String NAME = "box-unconfigured-risk-appetite";
-
-    @DynamicPropertySource
-    static void substrate(DynamicPropertyRegistry registry) {
-        TradingCoreSubstrate.registerOwn(registry, NAME, TradingCoreSubstrate.emptyRiskAppetite());
-    }
-
-    /** Своя тема владельца определений — довод у шапки субстрата. */
-    @Override
-    protected String strategyTopic() {
-        return TradingCoreSubstrate.ownStrategyTopic(NAME);
+    @Test
+    @DisplayName("B4.9 (пустые оси) — ядро не поднимается, причина называет все шесть чисел")
+    void b4_9_emptyRiskAppetiteAxesDoNotRaiseTheCore() {
+        assertThatThrownBy(() -> new SpringApplicationBuilder(TradingCoreApplication.class)
+                .run(arguments(TradingCoreSubstrate.emptyRiskAppetite()))
+                .close())
+                .as("пустое число риск-аппетита — отказ подъёма, а не рантайм-отказ на действии")
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Risk appetite is not accepted, trading-core does not start")
+                .hasMessageContaining("globalConsecutiveLossLimit: is not set by the environment")
+                .hasMessageContaining("globalSimultaneousRiskPerDealPercent: is not set by the environment")
+                .hasMessageContaining("globalMaxLeverage: is not set by the environment");
     }
 
     @Test
-    @DisplayName("B4.9 — незаданные числа риск-аппетита отказывают на действии, а не на старте")
-    void theUnassignedRiskAppetiteRefusesAtTheActionAndNotAtStartup() {
-        // Контекст поднялся при пустых осях — приём при старте ядра не
-        // роняет, и поверхность отвечает — в том числе чтением принятых
-        // чисел.
-        assertThat(get(HEALTH).status()).isEqualTo(200);
-        assertThat(get(RISK_APPETITE).status()).isEqualTo(200);
-        openGatedDealWithoutLeverage();
-        Integer mark = AppLog.mark();
+    @DisplayName("B4.9 (непринятые оси) — цепочка процентов нарушена: ядро не поднимается, причина называет её")
+    void b4_9_aBrokenPercentChainDoesNotRaiseTheCore() {
+        Map<String, String> axes = new LinkedHashMap<>(TradingCoreSubstrate.riskAppetite());
+        axes.put(TradingCoreSubstrate.RISK_APPETITE_KEYS.get(0), "40");
 
-        tick(Tick.DEAL_ORCHESTRATOR);
-
-        // Отказ приходит НА ДЕЙСТВИИ и называет, какое именно число пусто:
-        // первой мерится охрана предела серии.
-        String written = AppLog.since(mark);
-        assertThat(written).contains("Risk precheck blocked action");
-        assertThat(written).contains("LOSS_LIMIT_NOT_CONFIGURED");
-        assertThat(written).contains("globalConsecutiveLossLimit is not accepted from the environment configuration");
-        assertThat(rows.count("orders")).isEqualTo(0L);
-        // Сделка в аварию не уходит: код в карв-ауте исчерпанного бюджета.
-        assertThat(dealStatus()).isNotEqualTo("ERROR");
+        assertThatThrownBy(() -> new SpringApplicationBuilder(TradingCoreApplication.class)
+                .run(arguments(axes))
+                .close())
+                .as("непринятое число — тот же отказ подъёма, что и пустое")
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Risk appetite is not accepted, trading-core does not start")
+                .hasMessageContaining("chain deal <= account <= tenant is broken");
     }
 
-    @Test
-    @DisplayName("Плечо пары при непринятом пределе плеча не назначается: сверять не с чем")
-    void aLeverageIsNotAssignableWhileTheLimitIsNotAccepted() {
-        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
-
-        Answer assigned = put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT,
-                Bodies.pairSettings(WORKING_LEVERAGE));
-
-        assertThat(assigned.status()).isEqualTo(400);
-        assertThat(assigned.carriesErrorDto()).isTrue();
-    }
-
-    /**
-     * Сделка с траншем в предвходовой проверке, чей вход доходит до
-     * преконтроля: проекции, ставка комиссии, фичи и свежий снимок средств
-     * поставлены тропами ящика; плеча нет — его назначение отвергнуто бы.
-     */
-    private void openGatedDealWithoutLeverage() {
-        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
-        syncFeeRate();
-        marketData.answers(featuresPath(INSTRUMENT),
-                Feed.featuresWithPrice(MarketPhase.Type.BULL_TREND.name(), LAST_PRICE));
-        connector.answers(balancePath(ACCOUNT), balanceBody());
-        connector.answers(PEER_SERVER_TIME, Feed.serverTime(EXCHANGE_MOMENT));
-        activate(workingDefinition());
-        tick(Tick.ENTRY_SCANNER);
-        assertThat(rows.count("deals")).isEqualTo(1L);
-        // Первый тик сопровождения снимает снимок средств и работы не
-        // делает: предвходовая проверка обеспечивает его ДО работы.
-        tick(Tick.DEAL_ORCHESTRATOR);
-        assertThat(rows.count("orders")).isEqualTo(0L);
+    /** Оси субстрата с заменёнными осями риск-аппетита — аргументами командной строки. */
+    private String[] arguments(Map<String, String> riskAppetiteAxes) {
+        Map<String, String> axes = new LinkedHashMap<>(TradingCoreSubstrate.defaults());
+        axes.putAll(riskAppetiteAxes);
+        axes.put("server.port", "0");
+        return axes.entrySet().stream()
+                .map(axis -> "--" + axis.getKey() + "=" + axis.getValue())
+                .toArray(String[]::new);
     }
 }

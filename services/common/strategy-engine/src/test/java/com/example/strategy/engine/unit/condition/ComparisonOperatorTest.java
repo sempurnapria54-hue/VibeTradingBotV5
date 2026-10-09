@@ -15,7 +15,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategy.engine.condition.ConditionEvaluationContext;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceSource;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.ConstantValueType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
@@ -24,8 +23,6 @@ import com.example.tradingbot.domain.model.aggregate.strategy.condition.Strategy
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Сравнение: операторы и их область — группа `U2` документа
@@ -41,9 +38,10 @@ import org.junit.jupiter.params.provider.EnumSource;
  * `INDICATOR_COMPARE`, левый операнд — индикатор {@code ema_fast}, правый —
  * константа {@code 10} типа `NUMBER`, оператор `GT`.
  *
- * <p><b>Оператор `BETWEEN` (`U2.12`) не прогоняется:</b> правилу не на чем
- * нести вторую границу диапазона — форма невыразима структурой, а не
- * только не реализована (§«Кейсы, не прогоняемые сегодня»).
+ * <p>Строки `U2.12`, `U2.17`, `U2.21` сняты: операторы диапазона, истинности
+ * и существования и тип константы `BOOLEAN` сняты из перечней грамматики, и
+ * входа у строк нет (docs/rules/strategy-condition-contract.md §«Грамматика
+ * объявляет только исполняемое»).
  */
 class ComparisonOperatorTest {
 
@@ -179,15 +177,7 @@ class ComparisonOperatorTest {
                 constant("BULL_TREND", ConstantValueType.ENUM)))).isFalse();
     }
 
-    /** Та же ветвь у булева литерала. */
-    @Test
-    @DisplayName("U2.17 — правая константа типа BOOLEAN: ложь")
-    void u2_17_aBooleanConstantIsNotANumber() {
-        assertThat(evaluate(compare(StrategyConditionOperator.GT,
-                constant("true", ConstantValueType.BOOLEAN)))).isFalse();
-    }
-
-    /** Процент читается тем же числом, что и `NUMBER` — пара к U2.16 и U2.17. */
+    /** Процент читается тем же числом, что и `NUMBER` — пара к U2.16. */
     @Test
     @DisplayName("U2.18 — правая константа типа PERCENT со значением 10: истина")
     void u2_18_aPercentConstantIsReadAsTheSameNumber() {
@@ -214,33 +204,9 @@ class ComparisonOperatorTest {
     @DisplayName("U2.20 — тип PRICE_COMPARE, левый операнд — цена 12: истина")
     void u2_20_theRuleTypeDoesNotChangeOperandResolution() {
         StrategyCondition condition = condition(rule(StrategyConditionRuleType.PRICE_COMPARE,
-                StrategyConditionOperator.GT, price(StrategyPriceSource.LAST_PRICE), number("10")));
+                StrategyConditionOperator.GT, price(), number("10")));
 
         assertThat(evaluator.evaluate(condition, base().price(new BigDecimal("12")).build())).isTrue();
-    }
-
-    /**
-     * Пять операторов перечня, у которых исполнения нет: исход один —
-     * молчаливая ложь, и различает их только имя.
-     *
-     * <p>Строка добрана под-шагом 3 по пробелу `G1`: строка на каждое имя
-     * была бы пятикратным повтором одной ветви ({@code #applyRelational},
-     * {@code default}), а перечень — предмет параметризации.
-     */
-    @ParameterizedTest(name = "U2.21 — оператор {0}: ложь без записи журнала")
-    @EnumSource(value = StrategyConditionOperator.class,
-            names = {"NOT_BETWEEN", "IS_TRUE", "IS_FALSE", "EXISTS", "NOT_EXISTS"})
-    @DisplayName("U2.21 — пять операторов без исполнения: ложь, записи журнала нет")
-    void u2_21_theUnevaluableOperatorsAreSilentlyFalse(StrategyConditionOperator operator) {
-        try (EvaluatorLogCapture log = EvaluatorLogCapture.attach()) {
-            assertThat(evaluate(compare(operator, number("10"))))
-                    .as("оператор %s объявлен перечнем и не исполняется", operator)
-                    .isFalse();
-
-            assertThat(log.messages())
-                    .as("молчаливая ложь: журнальная ветвь у оператора своя не заведена")
-                    .isEmpty();
-        }
     }
 
     private Boolean evaluate(StrategyCondition condition) {

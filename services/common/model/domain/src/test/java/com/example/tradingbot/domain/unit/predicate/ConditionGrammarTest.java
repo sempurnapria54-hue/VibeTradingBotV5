@@ -9,8 +9,10 @@ import com.example.tradingbot.domain.model.aggregate.strategy.StrategyMarketData
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRule;
+import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionRuleType;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionSourceType;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
+import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -60,7 +62,9 @@ class ConditionGrammarTest {
     @Test
     @DisplayName("U17.3 — правила без ценовых операндов")
     void u17_3_noPriceOperandIsNotRead() {
-        assertThat(condition(rule(StrategyConditionSourceType.POSITION, null, null)).readsPrice()).isFalse();
+        assertThat(condition(
+                rule(StrategyConditionSourceType.INDICATOR, "ema-fast", null),
+                factRule(StrategyConditionRuleType.POSITION_OPENED)).readsPrice()).isFalse();
     }
 
     @Test
@@ -172,10 +176,12 @@ class ConditionGrammarTest {
     @Test
     @DisplayName("U17.15 — условие только из фактов сделки")
     void u17_15_dealFactsAreNotMarketData() {
+        StrategyConditionRule moveThreshold = factRule(StrategyConditionRuleType.PROFIT_PERCENTS_REACHED);
+        moveThreshold.setPercents(new BigDecimal("2"));
         StrategyCondition subject = condition(
-                rule(StrategyConditionSourceType.POSITION, null, null),
-                rule(StrategyConditionSourceType.ORDER, null, null),
-                rule(StrategyConditionSourceType.CONSTANT, null, null));
+                factRule(StrategyConditionRuleType.POSITION_OPENED),
+                factRule(StrategyConditionRuleType.ENTRY_ORDER_FINALIZED),
+                moveThreshold);
 
         assertThat(subject.readsMarketData()).isFalse();
     }
@@ -277,6 +283,13 @@ class ConditionGrammarTest {
                                               String indicatorKey, String structureKey) {
         StrategyConditionRule rule = new StrategyConditionRule();
         rule.setLeftOperand(operand(sourceType, indicatorKey, structureKey));
+        return rule;
+    }
+
+    /** Правило факта сделки: предмет его — состояние сделки, операндов у него нет. */
+    private static StrategyConditionRule factRule(StrategyConditionRuleType ruleType) {
+        StrategyConditionRule rule = new StrategyConditionRule();
+        rule.setRuleType(ruleType);
         return rule;
     }
 

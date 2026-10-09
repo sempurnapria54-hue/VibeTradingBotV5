@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.platform.security.ActorProvider;
+import com.example.strategies.exception.PeerReadException;
 import com.example.strategies.domain.service.StrategyLifecycleService;
 import com.example.strategies.domain.service.StrategyStatusWriter;
 import com.example.strategies.domain.service.TenantRiskAppetiteReader;
@@ -86,20 +87,22 @@ class StrategyLifecycleTest {
     }
 
     /**
-     * Числа риск-аппетита ядром не приняты — активация отвергается.
+     * Ответ ядра без чисел риск-аппетита — активация отвергается отказом
+     * чтения соседа: пустого числа работающее ядро не отдаёт, и такой ответ
+     * есть нарушение его контракта.
      *
-     * <p>Без них неравенства создания не считаются вовсе, и разрешение
+     * <p>Без чисел неравенства создания не считаются вовсе, и разрешение
      * было бы выдано определению, которого никто не проверял.
      */
     @Test
-    void activationIsRefusedWhenTheRiskNumbersAreNotAccepted() {
+    void activationIsRefusedWhenTheCoreAnswersWithoutTheRiskNumbers() {
         givenDefinition(definition(Strategy.Status.CREATED));
         givenReferencesResolve();
         givenRiskAppetite(null, null, null);
 
         assertThatThrownBy(() -> service.applyStatus(STRATEGY, TENANT, Strategy.Status.ACTIVE))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("RISK_APPETITE_NOT_CONFIGURED");
+                .isInstanceOf(PeerReadException.class)
+                .hasMessageContaining("risk-appetite");
         verify(eventWriter, never()).record(any(), any(), any());
     }
 

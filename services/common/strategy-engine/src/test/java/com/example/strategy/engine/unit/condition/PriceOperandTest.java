@@ -10,7 +10,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategy.engine.condition.ConditionEvaluationContext;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceSource;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperator;
@@ -26,15 +25,13 @@ import org.junit.jupiter.api.Test;
  * docs/components/StrategyConditionEvaluator.md §Данные).
  *
  * <p><b>Базовая сборка:</b> цена момента в контексте {@code 100}; правило
- * `PRICE_COMPARE`, левый операнд — цена с источником `LAST_PRICE`, правый —
- * константа {@code 90}, оператор `GT`.
+ * `PRICE_COMPARE`, левый операнд — цена, правый — константа {@code 90},
+ * оператор `GT`.
  *
- * <p><b>Три строки группы здесь не прогоняются</b> (`U4.4`-`U4.6`), и
- * причина у них общая: дом объявляет у ценового операнда источник из
- * перечня размещения, то есть требует величину (бид, аск, марк), которой
- * контекст оценки не несёт ни одним полем — у него один скаляр. Вход, на
- * котором ожидание проверяемо, не выразим ФОРМОЙ контекста, а не просто не
- * реализован (находка `F-2`, §«Кейсы, не прогоняемые сегодня»).
+ * <p>Строки `U4.4`-`U4.6` сняты: источника цены у ценового операнда нет —
+ * он последняя цена сделки, и объявленный источник отвергает создание
+ * (docs/rules/strategy-condition-contract.md §«Грамматика объявляет только
+ * исполняемое»).
  */
 class PriceOperandTest {
 
@@ -68,10 +65,10 @@ class PriceOperandTest {
     @Test
     @DisplayName("U4.7 — цена слева, цена справа, оператор GTE: истина — скаляр один и тот же")
     void u4_7_bothSidesTakeTheSameScalar() {
-        assertThat(evaluate("100", price(StrategyPriceSource.LAST_PRICE), StrategyConditionOperator.GTE))
+        assertThat(evaluate("100", price(), StrategyConditionOperator.GTE))
                 .as("обе стороны резолвятся в один скаляр — равенство обязано держаться")
                 .isTrue();
-        assertThat(evaluate("100", price(StrategyPriceSource.LAST_PRICE), StrategyConditionOperator.GT))
+        assertThat(evaluate("100", price(), StrategyConditionOperator.GT))
                 .as("и строгий оператор на нём обязан быть ложен")
                 .isFalse();
     }
@@ -79,7 +76,7 @@ class PriceOperandTest {
     private Boolean evaluate(String currentPrice, StrategyConditionOperand right,
                              StrategyConditionOperator operator) {
         StrategyCondition condition = condition(rule(StrategyConditionRuleType.PRICE_COMPARE, operator,
-                price(StrategyPriceSource.LAST_PRICE), right));
+                price(), right));
         ConditionEvaluationContext context = base()
                 .price(isNull(currentPrice) ? null : new BigDecimal(currentPrice))
                 .build();

@@ -217,7 +217,7 @@ class WireWordContractTest {
     private final EnvelopeReader reader = new EnvelopeReader(objectMapper);
 
     @Test
-    @DisplayName("Каждое слово, которым агрегат отбирает строки, — значение, которое пишет публикатор")
+    @DisplayName("U1.1 — Каждое слово, которым агрегат отбирает строки, — значение, которое пишет публикатор")
     void everyWordTheAggregateComparesIsAValueThePublisherWrites() throws Exception {
         Map<String, Set<String>> published = publishedValuesByColumn();
         List<String> compared = new ArrayList<>();
@@ -256,7 +256,7 @@ class WireWordContractTest {
     }
 
     @Test
-    @DisplayName("Слово, уезжающее параметром, — то, что ставит ручная поверхность публикатора")
+    @DisplayName("U1.2 — Слово, уезжающее параметром, — то, что ставит ручная поверхность публикатора")
     void everyWordBoundAsAParameterIsWhatThePublisherWrites() throws Exception {
         Set<String> parameters = new LinkedHashSet<>();
         for (Map.Entry<String, String> query : queryTexts().entrySet()) {
@@ -298,7 +298,7 @@ class WireWordContractTest {
     }
 
     @Test
-    @DisplayName("Каждый несомый класс — класс, который публикатор пишет")
+    @DisplayName("U1.3 — Каждый несомый класс — класс, который публикатор пишет")
     void everyCarriedClassIsAClassThePublisherWrites() throws IOException {
         Set<String> written = writtenForms().keySet();
 
@@ -311,7 +311,7 @@ class WireWordContractTest {
     }
 
     @Test
-    @DisplayName("Читатель достаёт радиус и поля слов из формы каждого несомого класса")
+    @DisplayName("U1.4 — Читатель достаёт радиус и поля слов из формы каждого несомого класса")
     void theReaderFindsTheRadiusAndTheBranchingFieldsInEveryCarriedForm() throws IOException {
         Map<String, String> forms = writtenForms();
 

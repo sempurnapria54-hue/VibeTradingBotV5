@@ -33,7 +33,7 @@ class EchoMatchTest {
     // --- отдельная условная заявка --------------------------------------
 
     @Test
-    @DisplayName("эхо совпадает по всем трём осям: совпадение")
+    @DisplayName("U24.1 — эхо совпадает по всем трём осям: совпадение")
     void anEchoAgreeingOnEveryAxisMatches() {
         AlgoOrder row = ocoRow();
 
@@ -41,7 +41,7 @@ class EchoMatchTest {
     }
 
     @Test
-    @DisplayName("расходится только признак «только уменьшать»: расхождение")
+    @DisplayName("U24.2 — расходится только признак «только уменьшать»: расхождение")
     void aDivergentReduceOnlyFlagAloneIsAMismatch() {
         AlgoOrder echo = ocoEcho();
         echo.setPositionReducingOnly(Boolean.FALSE);
@@ -50,7 +50,7 @@ class EchoMatchTest {
     }
 
     @Test
-    @DisplayName("расходится только сторона: расхождение")
+    @DisplayName("U24.3 — расходится только сторона: расхождение")
     void aDivergentSideAloneIsAMismatch() {
         AlgoOrder echo = ocoEcho();
         echo.setDirection(AlgoOrder.Direction.BUY);
@@ -59,7 +59,7 @@ class EchoMatchTest {
     }
 
     @Test
-    @DisplayName("расходится только база ноги стопа: расхождение")
+    @DisplayName("U24.4 — расходится только база ноги стопа: расхождение")
     void aDivergentStopLossBaseAloneIsAMismatch() {
         AlgoOrder echo = ocoEcho();
         echo.getCondition().getTrigger().getStopLoss().setExternalType(AlgoOrder.TriggerPriceType.LAST);
@@ -68,7 +68,7 @@ class EchoMatchTest {
     }
 
     @Test
-    @DisplayName("расходится только база ноги тейка: расхождение — ось у каждой ноги своя")
+    @DisplayName("U24.5 — расходится только база ноги тейка: расхождение — ось у каждой ноги своя")
     void aDivergentTakeProfitBaseAloneIsAMismatch() {
         AlgoOrder echo = ocoEcho();
         echo.getCondition().getTrigger().getTakeProfit().setExternalType(AlgoOrder.TriggerPriceType.INDEX);
@@ -77,7 +77,7 @@ class EchoMatchTest {
     }
 
     @Test
-    @DisplayName("эхо пусто по каждой оси: сверка не запускается")
+    @DisplayName("U24.6 — эхо пусто по каждой оси: сверка не запускается")
     void anEmptyEchoOnEveryAxisDoesNotTriggerTheCheck() {
         AlgoOrder echo = new AlgoOrder();
         echo.setCondition(new Condition(null, new Trigger(
@@ -87,7 +87,7 @@ class EchoMatchTest {
     }
 
     @Test
-    @DisplayName("декларация пуста по каждой оси: сверка не запускается")
+    @DisplayName("U24.7 — декларация пуста по каждой оси: сверка не запускается")
     void anEmptyDeclarationOnEveryAxisDoesNotTriggerTheCheck() {
         AlgoOrder row = new AlgoOrder();
         row.setConditionType(AlgoOrder.ConditionType.OCO_FULL);
@@ -98,13 +98,13 @@ class EchoMatchTest {
     }
 
     @Test
-    @DisplayName("прочитанной копии нет: сверять нечего")
+    @DisplayName("U24.8 — прочитанной копии нет: сверять нечего")
     void anAbsentEchoMatches() {
         assertThat(ocoRow().matchesEcho(null)).isTrue();
     }
 
     @Test
-    @DisplayName("трейлинг: оси базы нет, расходящаяся сторона по-прежнему расхождение")
+    @DisplayName("U24.9 — трейлинг: оси базы нет, расходящаяся сторона по-прежнему расхождение")
     void theTrailingHasNoBaseAxisButKeepsTheOthers() {
         AlgoOrder row = new AlgoOrder();
         row.setConditionType(AlgoOrder.ConditionType.TRAILING_PERCENTS);
@@ -129,21 +129,21 @@ class EchoMatchTest {
     // --- встроенная защита ----------------------------------------------
 
     @Test
-    @DisplayName("встроенная защита: эхо базы совпадает с объявленной")
+    @DisplayName("U24.10 — встроенная защита: эхо базы совпадает с объявленной")
     void anAttachedEchoAgreeingOnTheBaseMatches() {
         assertThat(attached(AlgoOrder.TriggerPriceType.MARK)
                 .matchesEcho(attached(AlgoOrder.TriggerPriceType.MARK))).isTrue();
     }
 
     @Test
-    @DisplayName("встроенная защита: эхо базы расходится с объявленной")
+    @DisplayName("U24.11 — встроенная защита: эхо базы расходится с объявленной")
     void anAttachedEchoDivergingOnTheBaseIsAMismatch() {
         assertThat(attached(AlgoOrder.TriggerPriceType.MARK)
                 .matchesEcho(attached(AlgoOrder.TriggerPriceType.LAST))).isFalse();
     }
 
     @Test
-    @DisplayName("встроенная защита: пустое эхо, пустая декларация либо нет копии — сверка не запускается")
+    @DisplayName("U24.12 — встроенная защита: пустое эхо, пустая декларация либо нет копии — сверка не запускается")
     void anAttachedEmptySideDoesNotTriggerTheCheck() {
         assertThat(attached(AlgoOrder.TriggerPriceType.MARK).matchesEcho(attached(null))).isTrue();
         assertThat(attached(null).matchesEcho(attached(AlgoOrder.TriggerPriceType.LAST))).isTrue();

@@ -15,8 +15,6 @@ import com.example.tradingbot.domain.model.trade.indicator.IndicatorValue;
 import com.example.tradingbot.domain.model.trade.market_price.MarketPriceData;
 import com.example.tradingbot.domain.model.trade.market_structure.MarketStructure;
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -90,7 +88,6 @@ public class MarketFeatureService {
                 .previousPrices(previousPrices)
                 .structures(structures)
                 .price(isNull(priceData) ? null : priceData.getExternalLastPrice())
-                .evaluationTime(OffsetDateTime.now(ZoneOffset.UTC))
                 .build();
         return MarketFeatureBundle.builder()
                 .latestIndicators(latestIndicators)

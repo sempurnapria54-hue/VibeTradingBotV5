@@ -1,6 +1,5 @@
 package com.example.strategies.unit.validation;
 
-import static com.example.strategies.unit.validation.ValidationFixture.appetite;
 import static com.example.strategies.unit.validation.ValidationFixture.bull;
 import static com.example.strategies.unit.validation.ValidationFixture.decimal;
 import static com.example.strategies.unit.validation.ValidationFixture.entryAction;
@@ -50,8 +49,6 @@ class NotionalHeadroomTest {
     private static final String FAN = "STRATEGY_SIMULTANEOUS_RISK_UNSATISFIABLE";
 
     private static final String ALLOCATION_NOT_DECLARED = "STRATEGY_ACTION_ALLOCATION_NOT_DECLARED";
-
-    private static final String NOT_CONFIGURED = "RISK_APPETITE_NOT_CONFIGURED";
 
     @Test
     @DisplayName("U12.1 — базовая сборка: объявленный нотинал оставляет запас")
@@ -109,20 +106,6 @@ class NotionalHeadroomTest {
         List<String> violations = violations(request);
 
         assertThat(matching(violations, ALLOCATION_NOT_DECLARED)).hasSize(1);
-        assertThat(matching(violations, HEADROOM)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("U12.7 — конфигурационный предел плеча пуст: запас не считается")
-    void u12_7_anUnconfiguredCeilingSilencesTheHeadroom() {
-        CreateStrategyApiRequest request = reference();
-        entryAction(bull(request)).setAllocationPercents(decimal("100"));
-
-        List<String> violations = violations(request, appetite("1", "2", null));
-
-        assertThat(matching(violations, "details[0] STRATEGY_" + NOT_CONFIGURED))
-                .as("отказ адресует деталь: объявленного числа под пределом плеча у неё нет")
-                .hasSize(1);
         assertThat(matching(violations, HEADROOM)).isEmpty();
     }
 

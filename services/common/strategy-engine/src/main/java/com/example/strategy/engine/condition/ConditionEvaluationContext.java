@@ -9,7 +9,6 @@ import com.example.tradingbot.domain.model.trade.market_structure.MarketStructur
 import static java.util.Collections.emptyMap;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.Map;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,8 +16,9 @@ import lombok.Getter;
 /**
  * Готовые данные для проверки StrategyCondition: значения индикаторов и
  * структуры по ключам настроек (latest + previous для slope/crossover),
- * текущая цена и её предыдущая половина, время оценки и — в контексте
- * сделки — её факты.
+ * текущая цена и её предыдущая половина и — в контексте сделки — её
+ * факты. Момента оценки контекст не несёт: ни одно правило грамматики
+ * часов не читает, и поле без читателя было бы объявлением без исполнения.
  * Собирается потребителем из готовых результатов; evaluator по свечам
  * ничего не считает. Runtime-объект.
  * См. docs/components/StrategyConditionEvaluator.md.
@@ -57,7 +57,11 @@ public class ConditionEvaluationContext {
     @Builder.Default
     private final Map<String, MarketStructure> structures = emptyMap();
 
-    /** Текущая рыночная цена для PRICE-операндов; null — недоступна. */
+    /**
+     * Цена момента для PRICE-операндов — последняя цена сделки инструмента:
+     * ценовой операнд условия другой цены не берёт
+     * (docs/rules/strategy-condition-contract.md); null — недоступна.
+     */
     private final BigDecimal price;
 
     /**
@@ -75,9 +79,6 @@ public class ConditionEvaluationContext {
      */
     @Builder.Default
     private final Map<String, BigDecimal> previousPrices = emptyMap();
-
-    /** Время оценки (UTC) — точка отсчёта TIME-операндов. */
-    private final OffsetDateTime evaluationTime;
 
     /**
      * Фаза рынка этого прохода — вычисленное значение, не загруженная

@@ -263,10 +263,6 @@ public class DealContext {
      * фактов — своих фич; собранный где-то ещё, контекст читал бы одну из
      * них через посредника.
      *
-     * <p><b>Время оценки ставит читатель, а не владелец данных.</b> Оно
-     * точка отсчёта {@code TIME}-операндов, то есть свойство момента
-     * РЕШЕНИЯ; часы владельца отвечали бы на вопрос о моменте чтения.
-     *
      * <p>Цена в контексте — последняя цена сделки: скалярный операнд
      * {@code PRICE} грамматики условий один, а прочие ценовые домены
      * читают калькуляторы у самого снимка
@@ -276,7 +272,6 @@ public class DealContext {
      */
     public ConditionEvaluationContext conditionContext(DealTranche tranche) {
         return conditionOperands()
-                .evaluationTime(OffsetDateTime.now(ZoneOffset.UTC))
                 .entryMarketPhase(isNull(deal) ? null : deal.getEntryMarketPhase())
                 .direction(isNull(deal) ? null : deal.getDirection())
                 .activePosition(isNull(deal) ? null : deal.livePosition())

@@ -97,7 +97,7 @@ public class RefreshPositionExecutor implements CommandExecutor {
         Deal deal = dealContext.getDeal();
         String accountInternalId = dealContext.getExchangeAccount().getInternalId();
         String externalInstrumentId = dealContext.getInstrument().getExternalId();
-        Position fetched = exchangeOperationsClient.getPosition(accountInternalId, externalInstrumentId);
+        Position fetched = liveOrNull(exchangeOperationsClient.getPosition(accountInternalId, externalInstrumentId));
         Position unconfirmedLive = isNull(fetched) ? deal.activeEpisode() : null;
         Boolean liveLegStops = liveLegStops(deal, fetched);
         if (isFalse(liveLegStops)) {
@@ -116,6 +116,21 @@ public class RefreshPositionExecutor implements CommandExecutor {
         }
         completeAction(actionState);
         return ServiceCommandExecutionResult.ok();
+    }
+
+    /**
+     * Ответ живой ноги, который считается НАЙДЕННОЙ позицией: строка с
+     * ненулевым размером. По закрытой позиции источник отдаёт строку с
+     * нулевым размером — минуты после закрытия и дольше, пока на
+     * инструменте стоят заявки, — и прочитанная найденной она ломала обе
+     * ветви: строку своей пары держала «тем же живым эпизодом», и запись
+     * закрытия не добывалась никогда, а строку давно закрытого чужого
+     * эпизода заводила эпизодом сделки, которая не исполнилась. Признак тот
+     * же, что у читателей среза счёта (docs/models/domain/core/Position.md
+     * §«Живой риск»; docs/components/RefreshPositionExecutor.md).
+     */
+    private static Position liveOrNull(Position fetched) {
+        return nonNull(fetched) && isTrue(fetched.hasLiveSize()) ? fetched : null;
     }
 
     /**

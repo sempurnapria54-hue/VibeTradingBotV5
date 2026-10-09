@@ -41,6 +41,8 @@ class FeatureReadBoxTest extends SharedMarketDataBox {
 
     private static final String SHAPE = "структура";
 
+    private static final String BULL_TREND = "BULL_TREND";
+
     @Test
     @DisplayName("B6.1 — связка фич снимается одним чтением по авторским именам")
     void b6_1_theFeatureBundleIsTakenByOneReadUnderAuthorNames() {
@@ -294,6 +296,26 @@ class FeatureReadBoxTest extends SharedMarketDataBox {
         assertThat(asking.nested("previousPrices")).containsOnlyKeys(FAST, SLOW);
         assertThat(new BigDecimal(String.valueOf(asking.nested("previousPrices").get(FAST))))
                 .isEqualByComparingTo(closeOfPreviousValueCandle(series.atr()));
+    }
+
+    @Test
+    @DisplayName("B6.16 — ключи, снятые из грамматики условий, тело чтения терпит, и ответ от них не меняется")
+    void b6_16_keysRetiredFromTheConditionGrammarAreToleratedAndChangeNoAnswer() {
+        Series series = series();
+        connector.answers(ConnectorStub.pricesOf(INSTRUMENT), Feed.prices(INSTRUMENT, "50500"));
+        String bindings = Bodies.array(Bodies.binding(FAST, series.atr(), WIDE));
+
+        Answer current = post(features(series.instrument()), Bodies.featureReadWithPhase(bindings,
+                Bodies.array(Bodies.pricePhaseRule(BULL_TREND, "GT", "50000"))));
+        Answer retired = post(features(series.instrument()), Bodies.featureReadWithPhase(bindings,
+                Bodies.array(Bodies.pricePhaseRuleWithRetiredKeys(BULL_TREND, "GT", "50000"))));
+
+        // Клауза обязана сработать: при UNKNOWN совпадение ответов было бы
+        // пустым — его давала бы и клауза, выброшенная целиком.
+        assertThat(current.status()).isEqualTo(200);
+        assertThat(current.nested("marketPhase").get("type")).isEqualTo(BULL_TREND);
+        assertThat(retired.status()).isEqualTo(200);
+        assertThat(retired.asObject()).isEqualTo(current.asObject());
     }
 
     /**

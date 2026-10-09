@@ -184,16 +184,18 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
     }
 
     @Test
-    @DisplayName("B1.8 — Неназначенные числа риск-аппетита отвергают создание")
-    void b1_8_unassignedRiskAppetiteNumbersRejectTheCreation() {
+    @DisplayName("B1.8 — Ответ ядра без числа риск-аппетита: отказ чтения соседа")
+    void b1_8_aCoreAnswerWithoutARiskNumberIsAPeerFailure() {
         peerResolvesEverything();
         peer.answers(PEER_RISK_APPETITE,
                 Feed.riskAppetite(null, GLOBAL_CUMULATIVE_MULTIPLIER, GLOBAL_MAX_LEVERAGE));
 
         Answer answer = post(STRATEGIES, TENANT, Bodies.reference());
 
-        assertThat(answer.status()).isEqualTo(400);
-        assertThat(answer.errorMessage()).contains("STRATEGY_RISK_APPETITE_NOT_CONFIGURED");
+        assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(answer.errorCode())
+                .as("пустого числа работающее ядро не отдаёт — ответ без него нарушает контракт соседа")
+                .isEqualTo("PEER_REFUSED");
         assertThat(answer.errorMessage())
                 .as("без глобальных чисел неравенства не считаются вовсе")
                 .doesNotContain("_ABOVE_GLOBAL");
@@ -201,17 +203,17 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
     }
 
     @Test
-    @DisplayName("B1.9 — Пустая строка чисел у ядра от пустого числа не отличается")
-    void b1_9_anAbsentRowOfNumbersIsIndistinguishableFromAnEmptyNumber() {
+    @DisplayName("B1.9 — Пустой ответ ядра от ответа без числа не отличается")
+    void b1_9_anEmptyCoreAnswerIsIndistinguishableFromAnAnswerWithoutANumber() {
         peerResolvesEverything();
         peer.answers(PEER_RISK_APPETITE, "");
 
         Answer answer = post(STRATEGIES, TENANT, Bodies.reference());
 
-        assertThat(answer.status()).isEqualTo(400);
-        assertThat(answer.errorMessage())
-                .as("исход у обеих причин один: сверять объявленное не с чем")
-                .contains("STRATEGY_RISK_APPETITE_NOT_CONFIGURED");
+        assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(answer.errorCode())
+                .as("исход у обеих причин один: ответ соседа не несёт операнда")
+                .isEqualTo("PEER_REFUSED");
         assertThat(rows.count(STRATEGIES_TABLE)).isZero();
     }
 
@@ -332,8 +334,7 @@ class DefinitionIntakeBoxTest extends SharedStrategiesBox {
         assertThat(answer.status()).isEqualTo(400);
         assertThat(answer.errorMessage())
                 .as("доля 0.995 базы ниже предела плеча 1, и отвергает её только запас — доли запаса в ответе соседа нет")
-                .contains("STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT")
-                .doesNotContain("STRATEGY_RISK_APPETITE_NOT_CONFIGURED");
+                .contains("STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT");
         assertThat(rows.count(STRATEGIES_TABLE)).isZero();
     }
 

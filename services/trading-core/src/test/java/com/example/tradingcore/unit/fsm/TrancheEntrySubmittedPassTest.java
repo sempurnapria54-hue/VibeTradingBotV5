@@ -291,7 +291,7 @@ class TrancheEntrySubmittedPassTest {
     // --- выходная проверка покрытия ------------------------------------------
 
     @Test
-    @DisplayName("Нога снята после частичного налива, защита не встала, обязательства нет: ступень 2 до консолидации")
+    @DisplayName("U18.18 — нога снята после частичного налива, защита не встала, обязательства нет: ступень 2 до консолидации")
     void aLostProtectionOnACancelledPartialLegEscalatesBeforeConsolidation() {
         harness.givenSystemCommand(SystemActionType.FINALIZE_DEAL_ENTRY_ACTION,
                 ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
@@ -306,7 +306,7 @@ class TrancheEntrySubmittedPassTest {
     }
 
     @Test
-    @DisplayName("Та же потеря защиты при живом обязательстве покрытия: ход продолжается консолидацией")
+    @DisplayName("U18.19 — та же потеря защиты при живом обязательстве покрытия: ход продолжается консолидацией")
     void aLiveCoverageCommitmentLetsTheConsolidationThrough() {
         harness.givenSystemCommand(SystemActionType.FINALIZE_DEAL_ENTRY_ACTION,
                 ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
@@ -327,7 +327,7 @@ class TrancheEntrySubmittedPassTest {
     }
 
     @Test
-    @DisplayName("Живая нога без налива с отказавшей защитой: экспозиции нет — нарушения нет, добыча идёт")
+    @DisplayName("U18.20 — живая нога без налива с отказавшей защитой: экспозиции нет — нарушения нет, добыча идёт")
     void aFailedProtectionWithoutAFillIsNotAViolation() {
         givenFetches();
         DealTranche subject = tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED);
@@ -344,7 +344,7 @@ class TrancheEntrySubmittedPassTest {
     }
 
     @Test
-    @DisplayName("Сделка сворачивается при потерянной защите налитой ноги: ребро в выход, гейт покрытия не спрашивался")
+    @DisplayName("U18.21 — сделка сворачивается при потерянной защите налитой ноги: ребро в выход, гейт покрытия не спрашивался")
     void aCollapsingDealSendsTheTrancheToTheExitWithoutTheCoverageCheck() {
         DealContext context = contextOf(Deal.Status.EXIT_PENDING, lostProtectionTranche());
         context.getDeal().getPositions().add(livePosition("2"));
@@ -358,7 +358,7 @@ class TrancheEntrySubmittedPassTest {
     }
 
     @Test
-    @DisplayName("Перевыставленный вход: новая нога жива, защита снятой налитой ноги не встала — ступень 2")
+    @DisplayName("U18.22 — перевыставленный вход: новая нога жива, защита снятой налитой ноги не встала — ступень 2")
     void aReplacedEntryWithTheLostProtectionOfTheCancelledLegEscalates() {
         DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "3", "0");
         subject.getOrders().add(cancelledPartialLeg(30L, "3", failedProtection(60L)));
@@ -373,7 +373,7 @@ class TrancheEntrySubmittedPassTest {
     }
 
     @Test
-    @DisplayName("Перевыставленный вход, защита снятой ноги ещё в постановке: добываются обе ноги, позиция последней")
+    @DisplayName("U18.23 — перевыставленный вход, защита снятой ноги ещё в постановке: добываются обе ноги, позиция последней")
     void aReplacedEntryObservesTheCarrierOfAPlacingProtectionTogetherWithTheLiveLeg() {
         givenFetches();
         DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "3", "0");

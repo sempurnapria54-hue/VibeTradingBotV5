@@ -14,7 +14,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategy.engine.condition.ConditionEvaluationContext;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceSource;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperator;
@@ -173,7 +172,7 @@ class CrossoverTest {
     @Test
     @DisplayName("U5.14 — цена против константы 95, раскладка предыдущих цен собрана: ложь — пары-индикатора нет")
     void u5_14_aPriceAgainstAConstantHasNoPast() {
-        StrategyCondition condition = crossover(price(StrategyPriceSource.LAST_PRICE), number("95"),
+        StrategyCondition condition = crossover(price(), number("95"),
                 StrategyConditionOperator.CROSSED_ABOVE);
 
         assertThat(evaluator.evaluate(condition, priceContext("90"))).isFalse();
@@ -183,7 +182,7 @@ class CrossoverTest {
     @Test
     @DisplayName("U5.15 — цена справа, средняя слева ушла под цену: CROSSED_BELOW — истина")
     void u5_15_aPriceOnTheRightFindsItsPairOnTheLeft() {
-        StrategyCondition condition = crossover(indicator(SLOW_KEY, null), price(StrategyPriceSource.LAST_PRICE),
+        StrategyCondition condition = crossover(indicator(SLOW_KEY, null), price(),
                 StrategyConditionOperator.CROSSED_BELOW);
 
         assertThat(evaluator.evaluate(condition, priceContext("105"))).isTrue();
@@ -215,7 +214,7 @@ class CrossoverTest {
     }
 
     private StrategyCondition priceCrossover() {
-        return crossover(price(StrategyPriceSource.LAST_PRICE), indicator(SLOW_KEY, null),
+        return crossover(price(), indicator(SLOW_KEY, null),
                 StrategyConditionOperator.CROSSED_ABOVE);
     }
 

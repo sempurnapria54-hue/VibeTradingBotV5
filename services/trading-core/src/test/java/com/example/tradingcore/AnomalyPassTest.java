@@ -228,6 +228,7 @@ class AnomalyPassTest {
      * каталога неполноты не производит.
      */
     @Test
+    @DisplayName("U11.15 — контур шире страницы: детекция получает весь контур после обхода, проход наблюдён")
     void aContourWiderThanAPageIsDetectedWhole() {
         givenAccount();
         AnomalyJobProperties narrow = properties();
@@ -256,6 +257,7 @@ class AnomalyPassTest {
      * отказа, — половина контура объявила бы чужими строки второй половины.
      */
     @Test
+    @DisplayName("U11.14 — отказ чтения страницы контура: проход не наблюдён, детекторы молчат и о прочитанной странице")
     void aFailedContourPageMakesThePassIncomplete() {
         givenAccount();
         when(scanReader.read(ACCOUNT_INTERNAL_ID)).thenReturn(scan(true));

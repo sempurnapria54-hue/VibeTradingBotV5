@@ -15,8 +15,8 @@ import lombok.Setter;
  * первая с истинным {@code condition} задаёт MarketPhase.Type; не сработала
  * ни одна → UNKNOWN. Condition — тот же StrategyCondition, но в контексте
  * классификации фазы (до выбора детали, без сделки): операнды
- * INDICATOR/MARKET_STRUCTURE/PRICE/CONSTANT/TIME, без MARKET_PHASE и
- * runtime-источников сделки (контекстный whitelist — create-валидация).
+ * INDICATOR/MARKET_STRUCTURE/PRICE/CONSTANT, без MARKET_PHASE — своего
+ * результата (контекстный whitelist — create-валидация).
  * Хранится JSONB (колонка phase_rules на строке настройки фазы). См.
  * docs/models/domain/aggregate/Strategy.md (§«Настройки рыночных данных»),
  * docs/components/MarketPhaseResolver.md.

@@ -1,6 +1,5 @@
 package com.example.tradingcore.unit.risk;
 
-import static com.example.tradingcore.unit.risk.RiskFixture.appetite;
 import static com.example.tradingcore.unit.risk.RiskFixture.codes;
 import static com.example.tradingcore.unit.risk.RiskFixture.contextBuilder;
 import static com.example.tradingcore.unit.risk.RiskFixture.emptyDeal;
@@ -21,7 +20,6 @@ import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.risk.RiskCheckResult.RiskCheckCode;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult;
 import com.example.tradingcore.domain.command.risk.RiskValidationResult.RiskDecision;
-import com.example.tradingcore.domain.model.RiskAppetite;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * <p><b>Базовая сборка</b> — {@code RiskFixture.workingContext()} плюс
  * {@code RiskFixture.entryAction()}: граф предъявлен целиком, правила
  * материализованы и торгуемы, валюта резолвлена, база живая и
- * положительна, оба числа тенанта назначены, пара изолированная без
+ * положительна, числа риск-аппетита приняты, пара изолированная без
  * ступени.
  */
 class PrecheckInputGateTest {
@@ -134,30 +132,6 @@ class PrecheckInputGateTest {
     @DisplayName("U1.12 — база риска ноль: тот же отказ")
     void u1_12_aZeroRiskBaseStopsThePass() {
         assertSingleCode(baseContext("0"), RiskCheckCode.BALANCE_INVALID);
-    }
-
-    @Test
-    @DisplayName("U1.13 — порог серии убытков не назначен: энфорсера остановки не существует")
-    void u1_13_anUnassignedLossStreakLimitStopsThePass() {
-        harness.givenAppetite(appetite("1", null));
-
-        assertSingleCode(workingContext(), RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED);
-    }
-
-    @Test
-    @DisplayName("U1.14 — максимальный риск на сделку не принят: ни одно неравенство не считается")
-    void u1_14_anUnassignedRiskAppetiteNumberStopsThePass() {
-        harness.givenAppetite(appetite(null, 3));
-
-        assertSingleCode(workingContext(), RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
-    }
-
-    @Test
-    @DisplayName("U1.15 — ни одно число риск-аппетита не принято: первым мерится порог серии убытков")
-    void u1_15_anEmptyAcceptedAppetiteFailsOnTheLossStreakLimitFirst() {
-        harness.givenAppetite(RiskAppetite.builder().build());
-
-        assertSingleCode(workingContext(), RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED);
     }
 
     @Test

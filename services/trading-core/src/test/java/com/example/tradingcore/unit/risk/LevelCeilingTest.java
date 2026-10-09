@@ -58,13 +58,13 @@ class LevelCeilingTest {
     }
 
     @Test
-    @DisplayName("Соседей нет: вход в пределах потолков счёта и тенанта проходит")
+    @DisplayName("U35.1 — соседей нет: вход в пределах потолков счёта и тенанта проходит")
     void anEntryWithoutPeersPasses() {
         assertThat(codes(harness.validate(entryAction(), workingContext()))).isEmpty();
     }
 
     @Test
-    @DisplayName("Сосед по счёту ровно добирает потолок счёта вместе со входом: граница включена")
+    @DisplayName("U35.2 — сосед по счёту ровно добирает потолок счёта вместе со входом: граница включена")
     void aPeerOnTheAccountExactlyAtTheAccountCeilingPasses() {
         harness.givenLevelDeals(List.of(peer(2L, ACCOUNT_ID, "907.045")));
 
@@ -74,7 +74,7 @@ class LevelCeilingTest {
     }
 
     @Test
-    @DisplayName("Сосед по счёту и вход выше потолка счёта: отказ кодом счёта, тенант в пределах")
+    @DisplayName("U35.3 — сосед по счёту и вход выше потолка счёта: отказ кодом счёта, тенант в пределах")
     void aPeerOnTheAccountOverTheAccountCeilingIsRejected() {
         harness.givenLevelDeals(List.of(peer(2L, ACCOUNT_ID, "907.046")));
 
@@ -84,7 +84,7 @@ class LevelCeilingTest {
     }
 
     @Test
-    @DisplayName("Сосед на другом счёте тенанта: отказ кодом тенанта, база тенанта — сумма баз счетов")
+    @DisplayName("U35.4 — сосед на другом счёте тенанта: отказ кодом тенанта, база тенанта — сумма баз счетов")
     void aPeerOnAnotherAccountOverTheTenantCeilingIsRejected() {
         harness.givenTenantAccounts(List.of(account(BASE), account(SECOND_ACCOUNT_ID, BASE)));
         harness.givenLevelDeals(List.of(peer(2L, SECOND_ACCOUNT_ID, "5907.046")));
@@ -95,7 +95,7 @@ class LevelCeilingTest {
     }
 
     @Test
-    @DisplayName("Счёт тенанта в другой валюте базы в базу тенанта не входит, и его сделки — тоже")
+    @DisplayName("U35.5 — счёт тенанта в другой валюте базы в базу тенанта не входит, и его сделки — тоже")
     void anAccountInAnotherBaseCurrencyIsLeftOutOfTheTenantLevel() {
         ExchangeAccount otherCurrency = account(SECOND_ACCOUNT_ID, "1000000");
         otherCurrency.setRiskBaseCurrency("USDC");
@@ -108,7 +108,7 @@ class LevelCeilingTest {
     }
 
     @Test
-    @DisplayName("Живой риск соседа не измерен: акт, повышающий живой риск, отвергается кодами уровней")
+    @DisplayName("U35.6 — живой риск соседа не измерен: акт, повышающий живой риск, отвергается кодами уровней")
     void anUnmeasuredPeerRejectsARaisingAct() {
         harness.givenLevelDeals(List.of(unprotectedPeer(2L, ACCOUNT_ID)));
 
@@ -119,7 +119,7 @@ class LevelCeilingTest {
     }
 
     @Test
-    @DisplayName("Акт живого риска своей сделки не повышает: уровни истинны, соседей не грузят")
+    @DisplayName("U35.7 — акт живого риска своей сделки не повышает: уровни истинны, соседей не грузят")
     void anActNotRaisingTheOwnLiveRiskLeavesTheLevelsAlone() {
         Deal live = deal(BigDecimal.ZERO, null);
         live.setPositions(List.of(episode("10", ANCHOR)));
@@ -129,24 +129,6 @@ class LevelCeilingTest {
                 .as("подтяжка уровня с 2910 до 2950 живой риск снижает")
                 .isEmpty();
         verifyNoInteractions(harness.levelDealsBoundary());
-    }
-
-    @Test
-    @DisplayName("Процент счёта не принят: повышающий акт отвергается кодом незаданного числа")
-    void anUnacceptedAccountPercentRejectsARaisingAct() {
-        harness.givenAppetite(levelAppetite(null, "30"));
-
-        assertThat(codes(harness.validate(entryAction(), workingContext())))
-                .containsExactly(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
-    }
-
-    @Test
-    @DisplayName("Процент тенанта не принят: повышающий акт отвергается кодом незаданного числа")
-    void anUnacceptedTenantPercentRejectsARaisingAct() {
-        harness.givenAppetite(levelAppetite("10", null));
-
-        assertThat(codes(harness.validate(entryAction(), workingContext())))
-                .containsExactly(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
     }
 
     /**

@@ -2181,47 +2181,6 @@ api-моделях и сущностях обоих сервисов, колон
 **Причина парковки.** Кодовая пачка документов кейсов сверх своих клеток не
 правит.
 
-## Грамматика условий в коде шире исполняемой
-
-<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
-
-**Что сделать.** Привести дерево кода к грамматике, суженной до исполняемого:
-- `common/model/domain`: из `StrategyConditionOperator` снять `BETWEEN`,
-  `NOT_BETWEEN`, `IS_TRUE`, `IS_FALSE`, `EXISTS`, `NOT_EXISTS`; из
-  `StrategyConditionSourceType` — `POSITION`, `ORDER`, `ALGO_ORDER`, `BALANCE`,
-  `TIME`; из `ConstantValueType` — `BOOLEAN`;
-- снять `StrategyConditionRule.timeframe` и `StrategyConditionOperand.priceSource`:
-  домен, навес JSONB, копия у ядра, мапперы, материал `StrategyOverlayCopyContract`;
-  api-формы создания ключи `timeframe` и `priceSource` сохраняют только ради отказа;
-- снять `ConditionEvaluationContext.evaluationTime` и его запись у сборщиков
-  (`MarketFeatureService.readFeatures` у market-data, `DealContext`,
-  `EntryScannerJob` у ядра), javadoc `MarketFeatures.conditionOperands`;
-- `StrategyDefinitionValidator`: точный набор полей правила по типу и операнда по
-  типу источника — `STRATEGY_CONDITION_FIELD_NOT_READ` с путём поля (таймфрейм и
-  источник цены — при любом значении); оператор сравнивающего правила — шесть
-  сравнений; скалярность операндов сравнения и пересечения —
-  `STRATEGY_CONDITION_OPERAND_NOT_SCALAR`; `MARKET_PHASE_IS` требует операнд
-  `MARKET_PHASE`; снять `rejectUnavailablePriceSource` у операнда (с его javadoc,
-  называющим прежние имена величин спеки) и `TIME` из `PHASE_ALLOWED_SOURCE_TYPES`;
-- javadoc `StrategyConditionEvaluator`, `StrategyConditionOperand`,
-  `StrategyConditionRule`, `StrategyCondition` (в том числе «проверяются по level
-  ASC») привести к дому;
-- удалить методы тестов снимаемых строк `strategy-engine-condition`: U2.12, U2.17,
-  U2.21, U4.4-U4.6, U12.5, U12.6, U12.9.
-
-**Дом** — `docs/rules/strategy-condition-contract.md` §«Правило и операнды»,
-§«Грамматика объявляет только исполняемое»; проверки —
-`docs/rules/strategy-validation.md` §«Что проверяется на создании»; величины —
-`docs/spec/strategy-reference.json` (`conditionPriceSourceDeclared`,
-`phaseConditionPriceSourceDeclared`); контекст —
-`docs/components/StrategyConditionEvaluator.md` §«Контекст оценки»; довод —
-`.claude/decisions/condition-grammar-executable-only.md`. Кейсы —
-`.claude/tests/cases/strategy-definition-validation.md` (U26.7, U26.9, U26.12,
-U27.6, U27.16, U27.17, U28.5, U28.42-U28.53, U29.6, U29.14).
-
-**Причина.** Объявленное грамматикой сверх исполняемого принимается созданием и
-исполняется молча не так, как объявлено, либо не исполняется никогда.
-
 ## Отказ от привязки токена у клиентов реалма не объявлен значением
 
 <!-- backlog: владелец=code-writer; оживит=наблюдение:ближайшая правка дома -->
@@ -2395,21 +2354,6 @@ density-инвариант — `docs/models/domain/other/CandleGroup.md`.
 **Причина парковки.** Доковая пачка дерева кода, кейсов тестера и стенда не
 держала.
 
-## Хвосты двадцать седьмой пачки 2026-10-01
-
-<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
-
-**Что сделать.** `services/common/test-support`, `InstrumentRulesOverlayCopyContract`: объект
-  «со всеми полями» клетки `U13.3` не несёт `positionTiers` — добавить поле в
-  сборку и в литеральный перечень ключей строки, завести пробу ключей вложенной
-  формы `PositionTier` (`minSize`, `maxSize`, `maintenanceMarginRate`) по
-  `docs/rules/persistence-representation.md`.
-
-**Дом** — `docs/models/domain/other/InstrumentExternalRules.md` §Структура.
-
-**Причина парковки.** Кодовая пачка держала пять модулей с продовой дельтой;
-`test-support` был бы шестым.
-
 ## Гигиена после двадцать седьмой пачки 2026-10-01
 
 <!-- backlog: владелец=code-writer; оживит=наблюдение:ближайшая правка дома -->
@@ -2448,31 +2392,6 @@ javadoc, комментария или литерала восстановить
 
 **Причина парковки.** Ось кода заведена доковой пачкой; правка дерева кода ей не
 давалась.
-
-## Хвосты двадцать девятой пачки 2026-10-08
-
-<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
-
-**Что сделать** — сверка эха отдельной условной заявки построена кодом
-(решение `.claude/decisions/standalone-algo-echo-check.md`), кейсы за ней не
-пошли:
-
-- `.claude/tests/cases/okx-mapping.md`: клетки `U10.14` (у формы источника
-  нет уже трёх полей, а не пяти) и `U9.8` (`reduceOnly` есть у формы
-  условной заявки, нет только у снапшота встроенной защиты) — ожидания
-  привести к коду; тесты переписаны тем же заходом;
-- завести клетки: предикат `AlgoOrder.matchesEcho` и
-  `AttachedAlgoOrder.matchesEcho` (юнит `EchoMatchTest` в
-  `services/common/model/domain` написан без меток); перевод коннектором
-  стороны и признака — пусто, в словаре, вне словаря (отказ инварианта);
-  ящик ядра — расхождение эха даёт отказ без записи строки и без живости;
-  перенос наблюдённого уровня трейлинга; сверка базы встроенной защиты на
-  трёх тропах (тело родителя, живая запись, история).
-
-**Дом** — `docs/models/mapping/AlgoOrder.md`, `docs/models/mapping/Order.md`,
-`docs/components/RefreshAlgoOrderExecutor.md`.
-
-**Причина парковки.** Кодовая пачка документов кейсов не правит.
 
 ## Код клеток тропы сворачивания отстал от ожиданий, переписанных пачкой 2026-10-01
 
@@ -2544,8 +2463,8 @@ javadoc, комментария или литерала восстановить
   адресе хранилища;
 - `JournalCleanupBoxTest` (`audit`): метод и `@DisplayName` B7.9 под новый
   заголовок; контрольный прогон ящиков `audit` и `statistics` по двум
-  незамеренным осям — таблицы §«Контрольный прогон на нейтрализованной
-  сборке» обоих документов;
+  незамеренным осям — таблицы `.claude/tests/cases/audit.md` и
+  `.claude/tests/cases/statistics.md` §«Контрольный прогон на нейтрализованной сборке»;
 - `PositionStatusResolveTest` — метод U9.6; `AttachedParentClassTest` —
   методы U10.18, U10.19 (`.claude/tests/cases/trading-core-calc.md`);
 - `ReceptionMetricsContract` (`common/test-support`) — методы U14.17, U14.18
@@ -2553,18 +2472,9 @@ javadoc, комментария или литерала восстановить
 - ящики `audit`/`statistics`: тест зовёт `tick()` своим потоком, а первый такт
   `fixedDelay` планировщика идёт с задержкой 0 — клетки рядов в первые секунды
   класса могут получить итог чужого такта (кандидат во флейк);
-- заголовки `.claude/tests/cases/e2e-exit-and-close.md` «…причина одна» и
-  `e2e-strategy-to-deal.md` «…причины две» открытой причины больше не
-  описывают — переименовать с входящими адресами;
-- `.claude/tests/cases/okx-mapping.md` (~394): «направление нельзя определить
-  — нарушение инварианта у вызывающего» ложно;
 - javadoc `PerimeterKafkaConfig` (`bff`) ведёт на снятую секцию о тропе к
   брокеру — перевести на `docs/architecture/platform.md` и снять строку
   `tools/anchor-code-debt.txt` (`code-writer`);
-- `docs/integrations/okx/rules/adapter-constants.md` («adapter validation при
-  refresh») и `docs/components/RefreshOrderExecutor.md` (сверка базы эха
-  встроенной защиты не описана) — к решению
-  `.claude/decisions/standalone-algo-echo-check.md` (`solution-designer`).
 
 **Причина парковки.** Найдено пачкой вне выданных путей; код тестов пачка не
 пишет.
@@ -2585,49 +2495,6 @@ javadoc, комментария или литерала восстановить
 
 **Причина парковки.** Офдок отвечает прямо, кроме названных мест; demo-счёта у
 стенда сейчас нет.
-
-## Клетки после тридцатой пачки 2026-10-08
-
-<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
-
-**Что сделать** — ожидания и клетки по решениям пачки:
-
-- `.claude/tests/cases/trading-core.md`: `B7.16 (а)` — опора на правило
-  отложенного покрытия, защита `PENDING`; `B7.16 (б)` — предусловие на ногу,
-  ставшую терминальной с наливом и отказом постановки, опора на дом
-  обработчика отправленного входа; `B5.18` — ступень поднимает проход
-  отправленного входа; `B7.4` — обе записи режима контура; новые клетки `A3`
-  (запись иного режима, одиночная кросс-запись не заводит восстановление
-  `A1`), kill-switch на записи иного режима, перевыставленный вход с
-  потерянной защитой снятой ноги;
-- `.claude/tests/cases/trading-core-calc.md`: `U11.2`, `U11.5` — «принята»
-  (`PENDING`); `U11.12`-`U11.14` — предусловие «терминал наблюдён раньше»;
-  новые клетки первого наблюдения (`WAIT`) и найденной ноги на нём;
-  строки таблицы гейта и второй ступени;
-- `StopLossSideTest`: полоса над ценой ноги на живом эпизоде;
-- `okx-mapping.md`: перевод `mgnMode`, тело закрытия с режимом;
-- `e2e-exit-and-close.md`: `E8.1`-`E8.3` по мере проскока, частичный выход
-  до стопа; ящик статистики — пара счётчиков проскока;
-- `trading-core.md` `B7.12`: клетка переписана кодом на постраничный обход
-  контура (`DetectionContourPagingBoxTest`) — название, предусловие,
-  ожидание и факт строки привести; клетки групп проб в `AccessContourBoxTest`
-  шести сервисов написаны без меток;
-- `smoke-live.md` `E1.1`: маршрутов у ингресса окружения три (`/resources`
-  — `.claude/decisions/identity-login-resources-route.md`), ожидание «вне
-  обоих маршрутов» и опоры строк 138, 273, 274, 653 — привести.
-
-Код построен кодовой пачкой 2026-10-08; её юниты и пробы написаны **без
-меток** и ждут строк: `TrancheEntrySubmittedPassTest`,
-`AttachedLivenessAndHistoryTest`, `OrderHarvestTest`, `StopLossSideTest`,
-`AnomalyDetectorTest`, `AnomalyPassTest`, `KillSwitchOutsideDealsTest`,
-`CoreEventFormTest` (ядро); `StopExitSlippageTest`,
-`StrategyStepAndActionTest` (домен); `ConverterDictionaryTest` U6.34-U6.38,
-`LivePositionToSnapshotTest` U11.10-U11.11, `PositionMarginModeSourceTest`,
-ящик коннектора (B5.2, закрытие с режимом); `DealGrainArithmeticBoxTest`
-(два примера агрегата), `WireWordContractTest` (статистика). Ожидания
-`U11.2`, `U11.5`, `U10.14` изменены кодом на `PENDING`.
-
-**Причина парковки.** Пачки клеток не правят.
 
 ## Клетка `B3.7` `bff` на маке: место закрытой подписки не освобождается
 
@@ -2680,16 +2547,10 @@ javadoc, комментария или литерала восстановить
 
 <!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
 
-**Что сделать** — по пунктам:
+**Что сделать.** Пункт о пустых числах снят решением держателя 2026-10-09
+(Д2864: без принятого набора ядро не стартует; код — заход 272). Остался
+реестр — документы кейсов сведены заходами 271-272, пункт исполним:
 
-- **пустые числа и не создающее риска действие (торгово-значимое):** при
-  пустом конфиге код отказывает глобальному кумулятивному потолку и потолку
-  нотинала **любого** класса действия, а дом
-  (`docs/rules/risk-policy.md`, таблица пустых чисел;
-  `docs/components/RiskValidator.md`) называет отказ только у действия,
-  создающего риск. Защитное действие не отвергается незаданным числом —
-  свести код к дому (либо дом к коду с доводом `solution-designer`) и
-  закрыть клеткой;
 - реестр снятых редакций `tools/retired-check.py`: запись под снятую модель
   (шаблон — `tenant_risk_appetites`, `risk-appetites/{`,
   `globalCatastrophicRiskPerDealMultiplier`,
@@ -2697,41 +2558,14 @@ javadoc, комментария или литерала восстановить
   `STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL`; пришедшая —
   `globalMaxLeverage|globalSimultaneousRiskPerTenantPercent`; популяция —
   `risk-policy.md`, `Tenant.md`, `strategy-validation.md`, `platform.md`,
-  `risk-limits.json`, `strategy-reference.json`) — после того, как тестер
-  сведёт документы кейсов (иначе запись красна на их прежних словах).
+  `risk-limits.json`, `strategy-reference.json`); вторая запись — снятая
+  редакция «Непринятый набор ядро не роняет» и код `LOSS_LIMIT_NOT_CONFIGURED`
+  (решение `.claude/decisions/risk-appetite-environment-config.md`, Д2864).
 
 **Дом** — `.claude/decisions/risk-appetite-environment-config.md`,
 `docs/rules/risk-policy.md`.
 
 **Причина парковки.** Найдено кодовой пачкой риск-аппетита.
-
-## Клетки после пачки риск-аппетита конфигом 2026-10-09
-
-<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
-
-**Что сделать.** Свести документы кейсов с моделью «числа — оси
-окружения, потолки сделки, счёта и тенанта, предел плеча, кумулятивный
-предел»:
-
-- `trading-core-risk.md`: U1.14, U1.15, U10.x, U12.6, U14.10, U14.11, U15.x,
-  U18.3, U18.12, U25.4, U29.2, U29.3; новые клетки — приём чисел при
-  старте, потолки счёта и тенанта, глобальный кумулятивный, предел плеча
-  (юниты `RiskAppetiteAcceptanceTest`, `LevelCeilingTest`,
-  `GlobalCumulativeCeilingTest`, `LeverageLimitTest` написаны без меток);
-- `trading-core.md`: B4.2 (операнд «снятые числа» больше невыразим — нужен
-  новый), B4.9 (теперь `UnconfiguredRiskAppetiteBoxTest`), B5 (свой
-  контекст), B11.5-B11.7 (сняты), B12.3, B13.5;
-- `trading-core-safety.md` U14.11; `strategies.md`;
-  `strategy-definition-validation.md` U3.2, U3.5, U9, U10 (U10.9 — шесть
-  нарушений), U12.6 (снят), U12.7, U30.3, U30.4, U30.10, U32.3;
-- сквозные: `e2e-strategy-to-deal.md` E1.4; `e2e-perimeter-read.md` E2.8,
-  E8.3; `e2e-exit-and-close.md` E2.6 (удержание второго транша — глобальный
-  потолок 0.75 %, оценка не проверена прогоном), ось 2 мутационной
-  таблицы; `smoke-live.md` строка о риск-аппетите.
-
-**Дом** — `docs/rules/risk-policy.md`, `docs/spec/risk-limits.json`.
-
-**Причина парковки.** Кодовая пачка клеток не правит.
 
 ## Поверхность ядра не отдаёт зеркало заявок (находка `F6` дыма)
 
@@ -2757,30 +2591,90 @@ javadoc, комментария или литерала восстановить
 команда — комментарий `tests/pom.xml`) прогнана заходом 269 без группы E6:
 20 кейсов из 21 зелены, «Факт» заполнен (`.claude/tests/cases/smoke-live.md`).
 Остаток — группа E6 отдельным прогоном (пересчёт агрегатов ждёт до двух
-часовых тактов) и повтор `E5.4` после закрытия находки `F10`. Кода нет у
+часовых тактов) и повтор `E5.4`: находка `F10` закрыта кодом ядра тем же
+заходом, и ядро с правкой выложено — повтор ждёт закрытия живой сделки
+эталонной стратегии (на счёте одна сделка за раз). Кода нет у
 E3.3, E4.4, E6.4, E8.1-E8.4 — причины в документе.
 
 **Предусловие — ход держателя:** эталонные стратегии стенда на время прогона
 деактивированы (стенд — `.claude/skills/local-stand.md` §«Тестовые данные
 стенда»); ступени счёта и пары перед прогоном сняты.
 
-**Причина парковки.** E6 требует отдельного долгого прогона; `E5.4` ждёт `F10`.
+**Причина парковки.** E6 требует отдельного долгого прогона; `E5.4` ждёт
+свободного счёта.
 
-## Аварийная тропа не добывает запись закрытия позиции (находка `F10` дыма)
+## Флаги кода `RISK_APPETITE_NOT_CONFIGURED` после снятия пустоты окружения
 
-<!-- backlog: владелец=trading-core; оживит=сейчас|шаг:2-12:DONE -->
+<!-- backlog: владелец=solution-designer; оживит=сейчас|шаг:2-12:DONE -->
 
-**Что сделать.** Сделка с наполненным входом, закрытая полной ступенью пары
-(kill-switch → `close-position`), приходит в `EMERGENCY_CLOSED` с
-`closeOutcome=UNDETERMINED` и происшествием `RESULT_NOT_COMPUTABLE`: зеркало
-эпизода остаётся `ACTIVE` с нулевым размером, а `positions-history` не
-запрашивается ни разу, хотя площадка запись закрытия (результат, комиссия,
-цена) отдаёт через секунды. Разобрать тропу: кто обязан добыть положение
-закрытия эпизода до аварийного терминала (`docs/components/MarkDealEmergencyClosedExecutor.md`
-— «факты уже приземлены добычей»; `docs/rules/pnl-reconciliation.md`), и
-почему на этой тропе добыча не запускается. Наблюдение — стенд 2026-10-09,
-сделки 6 и 7 базы `trading_core`.
+**Что решить.** Код остался писателем только у незаявленных чисел детали
+стратегии (охрана второго рубежа), а его флаги — временный, в карв-ауте —
+выведены из снятой тропы пустого числа окружения. По собственному признаку
+код был бы бессрочным. Назначить флаги по признаку и свести носители
+(`docs/components/models/RiskCheckResult.md`, `docs/processes/risk-evaluation.md`,
+javadoc `RiskCheckResult`).
 
-**Дом** — `.claude/tests/cases/smoke-live.md` (находка `F10`, кейс `E5.4`).
+**Причина парковки.** Найдено кодовой пачкой заходом 272.
 
-**Причина парковки.** Найдено прогоном дыма; разбор тропы ядра — отдельный заход.
+## Код клеток после доковых пачек 2026-10-09
+
+<!-- backlog: владелец=tester; оживит=сейчас|шаг:2-12:DONE -->
+
+**Что сделать** — код тестов под клетки, заведённые заходами 271-273
+(ожидания в документах есть, «Факт» пуст либо «ожидание изменено»):
+
+- **ящик ядра** (`trading-core.md`): B4.2 — операнд «режим маржи пары `CROSS`
+  прямой записью после входа» (`F-28`, слепота прежнего операнда); B5.18,
+  B5.19 (предусловие — вторая нога прямой записью: исполнителя замещения входа
+  нет, `B3.11`), B7.16 (а)/(б), B7.17, B7.18 — вариантам `Feed` не хватает
+  позиции режима `CROSS` и ноги с кодом отказа постановки; ящик ядра —
+  расхождение эха даёт отказ без записи строки и без живости; перенос
+  наблюдённого уровня трейлинга (`AlgoOrderMapper.updateFromFetched`) и сверка
+  базы встроенной защиты на трёх тропах (`RefreshOrderExecutor`) — клетки и
+  код (`trading-core.md` либо `trading-core-calc.md`);
+- **коннектор** (`okx-mapping.md`): U4.20-U4.22 (`OkxParse.flag`), U6.39-U6.41
+  (`algoSideToDomain`), U10.18, U21.19; **домен**
+  (`domain-model-predicates.md`): U25.17 (пример спеки «стоп, сработавшей
+  защиты нет»);
+- **сквозные** (`e2e-exit-and-close.md`): E8.1-E8.3, E8.6 — ходы обвязки в
+  §«Кейсы, не прогоняемые сегодня»;
+- **ассерты**: U26.3 — `FIELD_NOT_READ` у `.operator` и `.rightOperand`; U26.6
+  — `NOT_SCALAR` (`strategy-definition-validation.md`); B4.9 — пустая половина
+  пинит три имени из шести; G5 `trading-core-risk.md` — строка ERROR
+  непринятого набора; круговой ход `positionTiers` через конвертеры навеса;
+- **метки** — в именах методов (конвенция «метка в имени метода») у групп
+  U24/U25/U16.34 домена, U1/B2.16/B5.16 коннектора, U34-U37 риска, U11.8
+  `StrategyOverlayCopyContract`; в `@DisplayName`: `SurfaceReadBoxTest` (B11.14,
+  B11.15), `CodePermanenceTest` (U25.14), `OrderHarvestTest` (две пробы:
+  первое наблюдение `WAIT`, `PENDING` у живого частично налитого родителя —
+  дом клеток назначить), `CoreEventFormTest#theStopClosedTerminalCarriesTheStopExitSlippage`
+  (дом клетки формы содержимого событий назначить), `AccessContourBoxTest`
+  прочих пяти сервисов (группы проб живости и готовности),
+  `SecretStoreUnavailableBoxTest` (B9.3-S);
+- **javadoc тестов**, отставший от клеток: `EchoMatchTest`,
+  `StopExitSlippageTest`, `StrategyStepAndActionTest`, `LayerAbsenceTest#u32_8`
+  («бросающих ровно два»), `DealGrainArithmeticBoxTest`, `WireWordContractTest`,
+  потребители `InstrumentExternalRulesJsonConverterTest` (U13.6);
+- **дым**: `E1IngressSmokeTest` — текст `.as(...)` называет два маршрута;
+  половина с `@Tag("debt")` (консоль провайдера) по сверке стенда зелена —
+  метку снимать по прогону;
+- **заголовки** «…причина та же» (`e2e-safety-teardown.md`) и «…причина одна —
+  пролог» (`e2e-perimeter-read.md`) открытой причины больше не описывают —
+  переименовать с входящими адресами.
+
+**Дом** — документы кейсов названных предметов.
+
+**Причина парковки.** Доковые пачки код тестов не пишут (заходы 271-273).
+
+## Javadoc и доки после доковой пачки 2026-10-09 (заход 273)
+
+<!-- backlog: владелец=code-writer; оживит=сейчас|шаг:2-12:DONE -->
+
+**Что сделать.** Исключение «расхождение эха живость не пишет» получило дом в
+`docs/lifecycles/Order.md` (заход 273); за ним не пошли: javadoc
+`RefreshOrderExecutor#fetchOrFail` и `RefreshAlgoOrderExecutor` («Каждая
+добыча пишет наблюдённую живость…» — без исключения), описание `externalLive`
+в `docs/models/domain/core/AlgoOrder.md` (`solution-designer`).
+
+**Причина парковки.** Найдено доковой пачкой вне выданных путей.
+

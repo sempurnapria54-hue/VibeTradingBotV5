@@ -224,15 +224,13 @@ public class EntryScannerJob {
     }
 
     /**
-     * Контекст оценки входного условия: рыночная половина плюс момент
-     * решения. <b>Фактов сделки у него нет ни одного</b>, и эта пустота —
+     * Контекст оценки входного условия — рыночная половина как есть.
+     * <b>Фактов сделки у него нет ни одного</b>, и эта пустота —
      * whitelist контекста: правила, читающие эпизод, транш и фазу входа,
      * оказываются на пустом операнде и консервативно ложны
      * (docs/spec/deal-condition.json).
      */
     private ConditionEvaluationContext entryContext(MarketFeatures features) {
-        return features.conditionOperands()
-                .evaluationTime(OffsetDateTime.now(ZoneOffset.UTC))
-                .build();
+        return features.conditionOperands().build();
     }
 }

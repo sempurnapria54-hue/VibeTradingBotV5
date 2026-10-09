@@ -319,7 +319,7 @@ class StrategyStepAndActionTest {
      * Метки клетка не несёт — её назначает документ кейсов.
      */
     @Test
-    @DisplayName("Перевыставление входа с ключом цели — первичная постановка, а не перенос")
+    @DisplayName("U16.34 — перевыставление входа с ключом цели — первичная постановка, а не перенос")
     void aReplacedEntryWithATargetIsAPrimaryPlacement() {
         StrategyOrderAction replacedEntry = orderAction(4L, StrategyTradeDirection.LONG, false);
         replacedEntry.setActionType(StrategyActionType.REPLACE_ACTION);

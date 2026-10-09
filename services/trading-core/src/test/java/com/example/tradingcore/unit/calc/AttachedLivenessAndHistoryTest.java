@@ -367,7 +367,7 @@ class AttachedLivenessAndHistoryTest {
     // --- первое наблюдение терминала родителя ------------------------------
 
     @Test
-    @DisplayName("Терминал впервые увиден, живой записи и разбора нет, риск транша не покрыт: ожидание, а не потеря")
+    @DisplayName("U11.23 — терминал впервые увиден, живой записи и разбора нет, риск транша не покрыт: ожидание, а не потеря")
     void aFirstTerminalObservationWithAnEmptyAnalysisWaits() {
         AttachedProtectionResolution resolution = resolver.resolve(firstTerminalObservation()
                 .parentStatus(Order.Status.CANCELED)
@@ -386,7 +386,7 @@ class AttachedLivenessAndHistoryTest {
     }
 
     @Test
-    @DisplayName("Терминал впервые увиден, экспозиции у транша нет, разбор пуст: ожидание, а не неопределённый исход")
+    @DisplayName("U11.24 — терминал впервые увиден, экспозиции у транша нет, разбор пуст: ожидание, а не неопределённый исход")
     void aFirstTerminalObservationWithoutExposureWaitsInsteadOfSignalling() {
         AttachedProtectionResolution resolution = resolver.resolve(firstTerminalObservation()
                 .parentStatus(Order.Status.CANCELED)
@@ -400,7 +400,7 @@ class AttachedLivenessAndHistoryTest {
     }
 
     @Test
-    @DisplayName("Терминал впервые увиден, разбор нашёл срабатывание: факт применяется сразу")
+    @DisplayName("U11.25 — терминал впервые увиден, разбор нашёл срабатывание: факт применяется сразу")
     void aFirstTerminalObservationAppliesAFoundHistoryLeg() {
         AttachedProtectionResolution resolution = resolver.resolve(firstTerminalObservation()
                 .trancheExposure(fill("1"))
@@ -413,7 +413,7 @@ class AttachedLivenessAndHistoryTest {
     }
 
     @Test
-    @DisplayName("Терминал впервые увиден, живая запись найдена: защита активна сразу")
+    @DisplayName("U11.26 — терминал впервые увиден, живая запись найдена: защита активна сразу")
     void aFirstTerminalObservationActivatesOnAFoundRecord() {
         AttachedProtectionResolution resolution = resolver.resolve(firstTerminalObservation()
                 .standaloneRecordFound(true)
@@ -423,7 +423,7 @@ class AttachedLivenessAndHistoryTest {
     }
 
     @Test
-    @DisplayName("Признак «терминал наблюдён раньше» пуст: ожидания нет — пустота тревогу не снимает")
+    @DisplayName("U11.27 — признак «терминал наблюдён раньше» пуст: ожидания нет — пустота тревогу не снимает")
     void anEmptyPriorTerminalOperandDoesNotOpenTheWaitBranch() {
         AttachedProtectionResolution resolution = resolver.resolve(afterSearchCycle()
                 .parentTerminalObservedBefore(null)

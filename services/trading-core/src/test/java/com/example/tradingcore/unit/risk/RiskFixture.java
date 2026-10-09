@@ -201,7 +201,8 @@ final class RiskFixture {
 
     /**
      * Принятые числа с названными процентом одновременного риска сделки и
-     * порогом серии; пусто — число не принято.
+     * порогом серии. Пустого числа у принятого набора не бывает — непринятый
+     * набор роняет старт ядра.
      *
      * <p><b>Прочие четыре числа не связывают кейсов прежних групп:</b>
      * потолки счёта и тенанта — по сто процентов, предел кумулятивного
@@ -220,7 +221,7 @@ final class RiskFixture {
                 .build();
     }
 
-    /** Принятые числа с названными процентом сделки и пределом плеча; пусто — предел не принят. */
+    /** Принятые числа с названными процентом сделки и пределом плеча. */
     static RiskAppetite appetiteWithMaxLeverage(String simultaneousPercent, String maxLeverage) {
         return appetite(simultaneousPercent, 3).toBuilder()
                 .globalMaxLeverage(decimal(maxLeverage))
@@ -229,7 +230,7 @@ final class RiskFixture {
 
     /**
      * Принятые числа тестового окружения держателя для потолков уровней:
-     * сделка 1 %, счёт 10 %, тенант 30 %; пусто — число не принято.
+     * сделка 1 %, счёт 10 %, тенант 30 %.
      */
     static RiskAppetite levelAppetite(String accountPercent, String tenantPercent) {
         return appetite("1", 3).toBuilder()

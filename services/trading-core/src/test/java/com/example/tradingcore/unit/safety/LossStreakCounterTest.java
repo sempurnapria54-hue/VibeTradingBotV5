@@ -57,7 +57,7 @@ class LossStreakCounterTest {
         limit(LIMIT);
     }
 
-    /** Принятый ядром предел серии; пусто — не принят. */
+    /** Принятый ядром предел серии. */
     private void limit(Integer value) {
         when(appetites.getAccepted()).thenReturn(RiskAppetite.builder().globalConsecutiveLossLimit(value).build());
     }
@@ -186,24 +186,6 @@ class LossStreakCounterTest {
     @DisplayName("U14.9 — счётчик после хода ниже порога: предел не достигнут")
     void u14_9_belowTheLimitIsNotReached() {
         assertThat(counter.applyTerminal(lossContext(0))).isFalse();
-    }
-
-    /** Провизорное значение не подставляется. */
-    @Test
-    @DisplayName("U14.10 — порог не принят: предел не достигнут")
-    void u14_10_anUnsetLimitNeverTriggers() {
-        limit(null);
-
-        assertThat(counter.applyTerminal(lossContext(10))).isFalse();
-    }
-
-    /** Ни одно число риск-аппетита не принято — тот же исход. */
-    @Test
-    @DisplayName("U14.11 — ни одно число риск-аппетита не принято: тот же исход")
-    void u14_11_anEmptyAcceptedAppetiteNeverTriggers() {
-        when(appetites.getAccepted()).thenReturn(RiskAppetite.builder().build());
-
-        assertThat(counter.applyTerminal(lossContext(10))).isFalse();
     }
 
     /** Пустой счётчик читается нулём. */

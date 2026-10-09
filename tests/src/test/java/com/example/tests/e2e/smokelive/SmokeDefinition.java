@@ -46,7 +46,7 @@ final class SmokeDefinition {
                     "type": "BULL_TREND",
                     "condition": {"rules": [{
                       "level": 1, "ruleType": "PRICE_COMPARE", "operator": "GT",
-                      "leftOperand": {"sourceType": "PRICE", "priceSource": "LAST_PRICE"},
+                      "leftOperand": {"sourceType": "PRICE"},
                       "rightOperand": {"sourceType": "CONSTANT", "valueType": "NUMBER", "value": "0"}
                     }]}
                   }

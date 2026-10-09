@@ -67,6 +67,9 @@ import org.junit.jupiter.api.Test;
  */
 class DealTerminalEdgeTest {
 
+    /** Предел серии базовой сборки: ни одна клетка до него не доходит. */
+    private static final Integer UNREACHED_LOSS_LIMIT = 1000;
+
     private static final String EXCHANGE = "OKX";
     private static final String SETTLE = "USDT";
     private static final String TENANT = "tn-0001";
@@ -104,7 +107,9 @@ class DealTerminalEdgeTest {
                 new DealResultCalculator(contourProperties), reconciliationCalculator, featuresWriter,
                 terminalGate, lossStreakCounter, reports, coreEventWriter);
         errorExecutor = new MarkDealErrorExecutor(dealDataService, actionStates);
-        when(tenants.getAccepted()).thenReturn(RiskAppetite.builder().build());
+        // Предел серии задан всегда — у работающего ядра пустым он не бывает;
+        // базовый предел недостижим для серии клеток, порог мерят свои.
+        when(tenants.getAccepted()).thenReturn(appetiteWithLossLimit(UNREACHED_LOSS_LIMIT));
         // Ребро применилось — умолчание МОКА обратное, и это несущее:
         // непрослушанный гард даёт «сделка ушла из-под прохода», то есть
         // тест, забывший о нём, падает, а не проходит молча.

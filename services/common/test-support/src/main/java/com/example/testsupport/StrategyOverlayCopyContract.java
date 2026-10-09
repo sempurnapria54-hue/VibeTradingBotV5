@@ -114,12 +114,11 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
 
     /** Ключи правила условия, собранного всеми полями (`U13.2`). */
     private static final List<String> CONDITION_RULE_KEYS = List.of(
-            "level", "ruleType", "percents", "timeframe", "operator", "leftOperand", "rightOperand");
+            "level", "ruleType", "percents", "operator", "leftOperand", "rightOperand");
 
     /** Ключи операнда правила, собранного всеми полями (`U13.2`). */
     private static final List<String> CONDITION_OPERAND_KEYS = List.of(
-            "sourceType", "indicatorKey", "indicatorComponent", "structureKey", "priceSource",
-            "valueType", "value");
+            "sourceType", "indicatorKey", "indicatorComponent", "structureKey", "valueType", "value");
 
     /** Ключи настройки стопа, собранной всеми полями (`U13.2`). */
     private static final List<String> STOP_LOSS_SETTINGS_KEYS = List.of(
@@ -450,6 +449,28 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
                 .usingRecursiveComparison().isEqualTo(placement);
     }
 
+    /**
+     * Строка условия, записанная до сужения грамматики, несёт таймфрейм
+     * правила и источник цены операнда — полей, которых доменная форма больше
+     * не несёт (docs/rules/strategy-condition-contract.md §«Грамматика
+     * объявляет только исполняемое»). Такие строки лежат на стенде, и
+     * миграции у них нет: колонка — навес, а снятые ключи читатель обязан
+     * отбросить, а не отказать на них.
+     */
+    @Test
+    @DisplayName("U11.8 — строка условия прежней формы — с таймфреймом правила и источником цены — читается без них")
+    protected void aConditionRowOfThePreviousFormIsReadWithoutTheRetiredKeys() {
+        String previousForm = CONDITION_JSON
+                .replace("\"ruleType\":\"INDICATOR_COMPARE\",",
+                        "\"ruleType\":\"INDICATOR_COMPARE\",\"timeframe\":\"ONE_HOUR\",")
+                .replace("\"rightOperand\":{\"sourceType\":\"PRICE\"}",
+                        "\"rightOperand\":{\"sourceType\":\"PRICE\",\"priceSource\":\"LAST_PRICE\"}");
+
+        assertThat(previousForm).isNotEqualTo(CONDITION_JSON);
+        assertThat(readCondition(previousForm))
+                .usingRecursiveComparison().isEqualTo(condition());
+    }
+
     // --- U13.2: состав ключей строки — литеральным перечнем -------------
 
     @Test
@@ -537,12 +558,12 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
     /** Строка `U10.1`: объявлена один раз и сверяется каждой копией. */
     private static final String CONDITION_JSON =
             "{\"rules\":["
-                    + "{\"level\":1,\"ruleType\":\"INDICATOR_COMPARE\",\"timeframe\":\"ONE_HOUR\","
+                    + "{\"level\":1,\"ruleType\":\"INDICATOR_COMPARE\","
                     + "\"operator\":\"GT\","
                     + "\"leftOperand\":{\"sourceType\":\"INDICATOR\",\"indicatorKey\":\"ema_fast\","
                     + "\"indicatorComponent\":\"MIDDLE_BAND\"},"
-                    + "\"rightOperand\":{\"sourceType\":\"PRICE\",\"priceSource\":\"LAST_PRICE\"}},"
-                    + "{\"level\":2,\"ruleType\":\"PRICE_COMPARE\",\"timeframe\":\"FIVE_MINUTES\","
+                    + "\"rightOperand\":{\"sourceType\":\"PRICE\"}},"
+                    + "{\"level\":2,\"ruleType\":\"PRICE_COMPARE\","
                     + "\"operator\":\"LT\","
                     + "\"leftOperand\":{\"sourceType\":\"MARKET_STRUCTURE\",\"structureKey\":\"range_main\"},"
                     + "\"rightOperand\":{\"sourceType\":\"PRICE\",\"valueType\":\"NUMBER\",\"value\":\"42\"}}"
@@ -628,12 +649,10 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
 
         StrategyConditionOperand price = new StrategyConditionOperand();
         price.setSourceType(StrategyConditionSourceType.PRICE);
-        price.setPriceSource(StrategyPriceSource.LAST_PRICE);
 
         StrategyConditionRule first = new StrategyConditionRule();
         first.setLevel(1);
         first.setRuleType(StrategyConditionRuleType.INDICATOR_COMPARE);
-        first.setTimeframe(TimeFrame.ONE_HOUR);
         first.setOperator(StrategyConditionOperator.GT);
         first.setLeftOperand(indicator);
         first.setRightOperand(price);
@@ -650,7 +669,6 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
         StrategyConditionRule second = new StrategyConditionRule();
         second.setLevel(2);
         second.setRuleType(StrategyConditionRuleType.PRICE_COMPARE);
-        second.setTimeframe(TimeFrame.FIVE_MINUTES);
         second.setOperator(StrategyConditionOperator.LT);
         second.setLeftOperand(structure);
         second.setRightOperand(constant);
@@ -664,7 +682,6 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
         rule.setLevel(1);
         rule.setRuleType(StrategyConditionRuleType.INDICATOR_COMPARE);
         rule.setPercents(new BigDecimal("0.5"));
-        rule.setTimeframe(TimeFrame.ONE_HOUR);
         rule.setOperator(StrategyConditionOperator.GT);
         rule.setLeftOperand(operandWithEveryField());
         rule.setRightOperand(operandWithEveryField());
@@ -678,7 +695,6 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
         operand.setIndicatorKey("ema_fast");
         operand.setIndicatorComponent(IndicatorComponent.MIDDLE_BAND);
         operand.setStructureKey("range_main");
-        operand.setPriceSource(StrategyPriceSource.LAST_PRICE);
         operand.setValueType(ConstantValueType.NUMBER);
         operand.setValue("42");
         return operand;

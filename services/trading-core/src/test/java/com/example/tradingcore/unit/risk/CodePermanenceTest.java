@@ -72,10 +72,9 @@ class CodePermanenceTest {
     }
 
     @Test
-    @DisplayName("U25.5 — незаданные числа риск-аппетита: временны́е")
-    void u25_5_theUnassignedAppetiteNumbersAreTemporary() {
-        assertTemporary(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED,
-                RiskCheckCode.LOSS_LIMIT_NOT_CONFIGURED);
+    @DisplayName("U25.5 — незаявленное деталью число потолка: временный")
+    void u25_5_theUndeclaredDetailNumberIsTemporary() {
+        assertTemporary(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
     }
 
     @Test

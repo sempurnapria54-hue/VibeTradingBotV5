@@ -9,19 +9,9 @@
     "dealTerminal": "терминал, которым закрылась сделка: CLOSED — штатный, EMERGENCY_CLOSED — аварийный; ERROR терминалом не является — сделка идёт дальше аварийной тропой",
     "objectStatusBefore": "статус объекта блокировки до применения исхода сделки; объект здесь всегда счёт, и статус — ExchangeAccount.safetyRung; мягкая ступень — HOLD, сворачивание — TRADE_BLOCKED, прочие значения ступенью не являются",
     "consecutiveLossCountBefore": "ExchangeAccount.consecutiveLossCount до применения исхода сделки",
-    "globalConsecutiveLossLimit": "globalConsecutiveLossLimit — сколько подряд убыточных сделок останавливает торговлю; умолчания нет"
+    "globalConsecutiveLossLimit": "globalConsecutiveLossLimit — сколько подряд убыточных сделок останавливает торговлю; умолчания нет, и у работающего ядра пустым не бывает: непринятый набор чисел риск-аппетита роняет старт (docs/rules/risk-policy.md)"
   },
   "values": [
-    {
-      "name": "limitConfigured",
-      "note": "Пустое место — отказ, а не бессрочная торговля: провизорное N не назначается.",
-      "expr": "notNull(globalConsecutiveLossLimit)"
-    },
-    {
-      "name": "riskCreatingRefused",
-      "note": "Пока порог не задан, risk-creating действие отвергается кодом LOSS_LIMIT_NOT_CONFIGURED; точка применения — преконтроль риска, как у прочих незаданных чисел риск-аппетита.",
-      "expr": "!limitConfigured"
-    },
     {
       "name": "countedTerminal",
       "note": "Популяция счёта — оба терминала сделки. Аварийный входит: именно на нём реализуются худшие исходы (гэп через стоп, ликвидация, flatten), и энфорсер, их не видящий, не ограничивает ту величину, ради которой заведён. Ошибочное состояние терминалом не является и счётчика не двигает — сделка доедет до аварийного терминала и будет учтена там ровно один раз.",
@@ -59,8 +49,8 @@
     },
     {
       "name": "haltTriggered",
-      "note": "Запрос мягкой биржевой ступени, а не статус биржи: срабатывает на N-й сделке серии и подаётся идемпотентной точкой входа исполнителя блокировки после коммита терминала. Какой статус получится — дело лестницы (docs/rules/exchange-hold.md): монотонность ступеней и согласование эскалации живут там, спека их не дублирует. Порог не задан — срабатывать нечему, торговля уже отвергнута преконтролем.",
-      "expr": "limitConfigured && consecutiveLossCountAfter >= globalConsecutiveLossLimit"
+      "note": "Запрос мягкой биржевой ступени, а не статус биржи: срабатывает на N-й сделке серии и подаётся идемпотентной точкой входа исполнителя блокировки после коммита терминала. Какой статус получится — дело лестницы (docs/rules/exchange-hold.md): монотонность ступеней и согласование эскалации живут там, спека их не дублирует. Порог задан всегда: у работающего ядра пустого числа риск-аппетита не бывает — непринятый набор роняет его старт (docs/rules/risk-policy.md).",
+      "expr": "consecutiveLossCountAfter >= globalConsecutiveLossLimit"
     },
     {
       "name": "holdStandingBefore",
@@ -285,24 +275,6 @@
       }
     },
     {
-      "case": "порог не задан — risk-creating действие отвергается, срабатывать нечему, стоящий холд остаётся",
-      "state": {
-        "graphComplete": true,
-        "resultProfit": -10,
-        "fundingCost": 0,
-        "dealTerminal": "CLOSED",
-        "objectStatusBefore": "HOLD",
-        "consecutiveLossCountBefore": 5,
-        "globalConsecutiveLossLimit": null
-      },
-      "expect": {
-        "limitConfigured": false,
-        "riskCreatingRefused": true,
-        "haltTriggered": false,
-        "holdStandingAfter": true
-      }
-    },
-    {
       "case": "порог единица: первая же убыточная сделка запрашивает ступень",
       "state": {
         "graphComplete": true,
@@ -378,22 +350,6 @@
         "consecutiveLossCountAfter": 2,
         "haltTriggered": false,
         "holdStandingAfter": false
-      }
-    },
-    {
-      "case": "предел серии задан — risk-creating не отвергается: контрпример к предикату отказа",
-      "state": {
-        "graphComplete": true,
-        "resultProfit": -12.5,
-        "fundingCost": 0,
-        "dealTerminal": "CLOSED",
-        "objectStatusBefore": "ACTIVE",
-        "consecutiveLossCountBefore": 0,
-        "globalConsecutiveLossLimit": 3
-      },
-      "expect": {
-        "limitConfigured": true,
-        "riskCreatingRefused": false
       }
     },
     {

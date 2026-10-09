@@ -260,7 +260,6 @@ class MarketFeatureAssemblyTest {
                 .previousIndicators(Map.of())
                 .structures(context.getStructures())
                 .price(context.getPrice())
-                .evaluationTime(context.getEvaluationTime())
                 .build();
     }
 

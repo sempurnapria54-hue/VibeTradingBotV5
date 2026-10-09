@@ -35,7 +35,7 @@ class StopExitSlippageTest {
     private static final String LEVEL = "2910";
 
     @Test
-    @DisplayName("LONG, гэп через стоп: исполнение на 30 ниже уровня — проскок 300, положителен")
+    @DisplayName("U25.1 — LONG, гэп через стоп: исполнение на 30 ниже уровня — проскок 300, положителен")
     void aLongGapThroughTheStopIsAdverseAndPositive() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2880", stopTranche(LEVEL, "100"));
 
@@ -43,7 +43,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("SHORT: неблагоприятная сторона выше уровня — проскок 60")
+    @DisplayName("U25.2 — SHORT: неблагоприятная сторона выше уровня — проскок 60")
     void aShortMeasuresTheAdverseSideAboveTheLevel() {
         Deal deal = stopDeal(StrategyTradeDirection.SHORT, "3096", stopTranche("3090", "100"));
 
@@ -51,7 +51,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("LONG, исполнение лучше уровня: проскок отрицателен и нулём не обрезается")
+    @DisplayName("U25.3 — LONG, исполнение лучше уровня: проскок отрицателен и нулём не обрезается")
     void aBetterThanLevelExecutionIsNegative() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2912", stopTranche(LEVEL, "100"));
 
@@ -59,7 +59,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Стоп перенесён отдельной защитой: мерится против сработавшего уровня, снятая встроенная не входит")
+    @DisplayName("U25.4 — стоп перенесён отдельной защитой: мерится против сработавшего уровня, снятая встроенная не входит")
     void theMovedStandaloneStopIsTheComparedLevel() {
         DealTranche tranche = stopTranche(LEVEL, "100");
         AttachedAlgoOrder switched = tranche.getOrders().getFirst().getAttachedAlgoOrders().getFirst();
@@ -72,7 +72,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Два транша со стопами на одном уровне: экспозиция — сумма наливов, проскок 50")
+    @DisplayName("U25.5 — два транша со стопами на одном уровне: экспозиция — сумма наливов, проскок 50")
     void twoTranchesOnOneLevelSumTheirExposure() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2905", stopTranche(LEVEL, "60"),
                 stopTranche(LEVEL, "40"));
@@ -81,7 +81,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Частичный выход reduce-only ногой, остаток добрал стоп: мера пуста")
+    @DisplayName("U25.6 — частичный выход reduce-only ногой, остаток добрал стоп: мера пуста")
     void aPartialReduceOnlyExitLeavesTheMeasureEmpty() {
         DealTranche tranche = stopTranche(LEVEL, "100");
         tranche.getOrders().add(leg(true, "40"));
@@ -91,7 +91,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Соседний налитый транш закрыт не стопом: средняя цена смешана — мера пуста")
+    @DisplayName("U25.7 — соседний налитый транш закрыт не стопом: средняя цена смешана — мера пуста")
     void aNeighbourClosedOtherwiseLeavesTheMeasureEmpty() {
         DealTranche neighbour = stopTranche(LEVEL, "40");
         neighbour.setCloseReason(DealTranche.CloseReason.STRATEGY_EXIT);
@@ -101,7 +101,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Транш без налива с иной причиной меру не портит")
+    @DisplayName("U25.8 — транш без налива с иной причиной меру не портит")
     void anUnfilledTrancheDoesNotSpoilTheMeasure() {
         DealTranche expired = tranche();
         expired.setCloseReason(DealTranche.CloseReason.ENTRY_CONDITION_EXPIRED);
@@ -112,7 +112,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Сработал трейлинг: наблюдённый уровень мерой не берётся — мера пуста")
+    @DisplayName("U25.9 — сработал трейлинг: наблюдённый уровень мерой не берётся — мера пуста")
     void aFiredTrailingLeavesTheMeasureEmpty() {
         DealTranche tranche = tranche();
         tranche.setCloseReason(DealTranche.CloseReason.STOP_LOSS);
@@ -124,7 +124,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Лестница стопов на разных уровнях: средний уровень не взвешивается — мера пуста")
+    @DisplayName("U25.10 — лестница стопов на разных уровнях: средний уровень не взвешивается — мера пуста")
     void aStopLadderLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2895", stopTranche(LEVEL, "60"),
                 stopTranche("2900", "40"));
@@ -133,7 +133,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Аварийный терминал: причина не стоп — мера пуста при любом графе")
+    @DisplayName("U25.11 — аварийный терминал: причина не стоп — мера пуста при любом графе")
     void anEmergencyTerminalLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2880", stopTranche(LEVEL, "100"));
         deal.setCloseReason(Deal.CloseReason.EMERGENCY_CLOSE);
@@ -142,7 +142,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Граф на терминале неполон: мера пуста")
+    @DisplayName("U25.12 — граф на терминале неполон: мера пуста")
     void anIncompleteGraphLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2880", stopTranche(LEVEL, "100"));
 
@@ -150,7 +150,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Ликвидация: исход не штатный — мера пуста")
+    @DisplayName("U25.13 — ликвидация: исход не штатный — мера пуста")
     void aLiquidationLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2850", stopTranche(LEVEL, "100"));
         deal.setCloseOutcome(Deal.CloseOutcome.LIQUIDATION);
@@ -159,7 +159,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Два эпизода: средняя цена выхода у каждого своя — мера пуста")
+    @DisplayName("U25.14 — два эпизода: средняя цена выхода у каждого своя — мера пуста")
     void twoEpisodesLeaveTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2905", stopTranche(LEVEL, "100"));
         deal.getPositions().add(closedEpisode("2900"));
@@ -168,7 +168,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Средней цены выхода в записи закрытия нет: мера пуста, а не ноль")
+    @DisplayName("U25.15 — средней цены выхода в записи закрытия нет: мера пуста, а не ноль")
     void anAbsentExitPriceLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, null, stopTranche(LEVEL, "100"));
 
@@ -176,7 +176,7 @@ class StopExitSlippageTest {
     }
 
     @Test
-    @DisplayName("Восстановленная сделка без входных ног: вышедшая экспозиция ноль — мера пуста")
+    @DisplayName("U25.16 — восстановленная сделка без входных ног: вышедшая экспозиция ноль — мера пуста")
     void aRecoveredDealWithoutEntryLegsLeavesTheMeasureEmpty() {
         DealTranche recovered = tranche();
         recovered.setCloseReason(DealTranche.CloseReason.STOP_LOSS);

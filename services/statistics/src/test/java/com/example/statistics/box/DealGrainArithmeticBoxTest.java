@@ -757,7 +757,7 @@ class DealGrainArithmeticBoxTest extends StatisticsBox {
     }
 
     @Test
-    @DisplayName("Пример спеки — проскок выхода по стопу: сумма долей R по измеренным, неизмеренный "
+    @DisplayName("B8.20 — Проскок выхода по стопу: сумма долей R по измеренным, неизмеренный "
             + "виден разностью счётчиков, выход не стопом и сделка без знаменателя не входят никуда")
     void theStopExitSlippageSumsMeasuredSharesOfRAndCountsTheUnmeasured() {
         DealDraft.of("E-SX-1-MEASURED", TENANT, midnightDaysAgo(DAY))
@@ -800,7 +800,7 @@ class DealGrainArithmeticBoxTest extends StatisticsBox {
     }
 
     @Test
-    @DisplayName("Пример спеки — проскок выхода по стопу: аварийный терминал в популяцию закрытых "
+    @DisplayName("B8.21 — Проскок выхода по стопу: аварийный терминал в популяцию закрытых "
             + "стопом не входит, хотя в отношении к риску стоит")
     void anEmergencyTerminalStaysOutOfTheStopExitPopulation() {
         DealDraft.of("E-SX-2-MEASURED", TENANT, midnightDaysAgo(DAY))

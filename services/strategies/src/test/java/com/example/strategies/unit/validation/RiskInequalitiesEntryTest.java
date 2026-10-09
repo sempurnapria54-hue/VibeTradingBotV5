@@ -144,7 +144,7 @@ class RiskInequalitiesEntryTest {
     }
 
     @Test
-    @DisplayName("U30.10 — список деталей пуст: охрана незаданных чисел стои́т ДО этой точки")
+    @DisplayName("U30.10 — список деталей пуст: охрана ответа ядра без чисел стои́т ДО этой точки")
     void u30_10_anEmptyDetailListRejectsNothingHere() {
         assertThat(inequalityViolations(List.of(), appetite(null, null, null)))
                 .as("иначе определение без торгуемых деталей прошло бы мимо охраны чисел")

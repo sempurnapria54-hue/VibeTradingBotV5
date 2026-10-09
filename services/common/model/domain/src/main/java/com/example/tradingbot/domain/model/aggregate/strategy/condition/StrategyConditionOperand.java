@@ -1,24 +1,24 @@
 package com.example.tradingbot.domain.model.aggregate.strategy.condition;
 
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceSource;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Операнд условия — самоописательный: sourceType + ссылка/значение по
- * источнику. Ссылка на настройку — «мягкая», по ключу настройки из
- * **каталога стратегии** ({@code Strategy.indicatorSettings} /
- * {@code marketStructureSettings}): индикаторный операнд — indicatorKey,
- * операнд market-structure — structureKey; резолвит приложение в пределах
- * стратегии. Ссылаться на необъявленную настройку нельзя — ключ обязан
- * резолвиться в каталог (create-валидация, strategy-scope ref-resolution).
- * Операнд-CONSTANT (литерал valueType + value) и PRICE-операнд (priceSource)
- * — **не** ссылки на настройку, ограничение их не касается; у вычисляемых
- * источников значение приходит в рантайме. См.
- * docs/models/domain/aggregate/Strategy.md (§StrategyConditionOperand),
- * docs/rules/strategy-condition-contract.md.
+ * Операнд условия — самоописательный: sourceType плюс ссылка либо
+ * значение по источнику. Набор полей задан типом источника точно
+ * (docs/rules/strategy-condition-contract.md §«Грамматика объявляет только
+ * исполняемое»): индикаторный — ключ настройки и, у многокомпонентного
+ * типа, адресный компонент; структурный — ключ настройки структуры;
+ * константа — тип значения и значение; у ценового и фазового полей нет.
+ *
+ * <p>Ссылка на настройку — «мягкая», по ключу из <b>каталога стратегии</b>
+ * ({@code Strategy.indicatorSettings} / {@code marketStructureSettings});
+ * ключ обязан резолвиться в каталог (create-валидация). Ценовой операнд —
+ * последняя цена сделки инструмента в момент оценки, и источника цены он не
+ * несёт: источник рыночной цены объявляет только размещение. См.
+ * docs/models/domain/aggregate/Strategy.md (§Условия).
  */
 @Getter
 @Setter
@@ -26,7 +26,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class StrategyConditionOperand {
 
-    /** Источник значения операнда. */
+    /** Источник значения операнда — задаёт, какие из прочих полей операнд несёт. */
     private StrategyConditionSourceType sourceType;
 
     /** Ключ настройки индикатора (только для sourceType = INDICATOR). */
@@ -41,9 +41,6 @@ public class StrategyConditionOperand {
 
     /** Ключ настройки структуры рынка (только для sourceType = MARKET_STRUCTURE). */
     private String structureKey;
-
-    /** Конкретный источник цены (только для sourceType = PRICE). */
-    private StrategyPriceSource priceSource;
 
     /** Тип литерала (только для sourceType = CONSTANT). */
     private ConstantValueType valueType;

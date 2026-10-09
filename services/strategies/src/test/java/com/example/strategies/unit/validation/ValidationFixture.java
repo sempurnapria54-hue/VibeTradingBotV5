@@ -100,7 +100,7 @@ final class ValidationFixture {
         }
     }
 
-    /** Принятые ядром числа: пустое поле означает «ядро числа не приняло». */
+    /** Принятые ядром числа; пустое поле — ответ без числа, который до валидатора отвергает чтец. */
     static TenantRiskAppetite appetite(String simultaneous, String cumulative, String leverage) {
         return new TenantRiskAppetite(decimal(simultaneous), decimal(cumulative), decimal(leverage));
     }

@@ -104,7 +104,7 @@ class AccessContourBoxTest extends SharedTradingCoreBox {
      * Метки клетка не несёт — её назначает документ кейсов.
      */
     @Test
-    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
+    @DisplayName("B12.11 — группы проб живости и готовности открыты и отвечают состоянием")
     void theProbeGroupsAreOpenAndAnswerWithState() {
         Answer liveness = getAnonymously(HEALTH + "/liveness");
         Answer readiness = getAnonymously(HEALTH + "/readiness");

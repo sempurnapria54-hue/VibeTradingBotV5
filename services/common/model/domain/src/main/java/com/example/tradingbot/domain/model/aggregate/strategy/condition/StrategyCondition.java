@@ -18,12 +18,13 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Общее условие применимости шага стратегии: все rules должны быть
- * истинны; проверяются по level ASC (локальный порядок внутри
- * условия, не глобальный порядок шагов). Персистится целиком
- * JSONB-полем condition на строке strategy_step; вычисление
- * истинности — деталь evaluator'а (downstream,
- * StrategyConditionEvaluator). См.
+ * Условие применимости шага стратегии либо клаузы классификации фазы —
+ * конъюнкция правил: выполнено, когда истинно каждое; порядок правил и
+ * их уровень ответа не меняют (docs/components/StrategyConditionEvaluator.md
+ * §Границы). Авторская форма несёт хотя бы одно правило
+ * (docs/rules/strategy-condition-contract.md §«Условие непусто»).
+ * Персистится целиком JSONB-полем condition на строке шага; вычисление
+ * истинности — у StrategyConditionEvaluator. См.
  * docs/models/domain/aggregate/Strategy.md (§Условия),
  * docs/rules/strategy-condition-contract.md.
  */
@@ -33,7 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 @AllArgsConstructor
 public class StrategyCondition {
 
-    /** Правила условия; шаг применим, когда истинны все. */
+    /** Правила условия; условие выполнено, когда истинны все, независимо от их порядка. */
     private List<StrategyConditionRule> rules;
 
     /**

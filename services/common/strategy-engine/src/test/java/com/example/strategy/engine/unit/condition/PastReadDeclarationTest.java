@@ -15,7 +15,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.strategy.engine.condition.ConditionEvaluationContext;
 import com.example.strategy.engine.condition.StrategyConditionEvaluator;
-import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyPriceSource;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyCondition;
 import com.example.tradingbot.domain.model.aggregate.strategy.condition.StrategyConditionOperand;
@@ -139,7 +138,7 @@ class PastReadDeclarationTest {
     }
 
     private StrategyConditionOperand lastPrice() {
-        return price(StrategyPriceSource.LAST_PRICE);
+        return price();
     }
 
     /** Все значения перечня операторов и пустой оператор. */

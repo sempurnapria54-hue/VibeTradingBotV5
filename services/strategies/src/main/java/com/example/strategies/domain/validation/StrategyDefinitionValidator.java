@@ -193,13 +193,113 @@ public class StrategyDefinitionValidator {
      */
     private static final Set<String> DEAL_SELECTED_STATUSES = Set.of(Deal.Status.ACTIVE.name());
 
-    /** Допустимые sourceType операндов в контексте классификации фазы (без MARKET_PHASE и runtime-сделки). */
+    /** Допустимые sourceType операндов в контексте классификации фазы (без MARKET_PHASE — своего результата). */
     private static final Set<String> PHASE_ALLOWED_SOURCE_TYPES = Set.of(
             StrategyConditionSourceType.INDICATOR.name(),
             StrategyConditionSourceType.MARKET_STRUCTURE.name(),
             StrategyConditionSourceType.PRICE.name(),
-            StrategyConditionSourceType.CONSTANT.name(),
-            StrategyConditionSourceType.TIME.name());
+            StrategyConditionSourceType.CONSTANT.name());
+
+    /**
+     * Операторы сравнивающего правила — шесть сравнений
+     * (docs/rules/strategy-condition-contract.md §«Правило и операнды»):
+     * пересекающий оператор исполняет только пересечение, а в сравнении
+     * оценка читает его ложью всегда.
+     */
+    private static final Set<String> COMPARISON_OPERATORS = Set.of(
+            StrategyConditionOperator.EQ.name(),
+            StrategyConditionOperator.NE.name(),
+            StrategyConditionOperator.GT.name(),
+            StrategyConditionOperator.GTE.name(),
+            StrategyConditionOperator.LT.name(),
+            StrategyConditionOperator.LTE.name());
+
+    /**
+     * Источники скалярного операнда — тех, что оценка сравнивает числом;
+     * константа скалярна только числовым типом значения
+     * ({@link #SCALAR_CONSTANT_VALUE_TYPES}).
+     */
+    private static final Set<String> SCALAR_SOURCE_TYPES = Set.of(
+            StrategyConditionSourceType.INDICATOR.name(),
+            StrategyConditionSourceType.PRICE.name(),
+            StrategyConditionSourceType.CONSTANT.name());
+
+    /** Типы значения константы, которые оценка читает числом. */
+    private static final Set<String> SCALAR_CONSTANT_VALUE_TYPES = Set.of(
+            ConstantValueType.NUMBER.name(),
+            ConstantValueType.PERCENT.name());
+
+    /** Имена полей правила — путь нарушения и член набора полей типа. */
+    private static final String RULE_PERCENTS = "percents";
+
+    private static final String RULE_OPERATOR = "operator";
+
+    private static final String RULE_LEFT_OPERAND = "leftOperand";
+
+    private static final String RULE_RIGHT_OPERAND = "rightOperand";
+
+    /** Имена полей операнда — путь нарушения и член набора полей источника. */
+    private static final String OPERAND_INDICATOR_KEY = "indicatorKey";
+
+    private static final String OPERAND_INDICATOR_COMPONENT = "indicatorComponent";
+
+    private static final String OPERAND_STRUCTURE_KEY = "structureKey";
+
+    private static final String OPERAND_VALUE_TYPE = "valueType";
+
+    private static final String OPERAND_VALUE = "value";
+
+    /**
+     * Поля, которых доменная форма условия не несёт вовсе, — таймфрейм
+     * правила и источник цены операнда. Форма создания их узнаёт только ради
+     * отказа (.claude/decisions/condition-grammar-executable-only.md §Цена).
+     */
+    private static final String RULE_TIMEFRAME = "timeframe";
+
+    private static final String OPERAND_PRICE_SOURCE = "priceSource";
+
+    /** Поля правил над перечнем, сравнения и пересечения — оператор и два операнда. */
+    private static final Set<String> OPERATOR_AND_OPERANDS =
+            Set.of(RULE_OPERATOR, RULE_LEFT_OPERAND, RULE_RIGHT_OPERAND);
+
+    /**
+     * Поля правила, которые читает оценка его типа, — ровно эти (дом —
+     * docs/rules/strategy-condition-contract.md §«Правило и операнды», таблица
+     * типов). Поле вне набора отвергается {@code STRATEGY_CONDITION_FIELD_NOT_READ};
+     * обязательность названных держит контракт типа
+     * ({@link #validateRuleContract}). Поле порядка общее у всех типов и в
+     * наборах не называется.
+     */
+    private static final Map<StrategyConditionRuleType, Set<String>> RULE_FIELDS_READ = Map.ofEntries(
+            Map.entry(StrategyConditionRuleType.NO_OPEN_POSITION, Set.of()),
+            Map.entry(StrategyConditionRuleType.NO_ACTIVE_DEAL, Set.of()),
+            Map.entry(StrategyConditionRuleType.ENTRY_ORDER_FINALIZED, Set.of()),
+            Map.entry(StrategyConditionRuleType.POSITION_OPENED, Set.of()),
+            Map.entry(StrategyConditionRuleType.ATTACHED_STOP_LOSS_EXISTS, Set.of()),
+            Map.entry(StrategyConditionRuleType.MAIN_PROTECTION_EXISTS, Set.of()),
+            Map.entry(StrategyConditionRuleType.TREND_CHANGED, Set.of()),
+            Map.entry(StrategyConditionRuleType.PROFIT_PERCENTS_REACHED, Set.of(RULE_PERCENTS)),
+            Map.entry(StrategyConditionRuleType.LOSS_PERCENTS_REACHED, Set.of(RULE_PERCENTS)),
+            Map.entry(StrategyConditionRuleType.RANGE_BREAKOUT_CONFIRMED, OPERATOR_AND_OPERANDS),
+            Map.entry(StrategyConditionRuleType.MARKET_STRUCTURE_IS, OPERATOR_AND_OPERANDS),
+            Map.entry(StrategyConditionRuleType.MARKET_PHASE_IS, OPERATOR_AND_OPERANDS),
+            Map.entry(StrategyConditionRuleType.INDICATOR_COMPARE, OPERATOR_AND_OPERANDS),
+            Map.entry(StrategyConditionRuleType.PRICE_COMPARE, OPERATOR_AND_OPERANDS),
+            Map.entry(StrategyConditionRuleType.CROSSOVER, OPERATOR_AND_OPERANDS),
+            Map.entry(StrategyConditionRuleType.VOLUME_FILTER_PASSED, Set.of(RULE_LEFT_OPERAND)));
+
+    /**
+     * Поля операнда, которые читает оценка его источника, — ровно эти (дом —
+     * docs/rules/strategy-condition-contract.md §«Грамматика объявляет только
+     * исполняемое», таблица источников). Обязательность названных держит
+     * ветвь источника в {@link #validateOperand}.
+     */
+    private static final Map<StrategyConditionSourceType, Set<String>> OPERAND_FIELDS_READ = Map.of(
+            StrategyConditionSourceType.INDICATOR, Set.of(OPERAND_INDICATOR_KEY, OPERAND_INDICATOR_COMPONENT),
+            StrategyConditionSourceType.MARKET_STRUCTURE, Set.of(OPERAND_STRUCTURE_KEY),
+            StrategyConditionSourceType.MARKET_PHASE, Set.of(),
+            StrategyConditionSourceType.PRICE, Set.of(),
+            StrategyConditionSourceType.CONSTANT, Set.of(OPERAND_VALUE_TYPE, OPERAND_VALUE));
 
     public void validateCreate(CreateStrategyApiRequest request, TenantRiskAppetite appetite) {
         List<String> emptyMembers = new ArrayList<>();
@@ -378,7 +478,7 @@ public class StrategyDefinitionValidator {
     /**
      * Клаузы классификации фазы: тип-фазы — известный enum; condition —
      * только в контекстном whitelist фазы (ruleType сравнивающие/
-     * структурно-событийные; операнды без MARKET_PHASE и runtime-сделки).
+     * структурно-событийные; операнды без MARKET_PHASE — своего результата).
      */
     private void validatePhaseRules(List<StrategyMarketPhaseRuleApiModel> phaseRules,
                                     Map<String, IndicatorValue.Type> indicatorTypes,
@@ -396,26 +496,40 @@ public class StrategyDefinitionValidator {
             }
             List<StrategyConditionRuleApiModel> rules = rule.getCondition().getRules();
             for (int ruleIndex = 0; ruleIndex < rules.size(); ruleIndex++) {
-                validatePhaseConditionRule(rules.get(ruleIndex),
-                        path + ".condition.rules[" + ruleIndex + "]", indicatorTypes, structureKeys, violations);
+                validateConditionRule(rules.get(ruleIndex), path + ".condition.rules[" + ruleIndex + "]", true,
+                        indicatorTypes, structureKeys, violations);
             }
         }
     }
 
-    private void validatePhaseConditionRule(StrategyConditionRuleApiModel rule, String path,
-                                            Map<String, IndicatorValue.Type> indicatorTypes,
-                                            Set<String> structureKeys, List<String> violations) {
-        validateOperatorAndTimeframe(rule, path, violations);
+    /**
+     * Правило условия — у шага и у клаузы классификации фазы одной тропой.
+     *
+     * <p><b>Тип вне перечня останавливает обход правила</b>: набор полей и
+     * контракт задаёт тип, и без него их сверять не с чем — сверяются только
+     * перечень оператора и снятый таймфрейм, которых тип не касается. Тип вне
+     * белого списка классификации обход не останавливает.
+     *
+     * @param phaseContext правило клаузы классификации фазы — тип и операнды
+     *                     сверяются ещё и с белыми списками контекста
+     */
+    private void validateConditionRule(StrategyConditionRuleApiModel rule, String path, Boolean phaseContext,
+                                       Map<String, IndicatorValue.Type> indicatorTypes,
+                                       Set<String> structureKeys, List<String> violations) {
         if (isFalse(EnumUtils.isValidEnum(StrategyConditionRuleType.class, rule.getRuleType()))) {
             validateEnum(StrategyConditionRuleType.class, rule.getRuleType(), path + ".ruleType", violations);
+            rejectTimeframe(rule, path, violations);
+            if (nonNull(rule.getOperator())) {
+                validateEnum(StrategyConditionOperator.class, rule.getOperator(), path + "." + RULE_OPERATOR,
+                        violations);
+            }
             return;
         }
-        if (isFalse(PHASE_ALLOWED_RULE_TYPES.contains(rule.getRuleType()))) {
+        if (isTrue(phaseContext) && isFalse(PHASE_ALLOWED_RULE_TYPES.contains(rule.getRuleType()))) {
             violations.add(path + ".ruleType " + rule.getRuleType()
                     + " is not allowed in market phase classification context");
         }
-        validatePhaseOperand(rule.getLeftOperand(), path + ".leftOperand", indicatorTypes, structureKeys, violations);
-        validatePhaseOperand(rule.getRightOperand(), path + ".rightOperand", indicatorTypes, structureKeys, violations);
+        validateRuleFields(rule, path, phaseContext, indicatorTypes, structureKeys, violations);
         validateRuleContract(rule, path, violations);
     }
 
@@ -527,22 +641,17 @@ public class StrategyDefinitionValidator {
      * вычислим на создании, когда база ещё не наблюдена
      * (.claude/decisions/deal-leverage-ceiling.md). Запас — константа
      * правила, не число конфигурации.
-     *
-     * <p>Пустой предел плеча здесь молчит: отказ «не принят» адресует
-     * проверка риск-чисел детали, и второй отказ того же класса на той же
-     * детали был бы дублем.
      */
     private void validateNotionalHeadroom(StrategyDetailApiModel detail, String path,
                                           TenantRiskAppetite appetite, List<String> violations) {
         if (isFalse(tradableDetail(detail))) {
             return;
         }
-        BigDecimal maxLeverage = appetite.globalMaxLeverage();
         BigDecimal declaredShare = declaredNotionalShare(detail);
-        if (isNull(maxLeverage) || isNull(declaredShare)) {
+        if (isNull(declaredShare)) {
             return;
         }
-        BigDecimal allowed = maxLeverage.multiply(BigDecimal.ONE.subtract(Constants.Risk.NOTIONAL_HEADROOM_SHARE));
+        BigDecimal allowed = appetite.globalMaxLeverage().multiply(BigDecimal.ONE.subtract(Constants.Risk.NOTIONAL_HEADROOM_SHARE));
         if (declaredShare.compareTo(allowed) > 0) {
             violations.add(path + " STRATEGY_NOTIONAL_HEADROOM_INSUFFICIENT: объявленный нотинал детали ("
                     + declaredShare + " базы) не оставляет запаса под потолком нотинала сделки (допустимо "
@@ -866,13 +975,9 @@ public class StrategyDefinitionValidator {
      * {@code hasRequiredRiskFields}, {@code riskChainHolds},
      * {@code cumulativeMultiplierWithinGlobal}).
      *
-     * <p><b>Незаданное конфигурационное число отвергает создание, а не
-     * пропускает его:</b> сверять объявление автора не с чем, и
-     * пропуск был бы разрешающей ошибкой ровно там, где стои́т охрана.
-     * Пустой предел плеча — операнд пятого неравенства, а не объявления
-     * автора, — отвергается здесь же, на пути детали: неравенство запаса
-     * на нём молчит. Реджекты у неравенств РАЗНЫЕ — адресует отказ тот
-     * конъюнкт, который ложен (П3).
+     * <p>Конфигурационные числа приходят заданными всегда: ответ ядра без
+     * любого из них отвергает чтец чисел до валидации. Реджекты у неравенств
+     * РАЗНЫЕ — адресует отказ тот конъюнкт, который ложен (П3).
      */
     private void validateRiskNumbers(StrategyDetailApiModel detail, String path,
                                      TenantRiskAppetite appetite, List<String> violations) {
@@ -894,10 +999,6 @@ public class StrategyDefinitionValidator {
                 path + ".cumulativeRiskPerDealMultiplier",
                 "STRATEGY_CUMULATIVE_MULTIPLIER_ABOVE_GLOBAL",
                 "множитель кумулятивного потолка выше конфигурационного предела", violations);
-        if (isNull(appetite.globalMaxLeverage())) {
-            violations.add(path + " STRATEGY_RISK_APPETITE_NOT_CONFIGURED: предел плеча не задан — "
-                    + "объявленный нотинал детали сверять не с чем");
-        }
     }
 
     /** Деталь торгуема: политика фазы объявлена и она не NO_TRADE. */
@@ -914,15 +1015,10 @@ public class StrategyDefinitionValidator {
         }
     }
 
-    /** Объявление автора не выше конфигурационного предела; предела нет — отказ. */
+    /** Объявление автора не выше конфигурационного предела; незаявленное — отказ своим кодом выше. */
     private void validateWithinGlobal(BigDecimal declared, BigDecimal configured, String path,
                                       String code, String message, List<String> violations) {
         if (isNull(declared)) {
-            return;
-        }
-        if (isNull(configured)) {
-            violations.add(path + " STRATEGY_RISK_APPETITE_NOT_CONFIGURED: конфигурационное число риск-аппетита "
-                    + "не задано — объявленное стратегией сверять не с чем");
             return;
         }
         if (declared.compareTo(configured) > 0) {
@@ -1278,7 +1374,7 @@ public class StrategyDefinitionValidator {
         if (nonNull(step.getCondition()) && nonNull(step.getCondition().getRules())) {
             List<StrategyConditionRuleApiModel> rules = step.getCondition().getRules();
             for (int index = 0; index < rules.size(); index++) {
-                validateRule(rules.get(index), path + ".condition.rules[" + index + "]",
+                validateConditionRule(rules.get(index), path + ".condition.rules[" + index + "]", false,
                         indicatorTypes, structureKeys, violations);
             }
         }
@@ -1342,33 +1438,91 @@ public class StrategyDefinitionValidator {
                 + "а пустое оценка читает истиной");
     }
 
-    private void validateRule(StrategyConditionRuleApiModel rule, String path,
-                              Map<String, IndicatorValue.Type> indicatorTypes,
-                              Set<String> structureKeys, List<String> violations) {
-        validateEnum(StrategyConditionRuleType.class, rule.getRuleType(), path + ".ruleType", violations);
-        validateOperatorAndTimeframe(rule, path, violations);
-        validateOperand(rule.getLeftOperand(), path + ".leftOperand", indicatorTypes, structureKeys, violations);
-        validateOperand(rule.getRightOperand(), path + ".rightOperand", indicatorTypes, structureKeys, violations);
-        validateRuleContract(rule, path, violations);
+    /**
+     * Правило несёт ровно те поля, которые читает оценка его типа, — в ОБОИХ
+     * контекстах, у правила шага и у клаузы классификации фазы (дом —
+     * docs/rules/strategy-condition-contract.md §«Правило и операнды»,
+     * §«Грамматика объявляет только исполняемое»; код —
+     * docs/rules/strategy-validation.md §«Что проверяется на создании»).
+     *
+     * <p>Поле, которого тип не читает, отвергается
+     * {@code STRATEGY_CONDITION_FIELD_NOT_READ} с путём поля и внутрь не
+     * сверяется: принятое, оно исполнялось бы без того, что автор объявил, и
+     * разбирать его содержимое незачем. Поле, которое тип читает, сверяется
+     * дальше: оператор — с перечнем (граница держит перечни строкой затем,
+     * чтобы сверять их самой — .claude/rules/codestyle.md §«Слои моделей и
+     * enum'ы»), операнд — по своему источнику. Пустота здесь не отвергается:
+     * обязательность названных полей держит контракт типа. Тип сюда приходит
+     * разобранным — вне перечня обход правила останавливается раньше.
+     *
+     * @param phaseContext правило клаузы классификации фазы — операнды
+     *                     сверяются ещё и с белым списком контекста
+     */
+    private void validateRuleFields(StrategyConditionRuleApiModel rule, String path, Boolean phaseContext,
+                                    Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
+                                    List<String> violations) {
+        rejectTimeframe(rule, path, violations);
+        Set<String> read = RULE_FIELDS_READ.getOrDefault(StrategyConditionRuleType.valueOf(rule.getRuleType()),
+                Set.of());
+        if (nonNull(rule.getPercents()) && isFalse(read.contains(RULE_PERCENTS))) {
+            fieldNotRead(path + "." + RULE_PERCENTS, violations);
+        }
+        if (nonNull(rule.getOperator()) && isFalse(read.contains(RULE_OPERATOR))) {
+            fieldNotRead(path + "." + RULE_OPERATOR, violations);
+        } else if (nonNull(rule.getOperator())) {
+            validateEnum(StrategyConditionOperator.class, rule.getOperator(), path + "." + RULE_OPERATOR, violations);
+        }
+        validateRuleOperand(rule.getLeftOperand(), RULE_LEFT_OPERAND, read, path, phaseContext,
+                indicatorTypes, structureKeys, violations);
+        validateRuleOperand(rule.getRightOperand(), RULE_RIGHT_OPERAND, read, path, phaseContext,
+                indicatorTypes, structureKeys, violations);
     }
 
     /**
-     * Оператор и таймфрейм правила — из своих перечней, в ОБОИХ контекстах:
-     * у правила шага и у клаузы классификации фазы. Граница держит перечни
-     * строкой затем, чтобы сверять их самой (.claude/rules/codestyle.md
-     * §«Слои моделей и enum'ы»); пропущенное значение роняло бы разбор
-     * перечня в маппинге, то есть отказ пришёл бы не созданием
-     * (docs/rules/strategy-validation.md §«Линия реза»). Пустота здесь не
-     * отвергается: обязательность по типу правила держит его контракт.
+     * Операнд правила: тип, который его не читает, отвергает его целиком —
+     * одним нарушением с путём операнда; читаемый сверяется по своему
+     * источнику.
      */
-    private void validateOperatorAndTimeframe(StrategyConditionRuleApiModel rule, String path,
-                                              List<String> violations) {
-        if (nonNull(rule.getOperator())) {
-            validateEnum(StrategyConditionOperator.class, rule.getOperator(), path + ".operator", violations);
+    private void validateRuleOperand(StrategyConditionOperandApiModel operand, String field, Set<String> read,
+                                     String rulePath, Boolean phaseContext,
+                                     Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
+                                     List<String> violations) {
+        if (isNull(operand)) {
+            return;
         }
+        String path = rulePath + "." + field;
+        if (isFalse(read.contains(field))) {
+            fieldNotRead(path, violations);
+            return;
+        }
+        if (isTrue(phaseContext)) {
+            validatePhaseOperand(operand, path, indicatorTypes, structureKeys, violations);
+            return;
+        }
+        validateOperand(operand, path, indicatorTypes, structureKeys, violations);
+    }
+
+    /**
+     * Таймфрейма у правила нет ни у одного типа: таймфрейм — у настройки
+     * индикатора либо структуры, на которую операнд ссылается ключом. Поле
+     * отвергается при любом значении, годном перечню или нет, — отказ не
+     * зависит от того, как поверхность читает неизвестное поле.
+     */
+    private void rejectTimeframe(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
         if (nonNull(rule.getTimeframe())) {
-            validateEnum(TimeFrame.class, rule.getTimeframe(), path + ".timeframe", violations);
+            fieldNotRead(path + "." + RULE_TIMEFRAME, violations);
         }
+    }
+
+    /**
+     * Поле, которого оценка не читает, не объявляется
+     * (docs/rules/strategy-validation.md §«Что проверяется на создании»):
+     * принятое, оно исполнялось бы без того, что автор объявил, не сообщая
+     * об этом.
+     */
+    private void fieldNotRead(String path, List<String> violations) {
+        violations.add(path + " STRATEGY_CONDITION_FIELD_NOT_READ: оценка этого поля не читает, "
+                + "и принятое оно исполнялось бы без того, что объявлено");
     }
 
     /**
@@ -1483,16 +1637,22 @@ public class StrategyDefinitionValidator {
     }
 
     /**
-     * MARKET_PHASE_IS — константа, чьё значение — член перечня
-     * {@link MarketPhase.Type}, и оператор {@code EQ} либо {@code NE}; та же
-     * форма и тот же довод, что у {@link #validateMarketStructureIs}: оценка
-     * читает ложью всякий иной оператор и значение, не разобранное перечнем,
-     * при любом объявленном типе значения.
+     * MARKET_PHASE_IS — операнд фазы рынка против константы, чьё значение —
+     * член перечня {@link MarketPhase.Type}, и оператор {@code EQ} либо
+     * {@code NE}; та же форма и тот же довод, что у
+     * {@link #validateMarketStructureIs}: оценка сравнивает с константой фазу
+     * прохода, а не объявленный операнд, — без операнда фазы правило читалось
+     * бы автором как условие на другой операнд, — и читает ложью всякий иной
+     * оператор и значение, не разобранное перечнем, при любом объявленном типе
+     * значения.
      */
     private void validateMarketPhaseIs(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
         if (isNull(rule.getOperator()) || isNull(rule.getLeftOperand()) || isNull(rule.getRightOperand())) {
             violations.add(path + ": MARKET_PHASE_IS requires operator and both operands");
             return;
+        }
+        if (isFalse(hasOperandOfSource(rule, StrategyConditionSourceType.MARKET_PHASE))) {
+            violations.add(path + ": MARKET_PHASE_IS requires a MARKET_PHASE operand");
         }
         validateEqualityOperator(rule, path, violations);
         StrategyConditionOperandApiModel constant =
@@ -1517,17 +1677,71 @@ public class StrategyDefinitionValidator {
         return null;
     }
 
+    /**
+     * Сравнение — оператор из шести сравнений, два скалярных операнда, хотя бы
+     * один названного источника (дом — docs/rules/strategy-condition-contract.md
+     * §«Правило и операнды», строки {@code INDICATOR_COMPARE} и
+     * {@code PRICE_COMPARE}).
+     */
     private void validateComparing(StrategyConditionRuleApiModel rule, String path,
                                    StrategyConditionSourceType requiredSource, List<String> violations) {
         if (isNull(rule.getOperator()) || isNull(rule.getLeftOperand()) || isNull(rule.getRightOperand())) {
             violations.add(path + ": " + rule.getRuleType() + " requires operator and both operands");
             return;
         }
+        validateComparisonOperator(rule, path, violations);
         Boolean hasRequired = Objects.equals(rule.getLeftOperand().getSourceType(), requiredSource.name())
                 || Objects.equals(rule.getRightOperand().getSourceType(), requiredSource.name());
         if (isFalse(hasRequired)) {
             violations.add(path + ": " + rule.getRuleType() + " requires an operand with sourceType "
                     + requiredSource.name());
+        }
+        validateScalarOperands(rule, path, violations);
+    }
+
+    /**
+     * Оператор сравнения — одно из шести (довод — {@link #COMPARISON_OPERATORS}).
+     * Значение вне перечня операторов сюда не относится: его отвергает
+     * сверка перечня, и второе нарушение о том же поле ничего бы не добавило.
+     */
+    private void validateComparisonOperator(StrategyConditionRuleApiModel rule, String path,
+                                            List<String> violations) {
+        if (EnumUtils.isValidEnum(StrategyConditionOperator.class, rule.getOperator())
+                && isFalse(COMPARISON_OPERATORS.contains(rule.getOperator()))) {
+            violations.add(path + ": " + rule.getRuleType() + " accepts only a comparison operator "
+                    + "(EQ, NE, GT, GTE, LT or LTE), got " + rule.getOperator());
+        }
+    }
+
+    /** Оба операнда сравнения либо пересечения скалярны. */
+    private void validateScalarOperands(StrategyConditionRuleApiModel rule, String path, List<String> violations) {
+        validateScalarOperand(rule.getLeftOperand(), path + "." + RULE_LEFT_OPERAND, violations);
+        validateScalarOperand(rule.getRightOperand(), path + "." + RULE_RIGHT_OPERAND, violations);
+    }
+
+    /**
+     * Операнд сравнения и пересечения скалярен — индикатор, цена либо
+     * числовая константа (docs/rules/strategy-condition-contract.md
+     * §«Правило и операнды»): нескалярный операнд оценка числом не разрешает,
+     * и правило ложно всегда, молча.
+     *
+     * <p>Источник либо тип значения вне перечня скалярность не мерят: их
+     * отвергает сверка перечня, и предмета у второго нарушения нет.
+     */
+    private void validateScalarOperand(StrategyConditionOperandApiModel operand, String path,
+                                       List<String> violations) {
+        if (isFalse(EnumUtils.isValidEnum(StrategyConditionSourceType.class, operand.getSourceType()))) {
+            return;
+        }
+        Boolean constant = Objects.equals(operand.getSourceType(), StrategyConditionSourceType.CONSTANT.name());
+        if (isTrue(constant) && isFalse(EnumUtils.isValidEnum(ConstantValueType.class, operand.getValueType()))) {
+            return;
+        }
+        Boolean scalar = SCALAR_SOURCE_TYPES.contains(operand.getSourceType())
+                && (isFalse(constant) || SCALAR_CONSTANT_VALUE_TYPES.contains(operand.getValueType()));
+        if (isFalse(scalar)) {
+            violations.add(path + " STRATEGY_CONDITION_OPERAND_NOT_SCALAR: сравнение и пересечение читают "
+                    + "операнд числом, а " + operand.getSourceType() + " числом не разрешается");
         }
     }
 
@@ -1542,6 +1756,7 @@ public class StrategyDefinitionValidator {
         if (isFalse(crossOperator)) {
             violations.add(path + ": CROSSOVER requires operator CROSSED_ABOVE or CROSSED_BELOW");
         }
+        validateScalarOperands(rule, path, violations);
         validateCrossoverPricePair(rule, path, violations);
     }
 
@@ -1587,17 +1802,37 @@ public class StrategyDefinitionValidator {
                 + "читает прошлое левого операнда, и прошлое есть только у индикатора");
     }
 
+    /**
+     * Операнд несёт ровно те поля, которые читает оценка его источника (дом —
+     * docs/rules/strategy-condition-contract.md §«Грамматика объявляет только
+     * исполняемое»): поле вне набора — {@code STRATEGY_CONDITION_FIELD_NOT_READ}
+     * с путём поля, названные сверяются ветвью источника.
+     *
+     * <p><b>Источника цены у операнда нет ни у одного источника</b>, и
+     * объявленный он отвергается при любом значении и прежде разбора
+     * источника — как таймфрейм у правила: ценовой операнд есть последняя цена
+     * сделки, а принятый бид исполнялся бы ею молча
+     * (docs/spec/strategy-reference.json, величины
+     * {@code conditionPriceSourceDeclared} и
+     * {@code phaseConditionPriceSourceDeclared}).
+     */
     private void validateOperand(StrategyConditionOperandApiModel operand, String path,
                                  Map<String, IndicatorValue.Type> indicatorTypes, Set<String> structureKeys,
                                  List<String> violations) {
         if (isNull(operand)) {
             return;
         }
+        if (nonNull(operand.getPriceSource())) {
+            fieldNotRead(path + "." + OPERAND_PRICE_SOURCE, violations);
+        }
         validateEnum(StrategyConditionSourceType.class, operand.getSourceType(), path + ".sourceType", violations);
         if (isFalse(EnumUtils.isValidEnum(StrategyConditionSourceType.class, operand.getSourceType()))) {
             return;
         }
-        switch (StrategyConditionSourceType.valueOf(operand.getSourceType())) {
+        StrategyConditionSourceType sourceType = StrategyConditionSourceType.valueOf(operand.getSourceType());
+        rejectUnreadOperandFields(operand, path, OPERAND_FIELDS_READ.getOrDefault(sourceType, Set.of()),
+                violations);
+        switch (sourceType) {
             case INDICATOR -> {
                 validateReference(operand.getIndicatorKey(), indicatorTypes.keySet(),
                         path + ".indicatorKey", "indicator setting", violations);
@@ -1605,11 +1840,6 @@ public class StrategyDefinitionValidator {
             }
             case MARKET_STRUCTURE -> validateReference(operand.getStructureKey(), structureKeys,
                     path + ".structureKey", "market structure setting", violations);
-            case PRICE -> {
-                validateEnum(StrategyPriceSource.class, operand.getPriceSource(),
-                        path + ".priceSource", violations);
-                rejectUnavailablePriceSource(operand.getPriceSource(), path + ".priceSource", violations);
-            }
             case CONSTANT -> {
                 validateEnum(ConstantValueType.class, operand.getValueType(), path + ".valueType", violations);
                 if (isNull(operand.getValue())) {
@@ -1618,6 +1848,24 @@ public class StrategyDefinitionValidator {
             }
             default -> {
             }
+        }
+    }
+
+    /** Поля операнда вне набора его источника — каждое своим нарушением с путём поля. */
+    private void rejectUnreadOperandFields(StrategyConditionOperandApiModel operand, String path, Set<String> read,
+                                           List<String> violations) {
+        rejectUnreadOperandField(operand.getIndicatorKey(), OPERAND_INDICATOR_KEY, read, path, violations);
+        rejectUnreadOperandField(operand.getIndicatorComponent(), OPERAND_INDICATOR_COMPONENT, read, path,
+                violations);
+        rejectUnreadOperandField(operand.getStructureKey(), OPERAND_STRUCTURE_KEY, read, path, violations);
+        rejectUnreadOperandField(operand.getValueType(), OPERAND_VALUE_TYPE, read, path, violations);
+        rejectUnreadOperandField(operand.getValue(), OPERAND_VALUE, read, path, violations);
+    }
+
+    private void rejectUnreadOperandField(String value, String field, Set<String> read, String path,
+                                          List<String> violations) {
+        if (nonNull(value) && isFalse(read.contains(field))) {
+            fieldNotRead(path + "." + field, violations);
         }
     }
 
@@ -1894,15 +2142,14 @@ public class StrategyDefinitionValidator {
     }
 
     /**
-     * Источник рыночной цены, которого источник данных не отдаёт, отвергается
-     * на ОБОИХ носителях — у размещения цены и у ценового операнда условия
-     * (docs/spec/strategy-reference.json, величины
-     * {@code priceSourceUnavailable} и {@code conditionPriceSourceUnavailable}).
+     * Источник рыночной цены размещения, которого источник данных не отдаёт,
+     * отвергается (docs/spec/strategy-reference.json, величина
+     * {@code priceSourceUnavailable}).
      *
      * <p>Тикер площадки марк- и индексной цены не несёт, а калькулятор
-     * подставил бы последнюю: базис уехал бы в цену входа молча. Отвергать
-     * порознь нельзя — условие «цена ≥ марк-цена ± %» проходило бы создание и
-     * подменялось той же тропой (docs/rules/strategy-validation.md).
+     * подставил бы последнюю: базис уехал бы в цену входа молча. У ценового
+     * операнда условия источника цены нет вовсе — его объявление отвергает
+     * {@link #validateOperand} (docs/rules/strategy-validation.md).
      */
     private void rejectUnavailablePriceSource(String priceSource, String path, List<String> violations) {
         if (nonNull(priceSource) && UNAVAILABLE_PRICE_SOURCES.contains(priceSource)) {

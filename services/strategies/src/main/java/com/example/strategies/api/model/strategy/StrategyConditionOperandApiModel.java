@@ -6,16 +6,23 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Операнд условия (API): sourceType + ссылка/значение по источнику.
- * Заполняются только поля своего источника.
+ * Операнд условия (API): sourceType + ссылка/значение по источнику. Набор
+ * полей задан источником точно: поле чужого источника отвергает создание
+ * (docs/rules/strategy-condition-contract.md §«Грамматика объявляет только
+ * исполняемое»).
+ *
+ * <p><b>Ключ {@code priceSource} форма узнаёт только ради отказа:</b>
+ * ценовой операнд — последняя цена сделки, источника цены у него нет, и
+ * объявленный он отвергается валидатором при любом значении
+ * (.claude/decisions/condition-grammar-executable-only.md §Цена).
  */
 @Getter
 @Setter
 public class StrategyConditionOperandApiModel {
 
     @NotBlank
-    @Schema(description = "Источник значения: PRICE/INDICATOR/MARKET_PHASE/MARKET_STRUCTURE/POSITION/"
-            + "ORDER/ALGO_ORDER/BALANCE/TIME/CONSTANT", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Источник значения: PRICE (последняя цена сделки, полей нет)/INDICATOR/"
+            + "MARKET_PHASE (полей нет)/MARKET_STRUCTURE/CONSTANT", requiredMode = Schema.RequiredMode.REQUIRED)
     private String sourceType;
 
     @Schema(description = "Ключ настройки индикатора (только для INDICATOR)")
@@ -29,11 +36,11 @@ public class StrategyConditionOperandApiModel {
     @Schema(description = "Ключ настройки структуры рынка (только для MARKET_STRUCTURE)")
     private String structureKey;
 
-    @Schema(description = "Источник цены: LAST_PRICE/MARK_PRICE/INDEX_PRICE/BEST_BID_PRICE/"
-            + "BEST_ASK_PRICE/MID_PRICE (только для PRICE)")
+    @Schema(description = "Не объявляется: источника цены у операнда нет, и объявленный он отвергается "
+            + "(STRATEGY_CONDITION_FIELD_NOT_READ); источник рыночной цены объявляет только размещение")
     private String priceSource;
 
-    @Schema(description = "Тип литерала: NUMBER/PERCENT/ENUM/BOOLEAN (только для CONSTANT)")
+    @Schema(description = "Тип литерала: NUMBER/PERCENT/ENUM (только для CONSTANT)")
     private String valueType;
 
     @Schema(description = "Литерал-значение, интерпретируется по valueType (только для CONSTANT)")

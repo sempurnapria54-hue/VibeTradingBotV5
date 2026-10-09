@@ -247,6 +247,47 @@ class PositionHarvestTest {
     }
 
     /**
+     * Строка своей пары с НУЛЕВЫМ размером — позиция закрыта, а не тот же
+     * живой эпизод: обход идёт за записью закрытия и закрывает строку ею.
+     * Прочитанная найденной, она останавливала обход на живой ноге — запись
+     * закрытия не добывалась никогда, и аварийный терминал сделки приходил без
+     * результата (находка дыма F10).
+     */
+    @Test
+    void aZeroSizeRowOfTheSamePairIsAClosedPositionNotTheLiveEpisode() {
+        Position live = episode(11L, "pos-1", OPENED_AT, Position.Status.ACTIVE, "2");
+        Deal deal = deal(live);
+        givenGraph(deal, List.of(live));
+        when(exchange.getPosition(ACCOUNT, INSTRUMENT)).thenReturn(fetched("pos-1", OPENED_AT, "0"));
+        when(exchange.getPositionCloseRecords(ACCOUNT, INSTRUMENT, OPENED_AT))
+                .thenReturn(List.of(closeRecord("pos-1", OPENED_AT, "-4.5")));
+
+        ServiceCommandExecutionResult result = executor.execute(command(), row(), context(deal));
+
+        assertThat(live.getStatus()).isEqualTo(Position.Status.CLOSED);
+        assertThat(live.getCloseReason()).isEqualTo(Position.CloseReason.EXTERNAL_CLOSE);
+        assertThat(live.getExternalRealizedProfit()).isEqualByComparingTo("-4.5");
+        assertThat(result.getSuccess()).isTrue();
+    }
+
+    /**
+     * Нулевая строка давно закрытого эпизода у сделки без исполнения —
+     * позиции нет: строка не заводится. Прочитанная найденной, она
+     * становилась эпизодом сделки, которая не исполнилась.
+     */
+    @Test
+    void aZeroSizeRowOfAForeignClosedEpisodeMaterializesNothing() {
+        Deal deal = deal();
+        givenGraph(deal, List.of());
+        when(exchange.getPosition(ACCOUNT, INSTRUMENT)).thenReturn(fetched("pos-1", OPENED_AT, "0"));
+
+        executor.execute(command(), row(), context(deal));
+
+        verify(positionDataService, never()).save(any());
+        verify(exchange, never()).getPositionCloseRecords(any(), any(), any());
+    }
+
+    /**
      * Запись ЧУЖОЙ пары живую строку не закрывает: переоткрытая позиция
      * несёт другой момент открытия и за этот эпизод не сойдёт.
      */

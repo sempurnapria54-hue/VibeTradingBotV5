@@ -67,7 +67,7 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
      * чтения.
      */
     @Test
-    @DisplayName("Позиция иного режима маржи: отбор на чтении по инструменту, различитель в срезе")
+    @DisplayName("B5.16 — позиция иного режима маржи: отбор на чтении по инструменту, различитель в срезе")
     void aForeignMarginModeRecordIsSelectedOutAndDistinguishedInTheSlice() {
         exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH, Okx.ok(
                 Okx.position(INSTRUMENT, "7").with("posId", "pos-cross", "mgnMode", "cross").text(),

@@ -29,7 +29,7 @@ class LeverageLimitTest {
     private final RiskHarness harness = new RiskHarness();
 
     @Test
-    @DisplayName("Плечо пары равно пределу: граница включена")
+    @DisplayName("U37.1 — плечо пары равно пределу: граница включена")
     void aPairLeverageExactlyAtTheLimitPasses() {
         harness.givenAppetite(appetiteWithMaxLeverage("1", "10"));
         harness.givenPairState(pairStateWithLeverage(10));
@@ -38,7 +38,7 @@ class LeverageLimitTest {
     }
 
     @Test
-    @DisplayName("Плечо пары выше предела, акт создаёт риск: отказ кодом незаданного плеча")
+    @DisplayName("U37.2 — плечо пары выше предела, акт создаёт риск: отказ кодом незаданного плеча")
     void aPairLeverageAboveTheLimitRejectsARiskCreatingAct() {
         harness.givenAppetite(appetiteWithMaxLeverage("1", "10"));
         harness.givenPairState(pairStateWithLeverage(11));
@@ -48,21 +48,11 @@ class LeverageLimitTest {
     }
 
     @Test
-    @DisplayName("Плечо пары выше предела, акт риска не создаёт: отказа нет — плеча он площадке не пишет")
+    @DisplayName("U37.3 — плечо пары выше предела, акт риска не создаёт: отказа нет — плеча он площадке не пишет")
     void aPairLeverageAboveTheLimitLeavesAProtectiveActAlone() {
         harness.givenAppetite(appetiteWithMaxLeverage("1", "10"));
         harness.givenPairState(pairStateWithLeverage(11));
 
         assertThat(codes(harness.validate(protectionAction(STOP.toPlainString()), workingContext()))).isEmpty();
-    }
-
-    @Test
-    @DisplayName("Предел плеча не принят: плечо пары не сверяется, отказ даёт потолок нотинала своим кодом")
-    void anUnacceptedLimitIsRefusedByTheNotionalCeilingAlone() {
-        harness.givenAppetite(appetiteWithMaxLeverage("1", null));
-        harness.givenPairState(pairStateWithLeverage(11));
-
-        assertThat(codes(harness.validate(entryAction(), workingContext())))
-                .containsExactly(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
     }
 }

@@ -1,12 +1,15 @@
 package com.example.tradingcore.unit.risk;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.example.tradingcore.config.RiskAppetiteProperties;
 import com.example.tradingcore.domain.model.RiskAppetite;
 import com.example.tradingcore.domain.service.RiskAppetiteService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -19,15 +22,25 @@ import org.springframework.mock.env.MockEnvironment;
  * docs/rules/risk-policy.md §«Числа назначает держатель; пустое место —
  * отказ»; основание — .claude/decisions/risk-appetite-environment-config.md).
  *
- * <p><b>Правило приёма двухосное:</b> область определения каждого числа и
- * цепочка процентов {@code сделка ≤ счёт ≤ тенант}. Непринятое число
- * остаётся пустым; ядро при этом поднимается — исход здесь мерится
- * конструированием звена, которое не бросает ни на одной клетке.
+ * <p><b>Правило приёма трёхосное:</b> заданность каждого числа, его область
+ * определения и цепочка процентов {@code сделка ≤ счёт ≤ тенант}. Набор не
+ * принят — звено не конструируется, и это роняет старт ядра: исход здесь
+ * мерится исключением конструктора, а его сообщение обязано назвать каждое
+ * непринятое число и причину.
  */
 class RiskAppetiteAcceptanceTest {
 
+    /** Имена шести чисел в порядке оси окружения. */
+    private static final List<String> NUMBERS = List.of(
+            "globalSimultaneousRiskPerDealPercent",
+            "globalSimultaneousRiskPerAccountPercent",
+            "globalSimultaneousRiskPerTenantPercent",
+            "globalCumulativeRiskPerDealMultiplier",
+            "globalMaxLeverage",
+            "globalConsecutiveLossLimit");
+
     @Test
-    @DisplayName("Оси тестового окружения держателя принимаются все шесть")
+    @DisplayName("U34.1 — оси тестового окружения держателя принимаются все шесть")
     void theHolderTestNumbersAreAllAccepted() {
         RiskAppetite accepted = accept(properties("1", "10", "30", "2", "10", "3"));
 
@@ -40,11 +53,11 @@ class RiskAppetiteAcceptanceTest {
     }
 
     @Test
-    @DisplayName("Ось манифеста пустая строка: число не задано и не принято, ядро поднимается")
-    void anEmptyAxisIsNotAccepted() {
-        RiskAppetite accepted = accept(properties("", "", "", "", "", ""));
+    @DisplayName("U34.2 — оси манифеста пустые строки: старт падает, причина называет все шесть чисел")
+    void emptyAxesRefuseTheStart() {
+        AbstractStringAssert<?> refusal = refusal(properties("", "", "", "", "", ""));
 
-        assertThat(accepted).isEqualTo(RiskAppetite.builder().build());
+        NUMBERS.forEach(name -> refusal.contains(name + ": is not set by the environment"));
     }
 
     /**
@@ -54,8 +67,8 @@ class RiskAppetiteAcceptanceTest {
      * зависел бы от машины прогона.
      */
     @Test
-    @DisplayName("Ключи конфигурации ядра без переменных среды связываются в пустые числа")
-    void theServiceConfigurationWithoutEnvironmentVariablesYieldsEmptyNumbers() {
+    @DisplayName("U34.3 — ключи конфигурации ядра без переменных среды: старт падает на всех шести")
+    void theServiceConfigurationWithoutEnvironmentVariablesRefusesTheStart() {
         MockEnvironment environment = new MockEnvironment();
         try {
             new YamlPropertySourceLoader().load("application", new ClassPathResource("application.yaml"))
@@ -67,65 +80,66 @@ class RiskAppetiteAcceptanceTest {
                 .bind("risk-appetite", RiskAppetiteProperties.class)
                 .orElseGet(RiskAppetiteProperties::new);
 
-        assertThat(accept(bound)).isEqualTo(RiskAppetite.builder().build());
+        AbstractStringAssert<?> refusal = refusal(bound);
+
+        NUMBERS.forEach(name -> refusal.contains(name + ": is not set by the environment"));
     }
 
     @Test
-    @DisplayName("Процент и множитель неположительны: не принимаются, прочие числа принимаются")
-    void nonPositivePercentsAndMultiplierAreNotAccepted() {
-        RiskAppetite accepted = accept(properties("1", "10", "30", "0", "10", "3"));
+    @DisplayName("U34.4 — процент либо множитель неположителен: старт падает, причина называет ровно его")
+    void aNonPositivePercentOrMultiplierRefusesTheStart() {
+        refusal(properties("1", "10", "30", "0", "10", "3"))
+                .contains("globalCumulativeRiskPerDealMultiplier=0: must be strictly positive")
+                .doesNotContain("globalSimultaneousRiskPerDealPercent")
+                .doesNotContain("globalMaxLeverage");
 
-        assertThat(accepted.getGlobalCumulativeRiskPerDealMultiplier()).isNull();
-        assertThat(accepted.getGlobalSimultaneousRiskPerDealPercent()).isEqualByComparingTo("1");
-
-        RiskAppetite negativeTenant = accept(properties("1", "10", "-30", "2", "10", "3"));
-
-        assertThat(negativeTenant.getGlobalSimultaneousRiskPerTenantPercent()).isNull();
-        assertThat(negativeTenant.getGlobalSimultaneousRiskPerAccountPercent()).isEqualByComparingTo("10");
+        refusal(properties("1", "10", "-30", "2", "10", "3"))
+                .contains("globalSimultaneousRiskPerTenantPercent=-30: must be strictly positive")
+                .doesNotContain("globalSimultaneousRiskPerAccountPercent");
     }
 
     @Test
-    @DisplayName("Предел плеча ниже единицы не принимается; ровно единица — принимается")
-    void aMaxLeverageBelowOneIsNotAccepted() {
-        assertThat(accept(properties("1", "10", "30", "2", "0.5", "3")).getGlobalMaxLeverage()).isNull();
+    @DisplayName("U34.5 — предел плеча ниже единицы роняет старт; ровно единица — принимается")
+    void aMaxLeverageBelowOneRefusesTheStart() {
+        refusal(properties("1", "10", "30", "2", "0.5", "3"))
+                .contains("globalMaxLeverage=0.5: must not be below one");
         assertThat(accept(properties("1", "10", "30", "2", "1", "3")).getGlobalMaxLeverage())
                 .isEqualByComparingTo("1");
     }
 
     @Test
-    @DisplayName("Предел серии — только положительное целое: дробный и нулевой не принимаются")
+    @DisplayName("U34.6 — предел серии — только положительное целое: дробный и нулевой роняют старт")
     void theLossLimitMustBeAPositiveInteger() {
-        assertThat(accept(properties("1", "10", "30", "2", "10", "2.5")).getGlobalConsecutiveLossLimit()).isNull();
-        assertThat(accept(properties("1", "10", "30", "2", "10", "0")).getGlobalConsecutiveLossLimit()).isNull();
+        refusal(properties("1", "10", "30", "2", "10", "2.5"))
+                .contains("globalConsecutiveLossLimit=2.5: must be a positive integer");
+        refusal(properties("1", "10", "30", "2", "10", "0"))
+                .contains("globalConsecutiveLossLimit=0: must be a positive integer");
         assertThat(accept(properties("1", "10", "30", "2", "10", "3.0")).getGlobalConsecutiveLossLimit())
                 .isEqualTo(3);
     }
 
     @Test
-    @DisplayName("Значение, не читающееся числом, не принимается и ядра не роняет")
-    void aNonNumericValueIsNotAccepted() {
-        RiskAppetite accepted = accept(properties("1%", "10", "30", "2", "ten", "3"));
-
-        assertThat(accepted.getGlobalSimultaneousRiskPerDealPercent()).isNull();
-        assertThat(accepted.getGlobalMaxLeverage()).isNull();
-        assertThat(accepted.getGlobalConsecutiveLossLimit()).isEqualTo(3);
+    @DisplayName("U34.7 — значения, не читающиеся числом, роняют старт: причина называет каждое")
+    void nonNumericValuesRefuseTheStart() {
+        refusal(properties("1%", "10", "30", "2", "ten", "3"))
+                .contains("globalSimultaneousRiskPerDealPercent=1%: is not a number")
+                .contains("globalMaxLeverage=ten: is not a number")
+                .doesNotContain("globalConsecutiveLossLimit");
     }
 
     @Test
-    @DisplayName("Цепочка сделка ≤ счёт ≤ тенант нарушена: не принимаются все три процента, прочие — да")
-    void aBrokenPercentChainDropsAllThreePercents() {
-        RiskAppetite accepted = accept(properties("1", "40", "30", "2", "10", "3"));
-
-        assertThat(accepted.getGlobalSimultaneousRiskPerDealPercent()).isNull();
-        assertThat(accepted.getGlobalSimultaneousRiskPerAccountPercent()).isNull();
-        assertThat(accepted.getGlobalSimultaneousRiskPerTenantPercent()).isNull();
-        assertThat(accepted.getGlobalCumulativeRiskPerDealMultiplier()).isEqualByComparingTo("2");
-        assertThat(accepted.getGlobalMaxLeverage()).isEqualByComparingTo("10");
-        assertThat(accepted.getGlobalConsecutiveLossLimit()).isEqualTo(3);
+    @DisplayName("U34.8 — цепочка сделка ≤ счёт ≤ тенант нарушена: старт падает, причина называет все три процента")
+    void aBrokenPercentChainRefusesTheStart() {
+        refusal(properties("1", "40", "30", "2", "10", "3"))
+                .contains("globalSimultaneousRiskPerDealPercent=1")
+                .contains("globalSimultaneousRiskPerAccountPercent=40")
+                .contains("globalSimultaneousRiskPerTenantPercent=30")
+                .contains("chain deal <= account <= tenant is broken")
+                .doesNotContain("globalMaxLeverage");
     }
 
     @Test
-    @DisplayName("Звенья цепочки равны: граница включена")
+    @DisplayName("U34.9 — звенья цепочки равны: граница включена")
     void equalChainLinksAreAccepted() {
         RiskAppetite accepted = accept(properties("10", "10", "10", "2", "10", "3"));
 
@@ -134,16 +148,24 @@ class RiskAppetiteAcceptanceTest {
     }
 
     @Test
-    @DisplayName("Пустое среднее звено нарушения между крайними не скрывает")
+    @DisplayName("U34.10 — пустое среднее звено нарушения между крайними не скрывает: причин две")
     void anEmptyMiddleLinkDoesNotHideABreachBetweenTheOuterOnes() {
-        RiskAppetite accepted = accept(properties("40", "", "30", "2", "10", "3"));
-
-        assertThat(accepted.getGlobalSimultaneousRiskPerDealPercent()).isNull();
-        assertThat(accepted.getGlobalSimultaneousRiskPerTenantPercent()).isNull();
+        refusal(properties("40", "", "30", "2", "10", "3"))
+                .contains("globalSimultaneousRiskPerAccountPercent: is not set by the environment")
+                .contains("chain deal <= account <= tenant is broken");
     }
 
     private static RiskAppetite accept(RiskAppetiteProperties properties) {
         return new RiskAppetiteService(properties).getAccepted();
+    }
+
+    /** Сообщение отказа приёма: звено не конструируется, и старт ядра падает. */
+    private static AbstractStringAssert<?> refusal(RiskAppetiteProperties properties) {
+        Throwable failure = catchThrowable(() -> new RiskAppetiteService(properties));
+
+        assertThat(failure).isInstanceOf(IllegalStateException.class);
+        return assertThat(failure.getMessage())
+                .startsWith("Risk appetite is not accepted, trading-core does not start");
     }
 
     private static RiskAppetiteProperties properties(String dealPercent, String accountPercent,

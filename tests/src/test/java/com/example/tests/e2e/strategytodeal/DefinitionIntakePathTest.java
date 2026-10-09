@@ -35,8 +35,8 @@ import static org.assertj.core.api.Assertions.tuple;
  * следа не оставили.
  *
  * <p><b>Тропа одна на группу, а предусловия ставит каждый кейс сам.</b>
- * Синк проекций и простановка чисел необратимы, поэтому кейсу, которому
- * нужно их ОТСУТСТВИЕ, тропа поднимает ядро заново на пустой базе
+ * Синк проекций необратим, поэтому кейсу, которому нужно его
+ * ОТСУТСТВИЕ, тропа поднимает ядро заново на пустой базе
  * ({@link Trail#renew}); порядок методов подобран так, чтобы таких
  * подъёмов было меньше, но от него ни один кейс не зависит.
  */
@@ -61,45 +61,6 @@ class DefinitionIntakePathTest {
         if (nonNull(trail)) {
             SharedStand.release(DefinitionIntakePathTest.class);
         }
-    }
-
-    @Test
-    @Order(1)
-    @DisplayName("E1.4 — Чисел риск-аппетита у ядра нет: создание отвергнуто")
-    void e1_4_absentRiskAppetiteNumbersRejectTheCreation() {
-        trail.withoutRiskAppetite();
-        trail.projectionsSynced();
-        trail.feeRatesSynced();
-        trail.forgetTraces();
-
-        Answer answer = create();
-
-        assertThat(answer.status()).as("E1.4: создание отвергнуто — ответ " + answer.body()).isEqualTo(400);
-        assertThat(errorCodeOf(answer)).isEqualTo("STRATEGY_REQUEST_REJECTED");
-        assertThat(errorMessageOf(answer)).as("E1.4: сверять объявленное не с чем — числа не назначены")
-                .contains("STRATEGY_RISK_APPETITE_NOT_CONFIGURED");
-        assertThat(trail.rows(Party.STRATEGIES, "strategies")).as("E1.4: строки определения нет").isZero();
-        List<Side.Access> core = trail.accesses(Party.TRADING_CORE);
-        assertThat(core).as("E1.4: оба чтения пришли к ядру, пара — первой")
-                .extracting(Side.Access::path, Side.Access::status)
-                .containsExactly(tuple(PAIR_CHECKS, 200), tuple(riskAppetite(), 200));
-        assertIssuedToken(core, "E1.4");
-        assertNoTraceBeyondOwnerAndCore("E1.4");
-        Map<String, Object> numbers = object(trail.call(Party.TRADING_CORE, "GET", riskAppetite(), null, null));
-        assertThat(numbers.get("globalSimultaneousRiskPerDealPercent"))
-                .as("E1.4: ядро отвечает, а чисел в ответе нет — конфигурация окружения пуста").isNull();
-        assertThat(numbers.get("globalCumulativeRiskPerDealMultiplier")).isNull();
-        assertThat(numbers.get("globalMaxLeverage")).isNull();
-
-        trail.riskAppetiteSet();
-        trail.forgetTraces();
-
-        Answer again = create();
-
-        assertThat(again.status()).as("E1.4: повтор после подъёма ядра с числами проходит").isEqualTo(201);
-        assertThat(trail.accesses(Party.TRADING_CORE)).as("E1.4: проекции чисел у владельца нет — он снова идёт к ядру")
-                .extracting(Side.Access::path, Side.Access::status)
-                .contains(tuple(riskAppetite(), 200));
     }
 
     @Test
