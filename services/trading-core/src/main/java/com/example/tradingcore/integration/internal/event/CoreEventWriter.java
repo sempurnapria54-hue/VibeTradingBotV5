@@ -15,6 +15,7 @@ import com.example.tradingcore.persistence.model.OutboxEntity;
 import com.example.tradingcore.persistence.service.OutboxDataService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
@@ -117,13 +118,19 @@ public class CoreEventWriter {
                         exchangeAccountInternalId, instrumentInternalId, strategyInternalId, actor));
     }
 
-    /** Закрытие сделки; писателей у класса два, потому что терминалов два. */
+    /**
+     * Закрытие сделки; писателей у класса два, потому что терминалов два.
+     *
+     * @param stopExitSlippage проскок выхода по стопу, посчитанный писателем
+     *                         терминала по графу прохода; пусто — не измерен
+     *                         (docs/spec/stop-exit-slippage.json)
+     */
     public void dealClosed(String tenantId, Deal deal, String exchangeAccountInternalId,
                            String instrumentInternalId, String strategyInternalId,
-                           Boolean graphComplete) {
+                           Boolean graphComplete, BigDecimal stopExitSlippage) {
         write(tenantId, CoreEventType.DEAL_CLOSED,
                 eventMessageMapper.domainToDealClosedMessage(deal, exchangeAccountInternalId,
-                        instrumentInternalId, strategyInternalId, graphComplete));
+                        instrumentInternalId, strategyInternalId, graphComplete, stopExitSlippage));
     }
 
     /** Подъём ступени радиуса; инструмент пуст у счётного сигнала. */

@@ -12,6 +12,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -68,7 +69,10 @@ public abstract class ReceptionGapContract {
         void restartObservation(String topic, OffsetDateTime moment);
     }
 
-    /** Какие ожидания слушатель посадил в трекер. */
+    /**
+     * Какие ожидания слушатель посадил в трекер; пустое смещение — ожидание
+     * снято: позиции назначение не знает.
+     */
     public interface ExpectSink {
 
         void expect(TopicPartition partition, Long offset);
@@ -144,6 +148,57 @@ public abstract class ReceptionGapContract {
                 .isEmpty();
         assertThat(recording.restarts).isEmpty();
         assertThat(recording.expectations).containsExactly(Map.entry(PARTITION, 40L));
+    }
+
+    @Test
+    @DisplayName("U9.5 — наименьшего доступного нет, смещение есть: ожидание на смещении, граница стоит")
+    void u9_5_withoutTheEarliestTheCommittedOffsetSeatsTheExpectation() {
+        Recording recording = assignAll(Map.of(PARTITION, new OffsetAndMetadata(60L)), Map.of(), List.of(PARTITION));
+
+        assertThat(recording.gaps)
+                .as("сравнивать не с чем: разрыв, случившийся до назначения, объявит доставка")
+                .isEmpty();
+        assertThat(recording.restarts)
+                .as("момент наблюдения не двигается — разрыв границей не подменяется")
+                .isEmpty();
+        assertThat(recording.expectations)
+                .as("второй момент обнаружения получает операнд: ожидание на зафиксированном смещении")
+                .containsExactly(Map.entry(PARTITION, 60L));
+    }
+
+    @Test
+    @DisplayName("U9.5 — наименьшего доступного нет и смещения нет: наблюдение заново, ожидания нет")
+    void u9_5_withoutTheEarliestAndTheCommittedOffsetObservationRestarts() {
+        Recording recording = assignAll(Map.of(), Map.of(), List.of(PARTITION));
+
+        assertThat(recording.restarts)
+                .as("исход тот же, что при отсутствующем смещении: наименьшее доступное ему не нужно")
+                .containsExactly(TOPIC);
+        assertThat(recording.gaps).isEmpty();
+        assertThat(recording.expectations)
+                .as("позиции назначение не знает вовсе: ожидание снято, посадит его первая доставка")
+                .containsExactly(expectation(PARTITION, null));
+    }
+
+    @Test
+    @DisplayName("U9.5 — партиция отозвана и вернулась без смещения и без наименьшего: первая доставка без ожидания")
+    void u9_5_aReturnedPartitionWithoutAnyPositionMeetsNoStaleExpectation() {
+        Tracker tracker = newTracker();
+        ConsumerAwareRebalanceListener listener = rebalanceListener(new Recording(null), tracker::expect);
+        listener.onPartitionsAssigned(
+                consumerWith(committedMap(60L, List.of(PARTITION)), earliest(40L, PARTITION)), List.of(PARTITION));
+        tracker.observeDelivery(recordAt(60L));
+        Consumer<?, ?> returning = consumerWith(Map.of(), Map.of());
+        listener.onPartitionsRevokedBeforeCommit(returning, List.of(PARTITION));
+
+        listener.onPartitionsAssigned(returning, List.of(PARTITION));
+
+        assertThat(tracker.observeDelivery(recordAt(500L)))
+                .as("ожидание прошлого назначения (61) снято: сравнивать первую доставку не с чем")
+                .isFalse();
+        assertThat(tracker.observeDelivery(recordAt(501L)))
+                .as("ожидание посадила первая доставка: 500 плюс один")
+                .isFalse();
     }
 
     @Test
@@ -510,6 +565,11 @@ public abstract class ReceptionGapContract {
         return names;
     }
 
+    /** Посаженное ожидание; пустое смещение — снятое (`Map.entry` пустого значения не принимает). */
+    private static Map.Entry<TopicPartition, Long> expectation(TopicPartition partition, Long offset) {
+        return new AbstractMap.SimpleImmutableEntry<>(partition, offset);
+    }
+
     private static ConsumerRecord<String, String> recordAt(Long offset) {
         return new ConsumerRecord<>(TOPIC, 0, offset, "tenant-1", "{}");
     }
@@ -617,7 +677,7 @@ public abstract class ReceptionGapContract {
 
         @Override
         public void expect(TopicPartition partition, Long offset) {
-            expectations.add(Map.entry(partition, offset));
+            expectations.add(expectation(partition, offset));
         }
 
         private void throwIfAsked() {

@@ -97,8 +97,9 @@ evidence-cycle (специфика per-source — см. подразделы). �
 матчинг по `internalId` (client id вложенного TP/SL). Status: `PENDING`
 после `SUBMIT_ORDER_COMMAND`; `ACTIVE` — по предикату
 `docs/spec/order-lifecycle.json`, величина `attachedBecomesActive`
-(присутствия в снапшоте недостаточно: нужен непустой налив родителя и
-пустой код отказа); заполненный `failCode` → `ERROR` с
+(присутствия в снапшоте недостаточно: нужна найденная самостоятельная
+запись цикла добычи и пустой код отказа; налив живого родителя защиту не
+материализует); заполненный `failCode` → `ERROR` с
 `PROTECTION_PLACEMENT_FAILED`.
 Судьба защиты по фактам родителя (класс состояния + налив) — `docs/lifecycles/Order.md`.
 
@@ -289,9 +290,17 @@ required»). `algoId` материализованной записи нам н�
 клиентский идентификатор единственный сходящийся операнд.
 
 **Исчерпанный цикл даёт вторую ступень исхода**
-(`searchExhaustedOutcome`): `PROTECTION_LOST` либо `ANALYSE_HISTORY`, а не
-`MISSING_AFTER_REFRESH` — тот терминализует **заявку**, а здесь предмет
+(`searchExhaustedOutcome`): `PROTECTION_LOST`, `ANALYSE_HISTORY` либо
+`WAIT` — когда терминал родителя впервые показала эта же добыча, и пустота
+мерит задержку постановки, а не потерю
+(`.claude/decisions/protection-lost-needs-prior-terminal.md`), — а не
+`MISSING_AFTER_REFRESH`: тот терминализует **заявку**, а здесь предмет
 другой.
+
+**Элемент встроенной защиты в запросе один — только стоп**, без полей
+тейка: родителю со Split TP площадка ставит защиту лишь на
+полном наливе (`docs/integrations/okx/contracts/order.md`), и гард
+одноместности держится составом запроса.
 
 **`ordType = conditional` верен, пока встроенная защита одноместна.**
 Перечень `AttachedAlgoOrder.Type` сегодня несёт только
@@ -318,7 +327,7 @@ required»). `algoId` материализованной записи нам н�
 |---|---|---|
 | `algoClOrdId` | ключ матча | равен `attachAlgoClOrdId` родителя; связь только по нему |
 | `algoId` | `externalId` | **не** равен `attachAlgoId` родителя |
-| `state` | `externalStatus` | сырой статус **самостоятельной записи**: у неё он есть, в отличие от элемента `attachAlgoOrds[*]` родителя. Через резолвер внешних статусов (`docs/spec/external-status-resolution.json`) **не идёт**: его операнд `entity` защиту не принимает, а словарь отказных причин чужой — исход кодирует **нога, нашедшая запись** (таблица разбора — `docs/lifecycles/Order.md`), `state` — диагностика. Живость в **обеих** тропах предъявления выводит один предикат `attachedBecomesActive`: предъявленная самостоятельная запись — его второй дизъюнкт (`docs/spec/order-lifecycle.json`) |
+| `state` | `externalStatus` | сырой статус **самостоятельной записи**: у неё он есть, в отличие от элемента `attachAlgoOrds[*]` родителя. Через резолвер внешних статусов (`docs/spec/external-status-resolution.json`) **не идёт**: его операнд `entity` защиту не принимает, а словарь отказных причин чужой — исход кодирует **нога, нашедшая запись** (таблица разбора — `docs/lifecycles/Order.md`), `state` — диагностика. Живость в **обеих** тропах предъявления выводит один предикат `attachedBecomesActive`: предъявленная самостоятельная запись — его единственное доказательство материализации (`docs/spec/order-lifecycle.json`) |
 | `failCode` | `failCode` | код отказа; операнд ветви `attachedFailsToPlace` в `docs/spec/order-lifecycle.json` и **операнд разбора тропы** у записи `state=order_failed` — персистится |
 | `failReason` | `failReason` | причина отказа; в снапшоте поле уже объявлено, в колонку не садится (лог) |
 | `sz` | `size` | объявленный размер записи — операнд покрытия (`docs/spec/protection-coverage.json`) |

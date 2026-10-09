@@ -8,6 +8,7 @@ import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.exchange.ExchangeFailureClass;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
@@ -167,13 +168,23 @@ public class ExchangeOperationsClient {
                 .body(ExchangeAck.class));
     }
 
-    /** Рыночное закрытие позиции; пустая валюта расчёта в запрос не уходит. */
+    /**
+     * Рыночное закрытие позиции; пустая валюта расчёта в запрос не уходит.
+     *
+     * <p><b>Режим маржи необязателен, и пустота у него значит режим
+     * контура</b> — тропу всякой нашей позиции. Непустой приносит только
+     * снятие риска вне графа сделок: запись иного режима площадка различает
+     * лишь режимом, и закрытие режимом контура закрыло бы не ту запись либо
+     * ничего (docs/components/IntegrationService.md;
+     * docs/models/mapping/Position.md).
+     */
     public ExchangeAck closePosition(String accountInternalId, String externalInstrumentId,
-                                     String settleCurrency) {
+                                     String settleCurrency, Instrument.MarginMode marginMode) {
         return call("close-position", () -> restClient.post()
                 .uri(builder -> builder.path(ACCOUNT_PATH + "/positions/closures")
                         .queryParam("externalInstrumentId", externalInstrumentId)
                         .queryParamIfPresent("settleCurrency", Optional.ofNullable(settleCurrency))
+                        .queryParamIfPresent("marginMode", Optional.ofNullable(marginMode).map(Enum::name))
                         .build(accountInternalId))
                 .header(HttpHeaders.AUTHORIZATION, bearer())
                 .retrieve()

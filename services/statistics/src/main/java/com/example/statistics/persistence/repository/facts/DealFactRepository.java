@@ -60,12 +60,14 @@ public interface DealFactRepository extends Repository<DealFactEntity, DealFactI
                 (event_id, tenant_id, exchange_account_internal_id, strategy_internal_id,
                  result_currency, closed_at, took_risk, graph_complete, net_result, fee,
                  funding, liquidation_penalty, planned_risk, close_outcome,
-                 reconciliation_status, breakdown_incomplete, risk_benchmark_availability)
+                 reconciliation_status, breakdown_incomplete, risk_benchmark_availability,
+                 close_reason, stop_exit_slippage)
             values
                 (:eventId, :tenantId, :exchangeAccountInternalId, :strategyInternalId,
                  :resultCurrency, :closedAt, :tookRisk, :graphComplete, :netResult, :fee,
                  :funding, :liquidationPenalty, :plannedRisk, :closeOutcome,
-                 :reconciliationStatus, :breakdownIncomplete, :riskBenchmarkAvailability)
+                 :reconciliationStatus, :breakdownIncomplete, :riskBenchmarkAvailability,
+                 :closeReason, :stopExitSlippage)
             on conflict on constraint pk_deal_fact do nothing
             """)
     void insertAbsorbingDuplicate(@Param("eventId") String eventId,
@@ -84,5 +86,7 @@ public interface DealFactRepository extends Repository<DealFactEntity, DealFactI
                                   @Param("closeOutcome") String closeOutcome,
                                   @Param("reconciliationStatus") String reconciliationStatus,
                                   @Param("breakdownIncomplete") String breakdownIncomplete,
-                                  @Param("riskBenchmarkAvailability") String riskBenchmarkAvailability);
+                                  @Param("riskBenchmarkAvailability") String riskBenchmarkAvailability,
+                                  @Param("closeReason") String closeReason,
+                                  @Param("stopExitSlippage") BigDecimal stopExitSlippage);
 }

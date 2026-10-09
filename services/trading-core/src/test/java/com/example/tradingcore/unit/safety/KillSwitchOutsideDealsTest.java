@@ -18,6 +18,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingcore.config.KillSwitchProperties;
 import com.example.tradingcore.domain.command.executor.CancelAlgoOrderExecutor;
@@ -87,7 +88,8 @@ class KillSwitchOutsideDealsTest {
 
         assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, deals())).isTrue();
 
-        verify(exchange, times(1)).closePosition(ACCOUNT_INTERNAL_ID, FOREIGN_INSTRUMENT, SETTLE_CURRENCY);
+        verify(exchange, times(1)).closePosition(ACCOUNT_INTERNAL_ID, FOREIGN_INSTRUMENT, SETTLE_CURRENCY,
+                Instrument.MarginMode.ISOLATED);
     }
 
     /** Позицию сделки снимает ход сделки: мимо её ног она здесь не закрывается. */
@@ -100,7 +102,7 @@ class KillSwitchOutsideDealsTest {
 
         assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, population)).isFalse();
 
-        verify(exchange, never()).closePosition(anyString(), anyString(), any());
+        verify(exchange, never()).closePosition(anyString(), anyString(), any(), any());
     }
 
     /** Валюты расчёта у инструмента вне контура нет — закрытие уходит без неё. */
@@ -112,7 +114,8 @@ class KillSwitchOutsideDealsTest {
 
         assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, deals())).isTrue();
 
-        verify(exchange, times(1)).closePosition(ACCOUNT_INTERNAL_ID, OUTSIDE_CONTOUR, null);
+        verify(exchange, times(1)).closePosition(ACCOUNT_INTERNAL_ID, OUTSIDE_CONTOUR, null,
+                Instrument.MarginMode.ISOLATED);
     }
 
     /** Не добытые позиции подтверждением не считаются. */
@@ -132,7 +135,7 @@ class KillSwitchOutsideDealsTest {
 
         assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, INSTRUMENT_EXTERNAL_ID, deals())).isTrue();
 
-        verify(exchange, never()).closePosition(anyString(), anyString(), any());
+        verify(exchange, never()).closePosition(anyString(), anyString(), any(), any());
     }
 
     /** Строка закрытой позиции живой не считается. */
@@ -145,7 +148,7 @@ class KillSwitchOutsideDealsTest {
 
         assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, deals())).isTrue();
 
-        verify(exchange, never()).closePosition(anyString(), anyString(), any());
+        verify(exchange, never()).closePosition(anyString(), anyString(), any(), any());
     }
 
     /** Попытки ограничены пределом; отказ закрытия ход не срывает. */
@@ -153,12 +156,13 @@ class KillSwitchOutsideDealsTest {
     @DisplayName("U15.7 — закрытие бросает на каждой попытке: закрытий ровно по пределу, радиус не подтверждён")
     void u15_7_aFailingCloseIsRetriedUpToTheLimit() {
         when(exchange.getPositions(ACCOUNT_INTERNAL_ID)).thenReturn(List.of(live(FOREIGN_INSTRUMENT)));
-        when(exchange.closePosition(anyString(), anyString(), anyString()))
+        when(exchange.closePosition(anyString(), anyString(), anyString(), any()))
                 .thenThrow(new IllegalStateException("exchange rejected"));
 
         assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, deals())).isFalse();
 
-        verify(exchange, times(2)).closePosition(ACCOUNT_INTERNAL_ID, FOREIGN_INSTRUMENT, SETTLE_CURRENCY);
+        verify(exchange, times(2)).closePosition(ACCOUNT_INTERNAL_ID, FOREIGN_INSTRUMENT, SETTLE_CURRENCY,
+                Instrument.MarginMode.ISOLATED);
     }
 
     /** Популяция радиуса отдаётся проекции ключами инструментов своих сделок. */
@@ -174,10 +178,56 @@ class KillSwitchOutsideDealsTest {
         verify(instruments).findExternalIdsByIds(Set.of(INSTRUMENT_ID));
     }
 
+    /**
+     * Запись иного режима маржи на инструменте нетерминальной сделки: сделке
+     * она не принадлежит и закрывается здесь — своим режимом, а запись
+     * режима контура рядом остаётся ходу сделки. Метки клетка не несёт — её
+     * назначает документ кейсов.
+     */
+    @Test
+    @DisplayName("Кросс-запись на инструменте сделки: закрыта своим режимом, позиция сделки не тронута")
+    void aForeignMarginModeRecordOnADealInstrumentIsClosedInItsOwnMode() {
+        List<Deal> population = deals(deal(73L));
+        when(instruments.findExternalIdsByIds(any())).thenReturn(new HashSet<>(Set.of(INSTRUMENT_EXTERNAL_ID)));
+        when(exchange.getPositions(ACCOUNT_INTERNAL_ID))
+                .thenReturn(List.of(live(INSTRUMENT_EXTERNAL_ID), cross(INSTRUMENT_EXTERNAL_ID)), List.of());
+
+        assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, population)).isTrue();
+
+        verify(exchange, times(1)).closePosition(ACCOUNT_INTERNAL_ID, INSTRUMENT_EXTERNAL_ID, SETTLE_CURRENCY,
+                Instrument.MarginMode.CROSS);
+        verify(exchange, never()).closePosition(anyString(), anyString(), any(),
+                eq(Instrument.MarginMode.ISOLATED));
+    }
+
+    /**
+     * Подтверждение читает любую живую позицию: кросс-запись, пережившая
+     * закрытие, держит радиус неподтверждённым. Метки клетка не несёт.
+     */
+    @Test
+    @DisplayName("Кросс-запись пережила закрытие: радиус не подтверждён")
+    void aSurvivingForeignMarginModeRecordLeavesTheScopeUnconfirmed() {
+        when(exchange.getPositions(ACCOUNT_INTERNAL_ID)).thenReturn(List.of(cross(FOREIGN_INSTRUMENT)));
+
+        assertThat(executor.closePositionsOutsideDeals(ACCOUNT_ID, null, deals())).isFalse();
+
+        verify(exchange, times(2)).closePosition(ACCOUNT_INTERNAL_ID, FOREIGN_INSTRUMENT, SETTLE_CURRENCY,
+                Instrument.MarginMode.CROSS);
+    }
+
+    /** Живая запись среза режима контура — граница отдаёт режим у каждой записи. */
     private static Position live(String externalInstrumentId) {
         Position position = new Position();
         position.setExternalInstrumentId(externalInstrumentId);
         position.setExternalSize(BigDecimal.ONE);
+        position.setMarginMode(Instrument.MarginMode.ISOLATED);
+        return position;
+    }
+
+    /** Живая запись среза иного режима маржи — её открыла не наша заявка. */
+    private static Position cross(String externalInstrumentId) {
+        Position position = live(externalInstrumentId);
+        position.setMarginMode(Instrument.MarginMode.CROSS);
         return position;
     }
 }

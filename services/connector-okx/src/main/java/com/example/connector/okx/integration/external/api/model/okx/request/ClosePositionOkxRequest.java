@@ -5,8 +5,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Тело OKX close-position (POST /trade/close-position). mgnMode/posSide
- * — adapter-константы; ccy — settle currency; autoCxl снимает стоящие
+ * Тело OKX close-position (POST /trade/close-position). posSide —
+ * adapter-константа; mgnMode — режим маржи аргумента операции, пусто —
+ * adapter-константа isolated; ccy — settle currency; autoCxl снимает стоящие
  * заявки на закрытие (reduce-only), которые иначе отвергли бы закрытие, —
  * входные заявки он не снимает. null-поля не сериализуются. См.
  * docs/models/mapping/Position.md, docs/integrations/okx/contracts/position.md.
@@ -19,7 +20,10 @@ public class ClosePositionOkxRequest {
     /** Инструмент. */
     private String instId;
 
-    /** Режим маржи (adapter-константа isolated). */
+    /**
+     * Режим маржи закрываемой записи: режим аргумента операции; пусто —
+     * adapter-константа isolated (режим контура).
+     */
     private String mgnMode;
 
     /** Сторона позиции (adapter-константа net). */

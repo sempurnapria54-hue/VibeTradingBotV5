@@ -51,7 +51,9 @@ import org.springframework.transaction.annotation.Transactional;
  *          ноги — «не дошла до площадки»; у локально терминальной — ничего:
  *          запись ушла за горизонт выдачи
  * цикл 2 — материализованная встроенная защита, только у ТЕРМИНАЛЬНОГО
- *          родителя: живые условные по инструменту → разбор истории
+ *          родителя: живые условные по инструменту → разбор истории;
+ *          пустой разбор на терминале, впервые показанном этой добычей, —
+ *          ожидание, а не вывод
  * </pre>
  *
  * <p><b>Второй цикл — не удобство.</b> Встроенная защита, развёрнутая
@@ -65,6 +67,14 @@ import org.springframework.transaction.annotation.Transactional;
  * материализовать её нечему, и исчерпание цикла давало бы потерянное
  * покрытие на живой защите. Сам гейт живёт у резолвера — своей копии
  * здесь нет.
+ *
+ * <p><b>Наблюдён ли терминал родителя раньше, читается ДО применения
+ * наблюдения</b> (docs/spec/order-lifecycle.json, операнд
+ * {@code parentTerminalObservedBefore}): площадка ставит встроенную защиту
+ * на терминале родителя, то есть после него, и добыча, впервые увидевшая
+ * терминал, может застать записи ещё нет. Прочитанный после записи добычи,
+ * операнд был бы истинен всегда, и задержка постановки читалась бы
+ * потерянным покрытием (.claude/decisions/protection-lost-needs-prior-terminal.md).
  *
  * <p><b>Эхо базы триггера встроенной защиты сверяется с объявленной</b> на
  * обеих тропах предъявления — телом родителя и самостоятельной записью
@@ -115,6 +125,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
                                                  DealContext dealContext) {
         RefreshOrderCommandPayload payload = (RefreshOrderCommandPayload) command.getPayload();
         Order order = target(payload.getOrderId(), dealContext);
+        Boolean terminalObservedBefore = terminalObservedBefore(order);
         Order fetched = fetchOrFail(order, dealContext);
         HoldSignal requestedRung = null;
         if (isNull(fetched) && isTrue(order.isNotSubmitted())) {
@@ -124,7 +135,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
                 orderMapper.updateFromFetched(fetched, order);
                 applyStatus(order, fetched);
             }
-            requestedRung = resolveAttached(order, fetched, dealContext);
+            requestedRung = resolveAttached(order, fetched, terminalObservedBefore, dealContext);
         }
         orderDataService.save(order);
         if (isFalse(dealRiskNumbersService.recompute(dealContext))) {
@@ -149,6 +160,18 @@ public class RefreshOrderExecutor implements CommandExecutor {
                 .filter(item -> Objects.equals(orderId, item.getId()))
                 .findFirst()
                 .orElseGet(() -> orderDataService.getRequiredById(orderId));
+    }
+
+    /**
+     * Терминал ноги наблюдён до этой добычи: живость на площадке у неё уже
+     * исключена — локальный терминал исполнения либо отмены, а у ноги в
+     * {@code ERROR} прежняя наблюдённая нежилость
+     * (docs/spec/order-lifecycle.json, операнд
+     * {@code parentTerminalObservedBefore}). Читается до записи добычи, и
+     * пустым не бывает: оба носителя уже стоят.
+     */
+    private Boolean terminalObservedBefore(Order order) {
+        return isTrue(order.isLocallyTerminal()) && isFalse(order.mayBeLive());
     }
 
     /**
@@ -315,9 +338,11 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * живой защиты: нога в {@code ERROR}, чья живость не исключена, несёт и
      * защиту, ушедшую в терминал раньше (отказ постановки).
      *
-     * @param fetched снапшот родителя этой добычей; пусто — не получен
+     * @param fetched                снапшот родителя этой добычей; пусто — не получен
+     * @param terminalObservedBefore терминал родителя наблюдён до этой добычи
      */
-    private HoldSignal resolveAttached(Order order, Order fetched, DealContext dealContext) {
+    private HoldSignal resolveAttached(Order order, Order fetched, Boolean terminalObservedBefore,
+                                       DealContext dealContext) {
         if (isEmpty(order.getAttachedAlgoOrders())) {
             return null;
         }
@@ -327,7 +352,7 @@ public class RefreshOrderExecutor implements CommandExecutor {
             if (isTrue(attached.isTerminal())) {
                 continue;
             }
-            HoldSignal signal = resolveOne(attached, order, fetched, tranche, dealContext);
+            HoldSignal signal = resolveOne(attached, order, fetched, terminalObservedBefore, tranche, dealContext);
             if (nonNull(signal)) {
                 requested = signal;
             }
@@ -335,8 +360,8 @@ public class RefreshOrderExecutor implements CommandExecutor {
         return requested;
     }
 
-    private HoldSignal resolveOne(AttachedAlgoOrder attached, Order order, Order fetched, DealTranche tranche,
-                                  DealContext dealContext) {
+    private HoldSignal resolveOne(AttachedAlgoOrder attached, Order order, Order fetched,
+                                  Boolean terminalObservedBefore, DealTranche tranche, DealContext dealContext) {
         String accountInternalId = dealContext.getExchangeAccount().getInternalId();
         String externalInstrumentId = dealContext.getInstrument().getExternalId();
         AttachedAlgoOrder parentBody = isNull(fetched)
@@ -367,10 +392,11 @@ public class RefreshOrderExecutor implements CommandExecutor {
                 .standaloneProtectionExists(standaloneProtectionExists)
                 .historyLegFound(leg)
                 .cancelIntentStanding(cancelIntentStanding)
+                .parentTerminalObservedBefore(terminalObservedBefore)
                 .build();
         AttachedProtectionResolution resolution = attachedStateResolver.resolve(facts);
         applyResolution(attached, resolution);
-        return emptyAnalysisRung(resolution, searchCycle, leg);
+        return emptyAnalysisRung(resolution, searchCycle);
     }
 
     /**
@@ -387,10 +413,15 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * исчезновение объяснено нашим намерением: на ветви потерянного покрытия
      * пустой разбор терминализует защиту потерянной, и сигнал там не нужен
      * (docs/rules/instrument-hold.md).
+     *
+     * <p><b>Сигнал читается по флагу неопределённости, а не по пустому
+     * статусу.</b> Пустой статус несёт и ожидание — пустой разбор на
+     * терминале, впервые показанном этой добычей: там пустота мерит задержку
+     * постановки, и сигнал с мягкой ступенью поднимался бы по штатной тропе
+     * входа (docs/spec/order-lifecycle.json, {@code searchExhaustedOutcome}).
      */
-    private HoldSignal emptyAnalysisRung(AttachedProtectionResolution resolution, boolean searchCycle,
-                                         ProtectionHistoryLeg leg) {
-        if (isFalse(searchCycle) || nonNull(leg) || isTrue(resolution.hasStatus())) {
+    private HoldSignal emptyAnalysisRung(AttachedProtectionResolution resolution, boolean searchCycle) {
+        if (isFalse(searchCycle) || isFalse(resolution.getOutcomeUndetermined())) {
             return null;
         }
         return HoldSignal.instrumentSoft(Constants.Hold.INSTRUMENT_PROTECTION_FATE_UNKNOWN);
@@ -499,6 +530,13 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * промежуточной активации терминал по найденному факту применить было
      * бы нечем (docs/lifecycles/Order.md §«Разбор истории»).
      *
+     * <p><b>Откат активной защиты в постановку состояния не двигает</b> —
+     * ребра «активна → в постановке» матрица не содержит, тот же довод, что у
+     * отката живого статуса родителя. Достижимо это на защите живого
+     * родителя, активированной прежней формой предиката по наливу: теперь
+     * активирует только найденная запись (docs/spec/order-lifecycle.json,
+     * {@code attachedBecomesActive}).
+     *
      * <p><b>Неотправленная защита сначала становится отправленной</b> тем
      * же доводом, что и её родитель: у родителя с потерянным ответом на
      * отправку, найденного добычей, защита стоит созданной, а прямых рёбер
@@ -513,7 +551,11 @@ public class RefreshOrderExecutor implements CommandExecutor {
             attached.toPending();
         }
         switch (resolution.getStatus()) {
-            case PENDING -> attached.toPending();
+            case PENDING -> {
+                if (isTrue(attached.canTransitionTo(AttachedAlgoOrder.Status.PENDING))) {
+                    attached.toPending();
+                }
+            }
             case ACTIVE -> attached.toActive();
             default -> attached.applyObservedTerminal(resolution.getStatus(), resolution.getCloseReason());
         }

@@ -1,10 +1,13 @@
 package com.example.connector.okx.unit.mapping;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import com.example.connector.okx.integration.external.api.model.okx.response.PositionOkxResponse;
 import com.example.connector.okx.mapping.PositionMapper;
 import com.example.connector.okx.snapshot.PositionExternalSnapshot;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.lang.reflect.Field;
 import java.time.OffsetDateTime;
@@ -41,6 +44,7 @@ class LivePositionToSnapshotTest {
         assertThat(snapshot.getExternalUnrealizedProfit()).isEqualByComparingTo("5");
         assertThat(snapshot.getExternalCreatedAt()).isEqualTo(OffsetDateTime.parse("2023-11-14T22:13:20Z"));
         assertThat(snapshot.getExternalModifiedAt()).isEqualTo(OffsetDateTime.parse("2023-11-14T22:14:20Z"));
+        assertThat(snapshot.getMarginMode()).isEqualTo(Instrument.MarginMode.ISOLATED);
     }
 
     /** Одно поле источника даёт два поля снапшота. */
@@ -81,7 +85,12 @@ class LivePositionToSnapshotTest {
         assertThat(snapshot.getDirection()).isNull();
     }
 
-    /** Инвариантные операнды: полей под них у снапшота нет. */
+    /**
+     * Инвариантные операнды: полей под их СЫРЫЕ формы у снапшота нет.
+     * Режим маржи записи переносится, но доменным значением
+     * {@code marginMode}, а не словом площадки — он операнд отбора и
+     * различитель записей, а не сверки (docs/models/mapping/Position.md).
+     */
     @Test
     @DisplayName("U11.5 — четыре инвариантных операнда в снапшот не переносятся")
     void u11_5_fourInvariantOperandsDoNotCrossTheBoundary() {
@@ -125,5 +134,31 @@ class LivePositionToSnapshotTest {
     @DisplayName("U11.9 — пустота вместо формы источника даёт пустоту")
     void u11_9_emptinessInIsEmptinessOut() {
         assertThat(mapper.integrationToSnapshot(null)).isNull();
+    }
+
+    /** Чужая запись в срезе различима с нашей только режимом: он едет с каждой записью. */
+    @Test
+    @DisplayName("U11.10 — кросс-запись несёт доменный режим маржи кросс")
+    void u11_10_aCrossRecordCarriesTheCrossMarginMode() {
+        PositionOkxResponse response = OkxFixture.position();
+        response.setMgnMode("cross");
+
+        assertThat(mapper.integrationToSnapshot(response).getMarginMode()).isEqualTo(Instrument.MarginMode.CROSS);
+    }
+
+    /** Значение вне формы контракта — единственный отказ чтения живой позиции. */
+    @Test
+    @DisplayName("U11.11 — режим маржи вне словаря или пустой отказывает чтением")
+    void u11_11_anUnknownOrEmptyMarginModeRefusesTheRead() {
+        PositionOkxResponse unknown = OkxFixture.position();
+        unknown.setMgnMode("portfolio");
+        PositionOkxResponse empty = OkxFixture.position();
+        empty.setMgnMode("");
+
+        assertThatThrownBy(() -> mapper.integrationToSnapshot(unknown))
+                .isInstanceOf(ExternalInvariantViolationException.class)
+                .hasMessageContaining("portfolio");
+        assertThatThrownBy(() -> mapper.integrationToSnapshot(empty))
+                .isInstanceOf(ExternalInvariantViolationException.class);
     }
 }

@@ -86,6 +86,8 @@ class EventIntakeBoxTest extends SharedStatisticsBox {
         assertThat(fact.get("reconciliation_status")).isEqualTo("MATCHED");
         assertThat(fact.get("breakdown_incomplete")).isEqualTo("COMPLETE");
         assertThat(fact.get("risk_benchmark_availability")).isEqualTo("AVAILABLE");
+        assertThat(fact.get("close_reason")).isEqualTo(Bodies.STOP_LOSS);
+        assertThat(decimal(fact, "stop_exit_slippage")).isEqualByComparingTo(Bodies.STOP_EXIT_SLIPPAGE);
         // Класс раскладывается ровно в одну таблицу.
         assertThat(incidentFacts()).as("зерно происшествий не тронуто").isEmpty();
 

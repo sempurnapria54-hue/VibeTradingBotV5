@@ -65,6 +65,9 @@ public class DealAggregateDataService {
                 row.getPlannedRiskSum(),
                 row.getPlannedRiskExcludedSum(),
                 row.getRSum(),
+                row.getStopExitDeals(),
+                row.getStopExitSlippageDeals(),
+                row.getStopExitSlippageRSum(),
                 assembledAt);
     }
 

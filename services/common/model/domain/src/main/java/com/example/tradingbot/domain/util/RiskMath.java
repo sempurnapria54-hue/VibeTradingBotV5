@@ -42,7 +42,7 @@ public class RiskMath {
      * Round-trip комиссия в ценовых единицах: комиссия входа по якорю плюс
      * комиссия выхода по цене стопа. Численного буфера сверх комиссии
      * здесь нет — буфер есть величина риск-аппетита, и назначает её
-     * держатель (docs/rules/risk-policy.md).
+     * держатель (docs/rules/stop-level.md).
      */
     public static BigDecimal stopDistanceFloor(BigDecimal entryAnchor, BigDecimal stopPrice, BigDecimal feeRate) {
         return feeRate.multiply(entryAnchor.add(stopPrice));

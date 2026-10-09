@@ -206,8 +206,8 @@ class AttachedParentClassTest {
                 .build());
 
         assertThat(resolution.getStatus())
-                .as("класс проблемного увёл бы защиту в ошибочные")
-                .isEqualTo(AttachedAlgoOrder.Status.ACTIVE);
+                .as("класс живого держит защиту в постановке — записи нет; класс проблемного увёл бы её в ошибочные")
+                .isEqualTo(AttachedAlgoOrder.Status.PENDING);
         assertThat(resolution.getCloseReason()).isNull();
         assertThat(resolution.getOutcomeUndetermined()).isFalse();
     }

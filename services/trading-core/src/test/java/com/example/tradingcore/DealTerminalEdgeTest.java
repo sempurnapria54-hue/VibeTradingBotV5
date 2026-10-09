@@ -319,7 +319,7 @@ class DealTerminalEdgeTest {
         assertThat(deal.getStatus())
                 .as("модель не объявляет закрытым то, что в базе не закрыто")
                 .isEqualTo(Deal.Status.EXIT_PENDING);
-        verify(coreEventWriter, never()).dealClosed(anyString(), any(), any(), any(), any(), any());
+        verify(coreEventWriter, never()).dealClosed(anyString(), any(), any(), any(), any(), any(), any());
     }
 
     /** Тот же гард у аварийного терминала: он законен ровно из ошибочного. */
@@ -335,7 +335,7 @@ class DealTerminalEdgeTest {
 
         assertThat(result.getSuccess()).isFalse();
         assertThat(deal.getStatus()).isEqualTo(Deal.Status.ERROR);
-        verify(coreEventWriter, never()).dealClosed(anyString(), any(), any(), any(), any(), any());
+        verify(coreEventWriter, never()).dealClosed(anyString(), any(), any(), any(), any(), any(), any());
     }
 
     /**

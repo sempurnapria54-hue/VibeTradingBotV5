@@ -1,5 +1,6 @@
 package com.example.tradingcore.util;
 
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import lombok.experimental.UtilityClass;
 
 /**
@@ -305,6 +306,22 @@ public class Constants {
          * Дом — там же.
          */
         public static final String RESULT_CURRENCY_UNVERIFIABLE = "RESULT_CURRENCY_UNVERIFIABLE";
+    }
+
+    /**
+     * Величины контура, которые ядро сверяет со срезом площадки.
+     */
+    @UtilityClass
+    public class Contour {
+
+        /**
+         * Режим маржи, которым наш писатель ставит заявки, — adapter-константа
+         * {@code tdMode=isolated} (docs/integrations/okx/rules/adapter-constants.md).
+         * Запись среза позиций иного режима открывает только заявка, которой
+         * мы не отправляли (docs/components/AnomalyJob.md, запись позиции
+         * режима контура).
+         */
+        public static final Instrument.MarginMode MARGIN_MODE = Instrument.MarginMode.ISOLATED;
     }
 
     /**

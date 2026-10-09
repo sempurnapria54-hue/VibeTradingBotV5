@@ -444,7 +444,7 @@ class PlacementExecutorTest {
         live.setStatus(Position.Status.ACTIVE);
         live.setExternalSize(new BigDecimal("100"));
         when(positionDataService.getRequiredById(5L)).thenReturn(live);
-        when(exchange.closePosition(ACCOUNT, INSTRUMENT, "USDT")).thenReturn(ack(true, null, null));
+        when(exchange.closePosition(ACCOUNT, INSTRUMENT, "USDT", null)).thenReturn(ack(true, null, null));
 
         DealActionState row = row();
         closePositionExecutor().execute(command(ServiceCommandType.CLOSE_POSITION_COMMAND, row,
@@ -476,7 +476,7 @@ class PlacementExecutorTest {
                 context(deal()));
 
         assertThat(result.getSuccess()).isTrue();
-        verify(exchange, never()).closePosition(any(), any(), any());
+        verify(exchange, never()).closePosition(any(), any(), any(), any());
         verify(positionDataService, never()).save(any());
         assertThat(flat.getCloseReason()).isNull();
     }

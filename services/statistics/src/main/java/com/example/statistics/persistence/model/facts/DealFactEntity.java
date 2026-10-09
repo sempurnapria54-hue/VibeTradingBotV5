@@ -86,4 +86,10 @@ public class DealFactEntity {
 
     @Column(name = "risk_benchmark_availability", updatable = false)
     private String riskBenchmarkAvailability;
+
+    @Column(name = "close_reason", updatable = false)
+    private String closeReason;
+
+    @Column(name = "stop_exit_slippage", precision = 36, scale = 18, updatable = false)
+    private BigDecimal stopExitSlippage;
 }

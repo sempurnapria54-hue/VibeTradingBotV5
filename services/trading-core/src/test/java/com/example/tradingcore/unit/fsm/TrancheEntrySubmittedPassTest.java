@@ -1,26 +1,39 @@
 package com.example.tradingcore.unit.fsm;
 
+import static com.example.tradingcore.unit.fsm.FsmFixture.DECLARATION_ID;
 import static com.example.tradingcore.unit.fsm.FsmFixture.TRANCHE_ID;
+import static com.example.tradingcore.unit.fsm.FsmFixture.attachedProtection;
 import static com.example.tradingcore.unit.fsm.FsmFixture.cancelledEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.contextBuilder;
 import static com.example.tradingcore.unit.fsm.FsmFixture.deal;
+import static com.example.tradingcore.unit.fsm.FsmFixture.declaration;
+import static com.example.tradingcore.unit.fsm.FsmFixture.detail;
 import static com.example.tradingcore.unit.fsm.FsmFixture.filledEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.fills;
 import static com.example.tradingcore.unit.fsm.FsmFixture.leg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.liveEntryLeg;
 import static com.example.tradingcore.unit.fsm.FsmFixture.livePosition;
+import static com.example.tradingcore.unit.fsm.FsmFixture.protectiveAction;
+import static com.example.tradingcore.unit.fsm.FsmFixture.step;
+import static com.example.tradingcore.unit.fsm.FsmFixture.strategyRow;
 import static com.example.tradingcore.unit.fsm.FsmFixture.tranche;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
+import com.example.tradingbot.domain.model.aggregate.strategy.StrategyStepType;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
+import com.example.tradingcore.domain.command.DealActionStateStatus;
 import com.example.tradingcore.domain.command.DealContext;
 import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.ServiceCommandType;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
+import com.example.tradingcore.domain.safety.HoldRung;
+import com.example.tradingcore.domain.safety.HoldScope;
+import com.example.tradingcore.util.Constants;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +50,16 @@ import org.junit.jupiter.api.Test;
  * <p><b>Ребро в подтверждённый вход обработчик не пишет:</b> он эмитит
  * команду консолидации, а само ребро ставит звено в одной транзакции со
  * своим завершением.
+ *
+ * <p><b>Налитая нога несёт встроенную защиту.</b> Выходная проверка
+ * покрытия читается на каждом проходе, кроме сворачивания, и нога с
+ * наливом без защиты была бы потерей покрытия, а не штатным входом. Живая
+ * и снятая частично налитые ноги несут защиту в постановке — её покрытие
+ * засчитывается отложенным (docs/rules/live-risk-protection.md).
+ *
+ * <p><b>Клетки выходной проверки покрытия меток не несут</b> — их метки
+ * назначает документ кейсов
+ * (.claude/decisions/submitted-entry-lost-attached-protection.md).
  */
 class TrancheEntrySubmittedPassTest {
 
@@ -178,13 +201,18 @@ class TrancheEntrySubmittedPassTest {
                 ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
         givenFetches();
         DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "2", "0");
-        subject.getOrders().add(leg(30L, TRANCHE_ID, Order.Status.PARTIALLY_COMPLETED, Boolean.FALSE, "2"));
+        Order partial = leg(30L, TRANCHE_ID, Order.Status.PARTIALLY_COMPLETED, Boolean.FALSE, "2");
+        partial.getAttachedAlgoOrders().add(placingProtection(60L));
+        subject.getOrders().add(partial);
         DealContext context = contextOf(Deal.Status.ACTIVE, subject);
         context.getDeal().getPositions().add(livePosition("2"));
 
         TrancheTransition transition = handle(context);
 
         assertThat(transition.hasCommands()).isFalse();
+        assertThat(transition.getDealErrorRequested())
+                .as("защита живой частично налитой ноги в постановке — покрытие отложенное, не нарушение")
+                .isFalse();
         assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND,
                 ServiceCommandType.REFRESH_POSITION_COMMAND);
         assertThat(transition.movesStatus()).isFalse();
@@ -260,15 +288,156 @@ class TrancheEntrySubmittedPassTest {
         assertThat(transition.getCloseReason()).isNull();
     }
 
+    // --- выходная проверка покрытия ------------------------------------------
+
+    @Test
+    @DisplayName("Нога снята после частичного налива, защита не встала, обязательства нет: ступень 2 до консолидации")
+    void aLostProtectionOnACancelledPartialLegEscalatesBeforeConsolidation() {
+        harness.givenSystemCommand(SystemActionType.FINALIZE_DEAL_ENTRY_ACTION,
+                ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
+        DealContext context = contextOf(Deal.Status.ACTIVE, lostProtectionTranche());
+        context.getDeal().getPositions().add(livePosition("2"));
+
+        TrancheTransition transition = handle(context);
+
+        assertUncoveredEscalation(transition);
+        assertThat(transition.hasCommands()).as("консолидация не затребована").isFalse();
+        harness.verifyWorkPassNotRun();
+    }
+
+    @Test
+    @DisplayName("Та же потеря защиты при живом обязательстве покрытия: ход продолжается консолидацией")
+    void aLiveCoverageCommitmentLetsTheConsolidationThrough() {
+        harness.givenSystemCommand(SystemActionType.FINALIZE_DEAL_ENTRY_ACTION,
+                ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
+        DealContext context = contextBuilder(deal(Deal.Status.ACTIVE, lostProtectionTranche()))
+                .strategyDetail(detail(declaration(DECLARATION_ID, Boolean.FALSE,
+                        DealTranche.Status.ENTRY_SUBMITTED,
+                        step(1L, StrategyStepType.MAIN_PROTECTION, protectiveAction(5L)))))
+                .actionStates(List.of(strategyRow(5L, TRANCHE_ID, 1, DealActionStateStatus.SUBMITTED)))
+                .build();
+        context.getDeal().getPositions().add(livePosition("2"));
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.getDealErrorRequested()).isFalse();
+        assertThat(transition.getHoldSignal()).isNull();
+        assertThat(commandTypes(transition))
+                .containsExactly(ServiceCommandType.FINALIZE_DEAL_ENTRY_COMMAND);
+    }
+
+    @Test
+    @DisplayName("Живая нога без налива с отказавшей защитой: экспозиции нет — нарушения нет, добыча идёт")
+    void aFailedProtectionWithoutAFillIsNotAViolation() {
+        givenFetches();
+        DealTranche subject = tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED);
+        Order live = liveEntryLeg(30L, TRANCHE_ID);
+        live.getAttachedAlgoOrders().add(failedProtection(60L));
+        subject.getOrders().add(live);
+
+        TrancheTransition transition = handle(contextOf(Deal.Status.ACTIVE, subject));
+
+        assertThat(transition.getDealErrorRequested()).isFalse();
+        assertThat(transition.getHoldSignal()).isNull();
+        assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND,
+                ServiceCommandType.REFRESH_POSITION_COMMAND);
+    }
+
+    @Test
+    @DisplayName("Сделка сворачивается при потерянной защите налитой ноги: ребро в выход, гейт покрытия не спрашивался")
+    void aCollapsingDealSendsTheTrancheToTheExitWithoutTheCoverageCheck() {
+        DealContext context = contextOf(Deal.Status.EXIT_PENDING, lostProtectionTranche());
+        context.getDeal().getPositions().add(livePosition("2"));
+        context.getDeal().setCloseReason(Deal.CloseReason.STOP_LOSS);
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.getNextStatus()).isEqualTo(DealTranche.Status.EXIT_PENDING);
+        assertThat(transition.getDealErrorRequested()).isFalse();
+        harness.verifyCoverageGateNotAsked();
+    }
+
+    @Test
+    @DisplayName("Перевыставленный вход: новая нога жива, защита снятой налитой ноги не встала — ступень 2")
+    void aReplacedEntryWithTheLostProtectionOfTheCancelledLegEscalates() {
+        DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "3", "0");
+        subject.getOrders().add(cancelledPartialLeg(30L, "3", failedProtection(60L)));
+        subject.getOrders().add(liveEntryLeg(31L, TRANCHE_ID));
+        DealContext context = contextOf(Deal.Status.ACTIVE, subject);
+        context.getDeal().getPositions().add(livePosition("3"));
+
+        TrancheTransition transition = handle(context);
+
+        assertUncoveredEscalation(transition);
+        harness.verifyWorkPassNotRun();
+    }
+
+    @Test
+    @DisplayName("Перевыставленный вход, защита снятой ноги ещё в постановке: добываются обе ноги, позиция последней")
+    void aReplacedEntryObservesTheCarrierOfAPlacingProtectionTogetherWithTheLiveLeg() {
+        givenFetches();
+        DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "3", "0");
+        subject.getOrders().add(cancelledPartialLeg(30L, "3", placingProtection(60L)));
+        subject.getOrders().add(liveEntryLeg(31L, TRANCHE_ID));
+        DealContext context = contextOf(Deal.Status.ACTIVE, subject);
+        context.getDeal().getPositions().add(livePosition("3"));
+
+        TrancheTransition transition = handle(context);
+
+        assertThat(transition.getDealErrorRequested()).isFalse();
+        assertThat(observationTypes(transition)).containsExactly(ServiceCommandType.REFRESH_ORDER_COMMAND,
+                ServiceCommandType.REFRESH_ORDER_COMMAND, ServiceCommandType.REFRESH_POSITION_COMMAND);
+        assertThat(transition.getObservations().subList(0, 2).stream()
+                .map(observation -> ((RefreshOrderCommandPayload) observation.getPayload()).getOrderId())
+                .toList())
+                .containsExactly(30L, 31L);
+    }
+
     // --- сборка ------------------------------------------------------------
 
-    /** Транш с входной ногой, снятой после частичного налива. */
+    /** Транш с входной ногой, снятой после частичного налива; её защита ещё в постановке. */
     private DealTranche partiallyFilledCancelledTranche() {
         DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "2", "0");
-        Order leg = leg(30L, TRANCHE_ID, Order.Status.CANCELED, Boolean.FALSE, "2");
-        leg.setCloseReason(Order.CloseReason.CANCELED_BY_STRATEGY);
-        subject.getOrders().add(leg);
+        subject.getOrders().add(cancelledPartialLeg(30L, "2", placingProtection(60L)));
         return subject;
+    }
+
+    /** Транш с входной ногой, снятой после частичного налива; её защита не встала. */
+    private DealTranche lostProtectionTranche() {
+        DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "2", "0");
+        subject.getOrders().add(cancelledPartialLeg(30L, "2", failedProtection(60L)));
+        return subject;
+    }
+
+    /** Входная нога, снятая после частичного налива, со встроенной защитой. */
+    private Order cancelledPartialLeg(Long id, String fill, AttachedAlgoOrder protection) {
+        Order leg = leg(id, TRANCHE_ID, Order.Status.CANCELED, Boolean.FALSE, fill);
+        leg.setCloseReason(Order.CloseReason.CANCELED_BY_STRATEGY);
+        leg.getAttachedAlgoOrders().add(protection);
+        return leg;
+    }
+
+    /** Встроенная защита в постановке: площадка её ещё не показала. */
+    private AttachedAlgoOrder placingProtection(Long id) {
+        AttachedAlgoOrder protection = attachedProtection(id, "5");
+        protection.setStatus(AttachedAlgoOrder.Status.PENDING);
+        return protection;
+    }
+
+    /** Встроенная защита, которая на площадке не встала: отказ постановки. */
+    private AttachedAlgoOrder failedProtection(Long id) {
+        AttachedAlgoOrder protection = attachedProtection(id, "5");
+        protection.setStatus(AttachedAlgoOrder.Status.ERROR);
+        protection.setCloseReason(AttachedAlgoOrder.CloseReason.PROTECTION_PLACEMENT_FAILED);
+        return protection;
+    }
+
+    /** Исход нарушения покрытия: ошибочная тропа вместе с биржевой ступенью 2. */
+    private void assertUncoveredEscalation(TrancheTransition transition) {
+        assertThat(transition.getDealErrorRequested()).isTrue();
+        assertThat(transition.getHoldSignal().getScope()).isEqualTo(HoldScope.EXCHANGE_ACCOUNT);
+        assertThat(transition.getHoldSignal().getRung()).isEqualTo(HoldRung.HARD);
+        assertThat(transition.getHoldSignal().getCode()).isEqualTo(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED);
     }
 
     private void givenFetches() {
@@ -285,10 +454,12 @@ class TrancheEntrySubmittedPassTest {
         return harness.entrySubmitted().handle(context, context.getDeal().getTranches().getFirst());
     }
 
-    /** Нога налита целиком, живой эпизод есть. */
+    /** Нога налита целиком и несёт встроенную защиту, живой эпизод есть. */
     private DealContext confirmedEntryContext() {
         DealTranche subject = fills(tranche(TRANCHE_ID, DealTranche.Status.ENTRY_SUBMITTED), "5", "0");
-        subject.getOrders().add(filledEntryLeg(30L, TRANCHE_ID, "5"));
+        Order filled = filledEntryLeg(30L, TRANCHE_ID, "5");
+        filled.getAttachedAlgoOrders().add(attachedProtection(60L, "5"));
+        subject.getOrders().add(filled);
         DealContext context = contextOf(Deal.Status.ACTIVE, subject);
         context.getDeal().getPositions().add(livePosition("5"));
         return context;

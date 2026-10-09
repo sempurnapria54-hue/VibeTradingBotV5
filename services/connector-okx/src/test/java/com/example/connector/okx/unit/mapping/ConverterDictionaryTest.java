@@ -9,6 +9,7 @@ import com.example.connector.okx.mapping.OkxResponseConverter;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.balance.AccountMode;
 import com.example.tradingbot.domain.model.core.balance.PositionMode;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
@@ -35,7 +36,10 @@ import org.junit.jupiter.params.provider.ValueSource;
  * по-разному, и различие названо: у стороны заявки неизвестное значение
  * отказывает, у ценовой базы триггера — даёт пустоту. У режимов счёта и
  * позиций — тоже пустоту: пустой режим преконтроль читает как режим вне
- * контура (docs/models/mapping/Balance.md).
+ * контура (docs/models/mapping/Balance.md). У режима маржи записи позиции
+ * исходов два, а не три: пустоты нет вовсе — площадка отдаёт режим у
+ * каждой записи, и только им различает нашу запись и чужую
+ * (docs/models/mapping/Position.md).
  */
 class ConverterDictionaryTest {
 
@@ -274,5 +278,46 @@ class ConverterDictionaryTest {
     @DisplayName("U6.33 — пустой и отсутствующий режим позиций дают пустоту")
     void u6_33_anEmptyPositionModeIsEmptiness(String raw) {
         assertThat(converter.positionMode(raw)).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"isolated,ISOLATED", "cross,CROSS"})
+    @DisplayName("U6.34 — оба режима маржи записи позиции переводятся в домен")
+    void u6_34_bothPositionMarginModesTranslate(String raw, Instrument.MarginMode expected) {
+        assertThat(converter.marginModeToDomain(raw)).isEqualTo(expected);
+    }
+
+    /** Пустота выдала бы чужую запись за нашу либо нашу за чужую: режим — единственный различитель. */
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  "})
+    @DisplayName("U6.35 — пустой и отсутствующий режим маржи записи отказывают")
+    void u6_35_anEmptyPositionMarginModeRefuses(String raw) {
+        assertThatThrownBy(() -> converter.marginModeToDomain(raw))
+                .isInstanceOf(ExternalInvariantViolationException.class)
+                .hasMessageContaining("режим маржи записи");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ISOLATED", "Cross", "portfolio", "net"})
+    @DisplayName("U6.36 — режим маржи записи вне словаря отказывает, значение в сообщении")
+    void u6_36_aPositionMarginModeOutsideTheDictionaryRefusesWithItsValue(String raw) {
+        assertThatThrownBy(() -> converter.marginModeToDomain(raw))
+                .isInstanceOf(ExternalInvariantViolationException.class)
+                .hasMessageContaining(raw);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ISOLATED,isolated", "CROSS,cross"})
+    @DisplayName("U6.37 — доменный режим маржи закрытия в словарь площадки")
+    void u6_37_aDomainMarginModeBecomesTheSourceWord(Instrument.MarginMode mode, String expected) {
+        assertThat(converter.marginMode(mode)).isEqualTo(expected);
+    }
+
+    /** Пустой режим — тропа всякой нашей позиции: закрывается запись режима контура. */
+    @Test
+    @DisplayName("U6.38 — пустой режим маржи закрытия даёт режим контура")
+    void u6_38_anEmptyClosureMarginModeIsTheContourMode() {
+        assertThat(converter.marginMode(null)).isEqualTo("isolated");
     }
 }

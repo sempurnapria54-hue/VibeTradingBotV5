@@ -9,13 +9,15 @@ import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingcore.domain.command.DealContext;
-import com.example.tradingcore.domain.command.ServiceCommand;
 import com.example.tradingcore.domain.command.SystemActionType;
 import com.example.tradingcore.domain.command.action.SystemActionExecutor;
+import com.example.tradingcore.domain.deal.ProtectionCoverageGate;
 import com.example.tradingcore.domain.fsm.DealTrancheHandler;
 import com.example.tradingcore.domain.fsm.TrancheActionDisposition;
 import com.example.tradingcore.domain.fsm.TrancheTransition;
 import com.example.tradingcore.domain.fsm.TrancheWorkPass;
+import com.example.tradingcore.domain.safety.HoldSignal;
+import com.example.tradingcore.util.Constants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -31,9 +33,16 @@ import org.springframework.stereotype.Component;
  * двигает статус (docs/processes/fsm-execution-layering.md).
  *
  * <p><b>Налив входа наблюдает этот обработчик.</b> Пока вход не
- * подтверждён и рабочий блок молчит, проход отдаёт добычу ноги, а по её
- * наливу — позиции; иначе транш стоял бы в отправленном входе бессрочно,
+ * подтверждён и рабочий блок молчит, проход отдаёт добычу ног транша
+ * вместе с позицией; иначе транш стоял бы в отправленном входе бессрочно,
  * а живая экспозиция сделки не наблюдалась бы вовсе.
+ *
+ * <p><b>Встроенная защита потеряна — исход по обязательству, тот же, что у
+ * подтверждённого входа.</b> Выходная проверка покрытия читается раньше
+ * консолидации и раньше рабочего прохода и живостью ноги не гейтится:
+ * перевыставленный вход несёт живую ногу и потерянную защиту снятой
+ * (docs/components/TrancheEntrySubmittedHandler.md §«Выходные проверки»;
+ * довод — .claude/decisions/submitted-entry-lost-attached-protection.md).
  *
  * <p><b>Закреплённая деталь входной проверкой этого обработчика не
  * является</b> (docs/components/TrancheEntrySubmittedHandler.md
@@ -48,6 +57,7 @@ public class TrancheEntrySubmittedHandler implements DealTrancheHandler {
     private final TrancheWorkPass workPass;
     private final TrancheActionDisposition disposition;
     private final SystemActionExecutor systemActionExecutor;
+    private final ProtectionCoverageGate coverageGate;
 
     @Override
     public DealTranche.Status handledStatus() {
@@ -84,6 +94,18 @@ public class TrancheEntrySubmittedHandler implements DealTrancheHandler {
                     tranche.getId());
             return TrancheTransition.moveTo(DealTranche.Status.EXIT_PENDING);
         }
+        // Выходная проверка «встроенная защита не потеряна» — раньше консолидации и
+        // раньше рабочего прохода, без гейта живости ноги: на перевыставленном входе
+        // живая нога есть, а потерянная защита принадлежит снятой. Живая частично
+        // налитая нога нарушения не даёт — её покрытие отложенное
+        // (docs/rules/live-risk-protection.md). Предикат читается по дому, а не
+        // пересобирается здесь.
+        if (isTrue(coverageGate.trancheViolated(dealContext, tranche))) {
+            log.error("Coverage invariant violated on a submitted entry dealId={} trancheId={}",
+                    deal.getId(), tranche.getId());
+            return TrancheTransition.escalate(
+                    HoldSignal.exchangeAccount(Constants.Hold.EXCHANGE_LIVE_RISK_UNCOVERED));
+        }
         if (isTrue(entryConfirmed(entry, deal))) {
             return consolidateEntry(dealContext, tranche);
         }
@@ -91,7 +113,7 @@ public class TrancheEntrySubmittedHandler implements DealTrancheHandler {
         if (isTrue(workPass.spoke(work))) {
             return work;
         }
-        return observeEntry(dealContext, entry);
+        return observeEntry(dealContext, tranche);
     }
 
     /**
@@ -99,26 +121,35 @@ public class TrancheEntrySubmittedHandler implements DealTrancheHandler {
      * строка исполнения создания ноги завершается на подтверждённой
      * ОТПРАВКЕ, и дальше живых строк у транша нет.
      *
-     * <p><b>Живая нога добывается ВМЕСТЕ с позицией, одним проходом.</b>
-     * Налив, наблюдённый без позиции, делает следующий проход ложным
-     * дважды: сверка экспозиций траншей с нетто-размером живого эпизода
-     * расходится (биржевая ступень на штатном входе), а «вход налился,
-     * живого эпизода нет» читается как уже закрытая позиция. Налитая нога
-     * — одна позиция: её живой эпизод и есть второй операнд подтверждённого
-     * входа.
+     * <p><b>Состав заявок — тот же, что у наблюдения сопровождения</b>
+     * ({@link DealTranche#observedOrders()}): живая нога и налитые носители
+     * живой встроенной защиты. Носитель добывается и здесь: защита
+     * терминальной ноги может остаться в постановке дольше одной добычи —
+     * первая встреча терминала пустым разбором вывода о пропаже не даёт, — а
+     * на перевыставленном входе снятая нога с наливом остаётся при транше,
+     * чью финализацию читает новая живая нога. Без её добычи ожидание
+     * защиты не гасло бы, и пропажу не наблюдал бы никто, пока вход не
+     * подтвердится (.claude/decisions/protection-lost-needs-prior-terminal.md).
+     *
+     * <p><b>Ноги добываются ВМЕСТЕ с позицией, одним проходом, и позиция
+     * последней.</b> Налив, наблюдённый без позиции, делает следующий проход
+     * ложным дважды: сверка экспозиций траншей с нетто-размером живого
+     * эпизода расходится (биржевая ступень на штатном входе), а «вход
+     * налился, живого эпизода нет» читается как уже закрытая позиция. Заявок
+     * к добыче нет — одна позиция.
      *
      * <p>Добыча едет наблюдением, а не работой: транш опрашивает налив
      * каждым проходом, и работу уровня сделки это занимать не должно
      * (docs/components/TrancheEntrySubmittedHandler.md §«Налив наблюдается
      * добычей»).
      */
-    private TrancheTransition observeEntry(DealContext dealContext, Order entry) {
-        ServiceCommand position = disposition.positionFetch(dealContext).orElse(null);
-        if (isFalse(entry.isLive())) {
-            return TrancheTransition.observe(position);
+    private TrancheTransition observeEntry(DealContext dealContext, DealTranche tranche) {
+        TrancheTransition observation = TrancheTransition.stay();
+        for (Order order : tranche.observedOrders()) {
+            observation = observation.withObservation(
+                    disposition.orderFetch(dealContext, order.getId()).orElse(null));
         }
-        return TrancheTransition.observe(disposition.orderFetch(dealContext, entry.getId()).orElse(null))
-                .withObservation(position);
+        return observation.withObservation(disposition.positionFetch(dealContext).orElse(null));
     }
 
     /**

@@ -69,7 +69,8 @@ final class Aggregates {
                  risk_benchmark_missing_deals, r_denominator_deals,
                  result_before_funding_sum, net_result_sum, fee_sum, funding_sum,
                  liquidation_penalty_sum, win_result_sum, loss_result_sum,
-                 planned_risk_sum, planned_risk_excluded_sum, r_sum, assembled_at)
+                 planned_risk_sum, planned_risk_excluded_sum, r_sum,
+                 stop_exit_deals, stop_exit_slippage_deals, stop_exit_slippage_r_sum, assembled_at)
             values (?, ?, cast(? as varchar), ?, cast(? as varchar),
                     ?, 0, 0, 0, 0,
                     0, 0, 0,
@@ -78,6 +79,7 @@ final class Aggregates {
                     0, 0,
                     0, 0,
                     0, 0, 0, 0,
+                    0, 0, 0,
                     0, 0, 0,
                     0, 0, 0, ?)
             """;

@@ -38,6 +38,25 @@ class AccessContourBoxTest extends SharedConnectorBox {
     }
 
     /**
+     * Группы проб развёртывания — подпути того же открытого исключения
+     * {@code /actuator/health/**}, а не новые открытые точки. Манифест
+     * спрашивает именно их ({@code deploy/base/services/connector-okx.yaml}),
+     * и закрытая группа гасила бы под отказом {@code 401}, а не состоянием.
+     */
+    @Test
+    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
+    void theProbeGroupsAreOpenAndAnswerWithState() {
+        Answer liveness = getAnonymously("/actuator/health/liveness");
+        Answer readiness = getAnonymously("/actuator/health/readiness");
+
+        assertThat(liveness.status()).isEqualTo(200);
+        assertThat(liveness.body()).contains("UP");
+        assertThat(readiness.status()).isEqualTo(200);
+        assertThat(readiness.body()).contains("UP");
+        assertThat(readiness.body()).doesNotContain("apiKey", "accounts", "okx.com", "vault");
+    }
+
+    /**
      * Тело отказа доступа собирает общий энфорсер точек входа цепочки
      * ({@code docs/rules/error-handling-policy.md} §«Отказ доступа — тот же
      * контракт, что и прочие ошибки»).

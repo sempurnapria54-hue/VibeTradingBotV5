@@ -172,6 +172,18 @@ public class DealAggregateEntity {
     @Column(name = "r_sum", nullable = false)
     private BigDecimal rSum;
 
+    /** Из вошедших в отношение к риску — закрытые стопом. */
+    @Column(name = "stop_exit_deals", nullable = false)
+    private Integer stopExitDeals;
+
+    /** Из закрытых стопом — с измеренным проскоком. */
+    @Column(name = "stop_exit_slippage_deals", nullable = false)
+    private Integer stopExitSlippageDeals;
+
+    /** Сумма проскока выхода по стопу в долях планового риска сделки. */
+    @Column(name = "stop_exit_slippage_r_sum", nullable = false)
+    private BigDecimal stopExitSlippageRSum;
+
     /**
      * Момент сборки строки: показание читателю, а не операнд выбора
      * пересчитываемого (docs/rules/statistics-aggregates.md §«Пересчёт —

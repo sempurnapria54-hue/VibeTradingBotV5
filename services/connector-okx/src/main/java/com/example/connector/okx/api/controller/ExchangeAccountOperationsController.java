@@ -2,6 +2,7 @@ package com.example.connector.okx.api.controller;
 
 import com.example.connector.okx.api.model.AlgoOrderHistoryApiQuery;
 import com.example.connector.okx.api.model.ExchangeOrderLookupApiQuery;
+import com.example.connector.okx.api.model.PositionClosureApiQuery;
 import com.example.connector.okx.gateway.ExchangeGateway;
 import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
@@ -13,6 +14,7 @@ import com.example.tradingbot.domain.model.other.DealCashFlow;
 import com.example.tradingbot.domain.model.other.TradeFeeRate;
 import com.example.tradingbot.domain.resolve.ProtectionHistoryLeg;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -105,13 +107,18 @@ public class ExchangeAccountOperationsController {
      * требует, а позиция на инструменте вне контура ядра её не знает
      * ({@code docs/integrations/okx/contracts/position.md}, тело
      * close-position). Пусто — поле в запрос площадке не уходит.
+     *
+     * <p>Режим маржи записи необязателен тем же образом, но пустота у него
+     * значит другое: пусто — закрывается запись режима контура; непустой
+     * приносит только снятие риска вне графа сделок, закрывая запись иного
+     * режима её собственным режимом ({@code docs/components/IntegrationService.md}).
      */
     @Operation(summary = "Закрыть позицию по рынку")
     @PostMapping("/positions/closures")
     public ExchangeAck closePosition(@PathVariable String accountInternalId,
-                                     @RequestParam String externalInstrumentId,
-                                     @RequestParam(required = false) String settleCurrency) {
-        return gateway.closePosition(accountInternalId, externalInstrumentId, settleCurrency);
+                                     @Valid @ParameterObject PositionClosureApiQuery closure) {
+        return gateway.closePosition(accountInternalId, closure.getExternalInstrumentId(),
+                closure.getSettleCurrency(), closure.getMarginMode());
     }
 
     @Operation(summary = "Настроить плечо счёта на инструменте")

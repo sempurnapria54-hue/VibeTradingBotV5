@@ -35,6 +35,25 @@ class AccessContourBoxTest extends SharedAuthBox {
         assertThat(answer.body()).doesNotContain("tenant", "exchangeAccount", "internalId");
     }
 
+    /**
+     * Группы проб развёртывания — подпути того же открытого исключения
+     * {@code /actuator/health/**}, а не новые открытые точки. Манифест
+     * спрашивает именно их ({@code deploy/base/services/auth.yaml}), и
+     * закрытая группа гасила бы под отказом {@code 401}, а не состоянием.
+     */
+    @Test
+    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
+    void theProbeGroupsAreOpenAndAnswerWithState() {
+        Answer liveness = get("/actuator/health/liveness");
+        Answer readiness = get("/actuator/health/readiness");
+
+        assertThat(liveness.status()).isEqualTo(200);
+        assertThat(liveness.body()).contains("UP");
+        assertThat(readiness.status()).isEqualTo(200);
+        assertThat(readiness.body()).contains("UP");
+        assertThat(readiness.body()).doesNotContain("tenant", "exchangeAccount", "internalId");
+    }
+
     @Test
     @DisplayName("B5.2 — съём метрик у `auth` не открыт")
     void b5_2_theMetricsScrapeIsNotOpen() {

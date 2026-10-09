@@ -109,7 +109,7 @@ class KillSwitchTeardownTest {
         when(exchange.cancelOrder(anyString(), any(), anyString())).thenReturn(ack());
         when(exchange.cancelAlgoOrder(anyString(), any(), anyString())).thenReturn(ack());
         when(exchange.cancelAttachedProtection(anyString(), any(), anyString())).thenReturn(ack());
-        when(exchange.closePosition(anyString(), anyString(), any())).thenReturn(ack());
+        when(exchange.closePosition(anyString(), anyString(), any(), any())).thenReturn(ack());
     }
 
     @Test
@@ -121,7 +121,7 @@ class KillSwitchTeardownTest {
 
         InOrder order = inOrder(exchange);
         order.verify(exchange).cancelOrder(eq(ACCOUNT), eq(leg), eq(INSTRUMENT));
-        order.verify(exchange).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any());
+        order.verify(exchange).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any(), any());
     }
 
     @Test
@@ -218,7 +218,7 @@ class KillSwitchTeardownTest {
 
         ServiceCommandExecutionResult result = executor.execute(dealContext);
 
-        verify(exchange, times(2)).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any());
+        verify(exchange, times(2)).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any(), any());
         assertThat(result.getSuccess()).isFalse();
         assertThat(result.getErrorCode()).isEqualTo(RuntimeErrorCode.EXCHANGE_ERROR);
     }
@@ -242,7 +242,7 @@ class KillSwitchTeardownTest {
         ServiceCommandExecutionResult result = executor.execute(dealContext);
 
         assertThat(result.getSuccess()).isTrue();
-        verify(exchange, times(1)).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any());
+        verify(exchange, times(1)).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any(), any());
         assertThat(fetched.getCloseReason()).isEqualTo(Position.CloseReason.KILL_SWITCH);
     }
 
@@ -255,7 +255,7 @@ class KillSwitchTeardownTest {
 
         executor.execute(dealContext);
 
-        verify(exchange).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any());
+        verify(exchange).closePosition(eq(ACCOUNT), eq(INSTRUMENT), any(), any());
     }
 
     private void onGraphReload(Deal deal, Runnable mutation) {

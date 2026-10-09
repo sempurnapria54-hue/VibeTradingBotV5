@@ -70,7 +70,8 @@ class ReceptionEnvelopeTest {
              "funding":"-0.250000000000000003","liquidationPenalty":"0",
              "plannedRisk":"100.000000000000000001",
              "closeOutcome":"NORMAL","reconciliationStatus":"MATCHED",
-             "breakdownIncomplete":"COMPLETE","riskBenchmarkAvailability":"PRESENT"}""";
+             "breakdownIncomplete":"COMPLETE","riskBenchmarkAvailability":"PRESENT",
+             "closeReason":"STOP_LOSS","stopExitSlippage":"-0.500000000000000007"}""";
 
     /** Содержимое подъёма ступени защиты: несёт оба разреза класса. */
     private static final String HOLD_CONTENT = """
@@ -113,6 +114,28 @@ class ReceptionEnvelopeTest {
         assertThat(fact.getReconciliationStatus()).isEqualTo("MATCHED");
         assertThat(fact.getBreakdownIncomplete()).isEqualTo("COMPLETE");
         assertThat(fact.getRiskBenchmarkAvailability()).isEqualTo("PRESENT");
+        assertThat(fact.getCloseReason()).isEqualTo("STOP_LOSS");
+        assertThat(fact.getStopExitSlippage())
+                .as("мера проскока едет деньгами со своим знаком: исполнение лучше уровня — отрицательна")
+                .isEqualByComparingTo(new BigDecimal("-0.500000000000000007"));
+    }
+
+    @Test
+    @DisplayName("Терминал без меры проскока даёт факт с ПУСТОЙ мерой, а не с нулём")
+    void aTerminalWithoutTheSlippageMeasureLeavesItEmpty() {
+        String content = """
+                {"exchangeAccountInternalId":"acct-9","strategyInternalId":"strat-2",
+                 "resultCurrency":"USDT","tookRisk":true,"graphComplete":true,
+                 "result":"-3","plannedRisk":"10","closeReason":"STRATEGY_EXIT"}""";
+
+        listener.onEvent(message(envelope(Constants.CarriedEvent.DEAL_CLOSED), TENANT, content));
+
+        ArgumentCaptor<DealFact> captured = ArgumentCaptor.forClass(DealFact.class);
+        verify(receptionService).accept(captured.capture(), eq(TOPIC));
+        assertThat(captured.getValue().getCloseReason()).isEqualTo("STRATEGY_EXIT");
+        assertThat(captured.getValue().getStopExitSlippage())
+                .as("неприменимая мера — значение «не измерено», и нулём она не подменяется")
+                .isNull();
     }
 
     @Test

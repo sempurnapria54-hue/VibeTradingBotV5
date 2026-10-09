@@ -75,8 +75,14 @@ public interface ExchangeGateway {
     ExchangeAck cancelAttachedProtection(String accountInternalId, AttachedAlgoOrder attached,
                                          String externalInstrumentId);
 
-    /** Рыночное закрытие позиции. */
-    ExchangeAck closePosition(String accountInternalId, String externalInstrumentId, String settleCurrency);
+    /**
+     * Рыночное закрытие позиции. Режим маржи записи необязателен: пусто —
+     * режим контура; непустой приносит только снятие риска вне графа
+     * сделок, закрывая запись иного режима её собственным режимом
+     * ({@code docs/components/IntegrationService.md}).
+     */
+    ExchangeAck closePosition(String accountInternalId, String externalInstrumentId, String settleCurrency,
+                              Instrument.MarginMode marginMode);
 
     /** Настройка плеча счёта на инструменте. */
     ExchangeAck setLeverage(String accountInternalId, String externalInstrumentId, Integer leverage);

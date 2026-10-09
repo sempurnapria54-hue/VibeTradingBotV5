@@ -1,5 +1,6 @@
 package com.example.tradingcore.domain.safety;
 
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
@@ -12,15 +13,23 @@ import org.springframework.stereotype.Service;
 
 /**
  * Детекторы, чей признак читается <b>целиком со стороны биржи</b>: живой
- * риск по инструменту вне контура, больше одной позиции на инструмент,
- * живая заявка без нашего маркера (docs/components/AnomalyJob.md §«Что
- * ищет»).
+ * риск по инструменту вне контура, позиция на инструменте контура, которую
+ * наш писатель не производит, живая заявка без нашего маркера
+ * (docs/components/AnomalyJob.md §«Что ищет»).
  *
  * <p><b>Первым двум гистерезис не нужен, и это не послабление.</b> Гонка
  * чтения — срез, прочитанный между отправкой нашей команды и её
- * появлением на бирже — их признака не производит: вторая позиция по
- * одному инструменту нашей командой не создаётся никогда, а строка
- * инструмента нашим ходом не исчезает.
+ * появлением на бирже — их признака не производит: вторая позиция режима
+ * маржи контура по одному инструменту и позиция иного режима нашей
+ * командой не создаются никогда, а строка инструмента нашим ходом не
+ * исчезает.
+ *
+ * <p><b>У позиционного детектора исходов два, и различает их режим маржи
+ * записи</b> (разбор {@code A3}): больше одной записи режима контура —
+ * режим позиций счёта не тот; запись иного режима — след уже исполненной
+ * заявки, которой мы не отправляли, то есть сущность, которую система не
+ * создавала. Записи режима контура считаются без чужой: чужая
+ * кросс-позиция рядом с нашей изолированной режима позиций не нарушает.
  *
  * <p><b>Третьему гистерезис нужен, и посылка обратного опровергнута.</b>
  * Закрытие позиции идёт эндпоинтом, у которого клиентского идентификатора
@@ -30,9 +39,10 @@ import org.springframework.stereotype.Service;
  * исключения которого маркер и введён, только входом в него служит не
  * рестарт, а эндпоинт без поля.
  *
- * <p><b>Радиус у всех трёх счётный.</b> У первого строки инструмента нет
+ * <p><b>Радиус у всех счётный.</b> У первого строки инструмента нет
  * вовсе — инструментной реакции нечем адресоваться; у второго под
- * сомнением режим позиций СЧЁТА; у третьего — распоряжение счётом.
+ * сомнением режим позиций СЧЁТА либо — записью иного режима —
+ * распоряжение счётом; у третьего — распоряжение счётом.
  * Ступень жёсткая: счёт принадлежит системе единолично, и сущность,
  * которую мы не создавали, означает, что им распоряжается кто-то ещё.
  */
@@ -50,7 +60,7 @@ public class ExchangeSideDetectors {
     private final AnomalyReaction reaction;
 
     /**
-     * Проход по трём биржевым признакам.
+     * Проход по биржевым признакам.
      *
      * @param contour биржевые имена <b>всех</b> инструментов модели,
      *                независимо от их статуса: операнд первого детектора —
@@ -66,6 +76,7 @@ public class ExchangeSideDetectors {
                     continue;
                 }
                 duplicatePosition(scan, externalInstrumentId, account);
+                foreignMarginModePosition(scan, externalInstrumentId, account);
                 foreignOrders(scan, externalInstrumentId, account);
             } catch (RuntimeException e) {
                 // Отказ на одном имени обход не обрывает: остальные живые
@@ -96,12 +107,14 @@ public class ExchangeSideDetectors {
     }
 
     /**
-     * Позиций по одному инструменту больше одной. Модель допускает не
-     * больше одной живой, и наблюдение обратного означает, что режим
-     * позиций счёта не тот, который объявлен adapter-константой.
+     * Позиций режима маржи контура по одному инструменту больше одной.
+     * Режим позиций {@code net} сливает заявки одного инструмента,
+     * направления и режима маржи, поэтому кардинальность «не больше одной»
+     * верна внутри режима контура, и наблюдение обратного означает, что
+     * режим позиций счёта не тот, который объявлен adapter-константой.
      */
     private void duplicatePosition(AnomalyScan scan, String externalInstrumentId, ExchangeAccount account) {
-        int positions = scan.positionsOf(externalInstrumentId).size();
+        int positions = scan.contourPositionsOf(externalInstrumentId).size();
         if (positions <= 1) {
             return;
         }
@@ -111,6 +124,33 @@ public class ExchangeSideDetectors {
                 .scope(HoldScope.EXCHANGE_ACCOUNT)
                 .rung(HoldRung.HARD)
                 .code(Constants.Hold.EXCHANGE_POSITION_MODE_VIOLATION)
+                .externalObservation(scan.observedRowsOf(externalInstrumentId))
+                .hysteresisTicks(WITHOUT_HYSTERESIS)
+                .journalOnly(false)
+                .build(), account);
+    }
+
+    /**
+     * Запись позиции иного режима маржи на инструменте контура. Наш писатель
+     * ставит заявки одним режимом, и такую запись открыла заявка, которой мы
+     * не отправляли: класс сущности, которую система не создавала, — тот же
+     * код, что у чужой заявки, только заявка его больше не стои́т.
+     *
+     * <p><b>Гистерезис — один тик, а не два, как у чужой заявки.</b> Довод
+     * двух тиков там — наша закрывающая заявка без маркера; режима вне
+     * контура наш ход не производит вовсе, и гонки чтения у признака нет.
+     */
+    private void foreignMarginModePosition(AnomalyScan scan, String externalInstrumentId,
+                                           ExchangeAccount account) {
+        if (isEmpty(scan.foreignMarginModePositionsOf(externalInstrumentId))) {
+            return;
+        }
+        log.warn("Live position in a foreign margin mode on a contour instrument externalInstrumentId={}",
+                externalInstrumentId);
+        reaction.apply(AnomalyFinding.builder()
+                .scope(HoldScope.EXCHANGE_ACCOUNT)
+                .rung(HoldRung.HARD)
+                .code(Constants.Hold.EXCHANGE_FOREIGN_ORDER)
                 .externalObservation(scan.observedRowsOf(externalInstrumentId))
                 .hysteresisTicks(WITHOUT_HYSTERESIS)
                 .journalOnly(false)

@@ -59,6 +59,34 @@ class SecretStoreUnavailableBoxTest extends ConnectorBox {
         assertThat(answer.errorCode()).isEqualTo("SECRET_STORE_UNAVAILABLE");
     }
 
+    /**
+     * Пробы развёртывания хранилища не спрашивают: обе группы — состояние
+     * самого процесса ({@code application.yaml},
+     * {@code management.endpoint.health}). Готовность здесь — несущее
+     * следствие клетки выше: коннектор без хранилища ОБСЛУЖИВАЕТ, отвечая
+     * своим классом отказа, и снятый с балансировки под заменил бы этот
+     * класс отказом транспорта у вызывающего. Живость, заглядывающая в
+     * хранилище, гасила бы под по кругу, пока оно запечатано
+     * ({@code .claude/skills/local-stand.md}).
+     *
+     * <p><b>Общий {@code /actuator/health} при этом обязан лечь</b> — это
+     * охрана от пустоты клетки: без неё зелёные группы не отличались бы от
+     * контекста, который мёртвого хранилища попросту не видит.
+     */
+    @Test
+    @DisplayName("Пробы живости и готовности не зависят от хранилища секретов")
+    void theProbesDoNotDependOnTheSecretStore() {
+        Answer overall = getAnonymously("/actuator/health");
+        Answer liveness = getAnonymously("/actuator/health/liveness");
+        Answer readiness = getAnonymously("/actuator/health/readiness");
+
+        assertThat(overall.status()).as("хранилище мертво, и общее здоровье это видит").isEqualTo(503);
+        assertThat(liveness.status()).isEqualTo(200);
+        assertThat(liveness.body()).contains("UP");
+        assertThat(readiness.status()).isEqualTo(200);
+        assertThat(readiness.body()).contains("UP");
+    }
+
     private static String startAndStop() {
         VaultContainer<?> container = new VaultContainer<>(
                 DockerImageName.parse(ConnectorSubstrate.VAULT_IMAGE))

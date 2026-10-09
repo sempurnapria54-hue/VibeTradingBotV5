@@ -15,6 +15,8 @@
     "liqPenalty": "штраф ликвидации сделки, издержкой ПОЛОЖИТЕЛЬНЫЙ: величина rightLiquidationPenalty дома docs/spec/pnl-reconciliation.json с обратным знаком. Ноль у сделки, которую биржа не закрывала принудительно. У принудительного сокращения штраф НЕ ИСКЛЮЧЁН: наблюдения нет, и обе развязки держат фикстуры дома (docs/spec/pnl-reconciliation.json)",
     "plannedRisk": "плановый риск сделки — Deal.plannedRiskAmount, знаменатель R-мультипликатора; форма — docs/spec/deal-risk-numbers.json, величина dealPlannedRisk. Форма тотальна: сумма по входным ногам на пустом множестве даёт НОЛЬ, и ноль означает «сайзинга на тропе сделки не было» — так закрывается восстановительная сделка, заведённая вокруг живого риска. ПОЛЕ же пишут только писатели четвёрки чисел риска, и пишут на полном графе (docs/models/domain/aggregate/Deal.md, раздел о писателях четвёрки): пока ни один из них не завершился, поле пусто, и содержимое терминального события везёт его пустым. У принявшей риск сделки пустота значит «знаменатель НЕ ПОСЧИТАН», а не «сайзинга не было»: нулём она не читается (docs/rules/absent-value-semantics.md). Из знаменателя R такая сделка выпадает (rDenominatorPresent), и счётчик у неё есть — riskBenchmarkMissingDeals: писатель признака доступности знаменателя ставит MISSING ровно принявшей риск сделке без положительного планового риска, и связь держит охранный инвариант missingBenchmarkMarksAbsentDenominator",
     "currency": "расчётная валюта результата сделки — Deal.resultProfitCurrency, дом формы docs/spec/deal-result.json. Пусто достижимо: расчётная валюта инструмента не резолвилась, и у числа нет единицы измерения",
+    "closeReason": "причина закрытия сделки — Deal.CloseReason, поле содержимого DealClosed; область значений домовая (docs/models/domain/aggregate/Deal.md), и здесь она не переписывается. Агрегат читает одно её значение — STOP_LOSS, признак популяции проскока выхода по стопу (countsAsStopExit). Аварийный терминал пишет EMERGENCY_CLOSE безусловно (docs/lifecycles/Deal.md), и сделка, у которой сработал стоп, а закрылась она аварийно, в эту популяцию не входит — ограничение калибровки названо в доме агрегатов. Пусто достижимо только до терминала, а факт заводится терминалом",
+    "stopExitSlippage": "проскок выхода сделки по стопу — деньги расчётной валюты, неблагоприятный положителен; поле содержимого DealClosed. Форма — docs/spec/stop-exit-slippage.json, величина stopExitSlippage; здесь она не переписывается: операнды формы — граф сделки на терминале, у читателя их нет, и складывает число писатель события. Пусто — мера у этой сделки неприменима либо неизмерима (лестница стопов, трейлинг, частичный выход собственной reduce-only ногой до стопа, несколько эпизодов, недобытая средняя цена выхода); нулём пустота не читается (docs/rules/absent-value-semantics.md). Непуста только у сделки, закрытой стопом, — подмножество держит конъюнкт формы по причине закрытия",
     "closeOutcome": "торговый исход закрытия — Deal.closeOutcome, тип CloseOutcome: NORMAL_EXIT, LIQUIDATION, FORCED_REDUCTION, UNDETERMINED. Состав стоит здесь ВТОРОЙ СТОРОНОЙ СВЕРКИ, а не копией: команда вывода популяции (tools/derive/deal-selection-feature-values.sh) читает эту прозу и роняет прогон при расхождении с объявлением перечня; дом состава — docs/models/domain/aggregate/Deal.md. Пусто у сделки, закрытой без входа: признак неприменим",
     "reconciliationStatus": "исход сверки разбивки движений с биржевым итогом — Deal.reconciliationStatus, тип ReconciliationStatus: NOT_RUN, MATCHED, MISMATCHED. Состав стоит здесь второй стороной сверки, а не копией — тем же выводом, что у closeOutcome; дом состава — docs/models/domain/aggregate/Deal.md. Пусто у сделки, закрытой без входа",
     "breakdownIncomplete": "полнота разбивки движений сделки — Deal.breakdownIncomplete, тип BreakdownCompleteness: COMPLETE, INCOMPLETE_BY_WINDOW, NOT_ASSESSED. Состав стоит здесь второй стороной сверки, а не копией — тем же выводом, что у closeOutcome; дом состава — docs/models/domain/aggregate/Deal.md. Пусто у сделки, закрытой без входа: признак неприменим",
@@ -346,6 +348,34 @@
       "where": "entersRowSums && rDenominatorPresent",
       "note": "Сколько сделок вошло в сумму R-мультипликаторов. Без неё rSum не делится ни на что: riskBearingDeals шире (в него входят и невошедшие), а winRateDenominator считает другую популяцию. Средний R есть rSum / rDenominatorDeals, и обе половины обязаны храниться, иначе клейм выводимости снова ложен.",
       "$comment": "пара к rSum"
+    },
+    {
+      "name": "countsAsStopExit",
+      "note": "Сделка закрыта стопом и стоит в популяции отношения к риску — той же, что у rSum: проскок меряется в долях R, и знаменатель обязан быть у каждого слагаемого. Признак популяции — причина закрытия, а не непустота меры: иначе сделки, закрытые стопом с неизмеримым проскоком, выпадали бы МОЛЧА.",
+      "expr": "entersRowSums && rDenominatorPresent && closeReason == 'STOP_LOSS'"
+    },
+    {
+      "name": "stopExitDeals",
+      "note": "Сделок, закрытых стопом, в популяции отношения к риску. Пара к stopExitSlippageDeals: разность двух счётчиков — закрытые стопом с неизмеримым проскоком, и вторым носителем она не заводится (docs/concept.md, П4). Без этой половины доля измеренных не читалась бы ниоткуда, а выборка калибровки запаса выглядела бы полной.",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsStopExit"
+    },
+    {
+      "name": "stopExitSlippageDeals",
+      "note": "Сколько сделок вошло в сумму проскока в долях R — знаменатель среднего проскока.",
+      "over": "deals",
+      "op": "count",
+      "where": "countsAsStopExit && notNull(stopExitSlippage)",
+      "$comment": "пара к stopExitSlippageRSum"
+    },
+    {
+      "name": "stopExitSlippageRSum",
+      "note": "Сумма проскока выхода по стопу в долях планового риска сделки. Средний проскок в долях R есть stopExitSlippageRSum / stopExitSlippageDeals — вход калибровки запаса на проскок и спред (docs/rules/risk-policy.md). Хранится суммой ДОЛЕЙ, а не суммой денег: запас назначается долей R, и частное денежных сумм взвешивало бы сделки их риском — тот же довод, по которому rSum не заменяется частным сумм. Знак не нормализуется: исполнение лучше уровня входит отрицательным слагаемым.",
+      "over": "deals",
+      "op": "sum",
+      "of": "stopExitSlippage / plannedRisk",
+      "where": "countsAsStopExit && notNull(stopExitSlippage)"
     },
     {
       "name": "winRateDenominator",
@@ -1321,6 +1351,44 @@
         "reconciliationNotRunDeals": 0,
         "breakdownNotAssessedDeals": 0,
         "riskUnsizedDeals": 0
+      }
+    },
+    {
+      "case": "проскок выхода по стопу: сумма долей R по измеренным, неизмеренный виден разностью счётчиков, выход не стопом и сделка без знаменателя R не входят никуда",
+      "note": "Пять сделок. Две закрыты стопом с измеренным проскоком — 25 при риске 100 и -5 (исполнение лучше уровня) при риске 50: доли 0.25 и -0.1. Третья закрыта стопом, а проскок неизмерим — сработал трейлинг. Четвёртая вышла плановым выходом. Пятая закрыта стопом с измеренным проскоком, но плановый риск у неё пуст: знаменателя R нет, и в популяцию отношения к риску она не входит.",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          { "tookRisk": true, "graphComplete": true, "fee": 1, "fundingCost": 0, "liqPenalty": 0, "plannedRisk": 100, "currency": "USDT", "closeOutcome": "NORMAL_EXIT", "reconciliationStatus": "MATCHED", "breakdownIncomplete": "COMPLETE", "riskBenchmarkAvailability": "AVAILABLE", "resultProfit": -125, "closeReason": "STOP_LOSS", "stopExitSlippage": 25 },
+          { "tookRisk": true, "graphComplete": true, "fee": 0.5, "fundingCost": 0, "liqPenalty": 0, "plannedRisk": 50, "currency": "USDT", "closeOutcome": "NORMAL_EXIT", "reconciliationStatus": "MATCHED", "breakdownIncomplete": "COMPLETE", "riskBenchmarkAvailability": "AVAILABLE", "resultProfit": -45, "closeReason": "STOP_LOSS", "stopExitSlippage": -5 },
+          { "tookRisk": true, "graphComplete": true, "fee": 0.5, "fundingCost": 0, "liqPenalty": 0, "plannedRisk": 50, "currency": "USDT", "closeOutcome": "NORMAL_EXIT", "reconciliationStatus": "MATCHED", "breakdownIncomplete": "COMPLETE", "riskBenchmarkAvailability": "AVAILABLE", "resultProfit": -30, "closeReason": "STOP_LOSS", "stopExitSlippage": null },
+          { "tookRisk": true, "graphComplete": true, "fee": 0.4, "fundingCost": 0, "liqPenalty": 0, "plannedRisk": 40, "currency": "USDT", "closeOutcome": "NORMAL_EXIT", "reconciliationStatus": "MATCHED", "breakdownIncomplete": "COMPLETE", "riskBenchmarkAvailability": "AVAILABLE", "resultProfit": 12, "closeReason": "STRATEGY_EXIT", "stopExitSlippage": null },
+          { "tookRisk": true, "graphComplete": true, "fee": 0.5, "fundingCost": 0, "liqPenalty": 0, "plannedRisk": null, "currency": "USDT", "closeOutcome": "NORMAL_EXIT", "reconciliationStatus": "MATCHED", "breakdownIncomplete": "COMPLETE", "riskBenchmarkAvailability": "MISSING", "resultProfit": -60, "closeReason": "STOP_LOSS", "stopExitSlippage": 10 }
+        ]
+      },
+      "expect": {
+        "rDenominatorDeals": 4,
+        "stopExitDeals": 3,
+        "stopExitSlippageDeals": 2,
+        "stopExitSlippageRSum": 0.15
+      }
+    },
+    {
+      "case": "проскок выхода по стопу: аварийный терминал в популяцию закрытых стопом не входит, хотя в отношении к риску стоит",
+      "note": "Три сделки. Первая закрыта стопом, проскок 40 при риске 80 — доля 0.5. Вторая закрыта стопом, а проскок неизмерим: транш частично вышел своей reduce-only ногой до стопа (docs/spec/stop-exit-slippage.json, величина reduceOnlyExitTranches). Третья — гэп через стоп, после которого сделка ушла в ошибочное состояние и закрылась аварийным терминалом: причина EMERGENCY_CLOSE, мера пуста по первому конъюнкту формы. В сумме R она стоит, а в паре счётчиков проскока её нет — ни измеренной, ни неизмеренной: это и есть названное ограничение калибровки (docs/rules/statistics-aggregates.md).",
+      "state": {
+        "rowCurrency": "USDT",
+        "deals": [
+          { "tookRisk": true, "graphComplete": true, "fee": 0.8, "fundingCost": 0, "liqPenalty": 0, "plannedRisk": 80, "currency": "USDT", "closeOutcome": "NORMAL_EXIT", "reconciliationStatus": "MATCHED", "breakdownIncomplete": "COMPLETE", "riskBenchmarkAvailability": "AVAILABLE", "resultProfit": -121, "closeReason": "STOP_LOSS", "stopExitSlippage": 40 },
+          { "tookRisk": true, "graphComplete": true, "fee": 1, "fundingCost": 0, "liqPenalty": 0, "plannedRisk": 100, "currency": "USDT", "closeOutcome": "NORMAL_EXIT", "reconciliationStatus": "MATCHED", "breakdownIncomplete": "COMPLETE", "riskBenchmarkAvailability": "AVAILABLE", "resultProfit": -40, "closeReason": "STOP_LOSS", "stopExitSlippage": null },
+          { "tookRisk": true, "graphComplete": true, "fee": 1, "fundingCost": 0, "liqPenalty": 0, "plannedRisk": 100, "currency": "USDT", "closeOutcome": "NORMAL_EXIT", "reconciliationStatus": "MATCHED", "breakdownIncomplete": "COMPLETE", "riskBenchmarkAvailability": "AVAILABLE", "resultProfit": -260, "closeReason": "EMERGENCY_CLOSE", "stopExitSlippage": null }
+        ]
+      },
+      "expect": {
+        "rDenominatorDeals": 3,
+        "stopExitDeals": 2,
+        "stopExitSlippageDeals": 1,
+        "stopExitSlippageRSum": 0.5
       }
     },
     {

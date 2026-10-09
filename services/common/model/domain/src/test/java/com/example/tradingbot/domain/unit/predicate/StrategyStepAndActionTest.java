@@ -312,6 +312,22 @@ class StrategyStepAndActionTest {
         assertThat(positionAction(3L).placementRole()).isEqualTo(StrategyPlacementRole.PRIMARY);
     }
 
+    /**
+     * Перевыставление входа — замещение заявочного действия с целью — уровень
+     * ставит заново: роль первичная, и сторону его стопа преконтроль мерит
+     * (docs/spec/strategy-reference.json, величина {@code actionIsLevelTransfer}).
+     * Метки клетка не несёт — её назначает документ кейсов.
+     */
+    @Test
+    @DisplayName("Перевыставление входа с ключом цели — первичная постановка, а не перенос")
+    void aReplacedEntryWithATargetIsAPrimaryPlacement() {
+        StrategyOrderAction replacedEntry = orderAction(4L, StrategyTradeDirection.LONG, false);
+        replacedEntry.setActionType(StrategyActionType.REPLACE_ACTION);
+        replacedEntry.setTargetActionKey("order-1");
+
+        assertThat(replacedEntry.placementRole()).isEqualTo(StrategyPlacementRole.PRIMARY);
+    }
+
     /** Пустая база защиты триггерной ветки становится марк-ценой. */
     @ParameterizedTest
     @EnumSource(value = AlgoOrder.ConditionType.class, names = {"STOP_LOSS", "PARTIAL_STOP_LOSS", "OCO_FULL"})

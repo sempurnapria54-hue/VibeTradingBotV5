@@ -10,6 +10,7 @@ import com.example.connector.okx.util.OkxParse;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.balance.AccountMode;
 import com.example.tradingbot.domain.model.core.balance.PositionMode;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.resolve.ExternalStatusReason;
@@ -104,6 +105,49 @@ public class OkxResponseConverter {
                 .findFirst()
                 .orElseThrow(() -> new ExternalInvariantViolationException(
                         "positions-history: направление вне перечня: " + rawDirection));
+    }
+
+    /**
+     * Режим маржи записи позиции ({@code mgnMode}: isolated / cross) →
+     * доменный режим маржи (docs/models/mapping/Position.md).
+     *
+     * <p><b>Пустоты здесь нет, и это не строгость, а форма контракта:</b>
+     * площадка отдаёт режим у каждой записи, и запись без него либо с
+     * незнакомым словом — значение вне формы контракта, то есть отказ
+     * чтения. Пустота на его месте выдала бы чужую запись за нашу либо
+     * нашу за чужую: режим — единственное, чем площадка их различает.
+     */
+    @Named("okxMarginModeToDomain")
+    public Instrument.MarginMode marginModeToDomain(String mgnMode) {
+        if (OkxConstants.TD_MODE_ISOLATED.equals(mgnMode)) {
+            return Instrument.MarginMode.ISOLATED;
+        }
+        if (OkxConstants.MGN_MODE_CROSS.equals(mgnMode)) {
+            return Instrument.MarginMode.CROSS;
+        }
+        throw new ExternalInvariantViolationException("position: режим маржи записи вне словаря контракта: "
+                + mgnMode);
+    }
+
+    /**
+     * Доменный режим маржи → слово площадки для тела закрытия позиции.
+     *
+     * <p><b>Пусто — режим контура (adapter-константа isolated):</b> так
+     * закрывается всякая наша позиция. Непустой режим приносит только
+     * снятие риска вне графа сделок, закрывая запись иного режима её
+     * собственным режимом (docs/models/mapping/Position.md §«OKX
+     * close-position request body»;
+     * docs/integrations/okx/rules/adapter-constants.md).
+     */
+    @Named("okxMarginMode")
+    public String marginMode(Instrument.MarginMode marginMode) {
+        if (isNull(marginMode)) {
+            return OkxConstants.TD_MODE_ISOLATED;
+        }
+        return switch (marginMode) {
+            case ISOLATED -> OkxConstants.TD_MODE_ISOLATED;
+            case CROSS -> OkxConstants.MGN_MODE_CROSS;
+        };
     }
 
     /** BigDecimal → OKX строка суммы (plain, без экспоненты); null→null. */

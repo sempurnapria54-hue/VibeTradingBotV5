@@ -230,7 +230,8 @@ class AbsentOutputsBoxTest extends StatisticsBox {
             "riskBenchmarkMissingDeals", "rDenominatorDeals",
             "resultBeforeFundingSum", "netResultSum", "feeSum", "fundingSum",
             "liquidationPenaltySum", "winResultSum", "lossResultSum",
-            "plannedRiskSum", "plannedRiskExcludedSum", "rSum", "assembledAt");
+            "plannedRiskSum", "plannedRiskExcludedSum", "rSum",
+            "stopExitDeals", "stopExitSlippageDeals", "stopExitSlippageRSum", "assembledAt");
 
     /** Полный состав полей строки агрегата происшествий. */
     private static final Set<String> INCIDENT_ROW_FIELDS = Set.of(
@@ -261,7 +262,8 @@ class AbsentOutputsBoxTest extends StatisticsBox {
             "event_id", "tenant_id", "exchange_account_internal_id", "strategy_internal_id",
             "result_currency", "closed_at", "took_risk", "graph_complete", "net_result",
             "fee", "funding", "liquidation_penalty", "planned_risk", "close_outcome",
-            "reconciliation_status", "breakdown_incomplete", "risk_benchmark_availability");
+            "reconciliation_status", "breakdown_incomplete", "risk_benchmark_availability",
+            "close_reason", "stop_exit_slippage");
 
     /** Неразложенные поля содержимого: их несёт богатый документ клетки. */
     private static final List<String> UNRESOLVED_FIELDS =
@@ -516,7 +518,7 @@ class AbsentOutputsBoxTest extends StatisticsBox {
         Map<String, Object> fact = dealFact();
         assertThat(rows.columnNames(DEAL_FACTS))
                 .as("и колонки под неразложенное поле у таблицы фактов тоже нет ни одной: "
-                        + "перечень закрыт, и семнадцатая колонка предъявится падением")
+                        + "перечень закрыт, и лишняя колонка предъявится падением")
                 .containsExactlyInAnyOrderElementsOf(DEAL_FACT_COLUMNS);
         UNRESOLVED_FIELDS.forEach(field -> assertThat(fact.values().stream()
                 .map(String::valueOf))

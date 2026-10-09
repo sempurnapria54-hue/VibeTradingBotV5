@@ -132,8 +132,9 @@ public class OkxExchangeGateway implements ExchangeGateway {
     }
 
     @Override
-    public ExchangeAck closePosition(String accountInternalId, String externalInstrumentId, String settleCurrency) {
-        return reader.closePosition(keys(accountInternalId), externalInstrumentId, settleCurrency);
+    public ExchangeAck closePosition(String accountInternalId, String externalInstrumentId, String settleCurrency,
+                                     Instrument.MarginMode marginMode) {
+        return reader.closePosition(keys(accountInternalId), externalInstrumentId, settleCurrency, marginMode);
     }
 
     @Override

@@ -230,12 +230,18 @@ public class MarkDealClosedExecutor implements CommandExecutor {
      * терминальное ребро (docs/architecture/contracts.md §«У каждого
      * класса события назван писатель, и он же писатель решения»).
      * Писателей у класса два, потому что терминалов два.
+     *
+     * <p><b>Проскок выхода по стопу считается здесь</b>, по графу прохода, и
+     * кладётся в содержимое события: своего поля у величины нет, а операнды
+     * — граф сделки, которого у читателя нет
+     * (docs/spec/stop-exit-slippage.json; расчёт — метод модели сделки).
      */
     private void publishClosed(DealContext dealContext, Deal deal) {
         coreEventWriter.dealClosed(dealContext.getExchangeAccount().getTenantId(), deal,
                 dealContext.getExchangeAccount().getInternalId(),
                 dealContext.getInstrument().getInternalId(),
                 dealContext.strategyInternalId(),
-                dealContext.getGraphComplete());
+                dealContext.getGraphComplete(),
+                deal.stopExitSlippage(dealContext.getGraphComplete()));
     }
 }

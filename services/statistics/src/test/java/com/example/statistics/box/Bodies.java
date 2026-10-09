@@ -11,11 +11,11 @@ package com.example.statistics.box;
  * сериализатором, то есть клетка проверяла бы наш сборщик.
  *
  * <p><b>Значения перечней — СЛОВА чужого производителя, и это несущее.</b>
- * Исход закрытия, состояние сверки, полнота разбивки, доступность базы риска,
+ * Причина закрытия, исход закрытия, состояние сверки, полнота разбивки, доступность базы риска,
  * жёсткость ступени и критичность отчёта сравниваются у потребителя с
  * литералами; общей библиотеки этих перечней в дереве статистики нет вовсе
  * (docs/models/domain/other/StatisticsFact.md §«Признак несомого класса»).
- * Слова здесь взяты у домов перечней — {@code Deal.CloseOutcome},
+ * Слова здесь взяты у домов перечней — {@code Deal.CloseReason}, {@code Deal.CloseOutcome},
  * {@code Deal.ReconciliationStatus}, {@code Deal.BreakdownCompleteness},
  * {@code Deal.RiskBenchmarkAvailability}, {@code HoldRung},
  * {@code AnomalyReport.Severity}, код ручной операции — у правила ручной
@@ -45,6 +45,25 @@ final class Bodies {
 
     /** Плановый риск штатного содержимого: знаменатель отношения к риску. */
     static final String PLANNED_RISK = "5.000000000000000000";
+
+    /**
+     * Причина закрытия штатного содержимого — выход по стопу: его считает
+     * {@code stopExitDeals}, и только у него мера проскока бывает непустой.
+     */
+    static final String STOP_LOSS = "STOP_LOSS";
+
+    /** Причина закрытия плановым выходом: популяция проскока её не берёт. */
+    static final String STRATEGY_EXIT = "STRATEGY_EXIT";
+
+    /**
+     * Причина аварийного терминала: пишется безусловно, и популяция проскока
+     * её не берёт, даже если стоп сработал (docs/rules/statistics-aggregates.md,
+     * раздел об аварийном терминале).
+     */
+    static final String EMERGENCY_CLOSE = "EMERGENCY_CLOSE";
+
+    /** Проскок выхода по стопу штатного содержимого — неблагоприятный, деньгами. */
+    static final String STOP_EXIT_SLIPPAGE = "0.750000000000000000";
 
     /** Исход закрытия, ни одним разрезом не считаемый. */
     static final String NORMAL_EXIT = "NORMAL_EXIT";
@@ -161,10 +180,12 @@ final class Bodies {
                  "closeOutcome": "%s",
                  "reconciliationStatus": "%s",
                  "breakdownIncomplete": "%s",
-                 "riskBenchmarkAvailability": "%s"}"""
+                 "riskBenchmarkAvailability": "%s",
+                 "closeReason": "%s",
+                 "stopExitSlippage": %s}"""
                 .formatted(exchangeAccount, strategy, CURRENCY, NET_RESULT, FEE, FUNDING,
                         LIQUIDATION_PENALTY, PLANNED_RISK, NORMAL_EXIT,
-                        MATCHED, COMPLETE, AVAILABLE);
+                        MATCHED, COMPLETE, AVAILABLE, STOP_LOSS, STOP_EXIT_SLIPPAGE);
     }
 
     /**

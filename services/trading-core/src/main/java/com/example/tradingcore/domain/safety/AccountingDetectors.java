@@ -126,11 +126,16 @@ public class AccountingDetectors {
      * <p>Ступень мягкая по оси: живого направленного риска у хвоста нет,
      * снимать нечего, а под сомнением наш учёт по этому инструменту — то
      * есть право заводить на нём новое.
+     *
+     * <p>Позицией по инструменту считается только запись режима маржи
+     * контура: запись иного режима нашей не читается, и хвосты рядом с ней
+     * ничем не объяснены (docs/components/AnomalyJob.md, запись позиции
+     * режима контура).
      */
     private void orphanOrders(AnomalyScan scan, ExchangeAccount account, Instrument instrument,
                               Boolean dealExplains) {
         String externalId = instrument.getExternalId();
-        if (isNotEmpty(scan.positionsOf(externalId))) {
+        if (isNotEmpty(scan.contourPositionsOf(externalId))) {
             return;
         }
         if (isEmpty(scan.ordersOf(externalId)) && isEmpty(scan.algoOrdersOf(externalId))) {

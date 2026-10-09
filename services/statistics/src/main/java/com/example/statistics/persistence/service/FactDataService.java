@@ -45,7 +45,9 @@ public class FactDataService {
                 fact.getCloseOutcome(),
                 fact.getReconciliationStatus(),
                 fact.getBreakdownIncomplete(),
-                fact.getRiskBenchmarkAvailability());
+                fact.getRiskBenchmarkAvailability(),
+                fact.getCloseReason(),
+                fact.getStopExitSlippage());
     }
 
     /** Записать факт происшествия. */

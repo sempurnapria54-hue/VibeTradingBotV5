@@ -48,9 +48,10 @@ class SchemaInputBoxTest extends SharedStatisticsBox {
     /**
      * Цепочка целиком, в порядке наката: она у сервиса своя и начинается с
      * базовой миграции; вторая переписывает комментарий колонки момента
-     * разрыва — применённая миграция не правится ни в одном байте.
+     * разрыва — применённая миграция не правится ни в одном байте; третья
+     * заводит операнды и величины проскока выхода по стопу.
      */
-    private static final List<String> CHAIN = List.of("1", "2");
+    private static final List<String> CHAIN = List.of("1", "2", "3");
 
     /** Состав схемы, положенный цепочкой: шесть таблиц предмета. */
     private static final List<String> OWN_TABLES = List.of(

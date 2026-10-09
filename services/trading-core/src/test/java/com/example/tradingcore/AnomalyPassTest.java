@@ -362,6 +362,23 @@ class AnomalyPassTest {
                 eq(OPENED_AT));
     }
 
+    /**
+     * Одиночная запись иного режима маржи восстановительной сделки не
+     * заводит: сделка ведёт позицию своего режима и чужую ни закрыть, ни
+     * защитить не может — запись наблюдает детектор позиции на инструменте
+     * контура. Метки клетка не несёт — её назначает документ кейсов.
+     */
+    @Test
+    void aLoneForeignMarginModeRecordIsNotRecovered() {
+        Position cross = position(new BigDecimal("5"));
+        cross.setMarginMode(Instrument.MarginMode.CROSS);
+        givenCompletePass(cross);
+
+        job().tick();
+
+        verify(dealOpeningService, never()).recoverDeal(any(), any(), any(), any());
+    }
+
     /** Позицию, которую объясняет живая сделка, восстанавливать не надо. */
     @Test
     void anExplainedPositionIsNotRecovered() {
@@ -493,6 +510,7 @@ class AnomalyPassTest {
         position.setExternalSize(size);
         position.setDirection(Position.Direction.LONG);
         position.setExternalCreatedAt(OPENED_AT);
+        position.setMarginMode(Instrument.MarginMode.ISOLATED);
         return position;
     }
 

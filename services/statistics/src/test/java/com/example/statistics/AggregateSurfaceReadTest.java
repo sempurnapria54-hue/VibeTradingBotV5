@@ -113,6 +113,9 @@ class AggregateSurfaceReadTest {
                 .andExpect(jsonPath("$.dealRows[0].closedDeals").value(4))
                 .andExpect(jsonPath("$.dealRows[0].rSum").value(1.5))
                 .andExpect(jsonPath("$.dealRows[0].rDenominatorDeals").value(3))
+                .andExpect(jsonPath("$.dealRows[0].stopExitDeals").value(2))
+                .andExpect(jsonPath("$.dealRows[0].stopExitSlippageDeals").value(1))
+                .andExpect(jsonPath("$.dealRows[0].stopExitSlippageRSum").value(0.25))
                 .andExpect(jsonPath("$.incidentRows").doesNotExist());
     }
 
@@ -335,6 +338,9 @@ class AggregateSurfaceReadTest {
                 .riskBearingDeals(3)
                 .rSum(new BigDecimal("1.5"))
                 .rDenominatorDeals(3)
+                .stopExitDeals(2)
+                .stopExitSlippageDeals(1)
+                .stopExitSlippageRSum(new BigDecimal("0.25"))
                 .assembledAt(MOMENT)
                 .build();
     }

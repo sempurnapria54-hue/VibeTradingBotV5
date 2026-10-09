@@ -109,6 +109,15 @@ public interface FactAggregateSourceRepository extends Repository<DealFactEntity
      * <p><b>Сумма пустого множества есть ноль</b>, и только этот
      * {@code coalesce} здесь законен: колонки сумм объявлены
      * {@code not null}, потому что ноль у них — исход, а не пробел.
+     *
+     * <p><b>Популяция проскока выхода по стопу — та же, что у суммы R, плюс
+     * причина закрытия</b> (docs/spec/statistics-aggregates.json,
+     * {@code countsAsStopExit}): доля {@code R} без знаменателя не существует.
+     * Пустая мера сделку из пары счётчиков не выводит — она стои́т в
+     * {@code stopExitDeals} и отсутствует в {@code stopExitSlippageDeals}, и
+     * разность пары показывает неизмеренных. Слово причины — литерал провода:
+     * по нему этот запрос ветвится, и принадлежность слова перечню
+     * производителя держит сверка слов (WireWordContractTest).
      */
     @Query(nativeQuery = true, value = """
             select grain.tenant_id                    as "tenantId",
@@ -168,7 +177,19 @@ public interface FactAggregateSourceRepository extends Repository<DealFactEntity
                        as "plannedRiskExcludedSum",
                    coalesce(sum(grain.price_result / grain.planned_risk) filter (where grain.enters_row_sums
                              and grain.planned_risk > 0), 0)
-                       as "RSum"
+                       as "RSum",
+                   cast(count(*) filter (where grain.enters_row_sums and grain.planned_risk > 0
+                             and grain.close_reason = 'STOP_LOSS') as integer)
+                       as "stopExitDeals",
+                   cast(count(*) filter (where grain.enters_row_sums and grain.planned_risk > 0
+                             and grain.close_reason = 'STOP_LOSS'
+                             and grain.stop_exit_slippage is not null) as integer)
+                       as "stopExitSlippageDeals",
+                   coalesce(sum(grain.stop_exit_slippage / grain.planned_risk) filter (where grain.enters_row_sums
+                             and grain.planned_risk > 0
+                             and grain.close_reason = 'STOP_LOSS'
+                             and grain.stop_exit_slippage is not null), 0)
+                       as "stopExitSlippageRSum"
               from (select operand.*,
                            operand.took_risk
                                and operand.price_result is not null
@@ -187,6 +208,8 @@ public interface FactAggregateSourceRepository extends Repository<DealFactEntity
                                    fact.reconciliation_status,
                                    fact.breakdown_incomplete,
                                    fact.risk_benchmark_availability,
+                                   fact.close_reason,
+                                   fact.stop_exit_slippage,
                                    case when fact.graph_complete and fact.net_result is not null
                                         then fact.net_result + fact.funding
                                    end                                 as price_result

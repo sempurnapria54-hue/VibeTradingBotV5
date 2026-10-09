@@ -50,12 +50,13 @@ final class DealDraft {
                 (event_id, tenant_id, exchange_account_internal_id, strategy_internal_id,
                  result_currency, closed_at, took_risk, graph_complete, net_result, fee, funding,
                  liquidation_penalty, planned_risk, close_outcome, reconciliation_status,
-                 breakdown_incomplete, risk_benchmark_availability)
+                 breakdown_incomplete, risk_benchmark_availability, close_reason,
+                 stop_exit_slippage)
             values (?, ?, ?, cast(? as varchar), cast(? as varchar), ?, ?, ?,
                     cast(? as numeric), cast(? as numeric), cast(? as numeric),
                     cast(? as numeric), cast(? as numeric),
                     cast(? as varchar), cast(? as varchar), cast(? as varchar),
-                    cast(? as varchar))
+                    cast(? as varchar), cast(? as varchar), cast(? as numeric))
             """;
 
     /** Идентичность события: она же половина ключа строки. */
@@ -124,6 +125,17 @@ final class DealDraft {
     private final String riskBenchmarkAvailability = Bodies.AVAILABLE;
 
     /**
+     * Причина закрытия. Умолчание — выход по стопу, как у штатного содержимого:
+     * заготовка несёт ВСЕ операнды, и мера проскока у неё непуста.
+     */
+    @Builder.Default
+    private final String closeReason = Bodies.STOP_LOSS;
+
+    /** Проскок выхода по стопу записью; пусто означает «мера неприменима либо неизмерима». */
+    @Builder.Default
+    private final String stopExitSlippage = Bodies.STOP_EXIT_SLIPPAGE;
+
+    /**
      * Заготовка здоровой сделки с названными ключом строки и тенантом.
      *
      * @param eventId  идентичность события
@@ -139,7 +151,8 @@ final class DealDraft {
         Rows.shared().write(INSERT, eventId, tenantId, account, strategy, currency, closedAt,
                 tookRisk, graphComplete, decimal(netResult), decimal(fee), decimal(funding),
                 decimal(liquidationPenalty), decimal(plannedRisk), closeOutcome,
-                reconciliationStatus, breakdownIncomplete, riskBenchmarkAvailability);
+                reconciliationStatus, breakdownIncomplete, riskBenchmarkAvailability, closeReason,
+                decimal(stopExitSlippage));
     }
 
     /**

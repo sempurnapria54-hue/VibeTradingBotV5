@@ -324,6 +324,28 @@ class ExchangeCommandsBoxTest extends SharedConnectorBox {
         assertThat(sent).doesNotContain("ccy");
     }
 
+    /**
+     * Режим маржи закрытия необязателен: пусто — режим контура (B2.8,
+     * B2.15); непустой приносит снятие риска вне графа сделок, закрывая
+     * запись иного режима её собственным режимом
+     * ({@code docs/models/mapping/Position.md} §«OKX close-position request body»).
+     */
+    @Test
+    @DisplayName("Закрытие позиции с режимом маржи записи уходит этим режимом")
+    void aPositionClosureWithAMarginModeTravelsWithThatMode() {
+        exchange.answers(OkxConstants.TRADE_CLOSE_POSITION_PATH,
+                Okx.ok(Okx.acceptedAck("ord-close-1", "")));
+
+        Answer answer = post(account("/positions/closures?externalInstrumentId=" + INSTRUMENT
+                + "&marginMode=CROSS"), "");
+
+        assertThat(answer.status()).isEqualTo(200);
+        String sent = exchange.single(OkxConstants.TRADE_CLOSE_POSITION_PATH).getBodyAsString();
+        assertThat(sent).contains("\"instId\":\"" + INSTRUMENT + "\"", "\"mgnMode\":\"cross\"",
+                "\"posSide\":\"net\"", "\"autoCxl\":true");
+        assertThat(sent).doesNotContain("isolated", "ccy");
+    }
+
     /** Штатное подтверждение на каждом из семи путей команд. */
     private void answerEveryCommand() {
         exchange.answers(OkxConstants.TRADE_ORDER_PATH,

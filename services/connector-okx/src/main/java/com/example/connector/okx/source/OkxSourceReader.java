@@ -50,6 +50,7 @@ import com.example.connector.okx.mapping.InstrumentExternalRulesMapper;
 import com.example.connector.okx.mapping.InstrumentMapper;
 import com.example.connector.okx.mapping.MarketPriceDataMapper;
 import com.example.connector.okx.mapping.MarketSnapshotMapper;
+import com.example.connector.okx.mapping.OkxResponseConverter;
 import com.example.connector.okx.mapping.OrderMapper;
 import com.example.connector.okx.mapping.PositionMapper;
 import com.example.connector.okx.mapping.TradeFeeRateMapper;
@@ -72,6 +73,7 @@ import com.example.connector.okx.util.OkxConstants;
 import com.example.connector.okx.util.OkxParse;
 import com.example.tradingbot.domain.exchange.ExchangeAck;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.resolve.ProtectionHistoryLeg;
@@ -128,6 +130,7 @@ public class OkxSourceReader {
     private final AlgoOrderMapper algoOrderMapper;
     private final TradeFeeRateMapper tradeFeeRateMapper;
     private final DealCashFlowMapper dealCashFlowMapper;
+    private final OkxResponseConverter responseConverter;
     public InstrumentExternalSnapshot getInstrument(String externalInstrumentId, String externalInstrumentType) {
         OkxApiResponse<InstrumentOkxResponse> response = execute(
                 () -> okxRestClient.getInstruments(externalInstrumentType, externalInstrumentId),
@@ -431,6 +434,18 @@ public class OkxSourceReader {
         }
         return OkxParse.offsetTime(response.getData().getFirst().getTs());
     }
+    /**
+     * Живая позиция инструмента — запись РЕЖИМА МАРЖИ КОНТУРА.
+     *
+     * <p><b>Запись выбирается режимом, а не порядком в ответе.</b> Площадка
+     * держит изолированную и кросс-позицию одного инструмента рядом
+     * отдельными записями, а отбора по режиму у запроса живых позиций нет.
+     * Запись иного режима нашу позицию не описывает — её заводит чужая
+     * активность на счёте, — и в снапшот она не попадает. Это ОТБОР, а не
+     * сверка: чужая запись не нарушает контракта, и чтения она не роняет
+     * (docs/models/mapping/Position.md §«Invariant checks (общая идея)»). Записи режима
+     * контура нет — позиции нет: пустота, как у пустого ответа.
+     */
     public PositionExternalSnapshot getPosition(ExchangeCredentials credentials, String externalInstrumentId) {
         OkxApiResponse<PositionOkxResponse> response = execute(
                 () -> okxRestClient.getPositions(credentials, externalInstrumentId),
@@ -439,7 +454,11 @@ public class OkxSourceReader {
         if (isEmpty(response.getData())) {
             return null;
         }
-        return positionMapper.integrationToSnapshot(response.getData().getFirst());
+        return response.getData().stream()
+                .filter(record -> OkxConstants.TD_MODE_ISOLATED.equals(record.getMgnMode()))
+                .findFirst()
+                .map(positionMapper::integrationToSnapshot)
+                .orElse(null);
     }
     public List<PositionExternalSnapshot> getPositions(ExchangeCredentials credentials) {
         OkxApiResponse<PositionOkxResponse> response = execute(
@@ -531,15 +550,23 @@ public class OkxSourceReader {
                 "cancel-attached", "instId=" + externalInstrumentId + " algoId=" + attached.getExternalId());
         return toAlgoAck(response, "cancel-attached", externalInstrumentId);
     }
-    public ExchangeAck closePosition(ExchangeCredentials credentials, String externalInstrumentId, String settleCurrency) {
+    /**
+     * Рыночное закрытие позиции. Режим маржи необязателен: пусто —
+     * закрывается запись режима контура (тропа всякой нашей позиции);
+     * непустой приносит только снятие риска вне графа сделок, закрывая
+     * запись иного режима её собственным режимом
+     * (docs/models/mapping/Position.md §«OKX close-position request body»).
+     */
+    public ExchangeAck closePosition(ExchangeCredentials credentials, String externalInstrumentId, String settleCurrency,
+                                     Instrument.MarginMode marginMode) {
         ClosePositionOkxRequest request = new ClosePositionOkxRequest();
         request.setInstId(externalInstrumentId);
-        request.setMgnMode(OkxConstants.TD_MODE_ISOLATED);
+        request.setMgnMode(responseConverter.marginMode(marginMode));
         request.setPosSide(OkxConstants.POS_SIDE_NET);
         request.setCcy(settleCurrency);
         request.setAutoCxl(Boolean.TRUE);
         OkxApiResponse<OrderAckOkxResponse> response = execute(() -> okxRestClient.closePosition(credentials, request),
-                "close-position", "instId=" + externalInstrumentId);
+                "close-position", "instId=" + externalInstrumentId + " mgnMode=" + request.getMgnMode());
         return toOrderAck(response, "close-position", externalInstrumentId);
     }
     public ExchangeAck setLeverage(ExchangeCredentials credentials, String externalInstrumentId, Integer leverage) {

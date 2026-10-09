@@ -1,5 +1,6 @@
 package com.example.statistics.integration.internal.event;
 
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 
 import java.util.Map;
@@ -32,14 +33,31 @@ import org.springframework.stereotype.Component;
  * (docs/rules/durable-consumer-reception.md §«Операнд второго момента
  * сажает первый»). Повторно доставленная запись приходит со смещением
  * <b>не больше</b> ожидаемого и разрывом тоже не считается.
+ *
+ * <p><b>Состояние «ожидания нет» назначение тоже ЗАПИСЫВАЕТ, а не
+ * оставляет.</b> Партиция, отозванная и вернувшаяся в тот же процесс без
+ * позиции, иначе встретила бы первую доставку ожиданием прошлого назначения
+ * и объявила бы ложный разрыв. Чистки на отзыве для этого не нужно: всякое
+ * назначение переписывает ожидание своей партиции на каждом исходе
+ * сравнения, и отсутствие позиции — один из них.
  */
 @Component
 public class ReceptionOffsetTracker {
 
     private final Map<TopicPartition, Long> expected = new ConcurrentHashMap<>();
 
-    /** Запомнить, с какого смещения ожидается чтение партиции. */
+    /**
+     * Запомнить, с какого смещения ожидается чтение партиции.
+     *
+     * <p>Запись безусловная, в том числе запись отсутствия: пустое смещение
+     * снимает ожидание партиции — назначение позиции не знает, и посадит её
+     * первая доставка.
+     */
     public void expect(TopicPartition partition, Long offset) {
+        if (isNull(offset)) {
+            expected.remove(partition);
+            return;
+        }
         expected.put(partition, offset);
     }
 

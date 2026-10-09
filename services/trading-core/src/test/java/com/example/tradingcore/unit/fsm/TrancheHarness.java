@@ -130,7 +130,7 @@ final class TrancheHarness {
     }
 
     TrancheEntrySubmittedHandler entrySubmitted() {
-        return new TrancheEntrySubmittedHandler(workPass, disposition, systemActionExecutor);
+        return new TrancheEntrySubmittedHandler(workPass, disposition, systemActionExecutor, coverageGate);
     }
 
     TrancheEntryFinalizedHandler entryFinalized() {

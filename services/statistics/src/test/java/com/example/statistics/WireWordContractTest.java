@@ -81,6 +81,7 @@ import org.springframework.data.repository.query.Param;
  *   {@link WireFormContractTest} читает имена заголовков.
  *   <b>Мутация, которая её роняет:</b> переименование у писателя значения,
  *   по которому агрегат ветвится ({@code Deal.CloseOutcome.LIQUIDATION},
+ *   {@code Deal.CloseReason.STOP_LOSS},
  *   {@code CoreEventType.HOLD_RAISED}, {@code HoldRung.HARD},
  *   {@code Severity.CRITICAL} и прочие), либо слово в запросе по колонке,
  *   для которой носитель значений пробе не объявлен.</li>
@@ -339,6 +340,7 @@ class WireWordContractTest {
         Map<String, Set<String>> values = new LinkedHashMap<>();
         values.put("event_type", names(CoreEventType.values()));
         values.put("close_outcome", names(Deal.CloseOutcome.values()));
+        values.put("close_reason", names(Deal.CloseReason.values()));
         values.put("reconciliation_status", names(Deal.ReconciliationStatus.values()));
         values.put("breakdown_incomplete", names(Deal.BreakdownCompleteness.values()));
         values.put("risk_benchmark_availability", names(Deal.RiskBenchmarkAvailability.values()));
@@ -484,9 +486,15 @@ class WireWordContractTest {
      * зёрен, у всякого несомого класса; определение стратегии — ключ
      * сделочного зерна; поля, по словам которых агрегат ветвится, — у класса,
      * который их несёт.
+     *
+     * <p><b>Мера проскока выхода по стопу стои́т здесь же, хотя словом она не
+     * является:</b> агрегат ветвится и по ней — по её НЕПУСТОТЕ
+     * ({@code stopExitSlippageDeals}), — и имя, разошедшееся у формы и
+     * читателя, дало бы пустую меру у каждой сделки: счётчик измеренных
+     * встал бы на нуле, неотличимом от «не измерено ни разу».
      */
-    private Map<String, Function<StatisticsEventMessage, String>> expectedReadings(String eventType) {
-        Map<String, Function<StatisticsEventMessage, String>> readings = new LinkedHashMap<>();
+    private Map<String, Function<StatisticsEventMessage, Object>> expectedReadings(String eventType) {
+        Map<String, Function<StatisticsEventMessage, Object>> readings = new LinkedHashMap<>();
         readings.put(Constants.RadiusFields.EXCHANGE_ACCOUNT_INTERNAL_ID,
                 StatisticsEventMessage::getExchangeAccountInternalId);
         switch (eventType) {
@@ -500,6 +508,8 @@ class WireWordContractTest {
                         StatisticsEventMessage::getBreakdownIncomplete);
                 readings.put(Constants.ContentFields.RISK_BENCHMARK_AVAILABILITY,
                         StatisticsEventMessage::getRiskBenchmarkAvailability);
+                readings.put(Constants.ContentFields.CLOSE_REASON, StatisticsEventMessage::getCloseReason);
+                readings.put(Constants.ContentFields.STOP_EXIT_SLIPPAGE, StatisticsEventMessage::getStopExitSlippage);
             }
             case Constants.CarriedEvent.HOLD_RAISED -> {
                 readings.put(Constants.ContentFields.RUNG, StatisticsEventMessage::getHoldRung);

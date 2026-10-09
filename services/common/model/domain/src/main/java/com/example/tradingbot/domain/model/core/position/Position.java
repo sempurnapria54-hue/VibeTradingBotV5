@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.Auditable;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -58,6 +59,29 @@ public class Position extends Auditable {
      * идентификатор погасил бы находку.
      */
     private String externalInstrumentId;
+
+    /**
+     * Режим маржи биржевой записи — доменное значение того же перечня, что
+     * у настройки счёта на инструменте; непусто только у строки, приехавшей
+     * чтением границы.
+     *
+     * <p><b>Атрибут ГРАНИЦЫ, а не хранения</b>, той же формы, что биржевое
+     * имя инструмента: колонки под него нет. Площадка держит изолированную
+     * и кросс-позицию одного инструмента рядом, отдельными записями, и
+     * счёт-широкий срез без режима не отличил бы нашу запись от чужой.
+     * Читателей два, и оба читают срез: проактивная детекция (счёт записей
+     * на инструмент идёт по режиму контура, запись иного режима — сущность,
+     * которую система не создавала) и снятие риска вне графа сделок,
+     * закрывающее запись её собственным режимом.
+     *
+     * <p>Писатель — коннектор, при маппинге каждого ответа живых позиций;
+     * сырое слово площадки сюда не попадает — перевод делает граница.
+     * У записи, пересекшей границу, поле пустым не бывает: значение вне
+     * формы контракта — отказ чтения, а не пустота
+     * (docs/models/domain/core/Position.md §«Режим маржи записи — атрибут
+     * границы той же формы»).
+     */
+    private Instrument.MarginMode marginMode;
 
     /** Доменный статус. */
     private Status status;

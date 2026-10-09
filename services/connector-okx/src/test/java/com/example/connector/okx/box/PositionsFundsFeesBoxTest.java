@@ -58,6 +58,45 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
         assertThat(get(account("/positions")).asList()).isEmpty();
     }
 
+    /**
+     * Площадка держит изолированную и кросс-позицию одного инструмента рядом
+     * отдельными записями, а отбора по режиму у запроса живых позиций нет:
+     * чтение по инструменту берёт запись режима контура, срез отдаёт обе,
+     * каждую со своим режимом (docs/models/mapping/Position.md
+     * §«Invariant checks (общая идея)»). Слово режима вне словаря — отказ
+     * чтения.
+     */
+    @Test
+    @DisplayName("Позиция иного режима маржи: отбор на чтении по инструменту, различитель в срезе")
+    void aForeignMarginModeRecordIsSelectedOutAndDistinguishedInTheSlice() {
+        exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH, Okx.ok(
+                Okx.position(INSTRUMENT, "7").with("posId", "pos-cross", "mgnMode", "cross").text(),
+                Okx.position(INSTRUMENT, "3").text()));
+
+        Answer single = get(account("/positions/instrument?externalInstrumentId=" + INSTRUMENT));
+        Answer all = get(account("/positions"));
+
+        assertThat(single.status()).isEqualTo(200);
+        assertThat(single.asObject().get("externalId")).isEqualTo("pos-1");
+        assertThat(single.asObject().get("marginMode")).isEqualTo("ISOLATED");
+        assertThat(all.asList()).extracting(position -> position.get("marginMode"))
+                .containsExactly("CROSS", "ISOLATED");
+
+        exchange.reset();
+        exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH, Okx.ok(
+                Okx.position(INSTRUMENT, "7").with("mgnMode", "cross").text()));
+        Answer foreignOnly = get(account("/positions/instrument?externalInstrumentId=" + INSTRUMENT));
+        assertThat(foreignOnly.status()).isEqualTo(200);
+        assertThat(foreignOnly.carriesErrorDto()).isFalse();
+        assertThat(foreignOnly.body()).doesNotContain("\"externalId\"");
+
+        exchange.reset();
+        exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH, Okx.ok(
+                Okx.position(INSTRUMENT, "3").with("mgnMode", "portfolio").text()));
+        Answer unknown = get(account("/positions"));
+        assertThat(unknown.errorCode()).isEqualTo("EXTERNAL_INVARIANT_VIOLATION");
+    }
+
     @Test
     @DisplayName("B5.2 — закрытые эпизоды читаются окном снизу")
     void b5_2_closedEpisodesAreReadByALowerBoundedWindow() {
@@ -74,7 +113,7 @@ class PositionsFundsFeesBoxTest extends SharedConnectorBox {
         assertThat(position.get("direction")).isEqualTo("LONG");
 
         LoggedRequest sent = exchange.single(OkxConstants.ACCOUNT_POSITIONS_HISTORY_PATH);
-        assertThat(sent.getUrl()).contains("instType=SWAP", "instId=" + INSTRUMENT,
+        assertThat(sent.getUrl()).contains("instType=SWAP", "instId=" + INSTRUMENT, "mgnMode=isolated",
                 "before=" + WINDOW_BEGIN_MILLIS, "limit=100");
         assertThat(sent.getUrl()).doesNotContain("after=");
     }

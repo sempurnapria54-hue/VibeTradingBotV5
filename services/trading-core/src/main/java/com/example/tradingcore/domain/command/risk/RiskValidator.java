@@ -181,7 +181,7 @@ public class RiskValidator {
         }
         checkRiskCreatingEntryProtection(calculatedAction, checks);
         checkStopLossSide(calculatedAction.getSourceAction(), price.getStopLossPrice(), entryAnchor,
-                direction, checks);
+                price.getRoundedPrice(), direction, checks);
         checkTransferStopBehindMark(calculatedAction.getSourceAction(), price.getStopLossPrice(), position,
                 entryAnchor, direction, checks);
         checkStopDistanceFloor(price.getStopLossPrice(), entryAnchor, direction, rules, checks);
@@ -1129,9 +1129,27 @@ public class RiskValidator {
      * (трейлинг) — тоже: уровня в момент постановки у него нет вовсе, и
      * требовать стороны значило бы отвергать ступень, ради которой
      * держится прибыль.
+     *
+     * <p><b>У risk-creating входа сторона мерится дважды</b> — от якоря и от
+     * плановой цены своей ноги, строго за ней (docs/spec/stop-distance.json,
+     * величина {@code stopOnOwnLegLossSide}): на живом эпизоде якорь — средняя
+     * цена, и уровень, посчитанный от неё, может лечь между ценой ноги и
+     * средней. За безубытком ноги такой уровень отвергает сайзинг, а полосу
+     * до безубытка не ловил ни один рубеж; на ней же ложна посылка ценового
+     * приоритета отложенного покрытия встроенной защиты
+     * (docs/rules/live-risk-protection.md). Без живого эпизода якорь и есть
+     * цена ноги, и вторая мера совпадает с первой. Код отказа тот же: предмет
+     * один — уровень не на убыточной стороне.
+     *
+     * <p>Пустая цена ноги вторую меру пропускает, но не молча: у входа её
+     * пустоту отвергает проверка слагаемых акта ({@code CALCULATED_ACTION_INVALID}),
+     * и сверять сторону здесь не с чем.
+     *
+     * @param legPrice плановая (округлённая) цена своей ноги действия
      */
     private void checkStopLossSide(StrategyAction action, ResolvedStopLossPrice stopLoss, BigDecimal entryAnchor,
-                                   StrategyTradeDirection direction, List<RiskCheckResult> checks) {
+                                   BigDecimal legPrice, StrategyTradeDirection direction,
+                                   List<RiskCheckResult> checks) {
         if (isNull(stopLoss) || isNull(stopLoss.getTriggerPrice()) || isNull(entryAnchor)) {
             return;
         }
@@ -1140,13 +1158,26 @@ public class RiskValidator {
             return;
         }
         BigDecimal trigger = stopLoss.getTriggerPrice();
-        boolean invalid = StrategyTradeDirection.LONG.equals(direction)
-                ? trigger.compareTo(entryAnchor) >= 0
-                : trigger.compareTo(entryAnchor) <= 0;
-        if (invalid) {
+        if (isFalse(onLossSide(trigger, entryAnchor, direction))) {
             checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_LOSS_INVALID_SIDE,
                     "Stop-loss on wrong side of entry " + entryAnchor, trigger));
+            return;
         }
+        if (isTrue(isRiskCreatingEntry(action)) && nonNull(legPrice)
+                && isFalse(onLossSide(trigger, legPrice, direction))) {
+            checks.add(RiskCheckResult.blocked(RiskCheckCode.STOP_LOSS_INVALID_SIDE,
+                    "Stop-loss on wrong side of own entry leg price " + legPrice, trigger));
+        }
+    }
+
+    /**
+     * Уровень лежит строго на убыточной стороне от опорной цены: у длинной
+     * ниже, у короткой выше. Равенство убыточной стороной не читается.
+     */
+    private Boolean onLossSide(BigDecimal trigger, BigDecimal reference, StrategyTradeDirection direction) {
+        return StrategyTradeDirection.LONG.equals(direction)
+                ? trigger.compareTo(reference) < 0
+                : trigger.compareTo(reference) > 0;
     }
 
     /**

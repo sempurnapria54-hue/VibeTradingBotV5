@@ -66,6 +66,8 @@ public class EnvelopeReader {
                 .reconciliationStatus(text(content, Constants.ContentFields.RECONCILIATION_STATUS))
                 .breakdownIncomplete(text(content, Constants.ContentFields.BREAKDOWN_INCOMPLETE))
                 .riskBenchmarkAvailability(text(content, Constants.ContentFields.RISK_BENCHMARK_AVAILABILITY))
+                .closeReason(text(content, Constants.ContentFields.CLOSE_REASON))
+                .stopExitSlippage(number(content, Constants.ContentFields.STOP_EXIT_SLIPPAGE))
                 .holdRung(text(content, Constants.ContentFields.RUNG))
                 .anomalySeverity(text(content, Constants.ContentFields.SEVERITY))
                 .operationCode(text(content, Constants.ContentFields.CODE))

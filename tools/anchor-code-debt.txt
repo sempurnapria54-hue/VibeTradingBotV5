@@ -72,9 +72,7 @@ services/strategies/src/main/java/com/example/strategies/persistence/repository/
 services/strategies/src/main/resources/application.yaml	«Выборка данных»
 services/strategies/src/test/java/com/example/strategies/box/StrategiesSubstrate.java	«Оснований брать свой контейнер ДВА…»
 services/strategies/src/test/java/com/example/strategies/unit/config/AsyncActorContextConfigurerTest.java	«Решение: где живёт дерево прогона»
-services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql	«База следует за балансом»
 services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql	«Срок свежести проекции»
 services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql	«Ступень и настройки счёта на инструменте»
-services/trading-core/src/main/resources/db/migration/trading-core/V1__trading_core_baseline.sql	«Четыре потолка»
 tests/src/test/java/com/example/tests/e2e/safetyteardown/TeardownTrail.java	«Новая ось формы — ВХОД ТРОПЫ ЕСТЬ РАСХОЖДЕНИЕ, А НЕ ХОД»
 tests/src/test/java/com/example/tests/e2e/strategytodeal/DealEntryPathTest.java	«Новая ось формы — СТОРОНА ТРОПЫ И ЕЁ СЛЕД»

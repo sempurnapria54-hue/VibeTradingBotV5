@@ -247,27 +247,48 @@ public class AttachedAlgoOrderStateResolver {
     }
 
     /**
-     * Живость по факту МАТЕРИАЛИЗАЦИИ, один предикат на обе тропы
-     * предъявления: налив родителя ЛИБО предъявленная самостоятельная
-     * запись. Присутствие элемента в теле родителя живости не доказывает —
-     * он стои́т там и у живого без налива, и у отменённого.
+     * Живость по факту МАТЕРИАЛИЗАЦИИ (docs/spec/order-lifecycle.json,
+     * {@code attachedBecomesActive}): доказательство одно — самостоятельная
+     * запись, найденная циклом добычи. Присутствие элемента в теле родителя
+     * живости не доказывает — он стои́т там и у живого без налива, и у
+     * отменённого.
+     *
+     * <p><b>Налив родителя доказательством не является.</b> Площадка ставит
+     * встроенную защиту только на терминале родителя с наливом; у живого
+     * родителя её нет и при частичном наливе, и прежний дизъюнкт по наливу
+     * срабатывал ровно там, где факт его опровергает. Защита живого
+     * частично налитого родителя остаётся {@code PENDING}, а её покрытие
+     * засчитывается отложенным (docs/rules/live-risk-protection.md;
+     * .claude/decisions/attached-protection-deferred-coverage.md). Цикл
+     * добычи на нетерминальном родителе не запускается, поэтому здесь
+     * исход — постановка по построению.
      */
     private AttachedProtectionResolution observedLiveness(AttachedProtectionFacts facts) {
-        if (isNull(facts.getObserved())) {
-            return AttachedProtectionResolution.of(AttachedAlgoOrder.Status.PENDING, null);
-        }
-        Boolean materialized = isTrue(facts.getStandaloneRecordFound())
-                || (nonNull(facts.getParentAccumulatedFillSize())
-                        && facts.getParentAccumulatedFillSize().signum() > 0);
+        boolean materialized = nonNull(facts.getObserved()) && isTrue(facts.getStandaloneRecordFound());
         return AttachedProtectionResolution.of(
-                isTrue(materialized) ? AttachedAlgoOrder.Status.ACTIVE : AttachedAlgoOrder.Status.PENDING, null);
+                materialized ? AttachedAlgoOrder.Status.ACTIVE : AttachedAlgoOrder.Status.PENDING, null);
     }
 
     /**
-     * Терминальный родитель: цикл добычи материализованной защиты прошёл.
+     * Терминальный родитель: цикл добычи материализованной защиты прошёл
+     * (docs/spec/order-lifecycle.json, {@code searchExhaustedOutcome}).
      * Предъявленная запись живёт (нога живых) либо несёт терминал по
-     * нашедшей её ноге разбора; пустой разбор даёт потерянное покрытие на
-     * живом непокрытом риске транша и неопределённый исход на прочих.
+     * нашедшей её ноге разбора; пустой разбор на терминале, впервые
+     * показанном этой добычей, — ожидание; на терминале, наблюдённом
+     * раньше, — потерянное покрытие на живом непокрытом риске транша и
+     * неопределённый исход на прочих.
+     *
+     * <p><b>Ожидание на первом наблюдении терминала.</b> Площадка ставит
+     * защиту НА терминале родителя, то есть после него, а цикл запускает та
+     * же добыча, что терминал впервые увидела: пустота на ней мерит задержку
+     * постановки, а не судьбу защиты. Защита не двигается и сигнала нет —
+     * она остаётся в постановке, её покрытие засчитывается, и вывод делает
+     * следующая добыча того же родителя. Найденная нога разбора и живая
+     * запись применяются и на первом наблюдении: запись есть факт, и гонки у
+     * неё нет (.claude/decisions/protection-lost-needs-prior-terminal.md).
+     *
+     * <p>Пустой операнд «терминал наблюдён раньше» ожиданием не читается:
+     * пустота не открывает ветви, которая снимает тревогу.
      */
     private AttachedProtectionResolution afterSearchCycle(AttachedProtectionFacts facts) {
         if (nonNull(facts.getHistoryLegFound())) {
@@ -275,6 +296,9 @@ public class AttachedAlgoOrderStateResolver {
         }
         if (isTrue(facts.getStandaloneRecordFound())) {
             return AttachedProtectionResolution.of(AttachedAlgoOrder.Status.ACTIVE, null);
+        }
+        if (isFalse(facts.getParentTerminalObservedBefore())) {
+            return AttachedProtectionResolution.waiting();
         }
         if (isTrue(coverageLost(facts.getTrancheExposure(), facts.getStandaloneProtectionExists(),
                 facts.getCancelIntentStanding()))) {

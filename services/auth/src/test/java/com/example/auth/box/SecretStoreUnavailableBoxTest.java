@@ -60,6 +60,32 @@ class SecretStoreUnavailableBoxTest extends AuthBox {
         assertThat(answer.body()).doesNotContain("Exception", "Connection refused");
     }
 
+    /**
+     * Пробы развёртывания хранилища не спрашивают: живость — только
+     * состояние процесса, готовность — процесс плюс база
+     * ({@code application.yaml}, {@code management.endpoint.health.group}).
+     * Дефект, который ловит клетка: группа, заглядывающая в хранилище,
+     * гасила бы под по кругу, пока оно запечатано
+     * ({@code .claude/skills/local-stand.md}).
+     *
+     * <p><b>Общий {@code /actuator/health} при этом обязан лечь</b> — это
+     * охрана от пустоты клетки: без неё зелёные группы не отличались бы от
+     * контекста, который мёртвого хранилища попросту не видит.
+     */
+    @Test
+    @DisplayName("Пробы живости и готовности не зависят от хранилища секретов")
+    void theProbesDoNotDependOnTheSecretStore() {
+        Answer overall = get("/actuator/health");
+        Answer liveness = get("/actuator/health/liveness");
+        Answer readiness = get("/actuator/health/readiness");
+
+        assertThat(overall.status()).as("хранилище мертво, и общее здоровье это видит").isEqualTo(503);
+        assertThat(liveness.status()).isEqualTo(200);
+        assertThat(liveness.body()).contains("UP");
+        assertThat(readiness.status()).isEqualTo(200);
+        assertThat(readiness.body()).contains("UP");
+    }
+
     private static String startAndStop() {
         VaultContainer<?> container = new VaultContainer<>(
                 DockerImageName.parse(AuthSubstrate.VAULT_IMAGE))

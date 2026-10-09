@@ -59,12 +59,22 @@ public interface StrategyAction {
     StrategyLevelSource levelSource();
 
     /**
-     * Роль объявления уровня: замещение с указанной целью переносит уже
-     * стоящий уровень, всякое иное объявление ставит его впервые
-     * (docs/spec/stop-distance.json, операнд {@code placementRole}).
+     * Роль объявления уровня: ЗАЩИТНОЕ замещение — условной заявки — с
+     * указанной целью переносит уже стоящий уровень, всякое иное объявление
+     * ставит его впервые (docs/spec/stop-distance.json, операнд
+     * {@code placementRole}; резолв — docs/spec/strategy-reference.json,
+     * величина {@code actionIsLevelTransfer}).
+     *
+     * <p><b>Вид действия — несущая часть резолва.</b> Перевыставление входа —
+     * тоже замещение с целью, но уровень оно ставит заново: встроенная
+     * защита новой ноги есть первичная постановка, и её сторону преконтроль
+     * обязан мерить. Без отбора по виду такая нога читалась бы переносом и
+     * проверки стороны не проходила вовсе.
      */
     default StrategyPlacementRole placementRole() {
-        return StrategyActionType.REPLACE_ACTION.equals(getActionType()) && isNotBlank(getTargetActionKey())
+        return this instanceof StrategyAlgoOrderAction
+                && StrategyActionType.REPLACE_ACTION.equals(getActionType())
+                && isNotBlank(getTargetActionKey())
                 ? StrategyPlacementRole.TRANSFER
                 : StrategyPlacementRole.PRIMARY;
     }

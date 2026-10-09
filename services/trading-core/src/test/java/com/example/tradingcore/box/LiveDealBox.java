@@ -214,8 +214,10 @@ abstract class LiveDealBox extends TradingCoreBox {
 
     /**
      * Живая сделка с ЧАСТИЧНО налитым входом: нога жива и налита
-     * половиной, эпизод позиции открыт её наливом, встроенная защита
-     * материализована — транш в отправленном входе, сделка активна.
+     * половиной, эпизод позиции открыт её наливом, встроенная защита в
+     * постановке — площадка ставит её на терминале ноги, а покрытие налитого
+     * засчитывается отложенным (docs/rules/live-risk-protection.md), — транш
+     * в отправленном входе, сделка активна.
      *
      * <p><b>Это предусловие «живая входная нога при ненулевой
      * экспозиции»</b> — вход клеток о порядке снятия риска: у налитого
@@ -244,7 +246,7 @@ abstract class LiveDealBox extends TradingCoreBox {
                 partiallyFilledEntry("CANCELED", filled));
         connector.answers(positionPath(ACCOUNT), livePositionOf(filled));
         passesUntil(() -> Objects.equals("PARTIALLY_COMPLETED", entryStatus())
-                && Objects.equals("ACTIVE", String.valueOf(protectionRow().get("status")))
+                && Objects.equals("PENDING", String.valueOf(protectionRow().get("status")))
                 && rows.count("positions") == 1L);
         assertThat(trancheStatus()).isEqualTo("ENTRY_SUBMITTED");
         assertThat(dealStatus()).isEqualTo("ACTIVE");
@@ -327,8 +329,8 @@ abstract class LiveDealBox extends TradingCoreBox {
      * затем подтверждённое площадкой размещение каждой.
      *
      * <p><b>Ноги заводятся разными проходами:</b> риск-создающий вход
-     * решается один на сделку за проход (docs/rules/risk-policy.md §«Живое
-     * меряется от живой экспозиции»). Проход, отправляющий первую ногу,
+     * решается один на сделку за проход (docs/components/CreateOrderActionExecutor.md
+     * §«Риск-создающий вход решается один на сделку за проход»). Проход, отправляющий первую ногу,
      * заводит вторую; следующий отправляет вторую и добывает первую — она
      * найдена живой.
      */

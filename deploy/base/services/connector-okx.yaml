@@ -84,15 +84,21 @@ spec:
               memory: 512Mi
             limits:
               memory: 1Gi
+          # Пробы смотрят на РАЗНЫЕ группы здоровья, и это несущее: общий
+          # /actuator/health включает хранилище секретов, и при запечатанном
+          # Vault проба живости ждала его дольше своего таймаута — kubelet
+          # гасил под по кругу вместо «не готов» (.claude/skills/local-stand.md).
+          # Обе группы — только состояние процесса; довод, почему Vault нет и
+          # в готовности, — services/connector-okx/src/main/resources/application.yaml.
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: http
             initialDelaySeconds: 60
             periodSeconds: 20

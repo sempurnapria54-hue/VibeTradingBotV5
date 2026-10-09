@@ -20,6 +20,7 @@
 | `upl` | string-decimal | unrealized PnL (по mark) |
 | `cTime` | string-ms | время создания |
 | `uTime` | string-ms | время обновления |
+| `mgnMode` | string | режим маржи записи (`isolated` / `cross`) → `marginMode`: отбор записи контура при живом чтении и различитель записей в счёт-широком срезе; ответ им не сверяется (`docs/models/mapping/Position.md`) |
 
 ### Не используется bot'ом (отбрасывается на маппинге)
 
@@ -49,7 +50,7 @@
   `baseBorrowed`, `quoteBorrowed`, `baseInterest`, `quoteInterest`.
 - **Прочее:** `posCcy`, `bizRefId`, `bizRefType`.
 - **Контур и режим:** `instType` (параметр запроса среза, в ответе не
-  читается), `mgnMode`, `posSide`, `lever` — не читаются и не сверяются:
+  читается), `posSide`, `lever` — не читаются и не сверяются:
   посылки, которые они выражают, меряет преконтроль перед действием, а не
   ответ чтения (`docs/models/mapping/Position.md`).
 

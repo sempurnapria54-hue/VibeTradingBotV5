@@ -1,5 +1,6 @@
 package com.example.connector.okx.snapshot;
 
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.position.Position;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -53,4 +54,12 @@ public class PositionExternalSnapshot {
 
     /** Время обновления на бирже (OKX uTime). */
     OffsetDateTime externalModifiedAt;
+
+    /**
+     * Режим маржи записи (OKX mgnMode), переведённый в доменное значение.
+     * Различает в счёт-широком срезе запись режима контура и запись иного
+     * режима; у чтения по инструменту повторяет режим контура — запись
+     * иного режима туда не попадает отбором.
+     */
+    Instrument.MarginMode marginMode;
 }

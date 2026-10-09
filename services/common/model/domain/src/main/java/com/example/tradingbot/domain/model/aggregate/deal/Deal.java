@@ -11,14 +11,18 @@ import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import com.example.tradingbot.domain.model.Auditable;
 import com.example.tradingbot.domain.model.aggregate.strategy.action.StrategyTradeDirection;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,6 +43,17 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class Deal extends Auditable {
+
+    /**
+     * Виды отдельной защиты, у которых уровень срабатывания ОБЪЯВЛЕН —
+     * фиксированный стоп (docs/spec/stop-exit-slippage.json, операнд
+     * {@code protections[].kind}, значение {@code STOP}). Трейлинг и тейк
+     * сюда не входят: у первого уровень в момент срабатывания не записан
+     * никем, у второго уровня остановки убытка нет вовсе.
+     */
+    private static final Set<AlgoOrder.ConditionType> FIXED_STOP_TYPES = EnumSet.of(
+            AlgoOrder.ConditionType.STOP_LOSS, AlgoOrder.ConditionType.PARTIAL_STOP_LOSS,
+            AlgoOrder.ConditionType.OCO_FULL);
 
     /** Внутренний идентификатор в БД. */
     private Long id;
@@ -640,6 +655,123 @@ public class Deal extends Auditable {
         return emptyIfNull(positions).stream()
                 .map(field)
                 .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * Проскок выхода сделки по стопу — деньги расчётной валюты, на которые
+     * исполнение сработавшего стопа хуже его уровня; неблагоприятный
+     * положителен, знак не обрезается (docs/spec/stop-exit-slippage.json,
+     * величина {@code stopExitSlippage}). Пусто — мера неприменима либо
+     * неизмерима, и нулём пустота не подменяется
+     * (docs/rules/absent-value-semantics.md).
+     *
+     * <p><b>Своего поля у величины нет</b>: её считает писатель
+     * терминального события по графу прохода, и операнды — граф сделки,
+     * которого у читателя нет (docs/components/MarkDealClosedExecutor.md).
+     *
+     * <p><b>Применимость — конъюнкция, и каждый конъюнкт несущий:</b> сделка
+     * закрыта стопом; торговый исход штатный и граф предъявлен целиком;
+     * эпизод один — средняя цена выхода у каждого своя; все транши, принявшие
+     * риск, закрыты стопом; ни один не сокращал позицию собственной
+     * reduce-only ногой — её исполнение лежит в той же средней цене, а
+     * причина транша его не выдаёт; хотя бы одна защита сработала, у каждой
+     * сработавшей уровень объявлен, и он один на всех; средняя цена выхода
+     * добыта; вышедшая экспозиция положительна.
+     *
+     * @param graphComplete граф сделки предъявлен целиком на момент терминала
+     */
+    public BigDecimal stopExitSlippage(Boolean graphComplete) {
+        if (isFalse(stopExitApplicable(graphComplete))) {
+            return null;
+        }
+        List<BigDecimal> firedLevels = firedStopLevels();
+        if (isEmpty(firedLevels) || firedLevels.stream().anyMatch(Objects::isNull)) {
+            return null;
+        }
+        BigDecimal level = firedLevels.getFirst();
+        if (firedLevels.stream().anyMatch(fired -> fired.compareTo(level) != 0)) {
+            return null;
+        }
+        BigDecimal exitPrice = positions.getFirst().getExternalCloseAveragePrice();
+        BigDecimal exposure = stopExitedExposure();
+        if (isNull(exitPrice) || isNull(exposure) || exposure.signum() <= 0) {
+            return null;
+        }
+        BigDecimal perUnit = StrategyTradeDirection.LONG.equals(direction)
+                ? level.subtract(exitPrice)
+                : exitPrice.subtract(level);
+        return perUnit.multiply(exposure);
+    }
+
+    /**
+     * Структурная половина применимости меры проскока
+     * ({@code stopExitMeasurable} без конъюнктов уровня, цены и
+     * экспозиции): причина, исход, граф, один эпизод, причины траншей,
+     * принявших риск, и отсутствие собственного выхода reduce-only ногой.
+     *
+     * <p>Транш без налива объём эпизода не двигал и меру не портит, какой бы
+     * ни была его причина. Пустое направление делает знак неизмеримым.
+     */
+    private Boolean stopExitApplicable(Boolean graphComplete) {
+        return Objects.equals(CloseReason.STOP_LOSS, closeReason)
+                && isTrue(graphComplete)
+                && Objects.equals(CloseOutcome.NORMAL_EXIT, closeOutcome)
+                && nonNull(direction)
+                && emptyIfNull(positions).size() == 1
+                && emptyIfNull(tranches).stream().noneMatch(tranche -> isTrue(tranche.hasEntryFill())
+                        && isFalse(Objects.equals(DealTranche.CloseReason.STOP_LOSS, tranche.getCloseReason())))
+                && emptyIfNull(tranches).stream().noneMatch(tranche -> nonNull(tranche.getReduceOnlyFilled())
+                        && tranche.getReduceOnlyFilled().signum() > 0);
+    }
+
+    /**
+     * Уровни срабатывания всех защит сделки, сработавших у площадки, — по
+     * всем траншам и обоим носителям; {@code null} в перечне — сработавшая
+     * защита без объявленного уровня (трейлинг, тейк): её исполнение лежит в
+     * той же средней цене выхода, а сравнить его не с чем.
+     *
+     * <p>Уровень встроенной защиты — объявленная цена срабатывания; у
+     * отдельной — уровень её условия, и только у фиксированного стопа: у
+     * трейлинга персистится последний НАБЛЮДЁННЫЙ уровень, и сравнение с ним
+     * занижало бы проскок.
+     */
+    private List<BigDecimal> firedStopLevels() {
+        List<BigDecimal> levels = new ArrayList<>();
+        for (DealTranche tranche : emptyIfNull(tranches)) {
+            emptyIfNull(tranche.getOrders()).stream()
+                    .flatMap(order -> emptyIfNull(order.getAttachedAlgoOrders()).stream())
+                    .filter(protection -> AttachedAlgoOrder.CloseReason.TRIGGERED.equals(protection.getCloseReason()))
+                    .forEach(protection -> levels.add(protection.getStopLossTriggerPrice()));
+            emptyIfNull(tranche.getAlgoOrders()).stream()
+                    .filter(algo -> AlgoOrder.CloseReason.TRIGGERED.equals(algo.getCloseReason()))
+                    .forEach(algo -> levels.add(FIXED_STOP_TYPES.contains(algo.getConditionType())
+                            ? algo.stopLevel()
+                            : null));
+        }
+        return levels;
+    }
+
+    /**
+     * Экспозиция, вышедшая по стопу, в единицах базового актива: налив
+     * входных ног, помноженный на стоимость контракта, под которую нога
+     * сайзилась (docs/spec/stop-exit-slippage.json, величина
+     * {@code exitedExposure}). Объёму, закрытому стопами, она равна только
+     * под применимостью меры. Налитая нога без стоимости контракта делает
+     * величину неизмеримой — пусто, а не недосчитанная сумма.
+     */
+    private BigDecimal stopExitedExposure() {
+        List<Order> filledEntryLegs = emptyIfNull(tranches).stream()
+                .flatMap(tranche -> emptyIfNull(tranche.getOrders()).stream())
+                .filter(order -> isTrue(order.isEntryLeg()))
+                .filter(order -> nonNull(order.getAccumulatedFillSize())
+                        && order.getAccumulatedFillSize().signum() > 0)
+                .collect(Collectors.toList());
+        if (filledEntryLegs.stream().anyMatch(order -> isNull(order.getPlannedContractValue()))) {
+            return null;
+        }
+        return filledEntryLegs.stream()
+                .map(order -> order.getAccumulatedFillSize().multiply(order.getPlannedContractValue()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

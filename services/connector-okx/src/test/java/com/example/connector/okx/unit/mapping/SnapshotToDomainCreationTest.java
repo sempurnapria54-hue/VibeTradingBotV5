@@ -17,6 +17,7 @@ import com.example.connector.okx.snapshot.OrderExternalSnapshot;
 import com.example.connector.okx.snapshot.PositionExternalSnapshot;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.balance.BalanceContainer;
+import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
@@ -260,6 +261,7 @@ class SnapshotToDomainCreationTest {
         assertThat(position.getExternalMargin()).isEqualByComparingTo("20");
         assertThat(position.getExternalUnrealizedProfit()).isEqualByComparingTo("5");
         assertThat(position.getExternalCreatedAt()).isEqualTo(OffsetDateTime.parse("2023-11-14T22:13:20Z"));
+        assertThat(position.getMarginMode()).isEqualTo(Instrument.MarginMode.ISOLATED);
         assertThat(position.getStatus()).isNull();
     }
 

@@ -198,12 +198,18 @@ public class MarkDealEmergencyClosedExecutor implements CommandExecutor {
      * терминальное ребро (docs/architecture/contracts.md §«У каждого
      * класса события назван писатель, и он же писатель решения»).
      * Писателей у класса два, потому что терминалов два.
+     *
+     * <p><b>Проскок выхода по стопу на этой тропе пуст всегда</b>: причина
+     * закрытия аварийная, и мера определена только у сделки, закрытой стопом
+     * (docs/components/MarkDealEmergencyClosedExecutor.md;
+     * docs/spec/stop-exit-slippage.json, {@code stopExitMeasurable}).
      */
     private void publishClosed(DealContext dealContext, Deal deal) {
         coreEventWriter.dealClosed(dealContext.getExchangeAccount().getTenantId(), deal,
                 dealContext.getExchangeAccount().getInternalId(),
                 dealContext.getInstrument().getInternalId(),
                 dealContext.strategyInternalId(),
-                dealContext.getGraphComplete());
+                dealContext.getGraphComplete(),
+                null);
     }
 }

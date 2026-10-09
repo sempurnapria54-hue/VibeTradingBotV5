@@ -23,10 +23,17 @@ import org.junit.jupiter.api.Test;
  * ненайденности — вторая ступень», §«Пустой разбор истории»; звенья
  * Z26-Z28).
  *
- * <p><b>Живость — по факту МАТЕРИАЛИЗАЦИИ:</b> налив родителя ЛИБО
- * предъявленная самостоятельная запись. Присутствие элемента в теле
- * родителя живости не доказывает — он стои́т там и у живого без налива, и
- * у отменённого.
+ * <p><b>Живость — по факту МАТЕРИАЛИЗАЦИИ:</b> доказательство одно —
+ * предъявленная самостоятельная запись. Налив родителя его не заменяет:
+ * площадка ставит встроенную защиту только на терминале родителя с наливом
+ * (.claude/decisions/attached-protection-deferred-coverage.md). Присутствие
+ * элемента в теле родителя живости не доказывает — он стои́т там и у
+ * живого без налива, и у отменённого.
+ *
+ * <p><b>Вторая ступень собирается на терминале, наблюдённом раньше</b>, —
+ * кроме клеток первого наблюдения: там пустой разбор даёт ожидание
+ * (.claude/decisions/protection-lost-needs-prior-terminal.md). Клетки
+ * первого наблюдения меток не несут — их назначает документ кейсов.
  *
  * <p><b>Базовая сборка:</b> та же, что у {@code U10}; кода отказа
  * постановки нет ни в одном кейсе группы.
@@ -39,12 +46,19 @@ class AttachedLivenessAndHistoryTest {
         return CalcFixture.decimal(value);
     }
 
-    /** Терминальный родитель с наливом — сборка второй ступени. */
+    /** Терминальный родитель с наливом, терминал наблюдён раньше — сборка второй ступени. */
     private static AttachedProtectionFacts.AttachedProtectionFactsBuilder afterSearchCycle() {
         return facts()
                 .observed(observed())
                 .parentStatus(Order.Status.COMPLETED)
-                .parentAccumulatedFillSize(fill("1"));
+                .parentAccumulatedFillSize(fill("1"))
+                .parentTerminalObservedBefore(true);
+    }
+
+    /** Та же сборка на добыче, впервые показавшей терминал родителя. */
+    private static AttachedProtectionFacts.AttachedProtectionFactsBuilder firstTerminalObservation() {
+        return afterSearchCycle()
+                .parentTerminalObservedBefore(false);
     }
 
     @Test
@@ -60,15 +74,17 @@ class AttachedLivenessAndHistoryTest {
     }
 
     @Test
-    @DisplayName("U11.2 — родитель жив с наливом, защита предъявлена: материализация идёт на налитый объём")
-    void u11_2_aFilledLiveParentMaterialisesTheProtection() {
+    @DisplayName("U11.2 — родитель жив с наливом, защита предъявлена: записи нет — защита в постановке")
+    void u11_2_aFilledLiveParentKeepsTheProtectionPending() {
         AttachedProtectionResolution resolution = resolver.resolve(facts()
                 .observed(observed())
                 .parentStatus(Order.Status.ACTIVE)
                 .parentAccumulatedFillSize(fill("1"))
                 .build());
 
-        assertThat(resolution.getStatus()).isEqualTo(AttachedAlgoOrder.Status.ACTIVE);
+        assertThat(resolution.getStatus())
+                .as("налив живого родителя активации не доказывает: площадка ставит защиту на его терминале")
+                .isEqualTo(AttachedAlgoOrder.Status.PENDING);
     }
 
     @Test
@@ -102,7 +118,7 @@ class AttachedLivenessAndHistoryTest {
 
     @Test
     @DisplayName("U11.5 — родитель не подтверждён с наливом: до терминала налив исхода не меняет")
-    void u11_5_anUnconfirmedParentWithAFillStillGivesLiveness() {
+    void u11_5_anUnconfirmedParentWithAFillKeepsTheProtectionPending() {
         AttachedProtectionResolution resolution = resolver.resolve(facts()
                 .observed(observed())
                 .parentStatus(Order.Status.CREATED)
@@ -110,8 +126,8 @@ class AttachedLivenessAndHistoryTest {
                 .build());
 
         assertThat(resolution.getStatus())
-                .as("живость даёт тот же предикат (Z26)")
-                .isEqualTo(AttachedAlgoOrder.Status.ACTIVE);
+                .as("живость даёт тот же предикат (Z26): записи нет — постановка")
+                .isEqualTo(AttachedAlgoOrder.Status.PENDING);
     }
 
     @Test
@@ -346,5 +362,75 @@ class AttachedLivenessAndHistoryTest {
                 .isEqualTo(AttachedAlgoOrder.Status.CANCELED);
         assertThat(resolution.getCloseReason())
                 .isEqualTo(AttachedAlgoOrder.CloseReason.PARENT_ORDER_CANCELED);
+    }
+
+    // --- первое наблюдение терминала родителя ------------------------------
+
+    @Test
+    @DisplayName("Терминал впервые увиден, живой записи и разбора нет, риск транша не покрыт: ожидание, а не потеря")
+    void aFirstTerminalObservationWithAnEmptyAnalysisWaits() {
+        AttachedProtectionResolution resolution = resolver.resolve(firstTerminalObservation()
+                .parentStatus(Order.Status.CANCELED)
+                .trancheExposure(fill("1"))
+                .standaloneProtectionExists(false)
+                .cancelIntentStanding(false)
+                .build());
+
+        assertThat(resolution.getStatus())
+                .as("пустота на первом наблюдении мерит задержку постановки, а не судьбу защиты")
+                .isNull();
+        assertThat(resolution.getCloseReason()).isNull();
+        assertThat(resolution.getOutcomeUndetermined())
+                .as("ожидание сигнала не требует — вывод делает следующая добыча")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("Терминал впервые увиден, экспозиции у транша нет, разбор пуст: ожидание, а не неопределённый исход")
+    void aFirstTerminalObservationWithoutExposureWaitsInsteadOfSignalling() {
+        AttachedProtectionResolution resolution = resolver.resolve(firstTerminalObservation()
+                .parentStatus(Order.Status.CANCELED)
+                .parentAccumulatedFillSize(fill(""))
+                .trancheExposure(fill("0"))
+                .standaloneProtectionExists(false)
+                .build());
+
+        assertThat(resolution.hasStatus()).isFalse();
+        assertThat(resolution.getOutcomeUndetermined()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Терминал впервые увиден, разбор нашёл срабатывание: факт применяется сразу")
+    void aFirstTerminalObservationAppliesAFoundHistoryLeg() {
+        AttachedProtectionResolution resolution = resolver.resolve(firstTerminalObservation()
+                .trancheExposure(fill("1"))
+                .standaloneProtectionExists(false)
+                .historyLegFound(ProtectionHistoryLeg.EFFECTIVE)
+                .build());
+
+        assertThat(resolution.getStatus()).isEqualTo(AttachedAlgoOrder.Status.COMPLETED);
+        assertThat(resolution.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.TRIGGERED);
+    }
+
+    @Test
+    @DisplayName("Терминал впервые увиден, живая запись найдена: защита активна сразу")
+    void aFirstTerminalObservationActivatesOnAFoundRecord() {
+        AttachedProtectionResolution resolution = resolver.resolve(firstTerminalObservation()
+                .standaloneRecordFound(true)
+                .build());
+
+        assertThat(resolution.getStatus()).isEqualTo(AttachedAlgoOrder.Status.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("Признак «терминал наблюдён раньше» пуст: ожидания нет — пустота тревогу не снимает")
+    void anEmptyPriorTerminalOperandDoesNotOpenTheWaitBranch() {
+        AttachedProtectionResolution resolution = resolver.resolve(afterSearchCycle()
+                .parentTerminalObservedBefore(null)
+                .trancheExposure(fill("1"))
+                .standaloneProtectionExists(false)
+                .build());
+
+        assertThat(resolution.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.PROTECTION_LOST);
     }
 }

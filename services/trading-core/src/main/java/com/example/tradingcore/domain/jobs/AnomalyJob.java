@@ -191,7 +191,7 @@ public class AnomalyJob {
             try {
                 Boolean dealExplains = explainedPairs.contains(instrument.getId());
                 detectUnexplainedPosition(account, instrument,
-                        first(scan.positionsOf(instrument.getExternalId())), dealExplains);
+                        first(scan.contourPositionsOf(instrument.getExternalId())), dealExplains);
                 accountingDetectors.detect(scan, account, instrument, accountHardRung, hardRungPairs,
                         dealExplains);
             } catch (RuntimeException e) {
@@ -227,6 +227,11 @@ public class AnomalyJob {
      * Первая запись среза по инструменту. Больше одной живой позиции
      * модель не допускает; расхождение — предмет своего детектора, и
      * здесь оно не гасится молча.
+     *
+     * <p>Восстановительная тропа берёт только записи режима маржи контура:
+     * сделка ведёт позицию своего режима и запись иного ни закрыть, ни
+     * защитить не может — её наблюдатель детектор позиции на инструменте
+     * контура (docs/components/AnomalyJob.md, запись позиции режима контура).
      */
     private Position first(List<Position> rows) {
         return isEmpty(rows) ? null : rows.getFirst();

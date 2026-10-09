@@ -17,7 +17,7 @@ Used-минимум для числа `resultProfit`: готовый net бер�
 |---|---|---|
 | `realizedPnl` | string-decimal | готовый net realized P&L = `pnl` + `fee` + `fundingFee` + `liqPenalty` (посчитан биржей) → `Position.externalRealizedProfit` → `Deal.resultProfit` |
 | `ccy` | string | валюта, в которой посчитан `realizedPnl` → `Position.externalResultCurrency`. В `Deal.resultProfitCurrency` **не переходит** — авторитет валюты результата — расчётная валюта инструмента, а это поле **проверяемый признак**; кто, когда и с чем его сравнивает — правило проверки валюты чисел записей закрытия (`docs/rules/pnl-reconciliation.md`) |
-| `closeAvgPx` | string-decimal | средняя цена фактического выхода → `Position.externalCloseAveragePrice`; потребитель — калибровка запаса на проскок на тропе attached-SL |
+| `closeAvgPx` | string-decimal | средняя цена фактического выхода → `Position.externalCloseAveragePrice`; потребитель — проскок выхода по стопу у обоих носителей защиты (`docs/spec/stop-exit-slippage.json`, `stopExitSlippage`) |
 | `pnl` | string-decimal | реализованный P&L **до** издержек → `Position.externalRealizedProfitGross`; потребитель — **первая пара** раздельной сверки разбивки по категориям |
 | `fee` | string-decimal | знаковая комиссионная компонента (минус — комиссия, плюс — ребейт; **сырой знак**) → `Position.externalFee`; потребитель — **вторая пара** раздельной сверки |
 | `fundingFee` | string-decimal | накопленный funding закрытой позиции → `Position.externalFundingCost`, **со снятием знака при маппинге**. Потребители — ценовой результат сделки, на котором стои́т счётчик серии убытков (`docs/rules/loss-streak-halt.md`), и **третья пара** сверки. `FUNDING`-строки `DealCashFlow` — **сверка** этого числа, не источник |

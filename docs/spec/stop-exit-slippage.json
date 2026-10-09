@@ -1,0 +1,467 @@
+{
+  "subject": "stop-exit-slippage",
+  "question": "Чему равен проскок выхода сделки по стопу — насколько исполнение сработавшего стопа хуже его уровня",
+  "home": "docs/rules/risk-policy.md",
+  "includes": ["protection-coverage", "order-lifecycle", "position-close-outcome"],
+
+  "operands": {
+    "deal.direction": "Deal.direction — LONG или SHORT: от него зависит, какая сторона уровня неблагоприятна",
+    "deal.closeReason": "Deal.closeReason — причина закрытия сделки; область значений домовая (docs/models/domain/aggregate/Deal.md), порядок старшинства — docs/spec/deal-lifecycle.json, величина dealCloseReasonBySeniority. Конъюнкт по ней держит меру ПОДМНОЖЕСТВОМ сделок, закрытых стопом: агрегат статистики считает обе популяции одним признаком, и выпавшие из меры видны разностью двух счётчиков (docs/rules/statistics-aggregates.md)",
+    "hadEntry": "вход сделки состоялся — по сделке были операции на бирже. Дом признака — docs/rules/deal-without-operations.md; значение берётся из дома-спеки: hadEntry = positionObserved (docs/spec/deal-context-load.json). Операнд подключённой формы closeOutcome",
+    "graphComplete": "граф сделки предъявлен контекстом прохода целиком; значение берётся из дома-спеки docs/spec/deal-context-load.json, величина graphComplete. Операнд подключённой формы closeOutcome: на неполном графе исход UNDETERMINED, и мера неприменима — сумма по траншам и защитам недогруженного графа вышла бы ложной молча",
+    "episodes[]": "эпизоды позиции сделки (Position); закрытые и живой",
+    "episodes[].closeRecordFetched": "запись закрытия этого эпизода добыта; значение берётся из дома-спеки: closeRecordFetched в docs/spec/deal-result.json. Операнд подключённой формы closeOutcome",
+    "episodes[].externalCloseType": "Position.externalCloseType — сырой тип закрытия источника; операнд подключённой формы closeOutcome (docs/spec/position-close-outcome.json)",
+    "episodes[].externalCloseAveragePrice": "Position.externalCloseAveragePrice — средняя цена фактического выхода эпизода по записи закрытия площадки. Неконтрактное поле: пустота достижима и на ДОБЫТОЙ записи (docs/models/domain/core/Position.md, раздел о персистентности), и тогда мера неизмерима — пусто, а не ноль",
+    "tranches[]": "транши сделки (DealTranche); у каждого свои заявки и защиты",
+    "tranches[].closeReason": "DealTranche.closeReason — причина закрытия транша; вне сворачивания читается по фактам транша (docs/lifecycles/DealTranche.md, раздел об инициаторе выхода транша), под сворачиванием — причина сделки",
+    "tranches[].orders[].positionReducingOnly": "Order.positionReducingOnly — намерение ноги; отбор входной ноги — величина isEntryOrder подключённой docs/spec/protection-coverage.json",
+    "tranches[].orders[].accumulatedFillSize": "Order.accumulatedFillSize в контрактах",
+    "tranches[].orders[].plannedContractValue": "Order.plannedContractValue — стоимость контракта, под которую нога сайзилась; write-once снимок ноги",
+    "tranches[].protections[].kind": "STOP — фиксированный уровень (встроенная защита и отдельная STOP_LOSS, PARTIAL_STOP_LOSS, OCO_FULL); TRAILING — трейлинг; TAKE_PROFIT — тейк. Тот же операнд, что у docs/spec/protection-coverage.json. У двусторонней пары OCO_FULL уровень остановки убытка есть, а какая нога исполнилась, площадка не говорит: такой транш из меры уводит его причина — штатный выход (docs/lifecycles/DealTranche.md, раздел об инициаторе выхода транша), то есть конъюнкт nonStopRiskTranches",
+    "tranches[].protections[].closeReason": "причина финализации защиты — AttachedAlgoOrder.closeReason у встроенной, AlgoOrder.closeReason у отдельной; TRIGGERED — защита сработала у площадки (docs/models/domain/core/Order.md, docs/models/domain/core/AlgoOrder.md)",
+    "tranches[].protections[].stopLevel": "объявленный уровень остановки убытка защиты: AttachedAlgoOrder.stopLossTriggerPrice у встроенной, уровень условия-триггера у отдельной. У трейлинга здесь лежит наблюдённый уровень, и мерой он не берётся (firedStopLevel)"
+  },
+
+  "values": [
+    {
+      "name": "firedStopLevel",
+      "note": "Уровень, с которым сравнивается исполнение сработавшей защиты: объявленный уровень фиксированного стопа и ТОЛЬКО он. Не совпадает с protectionStopLevel дома покрытия намеренно — там предмет «действующий уровень сейчас», здесь «уровень в момент срабатывания». У трейлинга в момент срабатывания уровень не записан никем: персистится последний НАБЛЮДЁННЫЙ, а между наблюдениями трейлинг уровень только подтягивает, — у LONG фактический уровень срабатывания не ниже наблюдённого, и сравнение с наблюдённым ЗАНИЖАЛО бы проскок, то есть ошибалось бы в благоприятную сторону. Тейк уровня остановки убытка не несёт. Обоим — пусто, и мера сделки с такой сработавшей защитой неизмерима.",
+      "expr": "if(kind == 'STOP', stopLevel, null)"
+    },
+    {
+      "name": "firedProtections",
+      "note": "Сколько защит сделки сработало у площадки — по всем траншам и обоим носителям.",
+      "op": "count",
+      "over": "tranches[].protections[]",
+      "where": "closeReason == 'TRIGGERED'"
+    },
+    {
+      "name": "firedLevelUnknown",
+      "note": "Среди сработавших есть защита без уровня срабатывания — трейлинг либо тейк. Исполнение такой защиты лежит в той же средней цене выхода эпизода, а уровня, с которым его сравнить, нет: мера всей сделки неизмерима, а не считается по оставшимся.",
+      "op": "any",
+      "over": "tranches[].protections[]",
+      "where": "closeReason == 'TRIGGERED'",
+      "of": "isNull(firedStopLevel)"
+    },
+    {
+      "name": "exitLevelLow",
+      "note": "Нижний из уровней сработавших стопов. Пара с exitLevelHigh: средняя цена выхода эпизода одна, и сравнить её можно только с ОДНИМ уровнем. Разноуровневая лестница стопов дала бы средний уровень, взвешенный объёмами срабатываний, а закрытый объём встроенной защиты площадка не отдаёт — меру такой сделки не считают, а не взвешивают по объявленным размерам.",
+      "op": "min",
+      "over": "tranches[].protections[]",
+      "where": "closeReason == 'TRIGGERED' && notNull(firedStopLevel)",
+      "of": "firedStopLevel"
+    },
+    {
+      "name": "exitLevelHigh",
+      "op": "max",
+      "over": "tranches[].protections[]",
+      "where": "closeReason == 'TRIGGERED' && notNull(firedStopLevel)",
+      "of": "firedStopLevel"
+    },
+    {
+      "name": "nonStopRiskTranches",
+      "note": "Транши, принявшие риск, чья ПРИЧИНА закрытия — не стоп: тейк, сработавшая двусторонняя пара OCO, штатный выход, чужое закрытие. Их выход исполнен в ту же среднюю цену эпизода, и сравнение её с уровнем стопа смешало бы проскок с ценой другого выхода. Транш без налива объём эпизода не двигал и меру не портит, какой бы ни была его причина. Конъюнкт читает ПРИЧИНУ и потому не видит выхода, который причину не определил: налитая собственная reduce-only нога у транша, добранного стопом, причиной не становится — сработавшая защита старше её в чтении инициатора выхода (docs/lifecycles/DealTranche.md), и транш получает STOP_LOSS. Такой выход отсекает reduceOnlyExitTranches, а не этот конъюнкт.",
+      "op": "count",
+      "over": "tranches",
+      "where": "trancheEntryFilled > 0 && closeReason != 'STOP_LOSS'"
+    },
+    {
+      "name": "reduceOnlyExitTranches",
+      "note": "Транши, сокращавшие позицию собственной налитой reduce-only ногой — частичный или полный выход стратегии, шаг сокращения. Исполнение такой ноги лежит в той же средней цене выхода эпизода, что и исполнение стопа, а объём её графу известен — но мера одной средней цены против одного уровня его не вычитает, и сделка неизмерима. Конъюнкт отдельный от nonStopRiskTranches потому, что ПРИЧИНА транша такой выход не выдаёт: сработавшая защита старше налитой reduce-only ноги в чтении инициатора выхода (docs/lifecycles/DealTranche.md, раздел об инициаторе выхода транша), и транш, частично вышедший ногой и добранный стопом, закрыт причиной STOP_LOSS. Без конъюнкта мера считалась бы по смешанной цене, а экспозиция — по всему наливу, и выход ногой по цене лучше уровня записывался бы благоприятным проскоком. Величина trancheReduceOnlyFilled — дом docs/spec/protection-coverage.json, подключённый сюда.",
+      "op": "count",
+      "over": "tranches",
+      "where": "trancheReduceOnlyFilled > 0"
+    },
+    {
+      "name": "exitedExposure",
+      "note": "Экспозиция, вышедшая по стопу, в единицах базового актива: налив входных ног, помноженный на стоимость контракта. Объёму, закрытому стопами, она равна только под применимостью меры — эпизод один, все принявшие риск транши закрыты стопом, ни один не сокращал позицию своей reduce-only ногой (reduceOnlyExitTranches); вне её величина объёма стопа не мерит, и мера пуста. Остаток, который граф не несёт: чужое частичное закрытие на площадке, после которого встроенная защита сработала раньше, чем проход наблюдал недостачу. Объём встроенной читается её размером, сверка экспозиции к следующему проходу сходится на нуле, и мера считается по налитому объёму и смешанной цене. Недостача, наблюдённая проходом ДО срабатывания, поднимает биржевую ступень сворачивания, и сделка уходит в аварийный терминал — тогда мера пуста по причине закрытия (docs/models/domain/aggregate/Deal.md, раздел о сверке экспозиции).",
+      "op": "sum",
+      "over": "tranches[].orders[]",
+      "where": "isEntryOrder && accumulatedFillSize > 0",
+      "of": "accumulatedFillSize * plannedContractValue"
+    },
+    {
+      "name": "exitAveragePrice",
+      "note": "Средняя цена фактического выхода. Берётся у эпизода; при числе эпизодов, отличном от одного, мера неприменима, и выбор среди нескольких не возникает.",
+      "op": "max",
+      "over": "episodes",
+      "where": "notNull(externalCloseAveragePrice)",
+      "of": "externalCloseAveragePrice"
+    },
+    {
+      "name": "stopExitMeasurable",
+      "note": "Мера применима и измерима. Конъюнкты: сделка закрыта стопом; исход штатный — ликвидация, принудительное сокращение и неустановленный исход стопом не являются, а неполный граф даёт неустановленный исход формой дома; эпизод один — средняя цена выхода у каждого своя, а отдельная защита к эпизоду не привязана; все принявшие риск транши вышли стопом; ни один транш не сокращал позицию собственной reduce-only ногой — её исполнение лежит в той же средней цене, а причина транша его не выдаёт; хотя бы одна защита сработала; уровень срабатывания известен у всех сработавших и один на всех; средняя цена выхода добыта; вышедшая экспозиция положительна — у восстановленной сделки входных ног нет, и ноль здесь был бы благоприятным умолчанием. Ложь — мера ПУСТА, а не ноль (docs/rules/absent-value-semantics.md).",
+      "expr": "deal.closeReason == 'STOP_LOSS' && closeOutcome == 'NORMAL_EXIT' && episodeCount == 1 && nonStopRiskTranches == 0 && reduceOnlyExitTranches == 0 && firedProtections > 0 && !firedLevelUnknown && exitLevelLow == exitLevelHigh && notNull(exitAveragePrice) && exitedExposure > 0"
+    },
+    {
+      "name": "stopExitSlippagePerUnit",
+      "note": "Проскок на единицу базового актива: уровень сработавшего стопа минус средняя цена выхода — у LONG; обратная разность — у SHORT. Неблагоприятный ПОЛОЖИТЕЛЕН, как издержка. Знак не клэмпится: исполнение лучше уровня даёт отрицательное число, и обрезка нулём сместила бы среднее в неблагоприятную сторону. В число входят полуспред, проскок исполнения и базис между ценой триггера и ценой сделок, когда триггер стоит на марк-цене: всё это определение риска не видит одинаково (docs/rules/risk-policy.md, раздел о том, что называется риском).",
+      "expr": "if(stopExitMeasurable, if(deal.direction == 'LONG', exitLevelLow - exitAveragePrice, exitAveragePrice - exitLevelLow), null)"
+    },
+    {
+      "name": "stopExitSlippage",
+      "note": "ПРОСКОК ВЫХОДА ПО СТОПУ — деньги расчётной валюты, на которые исполнение стопа хуже его уровня; неблагоприятный положителен. Своего поля у величины нет (docs/concept.md, П4): её считает писатель терминального события сделки по графу прохода и кладёт в содержимое DealClosed, а в долях R её сводит агрегат статистики (docs/rules/statistics-aggregates.md). Сумма R-мультипликаторов этой величины не заменяет: на сделке с перенесённым стопом ожидаемый итог на уровне не равен минус единице, а рядом в том же слагаемом лежат проскок входа и отклонение комиссии.",
+      "expr": "if(stopExitMeasurable, stopExitSlippagePerUnit * exitedExposure, null)"
+    }
+  ],
+
+  "examples": [
+    {
+      "case": "LONG, гэп через стоп: исполнение на 30 ниже уровня, проскок положителен",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2880 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": {
+        "firedProtections": 1,
+        "firedLevelUnknown": false,
+        "exitLevelLow": 2910,
+        "exitLevelHigh": 2910,
+        "nonStopRiskTranches": 0,
+        "exitedExposure": 10,
+        "exitAveragePrice": 2880,
+        "stopExitMeasurable": true,
+        "stopExitSlippagePerUnit": 30,
+        "stopExitSlippage": 300
+      }
+    },
+    {
+      "case": "SHORT: неблагоприятная сторона — выше уровня, и знак меряется от направления",
+      "state": {
+        "deal": { "direction": "SHORT", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 3096 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 3090 } ]
+          }
+        ]
+      },
+      "expect": { "stopExitMeasurable": true, "stopExitSlippagePerUnit": 6, "stopExitSlippage": 60 }
+    },
+    {
+      "case": "LONG, исполнение лучше уровня: проскок отрицателен и нулём не обрезается",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2912 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "stopExitSlippagePerUnit": -2, "stopExitSlippage": -20 }
+    },
+    {
+      "case": "стоп перенесён в безубыток отдельной защитой: мера меряет исполнение против СРАБОТАВШЕГО уровня, а снятая встроенная в сравнение не входит",
+      "note": "На этих числах слагаемое суммы R-мультипликаторов близко к нулю — превышения риска нет, а проскок есть: 8 на единицу. Ровно поэтому сумма R меру не заменяет.",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2995 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [
+              { "kind": "STOP", "closeReason": "SWITCHED_BY_STRATEGY", "stopLevel": 2910 },
+              { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 3003 }
+            ]
+          }
+        ]
+      },
+      "expect": { "firedProtections": 1, "exitLevelLow": 3003, "stopExitMeasurable": true, "stopExitSlippage": 80 }
+    },
+    {
+      "case": "два транша со стопами на одном уровне: мера считается, экспозиция — сумма наливов",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2905 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 60, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          },
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 40, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "firedProtections": 2, "exitedExposure": 10, "stopExitMeasurable": true, "stopExitSlippage": 50 }
+    },
+    {
+      "case": "транш без налива, закрытый истечением входа, меру не портит",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2905 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          },
+          {
+            "closeReason": "ENTRY_CONDITION_EXPIRED",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 0, "plannedContractValue": 0.1 } ],
+            "protections": []
+          }
+        ]
+      },
+      "expect": { "nonStopRiskTranches": 0, "stopExitMeasurable": true, "stopExitSlippage": 50 }
+    },
+    {
+      "case": "лестница стопов на разных уровнях: средний уровень не взвешивается, мера пуста",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2895 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 60, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          },
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 40, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2900 } ]
+          }
+        ]
+      },
+      "expect": { "exitLevelLow": 2900, "exitLevelHigh": 2910, "stopExitMeasurable": false, "stopExitSlippagePerUnit": null, "stopExitSlippage": null }
+    },
+    {
+      "case": "сработал трейлинг: наблюдённый уровень мерой не берётся, мера пуста",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2945 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "TRAILING", "closeReason": "TRIGGERED", "stopLevel": 2950 } ]
+          }
+        ]
+      },
+      "expect": { "firedProtections": 1, "firedLevelUnknown": true, "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "соседний налитой транш закрыла двусторонняя пара OCO: какая нога исполнилась, неизвестно, средняя цена выхода смешана — мера пуста",
+      "note": "Причина сделки — STOP_LOSS: адверсный выход старше планового (docs/lifecycles/Deal.md). Пара несёт уровень остановки убытка, равный уровню соседнего стопа, и считается фиксированным стопом: сработавших две, уровень известен у обеих и один, reduce-only ног нет. Отказывает только конъюнкт причин траншей — пара читается штатным выходом (docs/lifecycles/DealTranche.md), и на этих числах исполнилась её тейк-нога.",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2980 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 60, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          },
+          {
+            "closeReason": "STRATEGY_EXIT",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 40, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "nonStopRiskTranches": 1, "reduceOnlyExitTranches": 0, "firedProtections": 2, "firedLevelUnknown": false, "exitLevelLow": 2910, "exitLevelHigh": 2910, "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "LONG: частичный выход reduce-only ногой выше уровня, остаток добрал стоп — транш закрыт стопом по старшинству носителей, мера пуста",
+      "note": "Вход 100 контрактов по 0.1; нога выхода 40 налита по 3100; стоп 2910 закрыл 60 по 2900 — истинный проскок на единицу +10, неблагоприятный. Средняя выхода эпизода (40·3100 + 60·2900) / 100 = 2980. Сработавшая защита старше налитой reduce-only ноги, и причина транша — STOP_LOSS: конъюнкт причин траншей молчит. Без конъюнкта reduce-only ног мера дала бы (2910 − 2980) · 10 = −700 — неблагоприятный проскок записан крупным благоприятным, и запас на проскок занизился бы.",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2980 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [
+              { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 },
+              { "positionReducingOnly": true, "accumulatedFillSize": 40, "plannedContractValue": 0.1 }
+            ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "nonStopRiskTranches": 0, "reduceOnlyExitTranches": 1, "firedLevelUnknown": false, "exitedExposure": 10, "stopExitMeasurable": false, "stopExitSlippagePerUnit": null, "stopExitSlippage": null }
+    },
+    {
+      "case": "плановый выход уровня сделки рыночным закрытием: стопа не было, мера пуста",
+      "note": "Проскок рыночного выхода против цены решения — другой предмет: цена решения не персистится, и мера его не меряет (развилка — .claude/decisions/stop-exit-slippage-measure.md).",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STRATEGY_EXIT" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2990 } ],
+        "tranches": [
+          {
+            "closeReason": "STRATEGY_EXIT",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "CANCELED_BY_STRATEGY", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "firedProtections": 0, "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "причина сделки не стоп, хотя налитой транш вышел стопом: мера следует причине сделки",
+      "note": "Неналивший транш закрыт контролем риска, и причина сделки по старшинству — RISK_CONTROL. Мера держится подмножеством сделок, закрытых стопом, ради парного счётчика агрегата; цена названа в доме меры.",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "RISK_CONTROL" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2905 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          },
+          {
+            "closeReason": "RISK_CONTROL",
+            "orders": [],
+            "protections": []
+          }
+        ]
+      },
+      "expect": { "nonStopRiskTranches": 0, "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "причина сделки — стоп, а сработавшей защиты в графе нет: сравнивать не с чем, мера пуста",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2905 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "UNKNOWN", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "firedProtections": 0, "firedLevelUnknown": false, "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "ликвидация: исход не штатный, мера пуста",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "3", "externalCloseAveragePrice": 2850 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "closeOutcome": "LIQUIDATION", "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "граф на момент терминала неполон: исход не установлен формой дома, мера пуста",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": false,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2880 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "closeOutcome": "UNDETERMINED", "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "два эпизода: средняя цена выхода у каждого своя, отдельную защиту к эпизоду не привязать — мера пуста",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [
+          { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2905 },
+          { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2900 }
+        ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "closeOutcome": "NORMAL_EXIT", "episodeCount": 2, "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "запись закрытия добыта, а средней цены выхода в ней нет: мера пуста, а не ноль",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": null } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [ { "positionReducingOnly": false, "accumulatedFillSize": 100, "plannedContractValue": 0.1 } ],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "exitAveragePrice": null, "stopExitMeasurable": false, "stopExitSlippage": null }
+    },
+    {
+      "case": "восстановленная сделка: входных ног нет, вышедшая экспозиция ноль — нулём мера не становится",
+      "state": {
+        "deal": { "direction": "LONG", "closeReason": "STOP_LOSS" },
+        "hadEntry": true,
+        "graphComplete": true,
+        "episodes": [ { "closeRecordFetched": true, "externalCloseType": "2", "externalCloseAveragePrice": 2905 } ],
+        "tranches": [
+          {
+            "closeReason": "STOP_LOSS",
+            "orders": [],
+            "protections": [ { "kind": "STOP", "closeReason": "TRIGGERED", "stopLevel": 2910 } ]
+          }
+        ]
+      },
+      "expect": { "exitedExposure": 0, "stopExitMeasurable": false, "stopExitSlippage": null }
+    }
+  ]
+}

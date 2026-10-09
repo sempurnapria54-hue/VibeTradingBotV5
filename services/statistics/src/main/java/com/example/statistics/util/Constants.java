@@ -300,6 +300,12 @@ public class Constants {
         /** Доступность базы риска. */
         public static final String RISK_BENCHMARK_AVAILABILITY = "riskBenchmarkAvailability";
 
+        /** Причина закрытия сделки: по ней отбирается популяция выхода по стопу. */
+        public static final String CLOSE_REASON = "closeReason";
+
+        /** Проскок выхода сделки по стопу — деньги расчётной валюты. */
+        public static final String STOP_EXIT_SLIPPAGE = "stopExitSlippage";
+
         /** Жёсткость поднятой ступени защиты. */
         public static final String RUNG = "rung";
 

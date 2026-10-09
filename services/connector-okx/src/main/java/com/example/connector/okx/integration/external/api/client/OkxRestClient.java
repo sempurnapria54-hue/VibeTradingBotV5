@@ -334,13 +334,18 @@ public class OkxRestClient {
      * История закрытых позиций инструмента. Окно снизу — по времени
      * обновления записи ({@code before}); сверху не задаётся. Фильтр по
      * идентификатору позиции не ставится: источник его переиспользует и
-     * выборку им не сужает. Приватный endpoint (подпись).
+     * выборку им не сужает. Выборка сужается режимом маржи контура
+     * ({@code mgnMode=isolated}): закрытый эпизод кросс-позиции того же
+     * инструмента — чужая позиция, и нашим эпизодом он не материализуется
+     * (docs/models/mapping/Position.md §«Invariant checks (общая идея)»). Приватный
+     * endpoint (подпись).
      */
     public OkxApiResponse<PositionsHistoryOkxResponse> getPositionsHistory(ExchangeCredentials credentials,
                                                                            String instId, String beforeMillis) {
         Map<String, Object> query = new LinkedHashMap<>();
         query.put(OkxConstants.PARAM_INST_TYPE, OkxConstants.INST_TYPE_SWAP);
         query.put(OkxConstants.PARAM_INST_ID, instId);
+        query.put(OkxConstants.PARAM_MGN_MODE, OkxConstants.TD_MODE_ISOLATED);
         query.put(OkxConstants.PARAM_BEFORE, beforeMillis);
         query.put(OkxConstants.PARAM_LIMIT, OkxConstants.POSITIONS_HISTORY_PAGE_LIMIT);
         return dispatch(HttpMethod.GET, OkxConstants.ACCOUNT_POSITIONS_HISTORY_PATH, query, null, credentials,

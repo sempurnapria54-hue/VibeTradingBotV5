@@ -77,6 +77,20 @@ import java.math.BigDecimal;
  *                                  издержкой положительный
  * @param plannedRisk               плановый риск сделки — знаменатель
  *                                  отношения к риску
+ * @param stopExitSlippage          проскок выхода сделки по стопу — деньги
+ *                                  расчётной валюты, на которые исполнение
+ *                                  сработавшего стопа хуже его уровня;
+ *                                  неблагоприятный положителен, знак не
+ *                                  нормализуется. Форма и применимость —
+ *                                  docs/spec/stop-exit-slippage.json, величина
+ *                                  {@code stopExitSlippage}; складывает её
+ *                                  писатель терминала, потому что операнды —
+ *                                  граф сделки, а у читателя их нет. Пусто —
+ *                                  мера неприменима либо неизмерима (сделка
+ *                                  закрыта не стопом, аварийный терминал,
+ *                                  трейлинг, лестница стопов, несколько
+ *                                  эпизодов, недобытая средняя цена выхода);
+ *                                  нулём пустота не читается
  * @param closeOutcome              торговый исход закрытия — имя значения
  *                                  {@code Deal.CloseOutcome}
  * @param reconciliationStatus      состояние сверки итога с разбивкой —
@@ -101,6 +115,7 @@ public record DealClosedMessage(String dealInternalId,
                                 BigDecimal funding,
                                 BigDecimal liquidationPenalty,
                                 BigDecimal plannedRisk,
+                                BigDecimal stopExitSlippage,
                                 String closeOutcome,
                                 String reconciliationStatus,
                                 String breakdownIncomplete,

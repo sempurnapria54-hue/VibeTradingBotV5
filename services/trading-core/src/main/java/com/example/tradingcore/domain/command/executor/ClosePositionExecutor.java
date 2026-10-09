@@ -72,10 +72,13 @@ public class ClosePositionExecutor implements CommandExecutor {
             // этом месте был бы отказом на штатной тропе повтора закрытия.
             return ServiceCommandExecutionResult.ok();
         }
+        // Позиция сделки — режима маржи контура: пустой режим закрытия и есть
+        // режим контура (docs/components/IntegrationService.md).
         ExchangeAck ack = exchangeOperationsClient.closePosition(
                 dealContext.getExchangeAccount().getInternalId(),
                 dealContext.getInstrument().getExternalId(),
-                dealContext.getInstrument().getExternalSettlementCurrency());
+                dealContext.getInstrument().getExternalSettlementCurrency(),
+                null);
         if (isFalse(ack.getSuccess())) {
             return ServiceCommandExecutionResult.failure(RuntimeErrorCode.VALIDATION_ERROR, ack.getMessage());
         }

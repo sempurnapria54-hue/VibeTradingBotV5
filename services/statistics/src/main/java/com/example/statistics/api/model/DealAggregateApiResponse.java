@@ -150,6 +150,20 @@ public class DealAggregateApiResponse {
     @Schema(description = "Сумма R-мультипликаторов сделок: частное сумм средним R не является")
     private final BigDecimal rSum;
 
+    @Schema(description = "Из вошедших в отношение к риску — закрытые стопом. Пара к stopExitSlippageDeals: "
+            + "разность двух счётчиков — закрытые стопом с неизмеримым проскоком; аварийный терминал "
+            + "сюда не входит")
+    private final Integer stopExitDeals;
+
+    @Schema(description = "Из закрытых стопом — с измеренным проскоком выхода: знаменатель среднего "
+            + "проскока в долях R")
+    private final Integer stopExitSlippageDeals;
+
+    @Schema(description = "Сумма проскока выхода по стопу в долях планового риска сделки; средний "
+            + "проскок есть stopExitSlippageRSum / stopExitSlippageDeals. Знак не нормализуется: "
+            + "исполнение лучше уровня входит отрицательным слагаемым")
+    private final BigDecimal stopExitSlippageRSum;
+
     @Schema(description = "Момент сборки строки: им читатель видит лаг проекции, "
             + "потому что строка пересчитывается джобой, а не двигается событием")
     private final OffsetDateTime assembledAt;

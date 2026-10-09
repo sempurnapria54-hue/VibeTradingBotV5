@@ -83,4 +83,10 @@ public interface DealGrainRow {
     BigDecimal getPlannedRiskExcludedSum();
 
     BigDecimal getRSum();
+
+    Integer getStopExitDeals();
+
+    Integer getStopExitSlippageDeals();
+
+    BigDecimal getStopExitSlippageRSum();
 }

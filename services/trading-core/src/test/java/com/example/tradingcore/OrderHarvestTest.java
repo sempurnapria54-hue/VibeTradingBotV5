@@ -358,6 +358,61 @@ class OrderHarvestTest {
     }
 
     /**
+     * Терминал родителя впервые показала ЭТА добыча — нога снята после
+     * частичного налива, — а живой записи защиты и записи в истории нет.
+     * Площадка ставит защиту на терминале, то есть после него: пустота на
+     * первом наблюдении мерит задержку постановки. Защита остаётся в
+     * постановке, сигнала нет; разбор истории при этом идёт — найденная нога
+     * применялась бы сразу (.claude/decisions/protection-lost-needs-prior-terminal.md).
+     */
+    @Test
+    void anEmptyAnalysisOnTheFirstObservedTerminalWaitsInsteadOfLosingTheProtection() {
+        Order order = order(Order.Status.PARTIALLY_COMPLETED, null);
+        AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.PENDING);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        order.setAccumulatedFillSize(new BigDecimal("1"));
+        Deal deal = dealWithLiveExposure(order);
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.CANCELED, "1"));
+        when(exchange.getPendingMaterializedProtections(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+        when(exchange.getMaterializedProtectionHistory(any(), any(), any())).thenReturn(List.of());
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELED);
+        assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.PENDING);
+        assertThat(attached.getCloseReason()).isNull();
+        assertThat(result.getHoldSignals()).isEmpty();
+        verify(exchange).getMaterializedProtectionHistory(ACCOUNT, INSTRUMENT, ProtectionHistoryLeg.EFFECTIVE);
+    }
+
+    /**
+     * Живой частично налитый родитель: защита предъявлена в его теле, но
+     * площадка ставит её только на терминале — активации нет, защита в
+     * постановке, и цикл добычи не запускается. Налив активации не доказывает
+     * (docs/spec/order-lifecycle.json, {@code attachedBecomesActive}).
+     */
+    @Test
+    void aPartiallyFilledLiveParentKeepsItsProtectionPending() {
+        Order order = order(Order.Status.ACTIVE, null);
+        AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.PENDING);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        Deal deal = dealWithLiveExposure(order);
+        givenSaves();
+        Order fetched = fetchedOrder(Order.Status.PARTIALLY_COMPLETED, "0.5");
+        fetched.setAttachedAlgoOrders(List.of(protection(null)));
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID)).thenReturn(fetched);
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(order.getStatus()).isEqualTo(Order.Status.PARTIALLY_COMPLETED);
+        assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.PENDING);
+        assertThat(result.getHoldSignals()).isEmpty();
+        verify(exchange, never()).getPendingMaterializedProtections(any(), any());
+    }
+
+    /**
      * Защита, сработавшая у площадки, из живых уходит так же, как пропавшая,
      * а экспозиция транша до наблюдения срабатывания стоит налитой. Разбор
      * идёт и на этой ветви: сработавший стоп закрыл риск, и потерянным
@@ -635,10 +690,15 @@ class OrderHarvestTest {
      * (docs/spec/order-lifecycle.json, attachedParentClass): налив не добыт —
      * поиск, пустой разбор истории — защита стоит, а звено затребует мягкую
      * ступень инструмента.
+     *
+     * <p>Нежилость ноги показала уже прежняя добыча — терминал наблюдён
+     * раньше, и пустой разбор ожиданием не читается
+     * (docs/spec/order-lifecycle.json, операнд {@code parentTerminalObservedBefore}).
      */
     @Test
     void anErrorParentNotFoundWithAnUnknownFillLeavesTheProtectionFateUnknown() {
         Order order = order(Order.Status.ERROR, Order.CloseReason.MISSING_AFTER_REFRESH);
+        order.setExternalLive(Boolean.FALSE);
         AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.ACTIVE);
         order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
         Deal deal = dealWith(order);

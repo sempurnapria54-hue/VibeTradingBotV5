@@ -25,6 +25,7 @@ import com.example.tradingbot.domain.model.core.algo_order.Trigger;
 import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
+import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
 import com.example.tradingbot.domain.model.core.position.Position;
 import com.example.tradingbot.domain.model.core.tenant.Tenant;
@@ -169,6 +170,14 @@ class CoreEventFormTest {
     private static final String HARD_RUNG_ON_THE_WIRE = "HARD";
     private static final String CRITICAL_SEVERITY_ON_THE_WIRE = "CRITICAL";
 
+    /**
+     * Причина закрытия стопом — слово, по которому агрегат статистики
+     * отбирает сделки, закрытые стопом, в пару счётчиков проскока
+     * (docs/rules/statistics-aggregates.md): потребитель ветвится по нему, и
+     * пин — словом, тем же правилом, что у двух слов выше.
+     */
+    private static final String STOP_LOSS_CLOSE_REASON_ON_THE_WIRE = "STOP_LOSS";
+
     private final OutboxDataService outboxDataService = mock(OutboxDataService.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final CoreEventWriter coreEventWriter = new CoreEventWriter(outboxDataService, objectMapper, EVENT_MESSAGES);
@@ -240,6 +249,26 @@ class CoreEventFormTest {
     }
 
     /**
+     * Сделка, закрытая стопом, везёт проскок выхода по стопу, посчитанный
+     * писателем терминала по графу прохода, и причину закрытия словом, по
+     * которому статистика ветвится (docs/spec/stop-exit-slippage.json).
+     */
+    @Test
+    @DisplayName("Терминал сделки, закрытой стопом, несёт проскок выхода и причину словом провода")
+    void theStopClosedTerminalCarriesTheStopExitSlippage() throws Exception {
+        Deal deal = stopClosedDeal();
+        DealContext context = context(deal, true, definition());
+
+        closedExecutor().execute(terminalCommand(), anchor(), context);
+
+        JsonNode content = contentOfWrittenRow(CoreEventType.DEAL_CLOSED);
+        assertThat(content.path("closeReason").textValue()).isEqualTo(STOP_LOSS_CLOSE_REASON_ON_THE_WIRE);
+        assertThat(content.path("stopExitSlippage").decimalValue())
+                .as("уровень 2910, выход 2880, 100 контрактов по 0.1: неблагоприятный проскок положителен")
+                .isEqualByComparingTo("300");
+    }
+
+    /**
      * Пустая величина едет ПУСТОЙ, а не текстом.
      *
      * <p>Проба о том, чего в содержимом нет: {@code String.valueOf} пустого
@@ -265,6 +294,9 @@ class CoreEventFormTest {
                 .isTrue();
         assertThat(content.path("plannedRisk").textValue()).isNotEqualTo("null");
         assertThat(content.path("strategyInternalId").textValue()).isNotEqualTo("null");
+        assertThat(content.path("stopExitSlippage").isNull())
+                .as("сделка закрыта не стопом — мера неприменима, и пустота нулём не читается")
+                .isTrue();
     }
 
     /**
@@ -749,6 +781,39 @@ class CoreEventFormTest {
         deal.setRiskBenchmarkAvailability(Deal.RiskBenchmarkAvailability.AVAILABLE);
         deal.setTranches(List.of(terminalTranche()));
         deal.setPositions(List.of(closedEpisode()));
+        return deal;
+    }
+
+    /**
+     * Вошедшая сделка, закрытая стопом: налитая входная нога транша, её
+     * встроенная защита сработала на уровне 2910 и закрыла налитое, эпизод
+     * закрыт по средней цене 2880. Налив и закрытое защитой стоят на транше
+     * так, как их выводит сборка графа.
+     */
+    private static Deal stopClosedDeal() {
+        AttachedAlgoOrder protection = new AttachedAlgoOrder();
+        protection.setStatus(AttachedAlgoOrder.Status.COMPLETED);
+        protection.setCloseReason(AttachedAlgoOrder.CloseReason.TRIGGERED);
+        protection.setSize(new BigDecimal("100"));
+        protection.setStopLossTriggerPrice(new BigDecimal("2910"));
+        Order entry = new Order();
+        entry.setStatus(Order.Status.COMPLETED);
+        entry.setPositionReducingOnly(false);
+        entry.setAccumulatedFillSize(new BigDecimal("100"));
+        entry.setPlannedContractValue(new BigDecimal("0.1"));
+        entry.setAttachedAlgoOrders(new ArrayList<>(List.of(protection)));
+        DealTranche tranche = terminalTranche();
+        tranche.setCloseReason(DealTranche.CloseReason.STOP_LOSS);
+        tranche.setOrders(new ArrayList<>(List.of(entry)));
+        tranche.setEntryFilled(new BigDecimal("100"));
+        tranche.setProtectionClosed(new BigDecimal("100"));
+        Position episode = closedEpisode();
+        episode.setExternalCloseType("2");
+        episode.setExternalCloseAveragePrice(new BigDecimal("2880"));
+        Deal deal = enteredDeal();
+        deal.setDirection(StrategyTradeDirection.LONG);
+        deal.setTranches(List.of(tranche));
+        deal.setPositions(List.of(episode));
         return deal;
     }
 

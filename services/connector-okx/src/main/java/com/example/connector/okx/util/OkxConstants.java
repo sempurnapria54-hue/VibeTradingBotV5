@@ -143,6 +143,12 @@ public class OkxConstants {
     /** Имя query-параметра tdMode (режим маржи). */
     public static final String PARAM_TD_MODE = "tdMode";
 
+    /**
+     * Имя query-параметра mgnMode (режим маржи записи позиции): сужает
+     * историю закрытых позиций режимом контура.
+     */
+    public static final String PARAM_MGN_MODE = "mgnMode";
+
     /** Имя query-параметра instFamily (семья инструмента). */
     public static final String PARAM_INST_FAMILY = "instFamily";
 
@@ -247,8 +253,20 @@ public class OkxConstants {
     /** Терминальное состояние условной заявки: сработала, заявка не исполнилась. */
     public static final String ALGO_STATE_ORDER_FAILED = "order_failed";
 
-    /** Adapter-константа режима маржи. */
+    /**
+     * Adapter-константа режима маржи: режим контура. То же слово площадка
+     * отдаёт в {@code mgnMode} записи позиции — по нему живое чтение
+     * отбирает запись контура (docs/models/mapping/Position.md).
+     */
     public static final String TD_MODE_ISOLATED = "isolated";
+
+    /**
+     * Режим маржи OKX: кросс. Наш писатель им заявок не ставит; слово
+     * приходит в {@code mgnMode} чужой записи позиции и уходит в тело
+     * закрытия, когда снятие риска вне графа сделок закрывает такую запись
+     * её собственным режимом (docs/models/mapping/Position.md).
+     */
+    public static final String MGN_MODE_CROSS = "cross";
 
     /** Adapter-константа стороны позиции (net-режим). */
     public static final String POS_SIDE_NET = "net";

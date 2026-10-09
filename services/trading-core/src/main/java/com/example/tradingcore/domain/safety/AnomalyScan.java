@@ -1,7 +1,10 @@
 package com.example.tradingcore.domain.safety;
 
+import static com.example.tradingcore.util.PositionMarginMode.isForeign;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
 import static org.apache.commons.collections4.MapUtils.emptyIfNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
 import com.example.tradingbot.domain.model.core.order.Order;
@@ -37,6 +40,16 @@ import lombok.Value;
  * схлопывание списка в первую запись погасило бы его признак раньше, чем
  * он его увидит.
  *
+ * <p><b>Запись позиции читается нашей только в режиме маржи контура.</b>
+ * Площадка держит изолированную и кросс-позицию одного инструмента рядом,
+ * отдельными записями, и различает их только режим записи. Популяции,
+ * читающие позицию как нашу (восстановительная тропа, хвосты заявок, счёт
+ * кардинальности), берут записи режима контура; запись иного режима —
+ * сущность, которую система не создавала, и её наблюдатель — детектор
+ * позиции на инструменте контура (docs/components/AnomalyJob.md, разбор
+ * {@code A3}). Признак «живые сущности по инструменту» видит обе: это риск
+ * на счёте.
+ *
  * <p>Живёт только в памяти прохода — читателя за сериализацией нет.
  */
 @Value
@@ -57,6 +70,20 @@ public class AnomalyScan {
 
     public List<Position> positionsOf(String externalInstrumentId) {
         return List.copyOf(emptyIfNull(emptyIfNull(positions).get(externalInstrumentId)));
+    }
+
+    /** Живые позиции режима маржи контура по биржевому имени — те, что читаются нашими. */
+    public List<Position> contourPositionsOf(String externalInstrumentId) {
+        return positionsOf(externalInstrumentId).stream()
+                .filter(position -> isFalse(isForeign(position)))
+                .toList();
+    }
+
+    /** Живые позиции иного режима маржи по биржевому имени — их открыла не наша заявка. */
+    public List<Position> foreignMarginModePositionsOf(String externalInstrumentId) {
+        return positionsOf(externalInstrumentId).stream()
+                .filter(position -> isTrue(isForeign(position)))
+                .toList();
     }
 
     public List<Order> ordersOf(String externalInstrumentId) {

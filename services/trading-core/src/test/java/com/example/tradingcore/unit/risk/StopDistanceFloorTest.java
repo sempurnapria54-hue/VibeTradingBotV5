@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
  * Пол дистанции стопа — группа {@code U7} документа
  * `.claude/tests/cases/trading-core-risk.md` (дом —
  * docs/spec/risk-at-stop.json, величина {@code stopDistanceFloor};
- * правило — docs/rules/risk-policy.md §«Пол дистанции стопа»).
+ * правило — docs/rules/stop-level.md §«Пол дистанции стопа»).
  *
  * <p><b>Базовая сборка</b> — U1.1: направление длинное, ставка
  * резолвится. Пол round-trip комиссии при якоре 3000 и уровне 2999

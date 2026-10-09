@@ -111,9 +111,10 @@ final class Bodies {
             case "DEAL_CLOSED" -> """
                     {"dealInternalId": "D-%1$s", "exchangeAccountInternalId": "EA-%1$s",
                      "instrumentInternalId": "I-%1$s", "strategyInternalId": "S-%1$s",
-                     "status": "CLOSED", "closeReason": "TAKE_PROFIT", "tookRisk": true,
+                     "status": "CLOSED", "closeReason": "STOP_LOSS", "tookRisk": true,
                      "graphComplete": true, "result": 12.5, "resultCurrency": "USDT", "fee": 0.4,
                      "funding": 0.1, "liquidationPenalty": 0, "plannedRisk": 5,
+                     "stopExitSlippage": 0.3,
                      "closeOutcome": "PROFIT", "reconciliationStatus": "RECONCILED",
                      "breakdownIncomplete": "NONE", "riskBenchmarkAvailability": "AVAILABLE"}"""
                     .formatted(mark);

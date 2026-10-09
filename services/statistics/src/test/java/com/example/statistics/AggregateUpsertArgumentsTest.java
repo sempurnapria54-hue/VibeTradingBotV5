@@ -102,6 +102,9 @@ class AggregateUpsertArgumentsTest {
                 amount("plannedRiskSum"),
                 amount("plannedRiskExcludedSum"),
                 amount("RSum"),
+                number("stopExitDeals"),
+                number("stopExitSlippageDeals"),
+                amount("stopExitSlippageRSum"),
                 ASSEMBLED);
     }
 

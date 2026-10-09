@@ -74,7 +74,7 @@ CalculatedPrice calculate(CalculationContext context);
 на рядовом проскоке уводит риск акта выше объявленного бюджета и
 обнуляет дед-бэнд между безубытком и активацией трейлинга — обе границы
 полосы сдвигаются вместе с якорем (порядок рубежей —
-`docs/rules/risk-policy.md`). Перечень закрывает подразумевание.
+`docs/rules/stop-level.md`). Перечень закрывает подразумевание.
 
 **Стоп от цены входа:** для длинной позиции ниже входа на долю, для
 короткой — выше.
@@ -139,7 +139,7 @@ CalculatedPrice calculate(CalculationContext context);
 (`Position.externalAverageEntryPrice`), а не плановая цена ноги: перенос
 уровня делается на уже открытой позиции, и себестоимость у неё
 реализованная. Пока эпизода нет, якорь — плановая цена своей ноги. Дом
-довода — `docs/rules/risk-policy.md`.
+довода — `docs/rules/stop-level.md`.
 
 Ставка — та же, что в сайзинге, на момент **переноса** уровня.
 
@@ -152,7 +152,7 @@ CalculatedPrice calculate(CalculationContext context);
 
 **Декларатор ограничен ролью: только перенос уровня.** Первичной защитой
 `BREAKEVEN` быть не может — уровень на прибыльной стороне worst-case
-выхода не задаёт; правило и реджект — `docs/rules/risk-policy.md`, `docs/rules/strategy-validation.md`.
+выхода не задаёт; правило и реджект — `docs/rules/stop-level.md`, `docs/rules/strategy-validation.md`.
 
 **Почему с комиссией.** Уровень, равный цене входа, оставляет сделке
 убыток ровно в размере round-trip комиссии, и эта ошибка направлена

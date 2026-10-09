@@ -16,8 +16,8 @@ import org.mapstruct.ReportingPolicy;
  * Маппинг {@link Position} на границе источника: OKX response →
  * snapshot (docs/models/domain/core/Position.md,
  * docs/models/mapping/Position.md). pos → abs(size) + direction (знак)
- * через {@link OkxResponseConverter}; enum'ы ↔ строка — MapStruct
- * автоматически.
+ * и mgnMode → доменный режим маржи — через {@link OkxResponseConverter};
+ * enum'ы ↔ строка — MapStruct автоматически.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
         uses = OkxResponseConverter.class)
@@ -34,6 +34,7 @@ public interface PositionMapper {
     @Mapping(target = "externalUnrealizedProfit", source = "upl")
     @Mapping(target = "externalCreatedAt", source = "cTime")
     @Mapping(target = "externalModifiedAt", source = "uTime")
+    @Mapping(target = "marginMode", source = "mgnMode", qualifiedByName = "okxMarginModeToDomain")
     PositionExternalSnapshot integrationToSnapshot(PositionOkxResponse response);
 
     /**

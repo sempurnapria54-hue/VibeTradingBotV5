@@ -1585,7 +1585,7 @@ RETIRED = [
         'source': 'D-G1 DOCS_CHECK_33: клетка «вход × полоса» без охраны, '
                   'узел 6 GAPS_CLOSE_33',
         'allowed': ('.claude/work/code-gate-ledger.json',),
-        'population': (('docs/rules/risk-policy.md', None),
+        'population': (('docs/rules/stop-level.md', None),
                        ('docs/spec/order-sizing.json', None),
                        ('docs/components/SizeCalculator.md', None),
                        ('docs/spec/stop-distance.json',
@@ -1606,7 +1606,7 @@ RETIRED = [
         'source': 'D4 DOCS_CHECK_34: якорь расчёта уровня, кодовый заход 3',
         'allowed': ('.claude/work/code-gate-ledger.json',),
         'population': (('docs/components/PriceCalculator.md', r'один\s+на\s+все\s+уровни'),
-                       ('docs/rules/risk-policy.md', r'у\s+ЛЮБОГО\s+уровня|от\s+ЯКОРЯ,\s+а\s+не\s+от\s+плановой')),
+                       ('docs/rules/stop-level.md', r'у\s+ЛЮБОГО\s+уровня|от\s+ЯКОРЯ,\s+а\s+не\s+от\s+плановой')),
     },
     {
         'name': 'ступень радиуса объекта — любая',
@@ -2522,17 +2522,22 @@ RETIRED = [
         # Счёт с тех пор изменился ещё раз — три стали двумя (узел 4
         # `GAPS_CLOSE_1` шага 11 фазы 2: у чужого подключения не осталось
         # читателей), — и пришедшая редакция переставлена на действующую.
+        # Третий пересчёт — раздел `audit-statistics` на два процесса
+        # (.claude/decisions/audit-statistics-split.md): у каждого одно
+        # подключение, и ключ `arrived` переставлен тем же способом (доковая
+        # пачка узла 1e шага 12 фазы 2, сверка с `PersistenceConfig` обоих
+        # сервисов).
         # Снятая остаётся снятой: роль назначается на владельца данных, а не на
         # процесс, и «два источника данных» как следствие одной роли на процесс
         # ложно при любом счёте подключений.
         'pattern': r'двумя\s+источниками\s+данных',
-        'arrived': r'подключений\s+к\s+базам\s+у\s+процесса\s+два',
+        'arrived': r'подключение\s+к\s+базе\s+у\s+каждого\s+из\s+двух\s+процессов\s+одно',
         'date': '2026-09-07',
         'source': 'GAPS_CLOSE_3 шага 10 фазы 2, узел 4',
         'allowed': ('.claude/work/decision-digest.md',),
         'population': (
             ('docs/architecture/data-ownership.md',
-             r'подключений\s+к\s+базам\s+у\s+процесса\s+два'),
+             r'подключение\s+к\s+базе\s+у\s+каждого\s+из\s+двух\s+процессов\s+одно'),
         ),
     },
     {

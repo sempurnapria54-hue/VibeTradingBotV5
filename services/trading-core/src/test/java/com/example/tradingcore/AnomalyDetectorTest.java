@@ -105,6 +105,69 @@ class AnomalyDetectorTest {
     }
 
     /**
+     * Запись иного режима маржи рядом с нашей изолированной: режим позиций
+     * не нарушен — записи режима контура одна, — а чужая запись есть
+     * сущность, которую система не создавала: код чужой заявки, счёт,
+     * жёсткая ступень, один тик. Метки клетка не несёт — её назначает
+     * документ кейсов.
+     */
+    @Test
+    void aForeignMarginModeRecordBesideOursIsAForeignEntityNotAPositionModeViolation() {
+        AnomalyScan scan = scan(Map.of(EXTERNAL_INSTRUMENT_ID,
+                List.of(position(new BigDecimal("5")), cross(new BigDecimal("3")))), Map.of(), Map.of());
+
+        exchangeSideDetectors().detect(scan, account, Set.of(EXTERNAL_INSTRUMENT_ID));
+
+        AnomalyFinding finding = captured();
+        assertThat(finding.getCode()).isEqualTo(Constants.Hold.EXCHANGE_FOREIGN_ORDER);
+        assertThat(finding.getScope()).isEqualTo(HoldScope.EXCHANGE_ACCOUNT);
+        assertThat(finding.getRung()).isEqualTo(HoldRung.HARD);
+        assertThat(finding.getHysteresisTicks()).isEqualTo(1);
+    }
+
+    /** Одиночная запись иного режима — тот же исход; нарушения режима позиций нет. Метки клетка не несёт. */
+    @Test
+    void aLoneForeignMarginModeRecordIsAForeignEntity() {
+        AnomalyScan scan = scan(Map.of(EXTERNAL_INSTRUMENT_ID, List.of(cross(new BigDecimal("3")))),
+                Map.of(), Map.of());
+
+        exchangeSideDetectors().detect(scan, account, Set.of(EXTERNAL_INSTRUMENT_ID));
+
+        assertThat(captured().getCode()).isEqualTo(Constants.Hold.EXCHANGE_FOREIGN_ORDER);
+    }
+
+    /**
+     * Две записи режима контура и чужая рядом: оба исхода, каждый своим
+     * кодом. Метки клетка не несёт.
+     */
+    @Test
+    void twoContourRecordsAndAForeignOneGiveBothOutcomes() {
+        AnomalyScan scan = scan(Map.of(EXTERNAL_INSTRUMENT_ID, List.of(position(new BigDecimal("5")),
+                position(new BigDecimal("7")), cross(new BigDecimal("3")))), Map.of(), Map.of());
+
+        exchangeSideDetectors().detect(scan, account, Set.of(EXTERNAL_INSTRUMENT_ID));
+
+        assertThat(capturedWithCode(Constants.Hold.EXCHANGE_POSITION_MODE_VIOLATION)).isNotNull();
+        assertThat(capturedWithCode(Constants.Hold.EXCHANGE_FOREIGN_ORDER).getHysteresisTicks()).isEqualTo(1);
+    }
+
+    /**
+     * Хвост заявок рядом с одной лишь кросс-записью — хвост: запись иного
+     * режима позицией по инструменту не считается. Метки клетка не несёт.
+     */
+    @Test
+    void aForeignMarginModeRecordDoesNotExplainOrphanOrders() {
+        AnomalyScan scan = scan(Map.of(EXTERNAL_INSTRUMENT_ID, List.of(cross(new BigDecimal("3")))),
+                Map.of(EXTERNAL_INSTRUMENT_ID, List.of(order(OUR_CLIENT_ID))), Map.of());
+        when(orderDataService.findByInternalId(OUR_CLIENT_ID)).thenReturn(Optional.of(liveOrder()));
+
+        accountingDetectors().detect(scan, account, instrument, false, Set.of(), false);
+
+        assertThat(capturedWithCode(Constants.Hold.INSTRUMENT_ORPHAN_ORDERS).getScope())
+                .isEqualTo(HoldScope.INSTRUMENT);
+    }
+
+    /**
      * Заявка БЕЗ нашего маркера — находка, но с гистерезисом в два тика:
      * наша рыночная закрывающая уходит эндпоинтом без клиентского
      * идентификатора и висит в срезе без маркера.
@@ -404,6 +467,14 @@ class AnomalyDetectorTest {
         Position position = new Position();
         position.setExternalSize(size);
         position.setDirection(Position.Direction.LONG);
+        position.setMarginMode(Instrument.MarginMode.ISOLATED);
+        return position;
+    }
+
+    /** Запись среза иного режима маржи: её открыла не наша заявка. */
+    private Position cross(BigDecimal size) {
+        Position position = position(size);
+        position.setMarginMode(Instrument.MarginMode.CROSS);
         return position;
     }
 

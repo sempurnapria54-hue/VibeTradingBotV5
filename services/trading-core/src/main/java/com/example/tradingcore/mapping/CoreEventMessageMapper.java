@@ -15,6 +15,7 @@ import com.example.tradingcore.domain.safety.AnomalyReport;
 import com.example.tradingcore.domain.safety.HoldRung;
 import com.example.tradingcore.domain.safety.HoldScope;
 import com.example.tradingcore.domain.safety.HoldSignal;
+import java.math.BigDecimal;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
@@ -118,6 +119,10 @@ public interface CoreEventMessageMapper {
      * ({@code positionObserved()}, накопленные издержки), и переносятся
      * выражением: предикат остаётся на модели
      * (.claude/rules/codestyle.md §«Вложенность и rich-модели»).
+     *
+     * <p>Проскок выхода по стопу приходит параметром, а не выражением:
+     * штатный терминал считает его по графу прохода, аварийный кладёт
+     * пустым всегда (docs/components/MarkDealEmergencyClosedExecutor.md).
      */
     @Mapping(target = "dealInternalId", source = "deal.internalId")
     @Mapping(target = "status", source = "deal.status")
@@ -137,7 +142,8 @@ public interface CoreEventMessageMapper {
                                                 String exchangeAccountInternalId,
                                                 String instrumentInternalId,
                                                 String strategyInternalId,
-                                                Boolean graphComplete);
+                                                Boolean graphComplete,
+                                                BigDecimal stopExitSlippage);
 
     /**
      * Подъём ступени радиуса. Инструмент приходит операндом и пуст у

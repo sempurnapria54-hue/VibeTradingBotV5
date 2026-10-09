@@ -43,11 +43,14 @@ public class AttachedProtectionResolution {
     }
 
     /**
-     * Исход «ждать» у родителя без наблюдения: защита не двигается —
-     * статус прежний, причины нет, — и сигнала нет. Отличается от
-     * {@link #undetermined()} тем, что факта не искали вовсе: о родителе
-     * площадка не показала ничего, и судьба защиты не выводится ни из чего
-     * (docs/spec/order-lifecycle.json, {@code attachedOutcomeByParent}).
+     * Исход «ждать»: защита не двигается — статус прежний, причины нет, — и
+     * сигнала нет. Тропы две, и обе не дают факта о защите: у родителя без
+     * наблюдения площадка о нём не показала ничего
+     * (docs/spec/order-lifecycle.json, {@code attachedOutcomeByParent}); у
+     * терминала родителя, впервые показанного этой добычей, пустой разбор
+     * мерит задержку постановки ({@code searchExhaustedOutcome}). Отличается
+     * от {@link #undetermined()} тем, что сигнала не требует: судьбу защиты
+     * выводит следующее наблюдение, а не человек.
      */
     public static AttachedProtectionResolution waiting() {
         return new AttachedProtectionResolution(null, null, false);

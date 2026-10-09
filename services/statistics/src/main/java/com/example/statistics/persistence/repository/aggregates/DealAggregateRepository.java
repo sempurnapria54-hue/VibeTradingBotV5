@@ -46,7 +46,8 @@ public interface DealAggregateRepository extends Repository<DealAggregateEntity,
                  risk_benchmark_missing_deals, r_denominator_deals,
                  result_before_funding_sum, net_result_sum, fee_sum, funding_sum,
                  liquidation_penalty_sum, win_result_sum, loss_result_sum,
-                 planned_risk_sum, planned_risk_excluded_sum, r_sum, assembled_at)
+                 planned_risk_sum, planned_risk_excluded_sum, r_sum,
+                 stop_exit_deals, stop_exit_slippage_deals, stop_exit_slippage_r_sum, assembled_at)
             values
                 (:tenantId, :exchangeAccountInternalId, :strategyInternalId, :bucketDate, :resultCurrency,
                  :closedDeals, :riskBearingDeals, :winningDeals, :losingDeals, :neutralDeals,
@@ -57,7 +58,8 @@ public interface DealAggregateRepository extends Repository<DealAggregateEntity,
                  :riskBenchmarkMissingDeals, :rDenominatorDeals,
                  :resultBeforeFundingSum, :netResultSum, :feeSum, :fundingSum,
                  :liquidationPenaltySum, :winResultSum, :lossResultSum,
-                 :plannedRiskSum, :plannedRiskExcludedSum, :rSum, :assembledAt)
+                 :plannedRiskSum, :plannedRiskExcludedSum, :rSum,
+                 :stopExitDeals, :stopExitSlippageDeals, :stopExitSlippageRSum, :assembledAt)
             on conflict on constraint uk_deal_aggregate_grain do update set
                 closed_deals = excluded.closed_deals,
                 risk_bearing_deals = excluded.risk_bearing_deals,
@@ -86,6 +88,9 @@ public interface DealAggregateRepository extends Repository<DealAggregateEntity,
                 planned_risk_sum = excluded.planned_risk_sum,
                 planned_risk_excluded_sum = excluded.planned_risk_excluded_sum,
                 r_sum = excluded.r_sum,
+                stop_exit_deals = excluded.stop_exit_deals,
+                stop_exit_slippage_deals = excluded.stop_exit_slippage_deals,
+                stop_exit_slippage_r_sum = excluded.stop_exit_slippage_r_sum,
                 assembled_at = excluded.assembled_at
             """)
     void upsert(@Param("tenantId") String tenantId,
@@ -120,6 +125,9 @@ public interface DealAggregateRepository extends Repository<DealAggregateEntity,
                 @Param("plannedRiskSum") BigDecimal plannedRiskSum,
                 @Param("plannedRiskExcludedSum") BigDecimal plannedRiskExcludedSum,
                 @Param("rSum") BigDecimal rSum,
+                @Param("stopExitDeals") Integer stopExitDeals,
+                @Param("stopExitSlippageDeals") Integer stopExitSlippageDeals,
+                @Param("stopExitSlippageRSum") BigDecimal stopExitSlippageRSum,
                 @Param("assembledAt") OffsetDateTime assembledAt);
 
     /**

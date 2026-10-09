@@ -50,7 +50,9 @@ import org.springframework.stereotype.Component;
  *       не двигается, разрыв объявит доставка;</li>
  *   <li>смещения нет — наблюдение начинается заново, как в третьем исходе,
  *       а ожидание посадит первая доставка: позиции назначение не знает
- *       вовсе.</li>
+ *       вовсе. Ожидание, оставшееся от прошлого назначения той же партиции
+ *       в этом процессе, назначение при этом <b>снимает</b> — иначе первая
+ *       доставка сравнилась бы с ним и объявила ложный разрыв.</li>
  * </ul>
  *
  * <p><b>Строки состояния пары может ещё не быть</b> — её заводит тик, а не
@@ -114,7 +116,10 @@ public class ReceptionRebalanceListener implements ConsumerAwareRebalanceListene
      *
      * <p>Ожидание садится на наименьшее доступное — с него чтение и
      * начнётся. Не отдал его брокер — ожидания нет, и посадит его первая
-     * доставка; наименьшее доступное этому исходу не нужно.
+     * доставка; наименьшее доступное этому исходу не нужно. Отсутствие
+     * ожидания назначение <b>записывает</b> так же, как его величину: прежнее
+     * ожидание партиции, вернувшейся в тот же процесс, снимается пустым
+     * смещением.
      */
     private void restartObservation(TopicPartition partition, Long earliestOffset, OffsetDateTime moment) {
         log.info("Смещения группы по партиции не осталось: наблюдение начинается заново partition={}", partition);
@@ -122,7 +127,6 @@ public class ReceptionRebalanceListener implements ConsumerAwareRebalanceListene
         if (isNull(earliestOffset)) {
             log.warn("Наименьшее доступное смещение партиции не отдано брокером: ожидание посадит первая доставка "
                     + "partition={}", partition);
-            return;
         }
         offsetTracker.expect(partition, earliestOffset);
     }

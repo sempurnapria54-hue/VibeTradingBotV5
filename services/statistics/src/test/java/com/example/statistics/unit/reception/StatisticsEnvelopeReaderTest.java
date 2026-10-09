@@ -53,7 +53,8 @@ class StatisticsEnvelopeReaderTest {
              "result":"123.45","fee":"-0.17","funding":"0.02",
              "liquidationPenalty":"0","plannedRisk":"50.00",
              "closeOutcome":"UNDEFINED","reconciliationStatus":"MATCHED",
-             "breakdownIncomplete":"COMPLETE","riskBenchmarkAvailability":"AVAILABLE"}""";
+             "breakdownIncomplete":"COMPLETE","riskBenchmarkAvailability":"AVAILABLE",
+             "closeReason":"STOP_LOSS","stopExitSlippage":"1.25"}""";
 
     private static final String INCIDENT_CONTENT = """
             {"exchangeAccountInternalId":"acct-9","rung":"HARD","severity":"CRITICAL","code":"ORD-42"}""";
@@ -85,6 +86,8 @@ class StatisticsEnvelopeReaderTest {
         assertThat(message.getReconciliationStatus()).isEqualTo("MATCHED");
         assertThat(message.getBreakdownIncomplete()).isEqualTo("COMPLETE");
         assertThat(message.getRiskBenchmarkAvailability()).isEqualTo("AVAILABLE");
+        assertThat(message.getCloseReason()).isEqualTo("STOP_LOSS");
+        assertThat(message.getStopExitSlippage()).isEqualByComparingTo("1.25");
         assertThat(fieldNames())
                 .as("пятого значения конверта у формы нет вовсе")
                 .doesNotContain("traceContext");

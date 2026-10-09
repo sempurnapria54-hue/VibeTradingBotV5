@@ -26,6 +26,13 @@ import org.springframework.test.context.DynamicPropertySource;
  * нет ни у одной клетки, и заведение второго контекста объявило бы ось,
  * которой группа не ставит.
  *
+ * <p><b>Две пробы без номера клетки — примеры дома величин проскока выхода
+ * по стопу</b> (docs/spec/statistics-aggregates.json, два примера
+ * {@code stopExitDeals}/{@code stopExitSlippageRSum}). Своих клеток у группы
+ * для них ещё нет; пробы стоя́т здесь, потому что вход у них тот же — факты
+ * прямой записью, такт пересчёта, страница агрегатов, — и арифметика у них та
+ * же: свёртка запроса. Ожидания взяты у примеров дословно.
+ *
  * <p><b>{@code B8.16} здесь нет, и это не пропуск.</b> Её состояние требует
  * производителя, не приславшего плановый риск, а построенный везёт его
  * всегда; дома у ветви сегодня нет вовсе — находка {@code F-3}
@@ -164,6 +171,15 @@ class DealGrainArithmeticBoxTest extends StatisticsBox {
 
     /** Поле суммы R-мультипликаторов. */
     private static final String R_SUM = "rSum";
+
+    /** Поле счётчика закрытых стопом в популяции отношения к риску. */
+    private static final String STOP_EXIT_DEALS = "stopExitDeals";
+
+    /** Поле счётчика закрытых стопом с измеренным проскоком. */
+    private static final String STOP_EXIT_SLIPPAGE_DEALS = "stopExitSlippageDeals";
+
+    /** Поле суммы проскока выхода по стопу в долях R. */
+    private static final String STOP_EXIT_SLIPPAGE_R_SUM = "stopExitSlippageRSum";
 
     /** Поле расчётной валюты — компонента ключа зерна в выдаче. */
     private static final String RESULT_CURRENCY = "resultCurrency";
@@ -738,6 +754,82 @@ class DealGrainArithmeticBoxTest extends StatisticsBox {
         assertThat(money(handed.getFirst(), NET_RESULT_SUM))
                 .as("числа сложены по обеим сделкам суток")
                 .isEqualByComparingTo(new BigDecimal("14"));
+    }
+
+    @Test
+    @DisplayName("Пример спеки — проскок выхода по стопу: сумма долей R по измеренным, неизмеренный "
+            + "виден разностью счётчиков, выход не стопом и сделка без знаменателя не входят никуда")
+    void theStopExitSlippageSumsMeasuredSharesOfRAndCountsTheUnmeasured() {
+        DealDraft.of("E-SX-1-MEASURED", TENANT, midnightDaysAgo(DAY))
+                .netResult("-125").funding(NO_FUNDING).plannedRisk("100")
+                .closeReason(Bodies.STOP_LOSS).stopExitSlippage("25").build().put();
+        DealDraft.of("E-SX-1-FAVOURABLE", TENANT, midnightDaysAgo(DAY))
+                .netResult("-45").funding(NO_FUNDING).plannedRisk("50")
+                .closeReason(Bodies.STOP_LOSS).stopExitSlippage("-5").build().put();
+        DealDraft.of("E-SX-1-TRAILING", TENANT, midnightDaysAgo(DAY))
+                .netResult("-30").funding(NO_FUNDING).plannedRisk("50")
+                .closeReason(Bodies.STOP_LOSS).stopExitSlippage(null).build().put();
+        DealDraft.of("E-SX-1-STRATEGY-EXIT", TENANT, midnightDaysAgo(DAY))
+                .netResult("12").funding(NO_FUNDING).plannedRisk("40")
+                .closeReason(Bodies.STRATEGY_EXIT).stopExitSlippage(null).build().put();
+        // Плановый риск пуст: знаменателя R нет, и мера, хоть и измерена, в
+        // популяцию отношения к риску не попадает.
+        DealDraft.of("E-SX-1-NO-DENOMINATOR", TENANT, midnightDaysAgo(DAY))
+                .netResult("-60").funding(NO_FUNDING).plannedRisk(null)
+                .riskBenchmarkAvailability(Bodies.MISSING)
+                .closeReason(Bodies.STOP_LOSS).stopExitSlippage("10").build().put();
+
+        recompute();
+
+        Answer page = aggregates(DEAL_GRAIN, TENANT);
+        assertThat(page.dealRows()).as("строка одна").hasSize(1);
+        Map<String, Object> row = rowOf(page.dealRows(), DAY);
+        assertThat(row.get(R_DENOMINATOR_DEALS))
+                .as("вход поставлен: в отношении к риску стоят четыре сделки — все, кроме "
+                        + "сделки без знаменателя").isEqualTo(4);
+        assertThat(row.get(STOP_EXIT_DEALS))
+                .as("закрытых стопом в популяции три: плановый выход не стоп, а сделка без "
+                        + "знаменателя в популяцию не входит").isEqualTo(3);
+        assertThat(row.get(STOP_EXIT_SLIPPAGE_DEALS))
+                .as("измеренных из них две: трейлинг меры не имеет и виден разностью пары")
+                .isEqualTo(2);
+        assertThat(page.number(STOP_EXIT_SLIPPAGE_R_SUM))
+                .as("сумма ДОЛЕЙ R: 25/100 плюс -5/50; благоприятный проскок вошёл "
+                        + "отрицательным слагаемым, а мера сделки без знаменателя — никак")
+                .isEqualByComparingTo(new BigDecimal("0.15"));
+    }
+
+    @Test
+    @DisplayName("Пример спеки — проскок выхода по стопу: аварийный терминал в популяцию закрытых "
+            + "стопом не входит, хотя в отношении к риску стоит")
+    void anEmergencyTerminalStaysOutOfTheStopExitPopulation() {
+        DealDraft.of("E-SX-2-MEASURED", TENANT, midnightDaysAgo(DAY))
+                .netResult("-121").funding(NO_FUNDING).plannedRisk("80")
+                .closeReason(Bodies.STOP_LOSS).stopExitSlippage("40").build().put();
+        DealDraft.of("E-SX-2-LEG-EXIT", TENANT, midnightDaysAgo(DAY))
+                .netResult("-40").funding(NO_FUNDING).plannedRisk("100")
+                .closeReason(Bodies.STOP_LOSS).stopExitSlippage(null).build().put();
+        DealDraft.of("E-SX-2-EMERGENCY", TENANT, midnightDaysAgo(DAY))
+                .netResult("-260").funding(NO_FUNDING).plannedRisk("100")
+                .closeReason(Bodies.EMERGENCY_CLOSE).stopExitSlippage(null).build().put();
+
+        recompute();
+
+        Answer page = aggregates(DEAL_GRAIN, TENANT);
+        assertThat(page.dealRows()).as("строка одна").hasSize(1);
+        Map<String, Object> row = rowOf(page.dealRows(), DAY);
+        assertThat(row.get(R_DENOMINATOR_DEALS))
+                .as("в сумме R аварийная сделка стоит наравне со всеми: отбор там свой")
+                .isEqualTo(3);
+        assertThat(row.get(STOP_EXIT_DEALS))
+                .as("закрытых стопом две: аварийный терминал пишет свою причину безусловно, "
+                        + "и разность пары его не показывает").isEqualTo(2);
+        assertThat(row.get(STOP_EXIT_SLIPPAGE_DEALS))
+                .as("измерена одна: транш, вышедший ногой до стопа, меры не имеет")
+                .isEqualTo(1);
+        assertThat(page.number(STOP_EXIT_SLIPPAGE_R_SUM))
+                .as("40/80 — единственное слагаемое")
+                .isEqualByComparingTo(new BigDecimal("0.5"));
     }
 
     /**

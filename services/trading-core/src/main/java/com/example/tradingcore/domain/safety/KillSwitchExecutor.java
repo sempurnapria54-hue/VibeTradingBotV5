@@ -1,5 +1,6 @@
 package com.example.tradingcore.domain.safety;
 
+import static com.example.tradingcore.util.PositionMarginMode.isForeign;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.collections4.CollectionUtils.emptyIfNull;
@@ -59,8 +60,8 @@ import org.springframework.stereotype.Component;
  * закрытия позиции — живая позиция не оголяется ни на мгновение.
  *
  * <p><b>Защита снимается в обеих формах</b> — отдельной условной заявкой и
- * встроенной. Встроенная при непустом наливе родителя материализуется на
- * бирже самостоятельной заявкой и переживает терминал родителя
+ * встроенной. Встроенная на терминале родителя с непустым наливом
+ * материализуется на бирже самостоятельной заявкой и этот терминал переживает
  * (docs/models/domain/core/Order.md §«Встроенная защита»), то есть
  * перечнем живых отдельных заявок не покрывается.
  *
@@ -115,10 +116,14 @@ public class KillSwitchExecutor {
      * позициями площадки (docs/components/KillSwitchExecutor.md §«Риск вне
      * графа сделок»).
      *
-     * <p><b>Закрывается только позиция на инструменте без нетерминальной
-     * сделки.</b> Позицию сделки снимает ход сделки: ноги траншей там
-     * снимаются раньше экспозиции, и закрытие её здесь, мимо ног, открыло бы
-     * позицию заново их исполнением.
+     * <p><b>Закрывается только запись, которая сделке не принадлежит:</b>
+     * позиция на инструменте без нетерминальной сделки ЛИБО запись иного
+     * режима маржи на любом инструменте радиуса. Позицию сделки снимает ход
+     * сделки: ноги траншей там снимаются раньше экспозиции, и закрытие её
+     * здесь, мимо ног, открыло бы позицию заново их исполнением. Запись
+     * иного режима этого инварианта не касается: наши ноги уходят режимом
+     * контура и в неё не наливаются, а ход сделки её не закрывает — он
+     * ведёт позицию своего режима.
      *
      * <p><b>Подтверждает радиус ЛЮБАЯ живая позиция</b>, а не только
      * закрываемая: остаток на инструменте сделки значит, что ход сделки
@@ -144,7 +149,8 @@ public class KillSwitchExecutor {
             }
             if (nonNull(live)) {
                 live.stream()
-                        .filter(position -> isFalse(dealInstruments.contains(position.getExternalInstrumentId())))
+                        .filter(position -> isFalse(dealInstruments.contains(position.getExternalInstrumentId()))
+                                || isTrue(isForeign(position)))
                         .forEach(position -> closeOutsideDeal(account, position));
             }
             live = positionSliceReader.livePositions(account, externalInstrumentId);
@@ -158,13 +164,20 @@ public class KillSwitchExecutor {
      * Закрытие позиции без сделки. Строка позиции валюты расчёта не несёт;
      * у инструмента проекции она читается, у инструмента вне контура её нет,
      * и закрытие уходит без неё — контракт закрытия её не требует.
+     *
+     * <p><b>Закрытие уходит режимом маржи самой записи</b>, прочитанным в
+     * срезе: режим контура закрыл бы на площадке не ту запись либо ничего, и
+     * чужая позиция пережила бы ход (docs/components/KillSwitchExecutor.md
+     * §«Риск вне графа сделок»). Для записи режима контура это тот же режим,
+     * что у всякого нашего закрытия.
      */
     private void closeOutsideDeal(ExchangeAccount account, Position position) {
         String externalInstrumentId = position.getExternalInstrumentId();
         String settleCurrency = instrumentDataService.findSettlementCurrency(account.getExchangeCode(),
                 externalInstrumentId).orElse(null);
         callSafely("close-position-outside-deal", account.getId(), () -> exchangeOperationsClient
-                .closePosition(account.getInternalId(), externalInstrumentId, settleCurrency));
+                .closePosition(account.getInternalId(), externalInstrumentId, settleCurrency,
+                        position.getMarginMode()));
     }
 
     /**
