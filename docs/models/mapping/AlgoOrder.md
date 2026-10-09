@@ -163,7 +163,7 @@ AlgoOrder.size → sz`). База доли — экспозиция **транш
 | `algoId` | `externalId` |
 | `instId` | `externalInstrumentId` |
 | `state` | `externalStatus` (raw) |
-| `failCode` | `failCode` |
+| `failCode` | `failCode`; `"0"` и пустая строка → пусто (`docs/models/mapping/Order.md`, строки `failCode`) |
 | `actualSz` | `externalSize` |
 | `actualPx` | `externalPrice` |
 | `triggerTime` | `externalTriggerTime` |

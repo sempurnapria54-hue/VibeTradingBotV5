@@ -209,26 +209,6 @@ class ConverterDictionaryTest {
                 .hasMessageContaining("net");
     }
 
-    @Test
-    @DisplayName("U6.24 — код успеха даёт истину")
-    void u6_24_theSuccessCodeIsTrue() {
-        assertThat(converter.ackSuccess("0")).isTrue();
-    }
-
-    @Test
-    @DisplayName("U6.25 — код отказа даёт ложь")
-    void u6_25_aFailureCodeIsFalse() {
-        assertThat(converter.ackSuccess("51008")).isFalse();
-    }
-
-    /** Направление консервативное: пустой код успехом не считается. */
-    @Test
-    @DisplayName("U6.26 — пустой код успехом не считается")
-    void u6_26_anEmptyCodeIsNotSuccess() {
-        assertThat(converter.ackSuccess("")).isFalse();
-        assertThat(converter.ackSuccess(null)).isFalse();
-    }
-
     /** Словарь режима счёта обходится целиком: преконтроль ветвится по каждому значению. */
     @ParameterizedTest
     @CsvSource({"1,SPOT", "2,FUTURES", "3,MULTI_CURRENCY_MARGIN", "4,PORTFOLIO_MARGIN"})

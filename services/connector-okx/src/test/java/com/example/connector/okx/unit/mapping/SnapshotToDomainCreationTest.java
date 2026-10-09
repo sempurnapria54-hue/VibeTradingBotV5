@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.connector.okx.exception.ExternalStatusException;
+import com.example.connector.okx.integration.external.api.model.okx.response.AttachAlgoOrdOkxResponse;
 import com.example.connector.okx.mapping.AlgoOrderMapper;
 import com.example.connector.okx.mapping.BalanceContainerMapper;
 import com.example.connector.okx.mapping.CandleMapper;
@@ -187,8 +188,9 @@ class SnapshotToDomainCreationTest {
     @Test
     @DisplayName("U21.8 — доменная встроенная защита: перенос по имени, статуса нет")
     void u21_8_theDomainAttachedProtectionHasNoStatus() {
-        AttachedAlgoOrderExternalSnapshot snapshot =
-                orderMapper.integrationToSnapshot(OkxFixture.attachedInParentBody());
+        AttachAlgoOrdOkxResponse response = OkxFixture.attachedInParentBody();
+        response.setFailCode("51000");
+        AttachedAlgoOrderExternalSnapshot snapshot = orderMapper.integrationToSnapshot(response);
 
         AttachedAlgoOrder attached = orderMapper.snapshotToDomain(snapshot);
 
@@ -198,7 +200,7 @@ class SnapshotToDomainCreationTest {
         assertThat(attached.getExternalType()).isEqualTo("condition");
         assertThat(attached.getStopLossTriggerPrice()).isEqualByComparingTo("90");
         assertThat(attached.getTriggerPriceType()).isEqualTo(AlgoOrder.TriggerPriceType.MARK);
-        assertThat(attached.getFailCode()).isEqualTo("0");
+        assertThat(attached.getFailCode()).isEqualTo("51000");
         assertThat(attached.getStatus()).isNull();
     }
 

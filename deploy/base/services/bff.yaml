@@ -478,6 +478,12 @@ metadata:
   name: perimeter
   annotations:
     cert-manager.io/issuer: perimeter-issuer
+    # Имя субъекта сертификата — имя хоста окружения. Без него
+    # самоподписанный сертификат выходит с пустыми субъектом и издателем, и
+    # JVM его не разбирает вовсе («Empty issuer DN not allowed»; найдено
+    # первым прогоном дыма 2026-10-09). Окружение подставляет своё имя тем же
+    # патчем, что и хост.
+    cert-manager.io/common-name: dev.vibetrading.invalid
 spec:
   ingressClassName: traefik
   tls:

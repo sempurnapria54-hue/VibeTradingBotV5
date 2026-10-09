@@ -14,7 +14,7 @@
 | `algoId` | string | биржевой algo id |
 | `algoClOrdId` | string | client id (stable, основной матчинг) |
 | `state` | string | сырой статус (`live`/`pause`/`effective`/`canceled`/`order_failed`/`partially_failed`/`partially_effective`) |
-| `failCode` | string | код ошибки |
+| `failCode` | string | код ошибки; «отказа нет» площадка отдаёт **кодом успеха `"0"`** (рантайм, `docs/integrations/okx/contracts/algo-order.md`) — граница переводит его в пусто (`docs/models/mapping/Order.md`) |
 | `failReason` | string | диагностика отказа — операнд разбора у записи `state=order_failed`, объявленный формой цикла добычи (`docs/models/mapping/Order.md`); в колонку не садится, идёт в лог. Одноимённое поле **вложенного** `attachAlgoOrds[*]` — другое место и в перечень используемых не входит |
 | `sz` | string-decimal | **объявленный** размер записи — операнд покрытия у материализованной встроенной защиты, найденной циклом добычи материализованной защиты (`docs/models/mapping/Order.md`; форма — `docs/spec/protection-coverage.json`) |
 | `actualSz` | string-decimal | фактический размер срабатывания |

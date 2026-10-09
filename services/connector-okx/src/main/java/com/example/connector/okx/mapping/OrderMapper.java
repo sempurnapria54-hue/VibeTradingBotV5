@@ -16,6 +16,7 @@ import com.example.connector.okx.integration.external.api.model.okx.response.Att
 import com.example.connector.okx.integration.external.api.model.okx.response.OrderAckOkxResponse;
 import com.example.connector.okx.integration.external.api.model.okx.response.OrderOkxResponse;
 import com.example.connector.okx.util.OkxConstants;
+import com.example.connector.okx.util.OkxParse;
 import org.apache.commons.lang3.StringUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -30,7 +31,7 @@ import org.mapstruct.ReportingPolicy;
  * docs/models/mapping/Order.md.
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
-        uses = OkxResponseConverter.class, imports = {OkxConstants.class, StringUtils.class})
+        uses = OkxResponseConverter.class, imports = {OkxConstants.class, OkxParse.class, StringUtils.class})
 public interface OrderMapper {
 
     @Mapping(target = "internalId", source = "clOrdId")
@@ -60,6 +61,7 @@ public interface OrderMapper {
     @Mapping(target = "externalType", source = "tpOrdKind")
     @Mapping(target = "size", source = "sz")
     @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx")
+    @Mapping(target = "failCode", expression = "java(OkxParse.failCode(response.getFailCode()))")
     @Mapping(target = "triggerPriceType", source = "slTriggerPxType",
             qualifiedByName = "okxTriggerPriceType")
     AttachedAlgoOrderExternalSnapshot integrationToSnapshot(AttachAlgoOrdOkxResponse response);
@@ -81,6 +83,7 @@ public interface OrderMapper {
     @Mapping(target = "externalStatus", source = "state")
     @Mapping(target = "size", source = "sz")
     @Mapping(target = "stopLossTriggerPrice", source = "slTriggerPx")
+    @Mapping(target = "failCode", expression = "java(OkxParse.failCode(response.getFailCode()))")
     @Mapping(target = "triggerPriceType", source = "slTriggerPxType",
             qualifiedByName = "okxTriggerPriceType")
     AttachedAlgoOrderExternalSnapshot integrationToSnapshot(AlgoOrderOkxResponse response);
@@ -160,12 +163,21 @@ public interface OrderMapper {
      * per-order {@code sCode}/{@code sMsg}; если они пусты (наблюдалось
      * на реджекте, находка F1), падаем на top-level {@code code}/{@code msg}
      * ответа, чтобы ack не нёс null на реджекте.
+     *
+     * <p><b>Успех выводится из ТОГО ЖЕ кода, что и {@code code}</b>, а не из
+     * одного {@code sCode}: у {@code close-position} записи {@code sCode} нет
+     * по контракту — {@code data[0]} несёт только {@code instId} и
+     * {@code posSide} (docs/integrations/okx/contracts/position.md
+     * §«ACK-семантика close-position»), — и принятое закрытие читалось
+     * отказом. У постановки и снятия {@code sCode} есть всегда, и для них
+     * исход не меняется.
      */
     @Mapping(target = "externalId", source = "ack.ordId")
     @Mapping(target = "internalId", source = "ack.clOrdId")
     @Mapping(target = "code", expression = "java(StringUtils.firstNonBlank(ack.getsCode(), topLevelCode))")
     @Mapping(target = "message", expression = "java(StringUtils.firstNonBlank(ack.getsMsg(), topLevelMessage))")
-    @Mapping(target = "success", source = "ack.sCode", qualifiedByName = "okxAckSuccess")
+    @Mapping(target = "success",
+            expression = "java(OkxConstants.SUCCESS_CODE.equals(StringUtils.firstNonBlank(ack.getsCode(), topLevelCode)))")
     @Mapping(target = "externalCreatedAt", source = "ack.ts")
     ExchangeAck integrationToAck(OrderAckOkxResponse ack, String topLevelCode, String topLevelMessage);
 

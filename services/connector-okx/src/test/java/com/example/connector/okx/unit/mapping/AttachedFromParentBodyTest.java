@@ -41,7 +41,7 @@ class AttachedFromParentBodyTest {
         assertThat(snapshot.getExternalId()).isEqualTo("9");
         assertThat(snapshot.getExternalType()).isEqualTo("condition");
         assertThat(snapshot.getStopLossTriggerPrice()).isEqualByComparingTo("90");
-        assertThat(snapshot.getFailCode()).isEqualTo("0");
+        assertThat(snapshot.getFailCode()).as("код успеха площадки — отсутствие отказа, а не код").isNull();
         assertThat(snapshot.getFailReason()).isEmpty();
     }
 
@@ -128,5 +128,15 @@ class AttachedFromParentBodyTest {
                 .extracting(Field::getName)
                 .doesNotContain("externalSize", "externalPrice", "externalTriggerTime",
                         "condition", "linkedOrderExternalIds");
+    }
+
+    /** Форма, которую тело родителя несёт на исполненной защите (наблюдено на демо-контуре). */
+    @Test
+    @DisplayName("U8.11 — пустой код отказа даёт пустоту")
+    void u8_11_anEmptyFailCodeIsEmptiness() {
+        AttachAlgoOrdOkxResponse response = OkxFixture.attachedInParentBody();
+        response.setFailCode("");
+
+        assertThat(mapper.integrationToSnapshot(response).getFailCode()).isNull();
     }
 }

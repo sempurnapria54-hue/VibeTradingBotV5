@@ -41,7 +41,7 @@ class AlgoOrderToSnapshotTest {
         assertThat(snapshot.getInternalId()).isEqualTo("tb-9");
         assertThat(snapshot.getExternalId()).isEqualTo("9");
         assertThat(snapshot.getExternalStatus()).isEqualTo("live");
-        assertThat(snapshot.getFailCode()).isEqualTo("0");
+        assertThat(snapshot.getFailCode()).as("код успеха площадки — отсутствие отказа, а не код").isNull();
         assertThat(snapshot.getExternalSize()).isEqualByComparingTo("3");
         assertThat(snapshot.getExternalPrice()).isEqualByComparingTo("99");
         assertThat(snapshot.getExternalTriggerTime()).isEqualTo(Instant.ofEpochMilli(1_700_000_000_000L));
@@ -236,5 +236,14 @@ class AlgoOrderToSnapshotTest {
         response.setuTime("");
 
         assertThat(mapper.integrationToSnapshot(response).getExternalModifiedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("U10.17 — код отказа срабатывания переносится своим значением")
+    void u10_17_aFailureCodeIsCarried() {
+        AlgoOrderOkxResponse response = OkxFixture.algoOrder();
+        response.setFailCode("51008");
+
+        assertThat(mapper.integrationToSnapshot(response).getFailCode()).isEqualTo("51008");
     }
 }

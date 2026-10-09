@@ -50,11 +50,19 @@
         -->
         <wiremock.version>3.13.1</wiremock.version>
         <!--
-          Метка красных ожиданий, изъятая из умолчания прогона: дом довода —
-          services/common/platform/pom.xml, свойство того же имени.
-          Прогон помеченных:  mvn test -Dtest.excluded.groups=
+          Метки, изъятые из умолчания прогона:
+          - debt — красные ожидания; дом довода — services/common/platform/pom.xml,
+            свойство того же имени;
+          - demo — мишень -D: тот же ящик против ЖИВОЙ demo-площадки OKX
+            (DemoExchangeBoxTest). В пайплайн не входит — идёт по запросу и по
+            расписанию, ключами держателя
+            (.claude/tests/cases/connector-okx.md §«Две мишени и суффикс метки»).
+          Прогон мишени -D:        mvn test -Dtest.excluded.groups=debt -Dtest=DemoExchangeBoxTest
+          Прогон красных без -D:   mvn test -Dtest.excluded.groups=demo
+          Пустое значение (-Dtest.excluded.groups=) снимает и demo, то есть
+          ставит заявки на живой площадке.
         -->
-        <test.excluded.groups>debt</test.excluded.groups>
+        <test.excluded.groups>debt,demo</test.excluded.groups>
     </properties>
 
     <dependencyManagement>

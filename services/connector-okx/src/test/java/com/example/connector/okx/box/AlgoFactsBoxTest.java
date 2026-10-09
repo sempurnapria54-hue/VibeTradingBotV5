@@ -194,6 +194,23 @@ class AlgoFactsBoxTest extends SharedConnectorBox {
         assertThat(partial.errorReason()).isEqualTo("PARTIALLY_FAILED");
     }
 
+    /**
+     * Неотправленная заявка, которую снятие риска застало до постановки, ищется
+     * клиентским идентификатором и площадке неизвестна (дым стенда 2026-10-09).
+     */
+    @Test
+    @DisplayName("B4.9 — «заявки не существует» от площадки — пусто, а не отказ")
+    void b4_9_theExchangeOrderDoesNotExistCodeMeansEmptyNotFailure() {
+        exchange.answers(OkxConstants.TRADE_ORDER_ALGO_PATH,
+                Okx.failure(OkxConstants.ORDER_NOT_EXIST_CODE, "Order does not exist"));
+
+        Answer single = get(account(LOOKUP + "&internalId=" + Bodies.ALGO_INTERNAL_ID));
+
+        assertThat(single.status()).isEqualTo(200);
+        assertThat(single.body()).isBlank();
+        assertThat(exchange.requests(OkxConstants.TRADE_ORDER_ALGO_PATH)).hasSize(1);
+    }
+
     /** Ответ на живые условные заявки названной семьи: названное число записей. */
     private void answerFamily(String family, Integer size) {
         String[] records = IntStream.range(0, size)

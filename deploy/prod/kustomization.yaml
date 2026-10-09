@@ -37,6 +37,9 @@ patches:
       - op: replace
         path: /spec/tls/0/hosts/0
         value: prod.vibetrading.invalid
+      - op: replace
+        path: /metadata/annotations/cert-manager.io~1common-name
+        value: prod.vibetrading.invalid
   # Тот же хост — в браузерном клиенте провайдера: адрес возврата и
   # источник запросов обязаны совпасть с ингрессом, иначе тропа токена
   # не замкнётся.

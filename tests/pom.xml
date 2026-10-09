@@ -48,6 +48,10 @@
           services/common/platform/pom.xml; `smoke` бежит по расписанию
           против стенда (.claude/skills/test-code.md §«Уровень 3 — сквозной
           набор»). Прогон помеченных:  mvn verify -Dtest.excluded.groups=smoke
+          Дым против стенда — фаза test, jar'ов сторон ему не нужно
+          (.claude/tests/cases/smoke-live.md §«Где живёт код кейсов»):
+          mvn -o -am -pl tests test -Dtest='E*SmokeTest'
+              -Dsurefire.failIfNoSpecifiedTests=false -Dtest.excluded.groups=debt -Dgroups=smoke
         -->
         <test.excluded.groups>debt,smoke</test.excluded.groups>
         <wiremock.version>3.13.1</wiremock.version>

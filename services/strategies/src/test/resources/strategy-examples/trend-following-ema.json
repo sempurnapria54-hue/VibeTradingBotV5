@@ -73,7 +73,8 @@
       "indicatorType": "EMA",
       "params": {
         "timeframe": "ONE_HOUR",
-        "period": 20
+        "period": 20,
+        "warmup": 60
       },
       "destiny": "MARKET_PHASE",
       "expirationDuration": "PT2H"
@@ -83,7 +84,8 @@
       "indicatorType": "EMA",
       "params": {
         "timeframe": "ONE_HOUR",
-        "period": 80
+        "period": 80,
+        "warmup": 240
       },
       "destiny": "MARKET_PHASE",
       "expirationDuration": "PT2H"
@@ -93,7 +95,8 @@
       "indicatorType": "EMA",
       "params": {
         "timeframe": "FIFTEEN_MINUTES",
-        "period": 10
+        "period": 10,
+        "warmup": 30
       },
       "destiny": "ENTRY_CONDITION",
       "expirationDuration": "PT30M"
@@ -103,7 +106,8 @@
       "indicatorType": "EMA",
       "params": {
         "timeframe": "FIFTEEN_MINUTES",
-        "period": 50
+        "period": 50,
+        "warmup": 150
       },
       "destiny": "ENTRY_CONDITION",
       "expirationDuration": "PT30M"
@@ -113,7 +117,8 @@
       "indicatorType": "RSI",
       "params": {
         "timeframe": "FIVE_MINUTES",
-        "period": 14
+        "period": 14,
+        "warmup": 100
       },
       "destiny": "ENTRY_CONDITION",
       "expirationDuration": "PT15M"
@@ -123,7 +128,8 @@
       "indicatorType": "ATR",
       "params": {
         "timeframe": "FIFTEEN_MINUTES",
-        "period": 14
+        "period": 14,
+        "warmup": 100
       },
       "destiny": "PROTECTION",
       "expirationDuration": "PT30M"

@@ -26,9 +26,9 @@ import org.junit.jupiter.api.Test;
  * <p><b>Кодов на ответе два, и переход выбирает между ними:</b> на
  * отказе площадка оставляет пер-заявочные код и сообщение пустыми, а
  * причина живёт в коде верхнего уровня, поэтому код подтверждения
- * берётся первым непустым из пары. Признак успеха при этом читается
- * <b>только</b> пер-заявочным кодом, и асимметрия названа, а не
- * умолчана ({@code U27.5}).
+ * берётся первым непустым из пары. Признак успеха читается из того же
+ * выбранного кода: у ответа {@code close-position} пер-заявочного кода нет
+ * по контракту, и принятое закрытие читалось отказом ({@code U27.5}).
  */
 class AckTest {
 
@@ -105,17 +105,29 @@ class AckTest {
     }
 
     /**
-     * Кейс закрепляет наблюдаемое и назван ограничением: дом признака успеха —
-     * пер-заявочный код, и другого ожидания у кейса нет.
+     * Форма ответа {@code close-position}: {@code data[0]} несёт только
+     * инструмент и сторону позиции, пер-заявочного кода нет
+     * (docs/integrations/okx/contracts/position.md §«ACK-семантика close-position»).
      */
     @Test
-    @DisplayName("U27.5 — пустой пер-заявочный код при верхнем успехе: код успеха при ложном признаке")
-    void u27_5_theAckCanContradictItself() {
-        ExchangeAck built = orderMapper.integrationToAck(
-                ack("", "", OkxFixture.CREATED_MILLIS), "0", "");
+    @DisplayName("U27.5 — пер-заявочного кода нет, верхний — успех: подтверждение успешно")
+    void u27_5_theTopLevelSuccessCodeMakesTheAckSuccessful() {
+        OrderAckOkxResponse closure = new OrderAckOkxResponse();
+        closure.setClOrdId("");
+
+        ExchangeAck built = orderMapper.integrationToAck(closure, "0", "");
 
         assertThat(built.getCode()).isEqualTo("0");
-        assertThat(built.getSuccess()).isFalse();
+        assertThat(built.getSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("U27.11 — у условной заявки успех читается тем же правилом")
+    void u27_11_theAlgoAckReadsSuccessTheSameWay() {
+        ExchangeAck built = algoOrderMapper.integrationToAck(algoAck(null, null), "0", "");
+
+        assertThat(built.getCode()).isEqualTo("0");
+        assertThat(built.getSuccess()).isTrue();
     }
 
     /** Подставленные локальные часы в сравнение войти не могут. */

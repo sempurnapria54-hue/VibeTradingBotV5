@@ -159,7 +159,7 @@ evidence-cycle (специфика per-source — см. подразделы). �
 | `sz` | `size` | string→`BigDecimal` |
 | `slTriggerPx` | `stopLossTriggerPrice` | trigger SL |
 | `slTriggerPxType` | `triggerPriceType` | **операнд сверки объявленной базы** `MARK`; `last`/`index`/`mark` → доменный енум, пусто → пусто |
-| `failCode` | `failCode` | если заполнен → attached `ERROR` с `PROTECTION_PLACEMENT_FAILED`; **персистится** — операнд разбора тропы |
+| `failCode` | `failCode` | если заполнен → attached `ERROR` с `PROTECTION_PLACEMENT_FAILED`; **персистится** — операнд разбора тропы; код успеха `"0"` и пустая строка → **пусто**: площадка кодирует «отказа нет» двумя формами, а читатель выводит отказ присутствием (`OkxParse.failCode`) |
 | `failReason` | `failReason` | диагностика ошибки; в колонку не садится (лог) |
 
 У `attachAlgoOrds` нет полноценного `state` как у ordinary order —
@@ -328,7 +328,7 @@ required»). `algoId` материализованной записи нам н�
 | `algoClOrdId` | ключ матча | равен `attachAlgoClOrdId` родителя; связь только по нему |
 | `algoId` | `externalId` | **не** равен `attachAlgoId` родителя |
 | `state` | `externalStatus` | сырой статус **самостоятельной записи**: у неё он есть, в отличие от элемента `attachAlgoOrds[*]` родителя. Через резолвер внешних статусов (`docs/spec/external-status-resolution.json`) **не идёт**: его операнд `entity` защиту не принимает, а словарь отказных причин чужой — исход кодирует **нога, нашедшая запись** (таблица разбора — `docs/lifecycles/Order.md`), `state` — диагностика. Живость в **обеих** тропах предъявления выводит один предикат `attachedBecomesActive`: предъявленная самостоятельная запись — его единственное доказательство материализации (`docs/spec/order-lifecycle.json`) |
-| `failCode` | `failCode` | код отказа; операнд ветви `attachedFailsToPlace` в `docs/spec/order-lifecycle.json` и **операнд разбора тропы** у записи `state=order_failed` — персистится |
+| `failCode` | `failCode` | код отказа; операнд ветви `attachedFailsToPlace` в `docs/spec/order-lifecycle.json` и **операнд разбора тропы** у записи `state=order_failed` — персистится; код успеха `"0"` и пустая строка → **пусто**: площадка кодирует «отказа нет» двумя формами, а читатель выводит отказ присутствием (`OkxParse.failCode`). Эта форма несёт `"0"` на **исполненной** защите — без снятия код успеха уводил материализованную защиту в «не встала» (`docs/integrations/okx/contracts/algo-order.md`, рантайм-расхождение 2026-10-09) |
 | `failReason` | `failReason` | причина отказа; в снапшоте поле уже объявлено, в колонку не садится (лог) |
 | `sz` | `size` | объявленный размер записи — операнд покрытия (`docs/spec/protection-coverage.json`) |
 | `slTriggerPx` | `stopLossTriggerPrice` | уровень срабатывания защиты; сторона — как у элемента `attachAlgoOrds` |

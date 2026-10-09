@@ -131,4 +131,18 @@ class AttachedFromStandaloneAlgoTest {
     void u9_10_emptinessInIsEmptinessOut() {
         assertThat(mapper.integrationToSnapshot((AlgoOrderOkxResponse) null)).isNull();
     }
+
+    /**
+     * Запись, в которую площадка развернула исполненную встроенную защиту, несёт
+     * код успеха {@code "0"} (наблюдено на демо-контуре 2026-10-09). Доехав до
+     * ядра, он читался отказом постановки: резолвер выводит отказ присутствием.
+     */
+    @Test
+    @DisplayName("U9.11 — код успеха записи — отсутствие отказа, а не код")
+    void u9_11_theSuccessCodeIsNoFailure() {
+        AlgoOrderOkxResponse response = OkxFixture.algoOrder();
+        response.setFailCode("0");
+
+        assertThat(mapper.integrationToSnapshot(response).getFailCode()).isNull();
+    }
 }

@@ -34,7 +34,7 @@ images:
   - name: registry.invalid/vibetrading/market-data
     newTag: 0.0.1-40bb9b8b-20261009123404
   - name: registry.invalid/vibetrading/connector-okx
-    newTag: 0.0.1-40bb9b8b-20261009123404
+    newTag: 0.0.1-bda600b9-20261009171859
   - name: registry.invalid/vibetrading/auth
     newTag: 0.0.1-40bb9b8b-20261009123404
 patches:

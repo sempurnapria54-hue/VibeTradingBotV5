@@ -32,7 +32,11 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ExchangeAck {
 
-    /** Запрос принят биржей (sCode успеха). */
+    /**
+     * Запрос принят биржей: код успеха у ТОГО ЖЕ кода, что несёт {@link #code}, —
+     * пер-заявочного, а у ответа без него (OKX {@code close-position}) —
+     * верхнего уровня.
+     */
     private Boolean success;
 
     /** Биржевой id созданной/затронутой сущности (ordId/algoId), если вернулся. */

@@ -169,12 +169,6 @@ public class OkxResponseConverter {
                 : percents.movePointLeft(OkxConstants.PERCENTS_TO_RATIO_POINT_SHIFT).toPlainString();
     }
 
-    /** OKX sCode → принят ли запрос (успех). */
-    @Named("okxAckSuccess")
-    public Boolean ackSuccess(String code) {
-        return Objects.equals(OkxConstants.SUCCESS_CODE, code);
-    }
-
     /**
      * Доменная сторона заявки → словарь площадки (buy/sell).
      *

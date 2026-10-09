@@ -70,7 +70,7 @@ public interface AlgoOrderMapper {
                 .internalId(response.getAlgoClOrdId())
                 .externalId(response.getAlgoId())
                 .externalStatus(response.getState())
-                .failCode(response.getFailCode())
+                .failCode(OkxParse.failCode(response.getFailCode()))
                 .externalSize(OkxParse.decimal(response.getActualSz()))
                 .externalPrice(OkxParse.decimal(response.getActualPx()))
                 .externalTriggerTime(OkxParse.instant(response.getTriggerTime()))
@@ -135,13 +135,16 @@ public interface AlgoOrderMapper {
      * OKX algo ack → {@link ExchangeAck}. {@code code}/{@code message} —
      * per-order {@code sCode}/{@code sMsg}; если они пусты (наблюдалось
      * на реджекте, находка F1), падаем на top-level {@code code}/{@code msg}
-     * ответа, чтобы ack не нёс null на реджекте.
+     * ответа, чтобы ack не нёс null на реджекте. Успех читается из того же
+     * кода, что и {@code code} — правило одно у обеих форм подтверждения
+     * ({@code OrderMapper.integrationToAck}).
      */
     @Mapping(target = "externalId", source = "ack.algoId")
     @Mapping(target = "internalId", source = "ack.algoClOrdId")
     @Mapping(target = "code", expression = "java(StringUtils.firstNonBlank(ack.getsCode(), topLevelCode))")
     @Mapping(target = "message", expression = "java(StringUtils.firstNonBlank(ack.getsMsg(), topLevelMessage))")
-    @Mapping(target = "success", source = "ack.sCode", qualifiedByName = "okxAckSuccess")
+    @Mapping(target = "success",
+            expression = "java(OkxConstants.SUCCESS_CODE.equals(StringUtils.firstNonBlank(ack.getsCode(), topLevelCode)))")
     ExchangeAck integrationToAck(AlgoOrderAckOkxResponse ack, String topLevelCode, String topLevelMessage);
 
     /** OKX algo ordType из conditionType (одностороннe). */

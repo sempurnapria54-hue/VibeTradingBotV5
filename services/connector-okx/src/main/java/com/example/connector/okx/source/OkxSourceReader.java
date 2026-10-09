@@ -410,8 +410,14 @@ public class OkxSourceReader {
      * прочитанный отказом он обрывал бы оба читателя поиска: отправку, которая
      * по ненайденной ноге ставит её, и цикл добычи, который по ней идёт к
      * живым заявкам и истории (docs/integrations/okx/contracts/order.md).
+     *
+     * <p><b>Тот же код у условной заявки</b> (docs/integrations/okx/contracts/algo-order.md):
+     * поиск неотправленной заявки, которую снятие риска застало до
+     * постановки, читался отказом, бюджет повторов исчерпывался, и сделка
+     * уходила в ошибку при чистой площадке — вместо терминала «не дошла до
+     * площадки», который ей ставит вызывающий (docs/lifecycles/AlgoOrder.md).
      */
-    private Boolean orderAbsent(OkxApiResponse<OrderOkxResponse> response) {
+    private Boolean orderAbsent(OkxApiResponse<?> response) {
         return nonNull(response) && Objects.equals(OkxConstants.ORDER_NOT_EXIST_CODE, response.getCode());
     }
 
@@ -420,6 +426,9 @@ public class OkxSourceReader {
         OkxApiResponse<AlgoOrderOkxResponse> response = execute(
                 () -> okxRestClient.getAlgoOrder(credentials, externalInstrumentId, externalId, internalId),
                 "order-algo", "instId=" + externalInstrumentId + " algoId=" + externalId);
+        if (isTrue(orderAbsent(response))) {
+            return null;
+        }
         verifyCode(response, "order-algo", "instId=" + externalInstrumentId);
         if (isEmpty(response.getData())) {
             return null;
