@@ -134,7 +134,7 @@ public class ExchangeAccountOperationsController {
     @Operation(summary = "Заявка по идентификатору")
     @GetMapping("/orders/lookup")
     public Order getOrder(@PathVariable String accountInternalId,
-                          @ParameterObject ExchangeOrderLookupApiQuery lookup) {
+                          @Valid @ParameterObject ExchangeOrderLookupApiQuery lookup) {
         return gateway.getOrder(accountInternalId, lookup.getExternalInstrumentId(),
                 lookup.getExternalId(), lookup.getInternalId());
     }
@@ -162,7 +162,7 @@ public class ExchangeAccountOperationsController {
     @Operation(summary = "Условная заявка по идентификатору")
     @GetMapping("/algo-orders/lookup")
     public AlgoOrder getAlgoOrder(@PathVariable String accountInternalId,
-                                  @ParameterObject ExchangeOrderLookupApiQuery lookup) {
+                                  @Valid @ParameterObject ExchangeOrderLookupApiQuery lookup) {
         return gateway.getAlgoOrder(accountInternalId, lookup.getExternalInstrumentId(),
                 lookup.getExternalId(), lookup.getInternalId());
     }

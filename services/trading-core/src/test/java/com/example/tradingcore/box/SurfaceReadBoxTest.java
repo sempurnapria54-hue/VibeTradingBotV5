@@ -52,6 +52,13 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
     /** Заголовок контекста тенанта — тот же, которым его подаёт периметр. */
     private static final String TENANT_HEADER = "X-Tenant-Id";
 
+    /** Проверка пары со всеми тремя идентичностями: вход без опущения. */
+    private static final String PAIR_CHECK_IN_FULL = PAIR_CHECKS + "?tenantInternalId=" + TENANT
+            + "&exchangeAccountInternalId=" + ACCOUNT + "&instrumentInternalId=" + INSTRUMENT;
+
+    /** Выборка сделок рабочего счёта: вход без опущения. */
+    private static final String DEALS_OF_ACCOUNT = DEALS + "?exchangeAccountInternalId=" + ACCOUNT;
+
     @Test
     @DisplayName("B11.1 — сделки счёта отдаются окном, от новых")
     void dealsOfAnAccountComeBackAsAWindowStartingFromTheNewest() {
@@ -351,6 +358,65 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
         assertThat(rows.count("account_instrument_states")).isZero();
     }
 
+    @Test
+    @DisplayName("B11.17 — проверка пары без идентичности тенанта отвергается контейнером")
+    void aPairCheckWithoutTheTenantIdentityIsRefusedByTheContainer() {
+        assertReadIsRefusedByTheContainerWithout("B11.17 — tenantInternalId", PAIR_CHECK_IN_FULL,
+                PAIR_CHECKS + "?exchangeAccountInternalId=" + ACCOUNT + "&instrumentInternalId=" + INSTRUMENT);
+    }
+
+    @Test
+    @DisplayName("B11.18 — проверка пары без идентичности счёта отвергается контейнером")
+    void aPairCheckWithoutTheAccountIdentityIsRefusedByTheContainer() {
+        assertReadIsRefusedByTheContainerWithout("B11.18 — exchangeAccountInternalId", PAIR_CHECK_IN_FULL,
+                PAIR_CHECKS + "?tenantInternalId=" + TENANT + "&instrumentInternalId=" + INSTRUMENT);
+    }
+
+    @Test
+    @DisplayName("B11.19 — проверка пары без идентичности инструмента отвергается контейнером")
+    void aPairCheckWithoutTheInstrumentIdentityIsRefusedByTheContainer() {
+        assertReadIsRefusedByTheContainerWithout("B11.19 — instrumentInternalId", PAIR_CHECK_IN_FULL,
+                PAIR_CHECKS + "?tenantInternalId=" + TENANT + "&exchangeAccountInternalId=" + ACCOUNT);
+    }
+
+    @Test
+    @DisplayName("B11.20 — сделки счёта без идентичности счёта отвергаются контейнером")
+    void dealsWithoutTheAccountIdentityAreRefusedByTheContainer() {
+        assertReadIsRefusedByTheContainerWithout("B11.20 — exchangeAccountInternalId", DEALS_OF_ACCOUNT, DEALS);
+    }
+
+    @Test
+    @DisplayName("B11.21 — назначение плеча без тела отвергается контейнером, строки не пишется")
+    void assigningTheLeverageWithoutABodyIsRefusedByTheContainerAndWritesNothing() {
+        String unit = "B11.21 — тело PUT /pair-settings";
+        String path = PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT;
+        assertAcceptedByTheContainer(unit, put(path, Bodies.pairSettings(WORKING_LEVERAGE)));
+        Map<String, Long> tables = rows.countsByTable();
+        Integer connectorRequests = connector.count();
+
+        Answer answer = put(path, Bodies.absent());
+
+        // Отсутствие тела — не снимок пустого намерения: пустой объект стёр
+        // бы плечо (B11.12), а здесь не пишется ничего.
+        assertRefusedByTheContainer(unit, answer, tables, connectorRequests);
+        assertThat(rows.count("account_instrument_states")).isZero();
+    }
+
+    /**
+     * Пустое значение — не отсутствие, и тропа у него своя: связыватель
+     * кладёт в параметр пустую строку, а {@code @NotBlank} на параметре
+     * метода исполняет прокси валидации метода — контроллер помечен
+     * {@code @Validated} классом, — а не контейнер. Ожидание то же, что у
+     * {@code B11.20}: граница одна, и вызывающий не обязан знать, каким
+     * звеном она проведена.
+     */
+    @Test
+    @DisplayName("B11.22 — сделки счёта с пустой идентичностью счёта отвергаются тем же отказом")
+    void dealsWithABlankAccountIdentityAreRefusedTheSameWay() {
+        assertReadIsRefusedByTheContainerWithout("B11.22 — exchangeAccountInternalId пуст", DEALS_OF_ACCOUNT,
+                DEALS + "?exchangeAccountInternalId=");
+    }
+
     // ------------------------------------------------------------------
     // Предусловия и наблюдатели группы
     // ------------------------------------------------------------------
@@ -393,12 +459,36 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
                 """, internalId, deal, level);
     }
 
-    /** Проверка пары по трём идентичностям. */
     /** Строка пары рабочего счёта и инструмента. */
     private Map<String, Object> pairRow() {
         return rows.row("account_instrument_states", "instrument_id", instrumentId(INSTRUMENT));
     }
 
+    /**
+     * Клетка обязательного входа читающей точки: вызов без опущения
+     * контейнер принимает, тот же вызов без единицы — отвергает.
+     *
+     * <p><b>Проекции не заведены намеренно.</b> Отказ производит контейнер
+     * раньше исполнителя и состояния базы не видит; вызов без опущения на
+     * пустой базе отвечает исполнителем — признаками либо отказом
+     * неизвестной идентичности, — и отрицания второй половины берутся
+     * разностью от него.
+     *
+     * @param unit     метка клетки с единицей
+     * @param accepted путь с запросом без опущения
+     * @param omitted  тот же путь без единицы
+     */
+    private void assertReadIsRefusedByTheContainerWithout(String unit, String accepted, String omitted) {
+        assertAcceptedByTheContainer(unit, get(accepted));
+        Map<String, Long> tables = rows.countsByTable();
+        Integer connectorRequests = connector.count();
+
+        Answer answer = get(omitted);
+
+        assertRefusedByTheContainer(unit, answer, tables, connectorRequests);
+    }
+
+    /** Проверка пары по трём идентичностям. */
     private Answer pairCheck(String tenantInternalId, String accountInternalId,
                              String instrumentInternalId) {
         return get(PAIR_CHECKS + "?tenantInternalId=" + tenantInternalId

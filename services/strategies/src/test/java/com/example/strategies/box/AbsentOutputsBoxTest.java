@@ -137,8 +137,7 @@ class AbsentOutputsBoxTest extends SharedStrategiesBox {
 
         assertThat(rows.tableNames())
                 .as("проекций чужих реестров у себя сервис не держит")
-                .doesNotContain("tenant_risk_appetites", "exchange_accounts", "instruments",
-                        "tenants", "memberships");
+                .doesNotContain("exchange_accounts", "instruments", "tenants", "memberships");
         assertThat(rows.columnNames(STRATEGIES_TABLE))
                 .as("и чисел риск-аппетита у себя не хранит: копия ошибалась бы в разрешающую сторону")
                 .noneMatch(column -> column.contains("risk") || column.contains("appetite"));

@@ -368,9 +368,9 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 | `U4.17` | `instant("1700000000000")` | `Instant` того же момента — форма без смещения; её несёт время срабатывания условной заявки | `docs/models/mapping/AlgoOrder.md` §«`AlgoOrderExternalSnapshot` → `AlgoOrder`» (`externalTriggerTime`) |  зелено 2026-09-19 |
 | `U4.18` | `instant("")` / `instant(null)` | пустота: у живой защиты времени срабатывания нет, и пустота здесь — штатный исход | там же |  зелено 2026-09-19 |
 | `U4.19` | все пять форм на входе `"00100"` | ведущие нули не роняют разбор: `decimal` даёт `100` масштаба нуль, `epochMillis` — `100` | `docs/models/mapping/Order.md` §«Конвертация (OKX)» |  зелено 2026-09-19 |
-| `U4.20` | `flag("true")` / `flag("false")` | `Boolean.TRUE` / `Boolean.FALSE` | `docs/models/mapping/AlgoOrder.md` §«`AlgoOrderOkxResponse` → `AlgoOrderExternalSnapshot`», строка `reduceOnly` | |
-| `U4.21` | `flag("")` / `flag("  ")` / `flag(null)` | пустота во всех трёх: признак не добыт, и сверку эха он не запускает | там же §«Сверка эха» («пустое эхо … сверку не запускает») | |
-| `U4.22` | `flag("yes")` / `flag("TRUE")` / `flag("1")` | отказ `ExternalInvariantViolationException`, в сообщении — само значение; **не** пустота и **не** `NumberFormatException`: слово вне формы контракта роняет разбор классом нарушения инварианта, как сторона вне словаря (`U6.41`) | там же («значение вне формы контракта роняет разбор на его стороне»); javadoc `OkxParse.flag` | |
+| `U4.20` | `flag("true")` / `flag("false")` | `Boolean.TRUE` / `Boolean.FALSE` | `docs/models/mapping/AlgoOrder.md` §«`AlgoOrderOkxResponse` → `AlgoOrderExternalSnapshot`», строка `reduceOnly` | зелено 2026-10-10 — заход 274 |
+| `U4.21` | `flag("")` / `flag("  ")` / `flag(null)` | пустота во всех трёх: признак не добыт, и сверку эха он не запускает | там же §«Сверка эха» («пустое эхо … сверку не запускает») | зелено 2026-10-10 — заход 274 |
+| `U4.22` | `flag("yes")` / `flag("TRUE")` / `flag("1")` | отказ `ExternalInvariantViolationException`, в сообщении — само значение; **не** пустота и **не** `NumberFormatException`: слово вне формы контракта роняет разбор классом нарушения инварианта, как сторона вне словаря (`U6.41`) | там же («значение вне формы контракта роняет разбор на его стороне»); javadoc `OkxParse.flag` | зелено 2026-10-10 — заход 274 |
 
 ## U5 — Конвертер: числовые и знаковые конвенции границы
 
@@ -480,9 +480,9 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 | `U6.36` | `marginModeToDomain("ISOLATED")` / `("Cross")` / `("portfolio")` / `("net")` | тот же отказ, в сообщении — само значение: сравнение точное, **регистр не подбирается** | там же; реализация `OkxResponseConverter.marginModeToDomain` | зелено 2026-10-09 — заход 270 |
 | `U6.37` | `marginMode(ISOLATED)` / `marginMode(CROSS)` | `"isolated"` / `"cross"` — доменный режим закрытия в словарь площадки | `docs/models/mapping/Position.md` §«OKX close-position request body» | зелено 2026-10-09 — заход 270 |
 | `U6.38` | `marginMode(null)` | `"isolated"` — режим контура, а не пустота: пустой режим закрытия есть тропа всякой нашей позиции | там же («пусто — adapter constant isolated»); §«Close-position request» | зелено 2026-10-09 — заход 270 |
-| `U6.39` | `algoSideToDomain("buy")` / `("sell")` | `AlgoOrder.Direction.BUY` / `SELL` — эхо стороны условной заявки в словаре домена | `docs/models/mapping/AlgoOrder.md` §«Сверка эха» («эхо в словарь домена переводит коннектор») | |
-| `U6.40` | `algoSideToDomain(null)` / `("")` / `("  ")` | **пустота** во всех трёх: молчание источника сверку стороны не запускает. В отличие от стороны обычной заявки (`U6.7`), пустая строка здесь — пустота: перевод спрашивает `isBlank` | там же («Пустое эхо либо пустая декларация сверку не запускают»); javadoc `OkxResponseConverter.algoSideToDomain` | |
-| `U6.41` | `algoSideToDomain("long")` / `("BUY")` | отказ `ExternalInvariantViolationException`, в сообщении — само значение: слово вне формы контракта, а не неизвестный статус (класс иной, чем у стороны обычной заявки, `U6.9`) | там же («значение вне формы контракта роняет разбор на его стороне»); `docs/rules/controlled-exchange-exceptions.md` | |
+| `U6.39` | `algoSideToDomain("buy")` / `("sell")` | `AlgoOrder.Direction.BUY` / `SELL` — эхо стороны условной заявки в словаре домена | `docs/models/mapping/AlgoOrder.md` §«Сверка эха» («эхо в словарь домена переводит коннектор») | зелено 2026-10-10 — заход 274 |
+| `U6.40` | `algoSideToDomain(null)` / `("")` / `("  ")` | **пустота** во всех трёх: молчание источника сверку стороны не запускает. В отличие от стороны обычной заявки (`U6.7`), пустая строка здесь — пустота: перевод спрашивает `isBlank` | там же («Пустое эхо либо пустая декларация сверку не запускают»); javadoc `OkxResponseConverter.algoSideToDomain` | зелено 2026-10-10 — заход 274 |
+| `U6.41` | `algoSideToDomain("long")` / `("BUY")` | отказ `ExternalInvariantViolationException`, в сообщении — само значение: слово вне формы контракта, а не неизвестный статус (класс иной, чем у стороны обычной заявки, `U6.9`) | там же («значение вне формы контракта роняет разбор на его стороне»); `docs/rules/controlled-exchange-exceptions.md` | зелено 2026-10-10 — заход 274 |
 
 ## U7 — Заявка площадки → граничный снапшот
 
@@ -609,7 +609,7 @@ volCcyQuote, confirm]`, поданный в фабрику `CandleOkxResponse.of
 | `U10.15` | пустота вместо формы источника | пустота на выходе — охрана написана явно, потому что метод не порождается | реализация `integrationToSnapshot` |  зелено 2026-09-19 |
 | `U10.16` | `uTime` = `""` (ответ живой ноги цикла) | `externalModifiedAt` — пустота: поле есть в истории и может не приходить у живых | `docs/models/mapping/AlgoOrder.md`, строка `uTime` |  зелено 2026-09-19 |
 | `U10.17` | `failCode` = `"51008"` | `failCode` = `"51008"`: код отказа переносится своим значением, снимается только код успеха | `docs/models/mapping/AlgoOrder.md`, строка `failCode` | зелено 2026-10-09 — заход 269 (дым стенда) |
-| `U10.18` | базовая сборка плюс `side` = `"sell"`, `reduceOnly` = `"true"`; затем `reduceOnly` = `"yes"` | снапшот: `side` = `"sell"` **строкой** (в `Direction` переводит следующий переход, `U21.19`), `reduceOnly` = `TRUE` — признак **уже разобран**; на `"yes"` построение снапшота отказывает `ExternalInvariantViolationException`: признак разбирается на этом переходе, сторона — на следующем, и место отказа у них разное | `docs/models/mapping/AlgoOrder.md` §«`AlgoOrderOkxResponse` → `AlgoOrderExternalSnapshot`», строки `side` и `reduceOnly`; `U4.22` | |
+| `U10.18` | базовая сборка плюс `side` = `"sell"`, `reduceOnly` = `"true"`; затем `reduceOnly` = `"yes"` | снапшот: `side` = `"sell"` **строкой** (в `Direction` переводит следующий переход, `U21.19`), `reduceOnly` = `TRUE` — признак **уже разобран**; на `"yes"` построение снапшота отказывает `ExternalInvariantViolationException`: признак разбирается на этом переходе, сторона — на следующем, и место отказа у них разное | `docs/models/mapping/AlgoOrder.md` §«`AlgoOrderOkxResponse` → `AlgoOrderExternalSnapshot`», строки `side` и `reduceOnly`; `U4.22` | зелено 2026-10-10 — заход 274 |
 
 ## U11 — Живая позиция → граничный снапшот
 
@@ -940,7 +940,7 @@ snapshot».
 | `U21.16` | снапшот контейнера с `externalTotalEquity` = `""` | соответствующее число — **пустота**: конвертер держит конвенцию пустой строки | `U5.1`; `docs/models/mapping/Order.md` §«Конвертация (OKX)» |  зелено 2026-09-19 |
 | `U21.17` | пустота вместо снапшота у любого перехода группы | пустота на выходе | конвенция MapStruct |  зелено 2026-09-19 |
 | `U21.18` | ответ площадки с `ordType` = `"limit"`, `"market"`, `"post_only"` → снапшот → домен | доменная заявка собрана, `type` — **пустота**, отказа нет: тип заявки есть **наше намерение** — перечень `ENTRY`/`ENTRY_ATTACHED_STOP_LOSS`, его пишет исполнитель ядра при создании, и эхо площадки его не трогает, как не трогает статус | `docs/models/domain/core/Order.md` §Структура (`type` — «Бизнес-тип заявки») и писатель `CreateOrderExecutor`; `docs/models/mapping/Order.md` §«`OrderExternalSnapshot` → `Order`», строка `Order.type` |  зелено 2026-09-24 — красна на прежней форме маппера: `IllegalArgumentException` на каждом из трёх (заход 152) |
-| `U21.19` | снапшот условной заявки с `side` = `"sell"`, `reduceOnly` = `TRUE`; затем `side` пуст; затем `side` = `"long"` | доменная копия: `direction` = `SELL`, `positionReducingOnly` = `TRUE` — эхо двух осей сверки в словаре домена; при пустой стороне `direction` пуст, отказа нет; на `"long"` — `ExternalInvariantViolationException` на **этом** переходе | `docs/models/mapping/AlgoOrder.md` §«`AlgoOrderExternalSnapshot` → `AlgoOrder`», строки `side` и `reduceOnly`; §«Сверка эха»; `U6.39`-`U6.41` | |
+| `U21.19` | снапшот условной заявки с `side` = `"sell"`, `reduceOnly` = `TRUE`; затем `side` пуст; затем `side` = `"long"` | доменная копия: `direction` = `SELL`, `positionReducingOnly` = `TRUE` — эхо двух осей сверки в словаре домена; при пустой стороне `direction` пуст, отказа нет; на `"long"` — `ExternalInvariantViolationException` на **этом** переходе | `docs/models/mapping/AlgoOrder.md` §«`AlgoOrderExternalSnapshot` → `AlgoOrder`», строки `side` и `reduceOnly`; §«Сверка эха»; `U6.39`-`U6.41` | зелено 2026-10-10 — заход 274 |
 
 ## U22 — Снапшот → доменная модель обновлением цели
 
@@ -1310,7 +1310,7 @@ kill-switch записал отказом.
 отдельной условной заявки, заведённый сверкой эха раньше, чем до него дошёл
 код тестов, — получили методы в классах своих групп заходом 274
 (`OkxParseTest`, `ConverterDictionaryTest`, `AlgoOrderToSnapshotTest`,
-`SnapshotToDomainCreationTest`); клетка «Факт» у них пуста до прогона.
+`SnapshotToDomainCreationTest`) и зелены прогоном того же захода.
 
 **Кейсы охраны второго рубежа прогоняемы, и их пометка означает другое.**
 Таких кейсов **пять**, и рубеж у них разный:

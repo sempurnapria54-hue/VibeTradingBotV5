@@ -129,6 +129,11 @@ class AccessContourBoxTest extends SharedConnectorBox {
         assertThat(unsupported.carriesErrorDto()).isTrue();
     }
 
+    /**
+     * Отрицание обращений к соседям здесь не повторяется: его дом — B10.3,
+     * и счётчик стаба соседа на нуле подтверждал бы прежде всего то, что
+     * адреса соседа сервису не назначено.
+     */
     @Test
     @DisplayName("B8.7 — строк отказа доступа коннектор не пишет")
     void b8_7_theConnectorWritesNoAccessDenialRows() {
@@ -139,7 +144,6 @@ class AccessContourBoxTest extends SharedConnectorBox {
         getWith(account(POSITIONS), identity.expiredToken());
 
         assertThat(secrets.reads() - readsBefore).isEqualTo(0);
-        assertThat(neighbour.count()).isEqualTo(0);
         assertThat(exchange.count()).isEqualTo(0);
     }
 }

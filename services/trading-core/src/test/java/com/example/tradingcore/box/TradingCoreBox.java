@@ -1,5 +1,6 @@
 package com.example.tradingcore.box;
 
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
@@ -134,6 +135,12 @@ abstract class TradingCoreBox {
 
     /** Класс отказа «негодный вход вызова» единого error-DTO. */
     protected static final String INVALID_REQUEST = "INVALID_REQUEST";
+
+    /**
+     * Класс отказа контейнера единого error-DTO: непредъявленная
+     * обязательная часть вызова либо нарушенное ограничение валидации.
+     */
+    protected static final String REQUEST_NOT_ACCEPTED = "REQUEST_NOT_ACCEPTED";
 
     /** Класс отказа «сосед недоступен» единого error-DTO — слово, общее с периметром и `strategies`. */
     protected static final String PEER_UNAVAILABLE = "PEER_UNAVAILABLE";
@@ -672,6 +679,49 @@ abstract class TradingCoreBox {
     /** Вызов неподдержанным методом под сервисным токеном. */
     protected Answer delete(String path) {
         return send(authorized(request(path)).DELETE());
+    }
+
+    /**
+     * Первая половина клетки обязательного входа: вызов без опущения
+     * контейнер принимает.
+     *
+     * <p>Без неё ожидание «отказ контейнера» было бы истинно и на вызове,
+     * который контейнер отвергает целиком по чужой причине (опечатка в
+     * имени поля, негодный путь), и клетка мерила бы её, а не единицу.
+     * Исход дальше контейнера здесь не утверждается: исполнитель вправе
+     * ответить и отказом своего класса.
+     *
+     * @param unit  метка клетки с единицей — для сообщения падения
+     * @param whole ответ на вызов без опущения
+     */
+    protected static void assertAcceptedByTheContainer(String unit, Answer whole) {
+        String refusalClass = isTrue(whole.carriesErrorDto()) ? whole.errorCode() : null;
+        assertThat(refusalClass)
+                .as("%s: вызов без опущения проходит контейнер; ответ %s %s", unit, whole.status(), whole.body())
+                .isNotEqualTo(REQUEST_NOT_ACCEPTED);
+    }
+
+    /**
+     * Вторая половина клетки обязательного входа: отказ контейнера единым
+     * error-DTO и ни одного следа — ни строки в таблицах схемы, ни запроса
+     * к площадке.
+     *
+     * @param unit              метка клетки с единицей — для сообщения падения
+     * @param answer            ответ на вызов без единицы
+     * @param tables            снимок числа строк до вызова без единицы
+     * @param connectorRequests число запросов к площадке до него же
+     */
+    protected void assertRefusedByTheContainer(String unit, Answer answer, Map<String, Long> tables,
+                                               Integer connectorRequests) {
+        assertThat(answer.status()).as("%s: число отказа входа; ответ %s", unit, answer.body()).isEqualTo(400);
+        assertThat(answer.carriesErrorDto()).as("%s: тело — единый error-DTO; ответ %s", unit, answer.body())
+                .isTrue();
+        assertThat(answer.errorCode())
+                .as("%s: отказ контейнера — не исполнитель и не непредусмотренное", unit)
+                .isEqualTo(REQUEST_NOT_ACCEPTED);
+        assertThat(rows.countsByTable()).as("%s: строк в таблицах схемы не прибавилось", unit).isEqualTo(tables);
+        assertThat(connector.count()).as("%s: к площадке не ушло ни одного запроса", unit)
+                .isEqualTo(connectorRequests);
     }
 
     private HttpRequest.Builder request(String path) {

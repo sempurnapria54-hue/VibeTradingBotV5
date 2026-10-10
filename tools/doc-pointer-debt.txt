@@ -36,10 +36,6 @@
 .claude/work/decision-digest.md	tools/insertion-neighborhood-check.py
 .claude/work/decision-digest.md	tools/scheduler-capacity-check.py
 .claude/work/decision-digest.md	tools/trap-index-debt.txt
-.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-conventions.md
-.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-disaster.md
-.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-divergence.md
-.claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-performance.md
 .claude/work/progress/phase-2-step-12-chronicle.md	.claude/work/progress/phase-2-step-12-focus-security.md
 .claude/work/progress/phase-2-step-12-fix-test-auth-12.md	.claude/snapshots/snapshot-v305.md
 .claude/work/progress/phase-2-step-12-fix-test-auth-5.md	.claude/snapshots/snapshot-v291.md

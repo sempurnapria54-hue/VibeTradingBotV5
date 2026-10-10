@@ -3560,6 +3560,78 @@ RETIRED = [
             ('docs/models/mapping/Position.md', None),
         ),
     },
+    {
+        'name': 'непринятый набор риск-аппетита ядро не роняет; код LOSS_LIMIT_NOT_CONFIGURED',
+        # Снято решением держателя 2026-10-09 (Д2864; код — заход 272,
+        # .claude/decisions/risk-appetite-environment-config.md): ядро с
+        # непринятым набором стартовало, а пустое число отказывало адресным
+        # кодом на действии. Что действует теперь — объявляет ключ `arrived`
+        # у каждого носителя популяции.
+        'pattern': r'LOSS_LIMIT_NOT_CONFIGURED'
+                   r'|[Нн]епринятый\s+набор\s+ядро\s+не\s+роняет'
+                   r'|набор\s+старт\s+не\s+роняет',
+        'arrived': r'ядро\s+не\s+стартует|роняет\s+(?:его\s+)?старт',
+        'date': '2026-10-09',
+        'source': 'решение держателя 2026-10-09 (Д2864; .claude/decisions/risk-appetite-environment-config.md), код — заход 272',
+        # Заметка — наблюдение корпуса на свой день (.claude/rules/naming.md
+        # §«Заметки»): её пункт 12 цитирует дом кодов 2026-09-24.
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/notes/2026-09-24-step-12-test-focus-trading-core-box-b3-b4-b7-b8.md'),
+        'population': (
+            ('docs/rules/risk-policy.md', None),
+            ('docs/rules/loss-streak-halt.md', None),
+            ('docs/components/RiskValidator.md', None),
+            ('docs/components/models/RiskCheckResult.md', None),
+            ('docs/processes/risk-evaluation.md', None),
+            ('docs/spec/loss-streak-halt.json', None),
+            ('services/trading-core/src/main/java/com/example/tradingcore/'
+             'domain/service/RiskAppetiteService.java', None),
+            ('services/trading-core/src/main/java/com/example/tradingcore/'
+             'domain/command/risk/RiskValidator.java', None),
+            ('services/trading-core/src/main/java/com/example/tradingcore/'
+             'domain/command/risk/RiskCheckResult.java', None),
+        ),
+    },
+    {
+        'name': 'риск-аппетит — строка тенанта с катастрофическими множителями',
+        # Снято решением 2026-10-09 (.claude/decisions/risk-appetite-environment-config.md;
+        # множитель — .claude/decisions/deal-leverage-ceiling.md): числа
+        # риск-аппетита жили строкой тенанта у ядра с точкой записи, а
+        # катастрофический потолок сделки — парой множителей. Что действует
+        # теперь — объявляет ключ `arrived` у каждого носителя популяции.
+        'pattern': r'tenant_risk_appetites|risk-appetites/\{'
+                   r'|globalCatastrophicRiskPerDealMultiplier'
+                   r'|strategyCatastrophicRiskPerDealMultiplier'
+                   r'|catastrophicLossCeiling'
+                   r'|STRATEGY_CATASTROPHIC_MULTIPLIER_ABOVE_GLOBAL',
+        'arrived': r'globalMaxLeverage|globalSimultaneousRiskPerTenantPercent',
+        'date': '2026-10-09',
+        'source': '.claude/decisions/risk-appetite-environment-config.md (Д2864, узел 1e шага 12 фазы 2)',
+        # Документы кейсов называют снятое как историю своей строки: строка
+        # предусловия дыма — прежнюю форму точки, правленную кодовым заходом;
+        # замер G1 — перечень кодов своего дня с пометкой о снятии кода.
+        # Миграции — применённый факт (.claude/rules/codestyle.md
+        # §«Применённая миграция неизменяема»): V1 таблицу заводил, V19 её
+        # удаляет, и правке ни та, ни другая не подлежат.
+        'allowed': ('.claude/work/decision-digest.md',
+                    '.claude/decisions/risk-appetite-environment-config.md',
+                    '.claude/decisions/deal-leverage-ceiling.md',
+                    '.claude/tests/cases/smoke-live.md',
+                    '.claude/tests/cases/strategies.md',
+                    'services/trading-core/src/main/resources/db/migration/trading-core/'
+                    'V1__trading_core_baseline.sql',
+                    'services/trading-core/src/main/resources/db/migration/trading-core/'
+                    'V19__risk_appetite_environment_config.sql'),
+        'population': (
+            ('docs/rules/risk-policy.md', None),
+            ('docs/models/domain/core/Tenant.md',
+             r'Чисел\s+риск-аппетита\s+тенант\s+не\s+несёт'),
+            ('docs/rules/strategy-validation.md', None),
+            ('docs/architecture/platform.md', None),
+            ('docs/spec/risk-limits.json', None),
+            ('docs/spec/strategy-reference.json', None),
+        ),
+    },
 ]
 
 

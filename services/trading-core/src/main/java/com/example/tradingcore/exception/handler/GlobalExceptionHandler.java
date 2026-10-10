@@ -4,6 +4,7 @@ import static java.util.Objects.isNull;
 
 import com.example.platform.exception.PeerServiceUnavailableException;
 import com.example.tradingbot.api.model.ErrorApiResponse;
+import jakarta.validation.ConstraintViolationException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    /** Класс отказа контейнера и равного ему отказа валидации вызова. */
+    private static final String REQUEST_NOT_ACCEPTED = "REQUEST_NOT_ACCEPTED";
 
     /**
      * Отказ при запуске сервисной операции: недопустимая пара, объект вне
@@ -77,6 +81,39 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
+     * Нарушенное ограничение параметра вызова, проверенное прокси валидации
+     * метода, — тот же отказ контейнера, что и непредъявленный параметр.
+     *
+     * <p><b>Почему он не доходит до унаследованных обработчиков.</b>
+     * Контроллер, помеченный {@code @Validated} классом, встроенную
+     * валидацию метода Spring MVC выключает
+     * ({@code HandlerMethod#shouldValidateArguments} отдаёт ложь), и
+     * ограничение параметра проверяет прокси валидации метода — он бросает
+     * {@link ConstraintViolationException}, которого
+     * {@link ResponseEntityExceptionHandler} не знает. Без этого обработчика
+     * пустое значение обязательного параметра уходило в последний
+     * обработчик пятисотым — «чини сервер» на негодный вход вызова.
+     *
+     * <p><b>Число — то же, что контейнер ставит встроенной валидации
+     * параметра</b>, а класс — тот же, что у прочих отказов контейнера
+     * (docs/rules/error-handling-policy.md §«Класс отказа — значение поля
+     * {@code code}, и перечень его закрыт», строка
+     * {@code REQUEST_NOT_ACCEPTED}). Пояснение постоянное: текст исключения
+     * несёт имя метода контроллера и уходит в лог.
+     *
+     * <p><b>Охват назван по коду, а не по замыслу:</b> ограничения валидации
+     * в сервисе стоят только на api-моделях и параметрах контроллера, и
+     * другого бросающего этот класс на тропе запроса нет. Ограничение,
+     * заведённое на сущности, бросало бы его на записи — дефектом нашей
+     * стороны, — и этот обработчик назвал бы его отказом входа.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorApiResponse> onConstraintViolation(ConstraintViolationException failure) {
+        log.info("Request is refused by method validation: {}", failure.getMessage());
+        return response(HttpStatus.BAD_REQUEST, REQUEST_NOT_ACCEPTED, "Нарушено ограничение валидации вызова");
+    }
+
+    /**
      * Всё непредусмотренное — наш дефект, а не вход вызывающего.
      *
      * <p><b>Текст исключения наружу не идёт</b>
@@ -97,7 +134,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleExceptionInternal(Exception failure, Object body,
                                                              HttpHeaders headers, HttpStatusCode statusCode,
                                                              WebRequest request) {
-        return new ResponseEntity<>(errorBody("REQUEST_NOT_ACCEPTED", detailOf(failure, body)),
+        return new ResponseEntity<>(errorBody(REQUEST_NOT_ACCEPTED, detailOf(failure, body)),
                 headers, statusCode);
     }
 

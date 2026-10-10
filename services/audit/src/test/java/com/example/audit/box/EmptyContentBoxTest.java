@@ -7,20 +7,19 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Клетка {@code B2.6}, второе звено — тело, заданное пустой строкой
+ * Клетка {@code B2.6} — тело, заданное пустой строкой
  * (.claude/tests/cases/audit.md).
  *
- * <p><b>Исход совпал с первым звеном, а звено другое, и это не
- * педантизм.</b> Предикат полноты пустую строку ПРОПУСКАЕТ — значение
- * непусто как ссылка, — и останавливает приём приведение к документу на
- * стороне базы. Ровно этот зазор и есть находка {@code F-1}: обязательность
- * входа мерится ненулевой ссылкой, а не непустым значением, и там, где
- * колонка типа не отвергает, исхода не остаётся вовсе
- * ({@link EmptyMandatoryValuesBoxTest}).
+ * <p><b>Звено то же, что у записи без тела, — предикат полноты.</b> После
+ * закрытия находки {@code F-1} его конъюнкт {@code isNotBlank(content)}
+ * ({@code AuditRecord#hasCompleteInput}) мерит непустое значение, а не
+ * ненулевую ссылку, и до приведения к документу на стороне базы такая
+ * запись не доходит.
  *
- * <p><b>Свой класс у звена потому, что оно — второе отравленное
+ * <p><b>Свой класс у входа потому, что он — второе отравленное
  * сообщение</b>, а два таких в одном контексте не уживаются
- * ({@link PoisonedReceptionBox}).
+ * ({@link PoisonedReceptionBox}); запись без тела —
+ * {@link MissingContentBoxTest}.
  *
  * <p>Исход общий всей группе, и он собран в базовом классе
  * ({@link PoisonedReceptionBox#assertReceptionHalted()}): строки журнала
@@ -35,8 +34,8 @@ class EmptyContentBoxTest extends PoisonedReceptionBox {
     }
 
     @Test
-    @DisplayName("B2.6 (второе звено) — Содержимое пустой строкой")
-    void anEmptyBodyStopsReceptionAtTheDatabaseInstead() {
+    @DisplayName("B2.6 — Содержимое пустой строкой")
+    void anEmptyStringBodyStopsReceptionAtTheCompletenessPredicate() {
         givenReceptionStateRows();
 
         poison(envelope(POISON_EVENT, occurredAt), TENANT, "");

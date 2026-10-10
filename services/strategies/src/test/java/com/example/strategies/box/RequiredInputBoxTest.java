@@ -38,16 +38,14 @@ import org.junit.jupiter.params.provider.MethodSource;
  * группы {@code B2}-{@code B5}; поданный здесь, переход сдвинул бы статус, о
  * неизменности которого строка и утверждает.
  *
- * <p><b>Строк {@code B11.23}-{@code B11.25} здесь нет: их предусловие
- * поставить нечем.</b> Объявление {@code STOCHASTIC} контейнер отвергает
- * целиком: у полей {@code kPeriod} и {@code dPeriod} Lombok под капитализацией
- * {@code beanspec} печатает {@code setkPeriod}/{@code getkPeriod}, а
- * сериализатор провода (Jackson 3) аксессора со строчной буквой после
- * префикса не опознаёт — оба поля остаются пустыми при любом теле, и
- * {@code @NotNull} отвергает вход без опущения тем же классом. Строка на
- * таком входе была бы зелена тавтологически; клетки гейтятся находкой
- * документа кейсов (.claude/tests/cases/strategies.md §«Находки владельцам»,
- * F-11).
+ * <p><b>Первая половина уже поймала дефект, против которого заведена.</b>
+ * Объявление {@code STOCHASTIC} контейнер прежде отвергал целиком: у полей
+ * {@code kPeriod} и {@code dPeriod} сериализатор провода (Jackson 3) не
+ * опознавал аксессоров {@code getkPeriod}/{@code setkPeriod}, и
+ * {@code @NotNull} отвергал вход без опущения тем же классом, что и с
+ * опущением (находка F-11, .claude/tests/cases/strategies.md §«Находки
+ * владельцам»). Строки {@code B11.23}-{@code B11.25} стоят с её закрытием
+ * явным именем поля; что объявление доезжает целиком, мерит {@code B3.4}.
  *
  * <p><b>У {@code B11.12} и {@code B11.13} рубежей два, и по коду первым
  * отвечает разбор тела.</b> Тип объявления индикатора есть внешнее свойство
@@ -87,6 +85,10 @@ class RequiredInputBoxTest extends SharedStrategiesBox {
 
     /** Полное объявление {@code OBV}. */
     private static final String OBV = indicator("OBV", "\"enabled\": true");
+
+    /** Полное объявление {@code STOCHASTIC}: три периода, каждый своим числом. */
+    private static final String STOCHASTIC = indicator("STOCHASTIC",
+            "\"kPeriod\": 14, \"dPeriod\": 3, \"smoothPeriod\": 5");
 
     /** Полное объявление {@code BOLLINGER_BANDS}. */
     private static final String BOLLINGER_BANDS = indicator("BOLLINGER_BANDS",
@@ -205,6 +207,12 @@ class RequiredInputBoxTest extends SharedStrategiesBox {
                         withIndicator(indicator("MACD", "\"fastPeriod\": 12, \"slowPeriod\": 26"))),
                 Arguments.of("B11.22 — ObvParamsApiModel.enabled", withIndicator(OBV),
                         withIndicator(indicator("OBV", ""))),
+                Arguments.of("B11.23 — StochasticParamsApiModel.kPeriod", withIndicator(STOCHASTIC),
+                        withIndicator(indicator("STOCHASTIC", "\"dPeriod\": 3, \"smoothPeriod\": 5"))),
+                Arguments.of("B11.24 — StochasticParamsApiModel.dPeriod", withIndicator(STOCHASTIC),
+                        withIndicator(indicator("STOCHASTIC", "\"kPeriod\": 14, \"smoothPeriod\": 5"))),
+                Arguments.of("B11.25 — StochasticParamsApiModel.smoothPeriod", withIndicator(STOCHASTIC),
+                        withIndicator(indicator("STOCHASTIC", "\"kPeriod\": 14, \"dPeriod\": 3"))),
                 Arguments.of("B11.26 — BollingerBandsParamsApiModel.period", withIndicator(BOLLINGER_BANDS),
                         withIndicator(indicator("BOLLINGER_BANDS", "\"deviationMultiplier\": 2.0"))),
                 Arguments.of("B11.27 — BollingerBandsParamsApiModel.deviationMultiplier",

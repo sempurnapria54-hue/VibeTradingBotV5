@@ -432,6 +432,34 @@ class ManualHaltBoxTest extends SharedTradingCoreBox {
         assertThat(eventTypes()).contains(HOLD_RELEASED);
     }
 
+    /**
+     * Единица — тело целиком, и точек у неё две: обязательность тела стоит
+     * у каждой операции своей аннотацией, поэтому ассерт у каждой точки
+     * свой, и красный прогон называет ту, что потеряла охрану.
+     *
+     * <p><b>Счёт не заведён намеренно.</b> Отказ производит контейнер раньше
+     * исполнителя, и состояния базы он не видит; вызов без опущения уходит к
+     * исполнителю и отвечает отказом его класса — неизвестной идентичностью,
+     * — чем и подтверждает, что контейнер его принял. Отрицания второй
+     * половины берутся разностью от первой
+     * (.claude/tests/cases/trading-core.md §«Исход по единице обязательного
+     * входа»).
+     */
+    @Test
+    @DisplayName("B6.19 — вызов без тела отвергается контейнером у обеих операций")
+    void aCallWithoutABodyIsRefusedByTheContainerAtBothOperations() {
+        for (String path : List.of(HALTS, HALT_CLEARANCES)) {
+            String unit = "B6.19 — тело " + path;
+            assertAcceptedByTheContainer(unit, post(path, Bodies.halt("FREEZE", ACCOUNT)));
+            Map<String, Long> tables = rows.countsByTable();
+            Integer connectorRequests = connector.count();
+
+            Answer answer = post(path, Bodies.absent());
+
+            assertRefusedByTheContainer(unit, answer, tables, connectorRequests);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Предусловия группы
     // ------------------------------------------------------------------
