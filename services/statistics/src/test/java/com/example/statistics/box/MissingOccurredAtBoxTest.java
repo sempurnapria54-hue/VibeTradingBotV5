@@ -13,6 +13,12 @@ import org.springframework.test.context.DynamicPropertySource;
  * пустой делает измерение произвольным: нижняя граница полноты выводится
  * именно из него (docs/rules/durable-consumer-reception.md §«Нижняя граница»).
  *
+ * <p><b>Класс записи — НЕНЕСОМЫЙ, и это и есть единица клетки.</b> У несомого
+ * класса пустой момент ловит второй охранник — предикат полноты факта, — и
+ * снятая охрана конверта на нём не видна: контрольный прогон группы с осью
+ * «{@code requireEnvelope} не зовётся» уронил одну {@code B2.1}. У ненесомого
+ * охрана конверта единственная: без неё запись ушла бы в принятые без факта.
+ *
  * <p>Исход общий всей группе
  * ({@link PoisonedReceptionBox#assertReceptionHalted()}).
  */
@@ -28,7 +34,7 @@ class MissingOccurredAtBoxTest extends PoisonedReceptionBox {
     void aMessageWithoutTheOccurrenceMomentStopsReception() {
         givenReceptionStateRows();
 
-        poisonWithout(OCCURRED_AT);
+        poison(envelopeWithout(NOT_CARRIED, OCCURRED_AT), TENANT, Bodies.incident(ACCOUNT));
 
         assertReceptionHalted();
     }

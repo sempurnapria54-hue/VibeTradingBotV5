@@ -70,6 +70,10 @@ class TeardownTracePathTest {
 
     private static final List<String> LIVE_ORDER = List.of("CREATED", "PENDING", "ACTIVE", "PARTIALLY_COMPLETED");
 
+    private static final String ACCESS_DENIALS = "access_denials";
+
+    private static final List<Party> DENIAL_SIDES = List.of(Party.AUDIT, Party.STATISTICS);
+
     private static Trail trail;
 
     private static String deal;
@@ -90,6 +94,12 @@ class TeardownTracePathTest {
 
     private static Integer lossCount;
 
+    /**
+     * Строк отказа доступа у сторон в начале тропы: базы общего стенда несут
+     * строки прежних классов, и {@code E8.4} утверждает о приросте за тропу.
+     */
+    private static Map<Party, Long> denialsBefore;
+
     @BeforeAll
     static void walkTheTrail() {
         trail = SharedStand.dealPath(TeardownTracePathTest.class);
@@ -97,6 +107,7 @@ class TeardownTracePathTest {
         trail.statisticsRecomputes(RECOMPUTE_EVERY_TWO_SECONDS);
         trail.side(Party.TRADING_CORE).set(MIN_AGE, "0s");
         trail.renew(Party.TRADING_CORE);
+        denialsBefore = trail.counts(ACCESS_DENIALS, DENIAL_SIDES);
         deal = walkToScaledIn(trail);
         trail.relayCore();
         strategyOutbox = trail.rows(Party.STRATEGIES, "outbox_events");
@@ -229,10 +240,11 @@ class TeardownTracePathTest {
                 .containsOnly("CLOSED");
         assertThat(commands(trail)).as("E8.4: ни одной торговой команды после снятия риска к стабу не ушло")
                 .isEmpty();
-        assertThat(trail.database(Party.AUDIT).count("access_denials")).as("E8.4: строк отказа доступа у audit нет")
-                .isZero();
-        assertThat(trail.database(Party.STATISTICS).count("access_denials"))
-                .as("E8.4: строк отказа доступа у statistics нет").isZero();
+        assertThat(denialsBefore).as("E8.4: отметка снята у обеих сторон с базой отказов")
+                .containsOnlyKeys(DENIAL_SIDES);
+        assertThat(trail.counts(ACCESS_DENIALS, DENIAL_SIDES))
+                .as("E8.4: строк отказа доступа у audit и statistics за тропу не прибавилось (отметка — начало тропы)")
+                .isEqualTo(denialsBefore);
         assertThat(safetyState(trail).path("consecutiveLossCount").asInt()).as("E8.4: серия убытков не двигалась")
                 .isEqualTo(lossCount);
     }

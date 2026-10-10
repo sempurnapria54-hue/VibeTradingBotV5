@@ -251,10 +251,14 @@ class CoreEventFormTest {
      * Сделка, закрытая стопом, везёт проскок выхода по стопу, посчитанный
      * писателем терминала по графу прохода, и причину закрытия словом, по
      * которому статистика ветвится (docs/spec/stop-exit-slippage.json).
+     *
+     * <p>Клетка {@code B9.11} документа .claude/tests/cases/trading-core.md:
+     * ящик её не достаёт — у стаба соседа нет тропы сработавшей встроенной
+     * защиты, — и носитель её ожидания — эта проба писателя формы.
      */
     @Test
-    @DisplayName("Терминал сделки, закрытой стопом, несёт проскок выхода и причину словом провода")
-    void theStopClosedTerminalCarriesTheStopExitSlippage() throws Exception {
+    @DisplayName("B9.11 — терминал сделки, закрытой стопом, несёт проскок выхода и причину словом провода")
+    void b9_11_theStopClosedTerminalCarriesTheStopExitSlippage() throws Exception {
         Deal deal = stopClosedDeal();
         DealContext context = context(deal, true, definition());
 

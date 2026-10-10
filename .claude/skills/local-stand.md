@@ -153,6 +153,16 @@ ETH-USDT-SWAP (`015411e5-451c-488c-9b5d-25bf4e39442b`) и SOL-USDT-SWAP
 инструмент в загрузке. Такую группу заводит заново только удаление группы и
 её свечей (при остановленном `market-data`) и новое требование.
 
+**Пока на счёте живая сделка, мак не засыпает.** Сон останавливает стенд
+целиком, а после пробуждения часы VM Docker отстают: площадка отвечает
+`50102 Timestamp request expired`, обновления сделки расходуют бюджет
+повторов, и сделка уходит в `ERROR` — сопровождение прекращается, позицию
+держит только защита на площадке (наблюдено 2026-10-09/10). Держать
+`caffeinate -s` либо настройку «не засыпать от сети»; с захода 276
+коннектор подписывает запросы по часам площадки, и `50102` бюджета сделки не
+тратит (`docs/components/IntegrationService.md`), но сон по-прежнему
+останавливает сопровождение.
+
 **Прямой запрос к OKX из скрипта на хосте несёт заголовок `User-Agent`:**
 без него пограничный фильтр площадки отвечает на запрос `urllib` ошибкой с
 телом не в JSON; клиент коннектора свой заголовок ставит сам.
@@ -201,6 +211,22 @@ Traefik исполняет его умолчанием: `/admin/master/console/`
 | Vault | `kubectl -n vault-system port-forward svc/vault 8200:8200` | корневой токен — в `%LOCALAPPDATA%\vibetrading-stand\vault-init.json` |
 | Postgres | `kubectl -n dev port-forward svc/platform-postgres-rw 5432:5432` | по роли: `kubectl -n dev get secret postgres-role-market-data -o jsonpath='{.data.password}' \| base64 -d` |
 | Поверхность сервиса | `kubectl -n dev port-forward svc/market-data 8080:8080` | открыта только проба живости `/actuator/health`; остальное требует токена провайдера |
+
+**Потребление ресурсов стенда.** Grafana (строка выше) — дашборды
+«Kubernetes / Compute Resources / Cluster», «… / Namespace (Pods)», «… /
+Pod», «… / Node (Pods)» и «Node Exporter / Nodes»: их данные Prometheus берёт
+у kubelet и cAdvisor сам. Kubernetic, Lens и `kubectl top` читают
+**metrics-server** — он стои́т только на стенде (`tools/stand/metrics-server.yaml`,
+применяет `tools/stand/up.sh`; флаг `--kubelet-insecure-tls` верен лишь для
+kind). Контекст клиента — `kind-vibetrading`. Цели Prometheus
+`kube-controller-manager`, `kube-etcd`, `kube-proxy`, `kube-scheduler` в kind
+`down`: компоненты слушают только `localhost` узла — дашборды плоскости
+управления пусты, ресурсные — полны. Лимиты: VM Docker Desktop — 12 CPU и
+23.4 GiB (настройка Docker Desktop), узел kind берёт их целиком. Квота и умолчания
+контейнера пространства `dev` — `deploy/dev/resource-limits.yaml` (в
+Kubernetic: пространство `dev`, ResourceQuota `environment-resources` —
+«использовано / из квоты», LimitRange `container-defaults`); лимита CPU нет
+намеренно — довод в шапке файла.
 
 **Ключ распечатывания Vault и корневой токен лежат вне репозитория** — в
 `%LOCALAPPDATA%\vibetrading-stand\vault-init.json`. Это единственный

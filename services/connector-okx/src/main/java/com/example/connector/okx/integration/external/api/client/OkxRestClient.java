@@ -2,6 +2,7 @@ package com.example.connector.okx.integration.external.api.client;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -35,6 +36,7 @@ import com.example.connector.okx.util.OkxConstants;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -116,6 +118,7 @@ public class OkxRestClient {
 
     private final RestClient okxRestClientHttp;
     private final SignedRestClientFactory signedClientFactory;
+    private final OkxServerClock serverClock;
 
     /**
      * Единая точка отправки запроса в OKX: типизированные методы ниже
@@ -126,9 +129,33 @@ public class OkxRestClient {
      * сериализует {@code body}, биндит ответ в {@code responseType}.
      * Тип ответа выбирает вызывающий типизированный метод —
      * {@code OkxApiResponse<*OkxResponse>} своей операции.
+     *
+     * <p><b>Отказ по метке подписи исправляется здесь.</b> Приватный запрос,
+     * отвергнутый кодом {@code 50102}, перемеряет смещение часов площадки
+     * ({@link OkxServerClock#resync}), и <b>чтение</b> повторяется один раз,
+     * новым моментом. <b>Команда не повторяется</b>, хотя смещение
+     * перемеряется и для неё: свой идентификатор площадка ключом
+     * идемпотентности не делает, и повтор постановки был бы второй
+     * постановкой, если первая состоялась; её повторяет ядро своей тропой
+     * поиска. Отказ, переживший замер, уезжает читателю источника как есть —
+     * класс ему ставит он (docs/components/IntegrationService.md).
      */
     public <R> R dispatch(HttpMethod method, String path, Map<String, ?> query, Object body,
                           ExchangeCredentials credentials, ParameterizedTypeReference<R> responseType) {
+        R response = send(method, path, query, body, credentials, responseType);
+        if (isFalse(timestampRejected(credentials, response))) {
+            return response;
+        }
+        Boolean resynced = serverClock.resync();
+        if (isTrue(resynced) && HttpMethod.GET.equals(method)) {
+            return send(method, path, query, body, credentials, responseType);
+        }
+        return response;
+    }
+
+    /** Один запрос площадке: клиент по наличию ключей, URI, тело, разбор ответа. */
+    private <R> R send(HttpMethod method, String path, Map<String, ?> query, Object body,
+                       ExchangeCredentials credentials, ParameterizedTypeReference<R> responseType) {
         RestClient restClient = isNull(credentials)
                 ? okxRestClientHttp
                 : signedClientFactory.forCredentials(credentials);
@@ -478,6 +505,17 @@ public class OkxRestClient {
         query.put(OkxConstants.PARAM_TD_MODE, OkxConstants.TD_MODE_ISOLATED);
         query.put(OkxConstants.PARAM_INST_FAMILY, instFamily);
         return dispatch(HttpMethod.GET, OkxConstants.POSITION_TIERS_PATH, query, null, null, POSITION_TIER_TYPE);
+    }
+
+    /**
+     * Отвергла ли площадка ПОДПИСАННЫЙ запрос по метке времени. Публичный
+     * запрос метки не несёт, и тот же код у него означал бы не расхождение
+     * часов, а чужое.
+     */
+    private Boolean timestampRejected(ExchangeCredentials credentials, Object response) {
+        return nonNull(credentials)
+                && response instanceof OkxApiResponse<?> envelope
+                && Objects.equals(OkxConstants.TIMESTAMP_EXPIRED_CODE, envelope.getCode());
     }
 
     /** Значение пригодно для query-параметра: не null и (для строк) не blank. */

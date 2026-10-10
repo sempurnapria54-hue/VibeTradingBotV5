@@ -3404,7 +3404,8 @@ RETIRED = [
         'allowed': ('.claude/work/decision-digest.md',),
         'population': (
             ('.claude/skills/test-design.md', None),
-            ('.claude/work/backlog.md', r'Субстратов\s+четыре'),
+            # Секция бэклога, нёсшая пришедшую редакцию, закрыта доковой
+            # пачкой 2026-10-10 (заход 275) — носитель снят из популяции.
             ('.claude/tests/cases/auth.md',
              r'JWKS-стаб[а-яё]*\s+провайдера\s+идентичности'),
         ),

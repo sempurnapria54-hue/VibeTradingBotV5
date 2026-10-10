@@ -1,6 +1,8 @@
 package com.example.tradingcore.box;
 
 import static java.util.Objects.isNull;
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
+import static org.apache.commons.lang3.BooleanUtils.isTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.trade.market_phase.MarketPhase;
@@ -8,6 +10,7 @@ import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -109,6 +112,45 @@ class ProactiveDetectionBoxTest extends SharedLiveDealBox {
 
     /** Клиентский идентификатор ЧУЖОЙ заявки: маркера контура на нём нет. */
     private static final String FOREIGN_CLIENT_ID = "someone-else-1";
+
+    /** Реализованный результат закрытого эпизода сделки: убыток. */
+    private static final String LOSS = "-5";
+
+    /** Режим маржи записи, которую открыла не наша заявка. */
+    private static final String CROSS = "CROSS";
+
+    /** Режим маржи контура: им уходят наши заявки. */
+    private static final String CONTOUR_MARGIN_MODE = "ISOLATED";
+
+    /** Query-параметр режима маржи у закрытия позиции. */
+    private static final String MARGIN_MODE = "marginMode";
+
+    /**
+     * Предел попыток снятия риска — {@code kill-switch.max-teardown-attempts}
+     * субстрата (умолчание конфигурации ядра).
+     */
+    private static final Integer TEARDOWN_ATTEMPTS = 3;
+
+    /** Запись иного режима уходит из среза после своего закрытия. */
+    private static final Boolean RECORD_LEAVES_ON_CLOSE = Boolean.TRUE;
+
+    /** Запись иного режима закрытие переживает: срез отдаёт её на каждом чтении. */
+    private static final Boolean RECORD_SURVIVES_CLOSE = Boolean.FALSE;
+
+    /** Сценарий стаба: позиция сделки и запись иного режима на одной паре. */
+    private static final String PAIR_SCENARIO = "pair-with-foreign-margin-record";
+
+    /** Сценарий стаба: одиночная запись иного режима на паре без сделки. */
+    private static final String LONE_RECORD_SCENARIO = "lone-foreign-margin-record";
+
+    /** Состояние сценария: закрыта позиция сделки, запись иного режима жива. */
+    private static final String DEAL_CLOSED = "deal-closed";
+
+    /** Состояние сценария: закрыта запись иного режима. */
+    private static final String RECORD_CLOSED = "record-closed";
+
+    /** Состояние сценария: закрыты обе записи. */
+    private static final String BOTH_CLOSED = "both-closed";
 
     @Test
     @DisplayName("B7.1 — активная позиция без объясняющей сделки заводит сделку восстановлением")
@@ -474,9 +516,258 @@ class ProactiveDetectionBoxTest extends SharedLiveDealBox {
         assertThat(accountRow().get(OBSERVED_PASS_AT)).isEqualTo(lastObserved);
     }
 
+    /**
+     * Живая нога налита половиной, встроенная защита в её теле в постановке:
+     * площадка ставит её только на терминале родителя, и покрытие налитой
+     * части отложенное (docs/rules/live-risk-protection.md §«Покрытие»).
+     * Ни детектор, ни выходная проверка отправленного входа ступени по нему
+     * не просят — и молчание здесь не тавтологично: половина (б) на той же
+     * сборке тем же предикатом ступень даёт.
+     */
+    @Test
+    @DisplayName("B7.16 (а) — встроенная защита живого частично налитого входа: налитая часть покрыта отложенно")
+    void b7_16a_theLivePartiallyFilledEntryHasItsFilledPartCoveredDeferred() {
+        openPartiallyFilledDeal();
+        standScan(Feed.array(livePositionOf(partialFill())),
+                Feed.array(Feed.pendingOrder(entryExternalId(), entryClientId(), EXTERNAL_INSTRUMENT)),
+                Feed.emptyArray());
+        Long uncoveredBefore = rows.countWhere("anomaly_reports", "code", LIVE_RISK_UNCOVERED);
+
+        tick(Tick.ANOMALY_DETECTION);
+        ageObservations();
+        tick(Tick.ANOMALY_DETECTION);
+        assertThat(rows.countWhere("anomaly_reports", "code", LIVE_RISK_UNCOVERED)).isEqualTo(uncoveredBefore);
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        assertThat(rows.countWhere("anomaly_reports", "code", LIVE_RISK_UNCOVERED)).isEqualTo(uncoveredBefore);
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        assertThat(dealStatus()).isEqualTo("ACTIVE");
+        // Защита остаётся в постановке — ассерт прямой по строке защиты.
+        assertThat(protectionRow().get("status")).isEqualTo("PENDING");
+        // К площадке ушла только добыча: команд нет ни одной.
+        assertThat(commandCalls()).isEmpty();
+    }
+
+    /**
+     * Нога снята после частичного налива, и элемент защиты в её теле несёт
+     * код отказа постановки: добыча, увидевшая терминал, уводит защиту в
+     * ошибку, а следующий проход читает выходную проверку отправленного
+     * входа — без гистерезиса и раньше консолидации
+     * (docs/components/TrancheEntrySubmittedHandler.md §«Выходные проверки»).
+     */
+    @Test
+    @DisplayName("B7.16 (б) — встроенная защита частично налитого входа: отказ постановки сворачивает счёт")
+    void b7_16b_theFailedPlacementOfThePartiallyFilledEntryProtectionTearsTheAccountDown() {
+        openPartiallyFilledDeal();
+        standExchangeFollowingCommands(LOSS, LOSS, partialFill());
+        standEntryWithFailedProtection(partiallyFilledEntryWithFailedProtection("CANCELED"));
+        passesUntilProtectionFailsToPlace();
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        Long raisedBefore = countEvents(HOLD_RAISED_EVENT);
+        Long shutdownsBefore = countEvents(DEAL_SHUTDOWN_INITIATED);
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+
+        passesUntil(() -> isFalse(Objects.equals("ACTIVE", dealStatus())));
+
+        // Биржевая ступень 2 без гистерезиса: отчёт критичной тяжести, и
+        // наблюдательной строки того же кода перед ним нет.
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        List<Map<String, Object>> uncovered = rows.rowsWhere("anomaly_reports", "code", LIVE_RISK_UNCOVERED);
+        assertThat(uncovered).hasSize(1);
+        assertThat(uncovered.getFirst().get("severity")).isEqualTo("CRITICAL");
+        assertThat(countEvents(HOLD_RAISED_EVENT)).isEqualTo(raisedBefore + 1);
+        // Консолидация не затребована: проверка читается раньше её эмиссии.
+        assertThat(trancheStatus()).isEqualTo("ENTRY_SUBMITTED");
+        // Ребро в ошибку — решение обработчика: причина остановки пуста.
+        assertThat(dealStatus()).isEqualTo("ERROR");
+        assertThat(dealRow().get("shutdown_reason")).isNull();
+        assertThat(countEvents(DEAL_SHUTDOWN_INITIATED)).isEqualTo(shutdownsBefore);
+        // Снятие риска: позиция закрыта; живой ноги нет, а встроенная защита
+        // в ошибке в очередь снятия не входит.
+        assertThat(connector.requests(closurePath(ACCOUNT))).isNotEmpty();
+        assertThat(connector.requests(cancellationPath(ACCOUNT))).isEmpty();
+        assertThat(connector.requests(attachedCancellationPath(ACCOUNT))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B7.17 (а) — запись иного режима маржи рядом с позицией сделки — чужая сущность, а не нарушение"
+            + " режима позиций")
+    void b7_17a_aForeignMarginModeRecordBesideTheDealPositionIsAForeignEntity() {
+        openLiveDeal();
+        standPairWithForeignMarginRecord(RECORD_LEAVES_ON_CLOSE);
+
+        tick(Tick.ANOMALY_DETECTION);
+
+        assertForeignEntityRaisedOnTheFirstTick();
+    }
+
+    @Test
+    @DisplayName("B7.17 (б) — одиночная запись иного режима маржи — чужая сущность, восстановительной сделки нет")
+    void b7_17b_aLoneForeignMarginModeRecordIsAForeignEntityAndIsNotRecovered() {
+        provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
+        connector.answersInState(LONE_RECORD_SCENARIO, positionsPath(ACCOUNT), PeerStub.INITIAL,
+                Feed.array(foreignMarginRecord()));
+        connector.answersInState(LONE_RECORD_SCENARIO, positionsPath(ACCOUNT), RECORD_CLOSED, Feed.emptyArray());
+        connector.flipsOnWhen(LONE_RECORD_SCENARIO, closurePath(ACCOUNT), PeerStub.INITIAL, MARGIN_MODE, CROSS,
+                Feed.ack("ex-close-record", "close-record"), RECORD_CLOSED);
+        connector.answers(pendingOrdersPath(ACCOUNT), Feed.emptyArray());
+        connector.answers(pendingAlgoOrdersPath(ACCOUNT), Feed.emptyArray());
+
+        tick(Tick.ANOMALY_DETECTION);
+
+        assertForeignEntityRaisedOnTheFirstTick();
+        // Одиночная запись иного режима позицией без сделки не читается:
+        // сделка ведёт позицию своего режима и чужую ни закрыть, ни защитить
+        // не может.
+        assertThat(rows.count("deals")).isZero();
+        assertThat(eventTypes()).doesNotContain(DEAL_OPENED);
+    }
+
+    /**
+     * Тот же тик, что поднимает ступень (клетка {@code B7.17 (а)}), гонит и
+     * снятие риска: позицию сделки — ходом сделки без параметра режима, запись
+     * иного режима — отдельным шагом вне графа сделок её режимом
+     * (docs/components/KillSwitchExecutor.md §«Риск вне графа сделок»).
+     */
+    @Test
+    @DisplayName("B7.18 (а) — снятие риска закрывает запись иного режима её режимом, и уход записи подтверждает"
+            + " радиус")
+    void b7_18a_theTeardownClosesTheForeignMarginModeRecordInItsModeAndConfirmsTheScope() {
+        openLiveDeal();
+        standPairWithForeignMarginRecord(RECORD_LEAVES_ON_CLOSE);
+
+        tick(Tick.ANOMALY_DETECTION);
+
+        assertTheDealAndTheRecordAreClosedEachInItsMode();
+        assertThat(closuresInMode(CROSS)).hasSize(1);
+        assertThat(criticalForeignEntityReport().get("status")).isEqualTo("COMPLETED");
+    }
+
+    /**
+     * Запись иного режима закрытие переживает: остаток любого режима значит,
+     * что риск не снят, — подтверждает радиус ЛЮБАЯ живая позиция, и попытки
+     * ограничены тем же пределом {@code kill-switch.max-teardown-attempts}
+     * (docs/components/KillSwitchExecutor.md §«Риск вне графа сделок»).
+     */
+    @Test
+    @DisplayName("B7.18 (б) — запись иного режима, пережившая закрытие, держит радиус неподтверждённым")
+    void b7_18b_aForeignMarginModeRecordSurvivingItsClosureKeepsTheScopeUnconfirmed() {
+        openLiveDeal();
+        standPairWithForeignMarginRecord(RECORD_SURVIVES_CLOSE);
+
+        tick(Tick.ANOMALY_DETECTION);
+
+        assertTheDealAndTheRecordAreClosedEachInItsMode();
+        assertThat(closuresInMode(CROSS)).hasSize(TEARDOWN_ATTEMPTS);
+        assertThat(criticalForeignEntityReport().get("status")).isNotEqualTo("COMPLETED");
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+    }
+
     // ------------------------------------------------------------------
     // Предусловия группы
     // ------------------------------------------------------------------
+
+    /**
+     * Площадка с позицией сделки режима контура и записью режима {@code CROSS}
+     * по тому же инструменту, отвечающая по ИСХОДУ команд.
+     *
+     * <p><b>Сценарий один на пару записей, и состояний у него четыре</b>: обе
+     * живы, закрыта позиция сделки, закрыта запись иного режима, закрыты обе.
+     * Срез счёта читает обе записи одним путём, поэтому его ответ зависит от
+     * того, что из двух уже исполнено, а две команды закрытия различаются
+     * только параметром режима: у позиции сделки его нет — режим контура и
+     * есть умолчание закрытия, — у записи иного режима он её режим
+     * ({@link PeerStub#flipsOnWhen}).
+     *
+     * <p>Защиту, движения и прочие срезы ставит
+     * {@link #standExchangeFollowingCommands(String)}; заготовки этого метода
+     * новее и покрывают все четыре состояния, поэтому позиционные заготовки
+     * того сценария на них не отвечают.
+     *
+     * @param recordLeavesOnClose уходит ли запись иного режима после своего
+     *                            закрытия
+     */
+    private void standPairWithForeignMarginRecord(Boolean recordLeavesOnClose) {
+        standExchangeFollowingCommands(LOSS);
+        String ours = livePositionOf(entrySize());
+        String record = foreignMarginRecord();
+        String closed = Feed.array(Feed.closedPosition(positionExternalId(), POSITION_CREATED_AT, CLOSED_AT, LOSS));
+        String dealAck = Feed.ack("ex-close-" + dealOrdinal(), "close-" + dealOrdinal());
+        String recordAck = Feed.ack("ex-close-record", "close-record");
+        Map<String, String> afterDealClose = Map.of(PeerStub.INITIAL, DEAL_CLOSED, DEAL_CLOSED, DEAL_CLOSED,
+                RECORD_CLOSED, BOTH_CLOSED, BOTH_CLOSED, BOTH_CLOSED);
+        Map<String, String> afterRecordClose = isTrue(recordLeavesOnClose)
+                ? Map.of(PeerStub.INITIAL, RECORD_CLOSED, DEAL_CLOSED, BOTH_CLOSED,
+                        RECORD_CLOSED, RECORD_CLOSED, BOTH_CLOSED, BOTH_CLOSED)
+                : Map.of(PeerStub.INITIAL, PeerStub.INITIAL, DEAL_CLOSED, DEAL_CLOSED,
+                        RECORD_CLOSED, RECORD_CLOSED, BOTH_CLOSED, BOTH_CLOSED);
+        Map<String, String> slice = Map.of(PeerStub.INITIAL, Feed.array(ours, record),
+                DEAL_CLOSED, Feed.array(record), RECORD_CLOSED, Feed.array(ours), BOTH_CLOSED, Feed.emptyArray());
+        for (String state : List.of(PeerStub.INITIAL, DEAL_CLOSED, RECORD_CLOSED, BOTH_CLOSED)) {
+            boolean dealPositionLive = PeerStub.INITIAL.equals(state) || RECORD_CLOSED.equals(state);
+            connector.flipsOnWhen(PAIR_SCENARIO, closurePath(ACCOUNT), state, MARGIN_MODE, null, dealAck,
+                    afterDealClose.get(state));
+            connector.flipsOnWhen(PAIR_SCENARIO, closurePath(ACCOUNT), state, MARGIN_MODE, CROSS, recordAck,
+                    afterRecordClose.get(state));
+            connector.answersInState(PAIR_SCENARIO, positionsPath(ACCOUNT), state, slice.get(state));
+            connector.answersInState(PAIR_SCENARIO, positionPath(ACCOUNT), state,
+                    dealPositionLive ? ours : Feed.absent());
+            connector.answersInState(PAIR_SCENARIO, closedPositionsPath(ACCOUNT), state,
+                    dealPositionLive ? Feed.emptyArray() : closed);
+        }
+    }
+
+    /** Запись позиции режима {@code CROSS} по инструменту контура: её открыла не наша заявка. */
+    private String foreignMarginRecord() {
+        return Feed.livePositionInMode("ex-cross-1", EXTERNAL_INSTRUMENT, "1", LAST_PRICE, POSITION_MOMENT, CROSS);
+    }
+
+    /**
+     * Исход {@code B7.17} в обоих прогонах: с ПЕРВОГО тика счёт свёрнут кодом
+     * чужой сущности критичной тяжести, а запись иного режима в счёт записей
+     * режима контура не вошла.
+     */
+    private void assertForeignEntityRaisedOnTheFirstTick() {
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(criticalForeignEntityReport()).isNotEmpty();
+        assertThat(eventTypes()).contains(HOLD_RAISED);
+        assertThat(codesOfReports()).doesNotContain(POSITION_MODE_VIOLATION);
+    }
+
+    /**
+     * Исход {@code B7.18} общий обоим прогонам: позиция сделки закрыта ходом
+     * сделки без параметра режима, запись иного режима — её режимом, и
+     * закрытий режимом контура вне хода сделки нет.
+     */
+    private void assertTheDealAndTheRecordAreClosedEachInItsMode() {
+        List<LoggedRequest> dealClosures = closuresInMode(null);
+        assertThat(dealClosures).hasSize(1);
+        assertThat(dealClosures.getFirst().queryParameter("externalInstrumentId").firstValue())
+                .isEqualTo(EXTERNAL_INSTRUMENT);
+        assertThat(closuresInMode(CONTOUR_MARGIN_MODE)).isEmpty();
+    }
+
+    /**
+     * Закрытия позиции, ушедшие к стабу с названным режимом маржи.
+     *
+     * @param marginMode режим в параметре закрытия; пусто — параметра нет
+     */
+    private List<LoggedRequest> closuresInMode(String marginMode) {
+        return connector.requests(closurePath(ACCOUNT)).stream()
+                .filter(request -> isNull(marginMode)
+                        ? isFalse(request.queryParameter(MARGIN_MODE).isPresent())
+                        : request.queryParameter(MARGIN_MODE).isPresent()
+                                && Objects.equals(marginMode, request.queryParameter(MARGIN_MODE).firstValue()))
+                .toList();
+    }
+
+    /** Строка отчёта чужой сущности критичной тяжести; пусто — её нет. */
+    private Map<String, Object> criticalForeignEntityReport() {
+        return rows.rowsWhere("anomaly_reports", "code", FOREIGN_ORDER).stream()
+                .filter(row -> Objects.equals("CRITICAL", row.get("severity")))
+                .findFirst()
+                .orElse(Map.of());
+    }
 
     /**
      * Срез счёта: три счёт-широкие выборки поимённо.

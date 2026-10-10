@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.connector.okx.util.OkxConstants;
 import com.example.tradingbot.domain.exchange.ExchangeFailureClass;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,6 +31,14 @@ import org.junit.jupiter.api.Test;
  * запроса неотличим от отвергнутых ключей — а реакции у них
  * противоположные: первое лечится нашей стороной, второе поднимает
  * биржевую ступень.
+ *
+ * <p><b>Расхождение часов наша сторона лечит САМА</b> ({@code B7.9}-{@code B7.12}):
+ * граница перемеряет смещение часов площадки и повторяет чтение новым
+ * моментом (docs/components/IntegrationService.md). Смещение живёт в процессе
+ * и переживает клетку; соседям это безвредно — стаб метку по часам не
+ * сверяет, а клетки, сверяющие подпись, берут метку из самого запроса. Отказ,
+ * переживший перемер, уезжает общим классом недоступности, а не классом
+ * границы.
  */
 class FailureClassesBoxTest extends SharedConnectorBox {
 
@@ -36,10 +46,26 @@ class FailureClassesBoxTest extends SharedConnectorBox {
     private static final List<String> CREDENTIALS_REJECTED_CODES =
             List.of("50101", "50105", "50111", "50113", "50119");
 
-    /** Коды того же семейства, означающие НАШ дефект сборки запроса. */
-    private static final List<String> OWN_DEFECT_CODES = List.of("50102", "50103");
+    /**
+     * Код того же семейства, означающий НАШ дефект сборки запроса и идущий общей
+     * тропой отказа границы: заголовок ключа не поставлен. Второй код нашего
+     * дефекта — расхождение часов — граница исправляет сама, и его клетки —
+     * {@code B7.9}-{@code B7.12}.
+     */
+    private static final String OWN_DEFECT_CODE = "50103";
+
+    /** Код площадки «метка подписи истекла». */
+    private static final String TIMESTAMP_EXPIRED = "50102";
+
+    /** Сдвиг часов площадки от часов хоста в клетке выравнивания: за окном метки в 30 секунд. */
+    private static final Long SKEW_SECONDS = 300L;
+
+    /** Общий класс недоступности поверхности. */
+    private static final String PEER_UNAVAILABLE = "PEER_UNAVAILABLE";
 
     private static final String POSITIONS = "/positions";
+
+    private static final String ORDERS = "/orders?externalInstrumentId=" + INSTRUMENT;
 
     @Test
     @DisplayName("B7.1 — каждый код отказа в кредах опознаётся как отказ кредов")
@@ -61,14 +87,107 @@ class FailureClassesBoxTest extends SharedConnectorBox {
     @Test
     @DisplayName("B7.2 — код нашего собственного дефекта отказом кредов не считается")
     void b7_2_ourOwnDefectCodeIsNotACredentialsRejection() {
-        OWN_DEFECT_CODES.forEach(code -> {
-            exchange.reset();
-            exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH, Okx.failure(code, "our own defect"));
+        exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH, Okx.failure(OWN_DEFECT_CODE, "our own defect"));
 
-            Answer answer = get(account(POSITIONS));
+        Answer answer = get(account(POSITIONS));
 
-            assertThat(answer.errorCode()).as("код площадки %s", code).isEqualTo("EXCHANGE_ERROR");
-        });
+        assertThat(answer.errorCode()).as("код площадки %s", OWN_DEFECT_CODE).isEqualTo("EXCHANGE_ERROR");
+    }
+
+    /**
+     * Чтение, отвергнутое по метке, перемеряет смещение и повторяется новым
+     * моментом: вызывающий получает ответ, а не отказ. Метка повтора —
+     * момент площадки: не раньше серверного времени, которым её выровняли.
+     */
+    @Test
+    @DisplayName("B7.9 — чтение, отвергнутое по метке подписи, перемеряет часы и повторяется новым моментом")
+    void b7_9_aReadRefusedByTheTimestampRemeasuresTheClockAndRepeatsWithANewMoment() {
+        Instant serverTime = Instant.now().plusSeconds(SKEW_SECONDS);
+        exchange.answersInTurn(OkxConstants.ACCOUNT_POSITIONS_PATH,
+                Okx.failure(TIMESTAMP_EXPIRED, "Timestamp request expired"), Okx.ok());
+        exchange.answers(OkxConstants.PUBLIC_TIME_PATH, Okx.serverTime(serverTime));
+
+        Answer answer = get(account(POSITIONS));
+
+        assertThat(answer.status()).as("B7.9: чтение удалось").isEqualTo(200);
+        assertThat(answer.asList()).isEmpty();
+        assertThat(exchange.requests().stream().map(request -> request.getUrl().split("\\?")[0]).toList())
+                .as("B7.9: чтение, замер, повтор — и ничего сверх")
+                .containsExactly(OkxConstants.ACCOUNT_POSITIONS_PATH, OkxConstants.PUBLIC_TIME_PATH,
+                        OkxConstants.ACCOUNT_POSITIONS_PATH);
+        LoggedRequest repeated = exchange.requests(OkxConstants.ACCOUNT_POSITIONS_PATH).get(1);
+        String repeatedTimestamp = repeated.getHeader(OkxConstants.ACCESS_TIMESTAMP_HEADER);
+        assertThat(Instant.parse(repeatedTimestamp)).as("B7.9: метка повтора — момент площадки")
+                .isAfterOrEqualTo(Instant.ofEpochMilli(serverTime.toEpochMilli()));
+        assertThat(repeated.getHeader(OkxConstants.ACCESS_SIGN_HEADER)).as("B7.9: подпись повтора от его метки")
+                .isEqualTo(Signatures.expected(secrets.secretOf(ACCOUNT), repeatedTimestamp, "GET",
+                        repeated.getUrl(), ""));
+        assertThat(exchange.requests(OkxConstants.PUBLIC_TIME_PATH).getFirst()
+                .containsHeader(OkxConstants.ACCESS_SIGN_HEADER)).as("B7.9: время читается без подписи").isFalse();
+    }
+
+    /**
+     * Команду граница не повторяет: свой идентификатор площадка ключом
+     * идемпотентности не делает, и повтор постановки был бы второй
+     * постановкой. Смещение перемеряется и для неё — следующий вызов уйдёт
+     * выровненным; отказ уезжает общим классом недоступности.
+     */
+    @Test
+    @DisplayName("B7.10 — команда, отвергнутая по метке подписи, не повторяется, а часы перемеряет")
+    void b7_10_aCommandRefusedByTheTimestampIsNotRepeatedButRemeasuresTheClock() {
+        exchange.answers(OkxConstants.TRADE_ORDER_PATH, Okx.failure(TIMESTAMP_EXPIRED, "Timestamp request expired"));
+        exchange.answers(OkxConstants.PUBLIC_TIME_PATH, Okx.serverTime(Instant.now()));
+
+        Answer answer = post(account(ORDERS), Bodies.limitOrder());
+
+        assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(answer.errorCode()).as("B7.10: класс отказа").isEqualTo(PEER_UNAVAILABLE);
+        assertThat(exchange.requests(OkxConstants.TRADE_ORDER_PATH)).as("B7.10: постановка одна").hasSize(1);
+        assertThat(exchange.requests(OkxConstants.PUBLIC_TIME_PATH)).as("B7.10: замер один").hasSize(1);
+        assertThat(exchange.count()).isEqualTo(2);
+    }
+
+    /**
+     * Повтор чтения один: отвергнут и он — второй замер дал бы тот же ответ.
+     * Отказ — общий класс недоступности, не отказ кредов и не класс границы.
+     */
+    @Test
+    @DisplayName("B7.11 — чтение, отвергнутое по метке и после повтора, уезжает общим классом недоступности")
+    void b7_11_aReadRefusedByTheTimestampAgainAfterTheRepeatIsUnavailability() {
+        exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH,
+                Okx.failure(TIMESTAMP_EXPIRED, "Timestamp request expired"));
+        exchange.answers(OkxConstants.PUBLIC_TIME_PATH, Okx.serverTime(Instant.now()));
+
+        Answer answer = get(account(POSITIONS));
+
+        assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(answer.errorCode()).as("B7.11: класс отказа").isEqualTo(PEER_UNAVAILABLE);
+        assertThat(exchange.requests(OkxConstants.ACCOUNT_POSITIONS_PATH)).as("B7.11: чтение и один повтор")
+                .hasSize(2);
+        assertThat(exchange.requests(OkxConstants.PUBLIC_TIME_PATH)).as("B7.11: замер один").hasSize(1);
+        assertThat(exchange.count()).isEqualTo(3);
+    }
+
+    /**
+     * Смещение не перемерено — повторять нечем: тот же момент дал бы тот же
+     * отказ. Класс — тот же, что у отказа, пережившего повтор.
+     */
+    @Test
+    @DisplayName("B7.12 — замер не удался: повтора нет, отказ тем же классом")
+    void b7_12_theMeasurementFailedSoThereIsNoRepeatAndTheSameClass() {
+        exchange.answers(OkxConstants.ACCOUNT_POSITIONS_PATH,
+                Okx.failure(TIMESTAMP_EXPIRED, "Timestamp request expired"));
+        exchange.breaks(OkxConstants.PUBLIC_TIME_PATH);
+
+        Answer answer = get(account(POSITIONS));
+
+        assertThat(answer.carriesErrorDto()).isTrue();
+        assertThat(answer.errorCode()).as("B7.12: класс отказа").isEqualTo(PEER_UNAVAILABLE);
+        assertThat(exchange.requests(OkxConstants.ACCOUNT_POSITIONS_PATH)).as("B7.12: повтора нет").hasSize(1);
+        // Разрыв соединения транспорт клиента повторяет сам (повтор ввода-вывода
+        // Apache HttpClient), поэтому число обращений к часам — не предмет
+        // клетки: она утверждает, что замер был, а не сколько раз его слал транспорт.
+        assertThat(exchange.requests(OkxConstants.PUBLIC_TIME_PATH)).as("B7.12: замер пытался").isNotEmpty();
     }
 
     @Test

@@ -12,6 +12,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import com.example.connector.okx.credentials.ExchangeCredentials;
 import com.example.connector.okx.exception.CredentialsRejectedException;
+import com.example.connector.okx.exception.ExchangeClockRejectedException;
 import com.example.connector.okx.exception.ExchangeIntegrationException;
 import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import com.example.connector.okx.integration.external.api.client.OkxRestClient;
@@ -767,8 +768,23 @@ public class OkxSourceReader {
         String code = isNull(response) ? "null" : response.getCode();
         String msg = isNull(response) ? "null response" : response.getMsg();
         log.error("OKX write failed [{}] instId={} code={} msg={}", endpoint, instId, code, msg);
-        return new ExchangeIntegrationException("OKX write failed [" + endpoint + "] instId=" + instId
-                + " code=" + code + " msg=" + msg);
+        String detail = "[" + endpoint + "] instId=" + instId + " code=" + code + " msg=" + msg;
+        // Команду граница по отказу метки не повторяет — её повтор у ядра, и
+        // бюджета на него тратить нечем объяснить (docs/components/IntegrationService.md).
+        if (isTrue(timestampRejected(code))) {
+            return new ExchangeClockRejectedException("OKX rejected the request timestamp " + detail);
+        }
+        return new ExchangeIntegrationException("OKX write failed " + detail);
+    }
+
+    /**
+     * Отвергнута ли метка подписи: код {@code 50102} доезжает сюда, только
+     * если перемер смещения его не снял — чтение граница отправки уже
+     * повторила новым моментом, команду не повторяет вовсе
+     * ({@link OkxRestClient#dispatch}).
+     */
+    private Boolean timestampRejected(String code) {
+        return Objects.equals(OkxConstants.TIMESTAMP_EXPIRED_CODE, code);
     }
 
     /** Advance-семья (trailing/move_order_stop) → cancel-advance-algos; иначе ordinary cancel-algos. */
@@ -1025,6 +1041,12 @@ public class OkxSourceReader {
             if (isTrue(credentialsRejectionResolver.isCredentialsRejected(response.getCode()))) {
                 throw new CredentialsRejectedException("OKX rejected our credentials [" + endpoint
                         + "] code=" + response.getCode() + " msg=" + response.getMsg());
+            }
+            // Метка подписи отвергнута и после перемера смещения: отказ среды,
+            // а не ответ площадки о вызове (docs/components/IntegrationService.md).
+            if (isTrue(timestampRejected(response.getCode()))) {
+                throw new ExchangeClockRejectedException("OKX rejected the request timestamp [" + endpoint
+                        + "] " + context + " code=" + response.getCode() + " msg=" + response.getMsg());
             }
             throw new ExchangeIntegrationException("OKX error [" + endpoint + "] code=" + response.getCode()
                     + " msg=" + response.getMsg());

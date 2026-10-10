@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.http.Fault;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.util.List;
@@ -67,6 +68,27 @@ final class ExchangeStub {
                         .withStatus(status)
                         .withHeader("Content-Type", "application/json")
                         .withBody(body)));
+    }
+
+    /**
+     * Ответы {@code 200} по очереди на любой метод по этому пути: первый запрос
+     * получает первое тело, второй — второе. Вход клеток, где площадка на
+     * повтор отвечает иначе, чем на исходный запрос. Запрос сверх очереди
+     * заготовки не находит.
+     *
+     * <p>Очередь держит сценарий стаба; {@link #reset} забывает и его.
+     */
+    void answersInTurn(String path, String... bodies) {
+        String scenario = "in-turn " + path;
+        IntStream.range(0, bodies.length).forEach(index -> server.stubFor(
+                WireMock.any(WireMock.urlPathEqualTo(path))
+                        .inScenario(scenario)
+                        .whenScenarioStateIs(index == 0 ? Scenario.STARTED : "answer-" + index)
+                        .willSetStateTo("answer-" + (index + 1))
+                        .willReturn(WireMock.aResponse()
+                                .withStatus(200)
+                                .withHeader("Content-Type", "application/json")
+                                .withBody(bodies[index]))));
     }
 
     /**

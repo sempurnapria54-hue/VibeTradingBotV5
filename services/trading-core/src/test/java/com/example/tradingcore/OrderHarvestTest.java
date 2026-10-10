@@ -1,5 +1,6 @@
 package com.example.tradingcore;
 
+import static java.util.Objects.isNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,6 +12,10 @@ import static org.mockito.Mockito.when;
 import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingbot.domain.model.core.algo_order.AlgoOrder;
+import com.example.tradingbot.domain.model.core.algo_order.Condition;
+import com.example.tradingbot.domain.model.core.algo_order.Trailing;
+import com.example.tradingbot.domain.model.core.algo_order.Trigger;
+import com.example.tradingbot.domain.model.core.algo_order.TriggerPrice;
 import com.example.tradingbot.domain.model.core.exchange_account.ExchangeAccount;
 import com.example.tradingbot.domain.model.core.instrument.Instrument;
 import com.example.tradingbot.domain.model.core.order.AttachedAlgoOrder;
@@ -29,6 +34,7 @@ import com.example.tradingcore.domain.command.payload.RefreshAlgoOrderCommandPay
 import com.example.tradingcore.domain.command.payload.RefreshOrderCommandPayload;
 import com.example.tradingcore.domain.command.resolve.AttachedAlgoOrderStateResolver;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbersService;
+import com.example.tradingcore.exception.ExternalInvariantViolationException;
 import com.example.tradingcore.exception.ExternalNotFoundException;
 import com.example.tradingcore.exception.ExternalStatusException;
 import com.example.tradingcore.integration.internal.api.exchange.ExchangeOperationsClient;
@@ -44,6 +50,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -61,6 +68,12 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Доменные модели собираются настоящими полями: предикаты считаются
  * сами (.claude/rules/codestyle.md §«Тесты доменных моделей»).
+ *
+ * <p><b>Группа {@code U15} документа .claude/tests/cases/trading-core-calc.md
+ * живёт здесь</b> — метки в именах методов и в {@code @DisplayName}: перенос
+ * наблюдённого уровня трейлинга, сверка эха базы встроенной защиты на трёх
+ * тропах предъявления и исход судьбы защиты у исполнителя добычи. Пробы без
+ * меток — существующий набор, клеток документа у них нет.
  */
 class OrderHarvestTest {
 
@@ -73,6 +86,21 @@ class OrderHarvestTest {
     private static final String ORDER_CLIENT_ID = "ord-0001";
     private static final String ALGO_CLIENT_ID = "alg-0001";
     private static final String PROTECTION_CLIENT_ID = "prt-0001";
+
+    /** Откат трейлинга, объявленный нашей строкой: декларация, а не наблюдение. */
+    private static final String DECLARED_CALLBACK_PERCENTS = "1";
+
+    /** Тот же откат в эхе площадки — иным числом, чтобы перенос был виден. */
+    private static final String ECHOED_CALLBACK_PERCENTS = "5";
+
+    /** Наблюдённый уровень трейлинга, который отдаёт площадка. */
+    private static final String OBSERVED_TRAILING_LEVEL = "97.5";
+
+    /** Уровень трейлинга, наблюдённый прежней добычей и стоящий на строке. */
+    private static final String STANDING_TRAILING_LEVEL = "96.0";
+
+    /** Уровень стопа триггерной заявки, объявленный нашей строкой. */
+    private static final String DECLARED_STOP_LEVEL = "95";
 
     private final OrderDataService orderDataService = mock(OrderDataService.class);
     private final AlgoOrderDataService algoOrderDataService = mock(AlgoOrderDataService.class);
@@ -366,7 +394,8 @@ class OrderHarvestTest {
      * применялась бы сразу (.claude/decisions/protection-lost-needs-prior-terminal.md).
      */
     @Test
-    void anEmptyAnalysisOnTheFirstObservedTerminalWaitsInsteadOfLosingTheProtection() {
+    @DisplayName("U15.2 — первое наблюдение терминала родителя: пустой разбор — ожидание, а не потерянное покрытие")
+    void u15_2_anEmptyAnalysisOnTheFirstObservedTerminalWaitsInsteadOfLosingTheProtection() {
         Order order = order(Order.Status.PARTIALLY_COMPLETED, null);
         AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.PENDING);
         order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
@@ -394,7 +423,8 @@ class OrderHarvestTest {
      * (docs/spec/order-lifecycle.json, {@code attachedBecomesActive}).
      */
     @Test
-    void aPartiallyFilledLiveParentKeepsItsProtectionPending() {
+    @DisplayName("U15.1 — живой частично налитый родитель: защита остаётся в постановке, цикл добычи не идёт")
+    void u15_1_aPartiallyFilledLiveParentKeepsItsProtectionPending() {
         Order order = order(Order.Status.ACTIVE, null);
         AttachedAlgoOrder attached = protection(AttachedAlgoOrder.Status.PENDING);
         order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
@@ -848,6 +878,233 @@ class OrderHarvestTest {
         assertThat(algoOrder.getCloseReason()).isEqualTo(AlgoOrder.CloseReason.TRIGGERED);
     }
 
+    /**
+     * Из условия на строку садится ровно одно поле — наблюдённый уровень
+     * трейлинга; откат и прочая декларация условия эхом не перетираются
+     * (docs/models/mapping/AlgoOrder.md, перенос
+     * {@code condition.trailing.externalPrice}).
+     */
+    @Test
+    @DisplayName("U15.3 — наблюдённый уровень трейлинга садится на строку, декларация условия не тронута")
+    void u15_3_theObservedTrailingLevelLandsOnTheRowAndTheDeclarationStays() {
+        AlgoOrder algoOrder = trailingAlgoOrder(null);
+        Deal deal = dealWithAlgo(algoOrder);
+        givenSaves();
+        AlgoOrder fetched = fetchedAlgo(AlgoOrder.Status.ACTIVE);
+        fetched.setCondition(trailingCondition(ECHOED_CALLBACK_PERCENTS, OBSERVED_TRAILING_LEVEL));
+        when(exchange.getAlgoOrder(ACCOUNT, INSTRUMENT, null, ALGO_CLIENT_ID)).thenReturn(fetched);
+
+        ServiceCommandExecutionResult result = algoExecutor.execute(algoCommand(), row(), context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        Trailing trailing = algoOrder.getCondition().getTrailing();
+        assertThat(trailing.getExternalPrice())
+                .as("U15.3: наблюдённый уровень — операнд действующего уровня трейлинга")
+                .isEqualByComparingTo(OBSERVED_TRAILING_LEVEL);
+        assertThat(trailing.getTrailingPercents())
+                .as("U15.3: откат — наша декларация, эхо её не перетирает")
+                .isEqualByComparingTo(DECLARED_CALLBACK_PERCENTS);
+        verify(algoOrderDataService).save(algoOrder);
+    }
+
+    /**
+     * Перенос уровня — только непустым: пустое эхо наблюдённого уровня
+     * прежнего не стирает, иначе трейлинг на одной добыче без уровня терял бы
+     * действующий уровень и переставал считаться покрытием
+     * (docs/spec/protection-coverage.json, {@code carriesActiveStopLevel}).
+     */
+    @Test
+    @DisplayName("U15.4 — пустой наблюдённый уровень трейлинга прежний уровень на строке не стирает")
+    void u15_4_anAbsentObservedTrailingLevelDoesNotEraseTheStandingOne() {
+        AlgoOrder algoOrder = trailingAlgoOrder(STANDING_TRAILING_LEVEL);
+        Deal deal = dealWithAlgo(algoOrder);
+        givenSaves();
+        AlgoOrder fetched = fetchedAlgo(AlgoOrder.Status.ACTIVE);
+        fetched.setCondition(trailingCondition(DECLARED_CALLBACK_PERCENTS, null));
+        when(exchange.getAlgoOrder(ACCOUNT, INSTRUMENT, null, ALGO_CLIENT_ID)).thenReturn(fetched);
+
+        algoExecutor.execute(algoCommand(), row(), context(deal));
+
+        assertThat(algoOrder.getCondition().getTrailing().getExternalPrice())
+                .as("U15.4: пустое эхо уровня — недобытый факт, а не нулевой уровень")
+                .isEqualByComparingTo(STANDING_TRAILING_LEVEL);
+    }
+
+    /**
+     * Ветвь трейлинга переносом не заводится: у заявки триггерного типа её
+     * нет, и уровень, пришедший эхом, на такую строку не садится — иначе в
+     * навесе появилась бы вторая ветвь условия
+     * (docs/models/mapping/AlgoOrder.md).
+     */
+    @Test
+    @DisplayName("U15.5 — у триггерной заявки ветвь трейлинга переносом не заводится")
+    void u15_5_theTrailingBranchIsNotCreatedOnATriggerOrder() {
+        AlgoOrder algoOrder = algoOrder(AlgoOrder.Status.ACTIVE);
+        algoOrder.setCondition(stopLossCondition());
+        Deal deal = dealWithAlgo(algoOrder);
+        givenSaves();
+        AlgoOrder fetched = fetchedAlgo(AlgoOrder.Status.ACTIVE);
+        fetched.setCondition(trailingCondition(DECLARED_CALLBACK_PERCENTS, OBSERVED_TRAILING_LEVEL));
+        when(exchange.getAlgoOrder(ACCOUNT, INSTRUMENT, null, ALGO_CLIENT_ID)).thenReturn(fetched);
+
+        algoExecutor.execute(algoCommand(), row(), context(deal));
+
+        assertThat(algoOrder.getCondition().getTrailing())
+                .as("U15.5: ветви трейлинга у триггерной строки нет и после переноса")
+                .isNull();
+        assertThat(algoOrder.getCondition().getTrigger().getStopLoss().getValue())
+                .as("U15.5: объявленный уровень стопа эхом не тронут")
+                .isEqualByComparingTo(DECLARED_STOP_LEVEL);
+    }
+
+    /**
+     * Тропа первая — тело добытого родителя: эхо базы встроенной защиты
+     * разошлось с объявленной, и это контролируемый отказ чтения ПЕРВЫМ ходом
+     * над найденной записью — до переноса фактов, статуса и наблюдённой
+     * живости (docs/lifecycles/Order.md
+     * §«Нога в {@code ERROR}: живость на площадке читается наблюдением»,
+     * строка о расхождении эха).
+     */
+    @Test
+    @DisplayName("U15.6 — расхождение эха базы защиты в теле родителя: отказ чтения раньше всякой записи")
+    void u15_6_anEchoDivergenceInTheParentBodyRefusesTheReadBeforeAnyWrite() {
+        Order order = order(Order.Status.ACTIVE, null);
+        AttachedAlgoOrder attached = declaredProtection(AttachedAlgoOrder.Status.PENDING);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        Deal deal = dealWithLiveExposure(order);
+        DealActionState row = row();
+        givenSaves();
+        Order fetched = fetchedOrder(Order.Status.PARTIALLY_COMPLETED, "0.5");
+        fetched.setAttachedAlgoOrders(List.of(protectionEcho(AlgoOrder.TriggerPriceType.MARK)));
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID)).thenReturn(fetched);
+
+        assertThatThrownBy(() -> orderExecutor.execute(orderCommand(), row, context(deal)))
+                .as("U15.6: эхо MARK против объявленной LAST — нарушение инварианта контракта")
+                .isInstanceOf(ExternalInvariantViolationException.class);
+
+        assertThat(order.getStatus()).as("U15.6: статус наблюдением не сдвинут").isEqualTo(Order.Status.ACTIVE);
+        assertThat(order.getAccumulatedFillSize()).as("U15.6: налив не перенесён").isNull();
+        assertThat(order.getExternalLive()).as("U15.6: живость не записана").isNull();
+        assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.PENDING);
+        assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.SUBMITTED);
+        verify(orderDataService, never()).save(any());
+        verify(exchange, never()).getPendingMaterializedProtections(any(), any());
+    }
+
+    /**
+     * Тропа вторая — самостоятельная живая запись цикла добычи
+     * материализованной защиты: отказ приходит после переноса фактов
+     * родителя в память прохода, но раньше сохранения — строка этим проходом
+     * не пишется, и записанная живость остаётся прежней.
+     */
+    @Test
+    @DisplayName("U15.7 — расхождение эха базы защиты в живой материализованной записи: отказ без сохранения")
+    void u15_7_anEchoDivergenceInTheLiveMaterializedRecordRefusesWithoutSaving() {
+        Order order = order(Order.Status.COMPLETED, Order.CloseReason.FILLED);
+        order.setAccumulatedFillSize(new BigDecimal("1"));
+        order.setExternalLive(Boolean.FALSE);
+        AttachedAlgoOrder attached = declaredProtection(AttachedAlgoOrder.Status.PENDING);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        Deal deal = dealWithLiveExposure(order);
+        DealActionState row = row();
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.COMPLETED, "1"));
+        when(exchange.getPendingMaterializedProtections(ACCOUNT, INSTRUMENT))
+                .thenReturn(List.of(protectionEcho(AlgoOrder.TriggerPriceType.MARK)));
+
+        assertThatThrownBy(() -> orderExecutor.execute(orderCommand(), row, context(deal)))
+                .isInstanceOf(ExternalInvariantViolationException.class);
+
+        assertThat(attached.getStatus()).as("U15.7: статус защиты не сдвинут").isEqualTo(AttachedAlgoOrder.Status.PENDING);
+        assertThat(attached.getCloseReason()).isNull();
+        assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.SUBMITTED);
+        verify(orderDataService, never()).save(any());
+        verify(exchange, never()).getMaterializedProtectionHistory(any(), any(), any());
+    }
+
+    /** Тропа третья — запись, найденная разбором истории: тот же отказ без сохранения. */
+    @Test
+    @DisplayName("U15.8 — расхождение эха базы защиты в записи разбора истории: отказ без сохранения")
+    void u15_8_anEchoDivergenceInTheHistoryRecordRefusesWithoutSaving() {
+        Order order = order(Order.Status.COMPLETED, Order.CloseReason.FILLED);
+        order.setAccumulatedFillSize(new BigDecimal("1"));
+        order.setExternalLive(Boolean.FALSE);
+        AttachedAlgoOrder attached = declaredProtection(AttachedAlgoOrder.Status.ACTIVE);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        Deal deal = dealWithLiveExposure(order);
+        DealActionState row = row();
+        givenSaves();
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID))
+                .thenReturn(fetchedOrder(Order.Status.COMPLETED, "1"));
+        when(exchange.getPendingMaterializedProtections(ACCOUNT, INSTRUMENT)).thenReturn(List.of());
+        when(exchange.getMaterializedProtectionHistory(ACCOUNT, INSTRUMENT, ProtectionHistoryLeg.EFFECTIVE))
+                .thenReturn(List.of(protectionEcho(AlgoOrder.TriggerPriceType.MARK)));
+
+        assertThatThrownBy(() -> orderExecutor.execute(orderCommand(), row, context(deal)))
+                .isInstanceOf(ExternalInvariantViolationException.class);
+
+        assertThat(attached.getStatus())
+                .as("U15.8: найденная нога истории не применена — терминала нет")
+                .isEqualTo(AttachedAlgoOrder.Status.ACTIVE);
+        assertThat(attached.getCloseReason()).isNull();
+        assertThat(row.getStatus()).isEqualTo(DealActionStateStatus.SUBMITTED);
+        verify(orderDataService, never()).save(any());
+    }
+
+    /**
+     * Пустое эхо сверку не запускает: молчание площадки нарушением не
+     * является ({@code AttachedAlgoOrder#matchesEcho}) — добыча идёт штатно.
+     */
+    @Test
+    @DisplayName("U15.9 — пустое эхо базы защиты сверку не запускает")
+    void u15_9_anAbsentEchoDoesNotStartTheCheck() {
+        Order order = order(Order.Status.ACTIVE, null);
+        AttachedAlgoOrder attached = declaredProtection(AttachedAlgoOrder.Status.PENDING);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        Deal deal = dealWithLiveExposure(order);
+        givenSaves();
+        Order fetched = fetchedOrder(Order.Status.PARTIALLY_COMPLETED, "0.5");
+        fetched.setAttachedAlgoOrders(List.of(protectionEcho(null)));
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID)).thenReturn(fetched);
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(order.getStatus()).isEqualTo(Order.Status.PARTIALLY_COMPLETED);
+        assertThat(order.getExternalLive()).isTrue();
+        verify(orderDataService).save(order);
+    }
+
+    /**
+     * Сверяется только НЕТЕРМИНАЛЬНАЯ встроенная защита: у терминальной
+     * судьба уже стоит, и эхо её базы ни одного решения не питает
+     * (docs/lifecycles/Order.md
+     * §«Нога в {@code ERROR}: живость на площадке читается наблюдением»,
+     * абзац о расхождении эха).
+     */
+    @Test
+    @DisplayName("U15.10 — эхо базы терминальной защиты не сверяется: добыча родителя идёт штатно")
+    void u15_10_theEchoOfATerminalProtectionIsNotChecked() {
+        Order order = order(Order.Status.ACTIVE, null);
+        AttachedAlgoOrder attached = declaredProtection(AttachedAlgoOrder.Status.ERROR);
+        attached.setCloseReason(AttachedAlgoOrder.CloseReason.PROTECTION_PLACEMENT_FAILED);
+        order.setAttachedAlgoOrders(new ArrayList<>(List.of(attached)));
+        Deal deal = dealWithLiveExposure(order);
+        givenSaves();
+        Order fetched = fetchedOrder(Order.Status.PARTIALLY_COMPLETED, "0.5");
+        fetched.setAttachedAlgoOrders(List.of(protectionEcho(AlgoOrder.TriggerPriceType.MARK)));
+        when(exchange.getOrder(ACCOUNT, INSTRUMENT, null, ORDER_CLIENT_ID)).thenReturn(fetched);
+
+        ServiceCommandExecutionResult result = orderExecutor.execute(orderCommand(), row(), context(deal));
+
+        assertThat(result.getSuccess()).isTrue();
+        assertThat(order.getStatus()).isEqualTo(Order.Status.PARTIALLY_COMPLETED);
+        assertThat(attached.getStatus()).isEqualTo(AttachedAlgoOrder.Status.ERROR);
+        assertThat(attached.getCloseReason()).isEqualTo(AttachedAlgoOrder.CloseReason.PROTECTION_PLACEMENT_FAILED);
+        verify(orderDataService).save(order);
+    }
+
     private void givenSaves() {
         when(orderDataService.save(any())).thenAnswer(call -> call.getArgument(0));
         when(algoOrderDataService.save(any())).thenAnswer(call -> call.getArgument(0));
@@ -885,6 +1142,58 @@ class OrderHarvestTest {
         attached.setStatus(status);
         attached.setSize(new BigDecimal("1"));
         return attached;
+    }
+
+    /** Встроенная защита нашей строки с объявленной ценовой базой триггера {@code LAST}. */
+    private static AttachedAlgoOrder declaredProtection(AttachedAlgoOrder.Status status) {
+        AttachedAlgoOrder attached = protection(status);
+        attached.setTriggerPriceType(AlgoOrder.TriggerPriceType.LAST);
+        return attached;
+    }
+
+    /**
+     * Копия той же защиты, прочитанная у площадки, с названным эхом базы
+     * триггера; пусто — площадка базу не назвала.
+     */
+    private static AttachedAlgoOrder protectionEcho(AlgoOrder.TriggerPriceType echoedBase) {
+        AttachedAlgoOrder echo = protection(null);
+        echo.setTriggerPriceType(echoedBase);
+        return echo;
+    }
+
+    /**
+     * Трейлинговая условная заявка нашей строки: объявленный откат и
+     * наблюдённый уровень, стоящий на строке; пусто — уровня ещё не было.
+     */
+    private static AlgoOrder trailingAlgoOrder(String standingLevel) {
+        AlgoOrder algoOrder = algoOrder(AlgoOrder.Status.ACTIVE);
+        algoOrder.setConditionType(AlgoOrder.ConditionType.TRAILING_PERCENTS);
+        algoOrder.setCondition(trailingCondition(DECLARED_CALLBACK_PERCENTS, standingLevel));
+        return algoOrder;
+    }
+
+    /** Условие трейлинга: откат и наблюдённый уровень; пустой уровень — его нет. */
+    private static Condition trailingCondition(String callbackPercents, String observedLevel) {
+        Trailing trailing = new Trailing();
+        trailing.setTrailingPercents(new BigDecimal(callbackPercents));
+        trailing.setExternalPrice(isNull(observedLevel) ? null : new BigDecimal(observedLevel));
+        Condition condition = new Condition();
+        condition.setType(AlgoOrder.ConditionType.TRAILING_PERCENTS);
+        condition.setTrailing(trailing);
+        return condition;
+    }
+
+    /** Условие триггерного стопа: уровень и база объявлены, ветви трейлинга нет. */
+    private static Condition stopLossCondition() {
+        TriggerPrice stopLoss = new TriggerPrice();
+        stopLoss.setType(AlgoOrder.TriggerPriceType.LAST);
+        stopLoss.setValue(new BigDecimal(DECLARED_STOP_LEVEL));
+        Trigger trigger = new Trigger();
+        trigger.setStopLoss(stopLoss);
+        Condition condition = new Condition();
+        condition.setType(AlgoOrder.ConditionType.STOP_LOSS);
+        condition.setTrigger(trigger);
+        return condition;
     }
 
     private static AlgoOrder algoOrder(AlgoOrder.Status status) {

@@ -1,0 +1,41 @@
+# Метрики ресурсов подов для `kubectl top` и клиентов кластера (Kubernetic,
+# Lens) — ТОЛЬКО на локальном стенде.
+#
+# ПОЧЕМУ НЕ В deploy/base/platform. Кластерный слой ставится на любой
+# кластер, а здесь стои́т флаг, верный только для kind: kubelet стенда
+# подписан самоподписанным сертификатом, и без `--kubelet-insecure-tls`
+# metrics-server не читает его метрики. Управляемый кластер провайдера
+# metrics-server обычно несёт сам, а отключённая сверка сертификата там была
+# бы дефектом безопасности. Решение держателя 2026-10-10: «только этот
+# кластер».
+#
+# Grafana и Prometheus в нём не нуждаются: дашборды «Kubernetes / Compute
+# Resources / …» читают cAdvisor через kubelet самим Prometheus
+# (kube-prometheus-stack, deploy/base/platform).
+#
+# Применяет tools/stand/up.sh шагом после кластерного слоя; дальше ведёт
+# Argo CD, как прочие Application стенда.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://kubernetes-sigs.github.io/metrics-server/
+    chart: metrics-server
+    targetRevision: 3.14.0
+    helm:
+      valuesObject:
+        args:
+          - --kubelet-insecure-tls
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: false
+    syncOptions:
+      - ServerSideApply=true

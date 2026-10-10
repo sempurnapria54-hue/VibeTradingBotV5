@@ -3,6 +3,7 @@ package com.example.connector.okx.unit.mapping;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import com.example.connector.okx.util.OkxParse;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -10,6 +11,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Разбор сырой строки: пять форм и три класса входа — группа `U4`
@@ -25,6 +29,11 @@ import org.junit.jupiter.api.Test;
  * строка, пустая строка, отсутствие значения. Четвёртый — строка,
  * числом не являющаяся, — <b>отказывает</b>, и это объявленный
  * контракт границы, а не оговорка.
+ *
+ * <p>Сверх пяти форм числа и времени разбор переводит строковый признак
+ * ({@code flag}, `U4.20`-`U4.22`): у него четвёртый класс входа — слово
+ * вне формы контракта — отказывает не разбором числа, а нарушением
+ * инварианта.
  */
 class OkxParseTest {
 
@@ -164,5 +173,36 @@ class OkxParseTest {
         assertThat(OkxParse.integer("00100")).isEqualTo(100);
         assertThat(OkxParse.offsetTime("00100")).isEqualTo(OffsetDateTime.parse("1970-01-01T00:00:00.100Z"));
         assertThat(OkxParse.instant("00100")).isEqualTo(Instant.ofEpochMilli(100L));
+    }
+
+    @Test
+    @DisplayName("U4.20 — строковый признак в доменное значение")
+    void u4_20_aFlagWordBecomesABoolean() {
+        assertThat(OkxParse.flag("true")).isEqualTo(Boolean.TRUE);
+        assertThat(OkxParse.flag("false")).isEqualTo(Boolean.FALSE);
+    }
+
+    /** Признак не добыт: сверку эха он не запускает. */
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  "})
+    @DisplayName("U4.21 — пустой, пробельный и отсутствующий признак дают пустоту")
+    void u4_21_anEmptyFlagIsEmptiness(String raw) {
+        assertThat(OkxParse.flag(raw)).isNull();
+    }
+
+    /**
+     * Слово вне формы контракта роняет разбор классом нарушения инварианта,
+     * как сторона вне словаря (`U6.41`): молча пустой признак гасил бы
+     * сверку эха, а отказ разбора числа назвал бы не тот класс.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"yes", "TRUE", "1"})
+    @DisplayName("U4.22 — признак вне формы контракта отказывает нарушением инварианта, значение в сообщении")
+    void u4_22_aFlagOutsideTheContractRefusesWithItsValue(String raw) {
+        assertThatThrownBy(() -> OkxParse.flag(raw))
+                .isInstanceOf(ExternalInvariantViolationException.class)
+                .isNotInstanceOf(NumberFormatException.class)
+                .hasMessageContaining(raw);
     }
 }

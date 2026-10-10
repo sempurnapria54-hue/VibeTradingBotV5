@@ -3,6 +3,7 @@ package com.example.statistics.integration.internal.event;
 import static java.util.Objects.isNull;
 import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.apache.commons.lang3.BooleanUtils.isTrue;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import com.example.statistics.domain.model.AggregateGrain;
 import com.example.statistics.domain.model.DealFact;
@@ -111,9 +112,16 @@ public class StatisticsEventListener {
      * момент происшествия двигает возраст последнего принятого, а класс
      * решает, становится ли событие фактом. Пустой любой из них делает
      * ветвление и измерение произвольными.
+     *
+     * <p><b>Класс пустой строкой — отсутствующий класс, а не неизвестный.</b>
+     * Неизвестный класс назван и ветвится в ненесомый штатно; пустая строка не
+     * называет никакого, и ветвь «ненесомый» на ней была бы благоприятным
+     * умолчанием — несомое событие, потерявшее класс, ушло бы без факта со
+     * сдвинутым смещением (docs/models/domain/other/StatisticsFact.md
+     * §«Признак несомого класса»; docs/rules/absent-value-semantics.md).
      */
     private void requireEnvelope(StatisticsEventMessage message, ConsumerRecord<String, String> record) {
-        if (isNull(message.getEventType()) || isNull(message.getOccurredAt())) {
+        if (isBlank(message.getEventType()) || isNull(message.getOccurredAt())) {
             throw incomplete("конверта", record);
         }
     }

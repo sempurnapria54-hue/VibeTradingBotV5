@@ -124,7 +124,7 @@
 | тег образа сервиса | — блок `images:` оверлея | свой на окружение | свой на окружение | свой на окружение — см. развёртывание выше |
 | глубина хранения рядов | `retentionProfile` | сокращённая | сокращённая | по виду ряда (`data-ownership.md`) |
 | глубина хранения журнала аудита | `journalRetentionProfile` | сокращённая | сокращённая | бессрочно (`docs/models/domain/other/AuditRecord.md`) |
-| ресурсные лимиты | `resourceProfile` | минимальные | как в `prod` | целевые |
+| ресурсные лимиты | `resourceProfile` | минимальные — квота пространства имён и умолчания контейнера оверлея (`deploy/dev/resource-limits.yaml`) | как в `prod` | целевые |
 | потолок живого риска сделки | `globalSimultaneousRiskPerDealPercent` | число держателя | пусто | пусто |
 | потолок живого риска счёта | `globalSimultaneousRiskPerAccountPercent` | число держателя | пусто | пусто |
 | потолок живого риска тенанта | `globalSimultaneousRiskPerTenantPercent` | число держателя | пусто | пусто |

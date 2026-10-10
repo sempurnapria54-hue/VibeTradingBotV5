@@ -71,6 +71,13 @@ class AccessContourBoxTest extends SharedAuditBox {
     private static final String CREATED_COLUMN = "created_at";
 
     /**
+     * Точки провайдера, к которым сервис ходит за ключами: описание
+     * издателя и JWKS. Иных обращений у локальной проверки подписи нет.
+     */
+    private static final Set<String> IDENTITY_PATHS =
+            Set.of("/.well-known/openid-configuration", "/jwks");
+
+    /**
      * Ширина колонки поверхности.
      *
      * <p><b>Объявлена здесь величиной по тому же доводу, что оси
@@ -186,15 +193,18 @@ class AccessContourBoxTest extends SharedAuditBox {
     @Test
     @DisplayName("B9.2 — Токен, подписанный чужим ключом")
     void aTokenSignedWithAForeignKeyIsRefused() {
+        Integer identityBefore = identity.paths().size();
+
         Answer answer = getWith(question(), identity.foreignKeyToken());
 
         assertThat(answer.status()).isEqualTo(401);
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode()).isEqualTo(UNAUTHENTICATED);
-        assertThat(identity.paths())
-                .as("за подтверждением сервис ходил только к точкам ключей: подпись проверена локально")
-                .isNotEmpty()
-                .allMatch(path -> path.contains("jwks") || path.contains("openid-configuration"));
+        List<String> duringEntry = identity.paths().subList(identityBefore, identity.paths().size());
+        assertThat(duringEntry)
+                .as("за вход кейса сервис ходил к провайдеру только за ключами и описанием издателя — "
+                        + "подпись проверена локально; не прибавиться может и ни одного: ключи забраны раньше")
+                .allMatch(IDENTITY_PATHS::contains);
 
         Map<String, Object> denial = onlyDenial();
         assertThat(denial.get(OUTCOME_COLUMN))
@@ -251,8 +261,8 @@ class AccessContourBoxTest extends SharedAuditBox {
      * {@code UP}.
      */
     @Test
-    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
-    void theProbeGroupsAreOpenAndAnswerWithState() {
+    @DisplayName("B9.12 — Группы проб живости и готовности открыты и отвечают состоянием")
+    void b9_12_theProbeGroupsAreOpenAndAnswerWithState() {
         Answer liveness = getAnonymously(LIVENESS_GROUP);
         Answer readiness = getAnonymously(READINESS_GROUP);
 

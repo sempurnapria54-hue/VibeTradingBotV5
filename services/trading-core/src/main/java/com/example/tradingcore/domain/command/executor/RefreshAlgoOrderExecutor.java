@@ -161,7 +161,8 @@ public class RefreshAlgoOrderExecutor implements CommandExecutor {
      *
      * <p><b>Исключение одно — запись, чьё эхо разошлось с нашей строкой:</b>
      * живости она не пишет, потому что ответ, нарушивший контракт,
-     * наблюдением не является ({@link #requireEchoMatch}).
+     * наблюдением не является ({@link #requireEchoMatch}); дом исключения —
+     * тот же раздел docs/lifecycles/AlgoOrder.md.
      */
     private AlgoOrder fetchOrFail(AlgoOrder algoOrder, DealContext dealContext) {
         AlgoOrder fetched;

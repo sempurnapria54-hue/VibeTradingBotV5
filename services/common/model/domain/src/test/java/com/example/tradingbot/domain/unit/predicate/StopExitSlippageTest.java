@@ -20,9 +20,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Проскок выхода сделки по стопу — по примерам дома формы
- * (docs/spec/stop-exit-slippage.json, величина {@code stopExitSlippage}).
- * Меток клетки не несут — их назначает документ кейсов.
+ * Проскок выхода сделки по стопу — группа `U25` документа
+ * `.claude/tests/cases/domain-model-predicates.md`, клетки — примеры дома
+ * формы (docs/spec/stop-exit-slippage.json, величина
+ * {@code stopExitSlippage}); метка клетки стоит в имени метода и в
+ * {@code @DisplayName}.
  *
  * <p><b>Базовая сборка:</b> длинная сделка, закрытая стопом, исход штатный,
  * граф полон, эпизод один со средней ценой выхода; транш закрыт стопом, его
@@ -36,7 +38,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.1 — LONG, гэп через стоп: исполнение на 30 ниже уровня — проскок 300, положителен")
-    void aLongGapThroughTheStopIsAdverseAndPositive() {
+    void u25_1_aLongGapThroughTheStopIsAdverseAndPositive() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2880", stopTranche(LEVEL, "100"));
 
         assertThat(deal.stopExitSlippage(true)).isEqualByComparingTo("300");
@@ -44,7 +46,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.2 — SHORT: неблагоприятная сторона выше уровня — проскок 60")
-    void aShortMeasuresTheAdverseSideAboveTheLevel() {
+    void u25_2_aShortMeasuresTheAdverseSideAboveTheLevel() {
         Deal deal = stopDeal(StrategyTradeDirection.SHORT, "3096", stopTranche("3090", "100"));
 
         assertThat(deal.stopExitSlippage(true)).isEqualByComparingTo("60");
@@ -52,7 +54,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.3 — LONG, исполнение лучше уровня: проскок отрицателен и нулём не обрезается")
-    void aBetterThanLevelExecutionIsNegative() {
+    void u25_3_aBetterThanLevelExecutionIsNegative() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2912", stopTranche(LEVEL, "100"));
 
         assertThat(deal.stopExitSlippage(true)).isEqualByComparingTo("-20");
@@ -60,7 +62,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.4 — стоп перенесён отдельной защитой: мерится против сработавшего уровня, снятая встроенная не входит")
-    void theMovedStandaloneStopIsTheComparedLevel() {
+    void u25_4_theMovedStandaloneStopIsTheComparedLevel() {
         DealTranche tranche = stopTranche(LEVEL, "100");
         AttachedAlgoOrder switched = tranche.getOrders().getFirst().getAttachedAlgoOrders().getFirst();
         switched.setStatus(AttachedAlgoOrder.Status.CANCELED);
@@ -73,7 +75,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.5 — два транша со стопами на одном уровне: экспозиция — сумма наливов, проскок 50")
-    void twoTranchesOnOneLevelSumTheirExposure() {
+    void u25_5_twoTranchesOnOneLevelSumTheirExposure() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2905", stopTranche(LEVEL, "60"),
                 stopTranche(LEVEL, "40"));
 
@@ -82,7 +84,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.6 — частичный выход reduce-only ногой, остаток добрал стоп: мера пуста")
-    void aPartialReduceOnlyExitLeavesTheMeasureEmpty() {
+    void u25_6_aPartialReduceOnlyExitLeavesTheMeasureEmpty() {
         DealTranche tranche = stopTranche(LEVEL, "100");
         tranche.getOrders().add(leg(true, "40"));
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2980", tranche);
@@ -92,7 +94,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.7 — соседний налитый транш закрыт не стопом: средняя цена смешана — мера пуста")
-    void aNeighbourClosedOtherwiseLeavesTheMeasureEmpty() {
+    void u25_7_aNeighbourClosedOtherwiseLeavesTheMeasureEmpty() {
         DealTranche neighbour = stopTranche(LEVEL, "40");
         neighbour.setCloseReason(DealTranche.CloseReason.STRATEGY_EXIT);
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2980", stopTranche(LEVEL, "60"), neighbour);
@@ -102,7 +104,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.8 — транш без налива с иной причиной меру не портит")
-    void anUnfilledTrancheDoesNotSpoilTheMeasure() {
+    void u25_8_anUnfilledTrancheDoesNotSpoilTheMeasure() {
         DealTranche expired = tranche();
         expired.setCloseReason(DealTranche.CloseReason.ENTRY_CONDITION_EXPIRED);
         expired.getOrders().add(leg(false, "0"));
@@ -113,7 +115,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.9 — сработал трейлинг: наблюдённый уровень мерой не берётся — мера пуста")
-    void aFiredTrailingLeavesTheMeasureEmpty() {
+    void u25_9_aFiredTrailingLeavesTheMeasureEmpty() {
         DealTranche tranche = tranche();
         tranche.setCloseReason(DealTranche.CloseReason.STOP_LOSS);
         tranche.getOrders().add(leg(false, "100"));
@@ -125,7 +127,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.10 — лестница стопов на разных уровнях: средний уровень не взвешивается — мера пуста")
-    void aStopLadderLeavesTheMeasureEmpty() {
+    void u25_10_aStopLadderLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2895", stopTranche(LEVEL, "60"),
                 stopTranche("2900", "40"));
 
@@ -134,7 +136,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.11 — аварийный терминал: причина не стоп — мера пуста при любом графе")
-    void anEmergencyTerminalLeavesTheMeasureEmpty() {
+    void u25_11_anEmergencyTerminalLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2880", stopTranche(LEVEL, "100"));
         deal.setCloseReason(Deal.CloseReason.EMERGENCY_CLOSE);
 
@@ -143,7 +145,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.12 — граф на терминале неполон: мера пуста")
-    void anIncompleteGraphLeavesTheMeasureEmpty() {
+    void u25_12_anIncompleteGraphLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2880", stopTranche(LEVEL, "100"));
 
         assertThat(deal.stopExitSlippage(false)).isNull();
@@ -151,7 +153,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.13 — ликвидация: исход не штатный — мера пуста")
-    void aLiquidationLeavesTheMeasureEmpty() {
+    void u25_13_aLiquidationLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2850", stopTranche(LEVEL, "100"));
         deal.setCloseOutcome(Deal.CloseOutcome.LIQUIDATION);
 
@@ -160,7 +162,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.14 — два эпизода: средняя цена выхода у каждого своя — мера пуста")
-    void twoEpisodesLeaveTheMeasureEmpty() {
+    void u25_14_twoEpisodesLeaveTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2905", stopTranche(LEVEL, "100"));
         deal.getPositions().add(closedEpisode("2900"));
 
@@ -169,7 +171,7 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.15 — средней цены выхода в записи закрытия нет: мера пуста, а не ноль")
-    void anAbsentExitPriceLeavesTheMeasureEmpty() {
+    void u25_15_anAbsentExitPriceLeavesTheMeasureEmpty() {
         Deal deal = stopDeal(StrategyTradeDirection.LONG, null, stopTranche(LEVEL, "100"));
 
         assertThat(deal.stopExitSlippage(true)).isNull();
@@ -177,11 +179,28 @@ class StopExitSlippageTest {
 
     @Test
     @DisplayName("U25.16 — восстановленная сделка без входных ног: вышедшая экспозиция ноль — мера пуста")
-    void aRecoveredDealWithoutEntryLegsLeavesTheMeasureEmpty() {
+    void u25_16_aRecoveredDealWithoutEntryLegsLeavesTheMeasureEmpty() {
         DealTranche recovered = tranche();
         recovered.setCloseReason(DealTranche.CloseReason.STOP_LOSS);
         recovered.getAlgoOrders().add(firedStandalone(AlgoOrder.ConditionType.STOP_LOSS, LEVEL));
         Deal deal = stopDeal(StrategyTradeDirection.LONG, "2905", recovered);
+
+        assertThat(deal.stopExitSlippage(true)).isNull();
+    }
+
+    /**
+     * Защита транша, закрытого стопом, финализирована, но не срабатыванием:
+     * уровень у неё объявлен, а исполнения против него не было, и мера
+     * неизмерима — а не взята по объявленному уровню.
+     */
+    @Test
+    @DisplayName("U25.17 — причина сделки стоп, а сработавшей защиты в графе нет: сравнивать не с чем — мера пуста")
+    void u25_17_noFiredProtectionLeavesTheMeasureEmpty() {
+        DealTranche tranche = stopTranche(LEVEL, "100");
+        AttachedAlgoOrder unresolved = tranche.getOrders().getFirst().getAttachedAlgoOrders().getFirst();
+        unresolved.setStatus(AttachedAlgoOrder.Status.CANCELED);
+        unresolved.setCloseReason(AttachedAlgoOrder.CloseReason.UNKNOWN);
+        Deal deal = stopDeal(StrategyTradeDirection.LONG, "2905", tranche);
 
         assertThat(deal.stopExitSlippage(true)).isNull();
     }

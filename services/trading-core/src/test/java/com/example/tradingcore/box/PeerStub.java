@@ -1,5 +1,7 @@
 package com.example.tradingcore.box;
 
+import static java.util.Objects.isNull;
+
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
@@ -249,6 +251,37 @@ final class PeerStub {
     void flipsOn(String scenario, String path, String body, String newState) {
         server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
                 .inScenario(scenario)
+                .willSetStateTo(newState)
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+    }
+
+    /**
+     * Команда, переключающая сценарий из НАЗВАННОГО состояния и только при
+     * названном значении query-параметра: им разводятся команды площадке,
+     * которые уходят одним путём и различаются параметром (закрытие позиции
+     * сделки — без режима маржи, закрытие записи иного режима — её режимом).
+     *
+     * <p><b>Состояние называется явно, а не берётся любым</b>: у двух
+     * сущностей площадки, чьё чтение идёт одним путём, состояние сценария
+     * одно на пару, и переход зависит от того, что уже исполнено.
+     *
+     * @param scenario  имя сценария
+     * @param path      путь команды
+     * @param state     состояние, в котором действует заготовка
+     * @param parameter имя query-параметра
+     * @param value     его значение; пусто — параметра в запросе нет
+     * @param body      тело подтверждения
+     * @param newState  состояние сценария после команды
+     */
+    void flipsOnWhen(String scenario, String path, String state, String parameter, String value, String body,
+                     String newState) {
+        server.stubFor(WireMock.any(WireMock.urlPathEqualTo(path))
+                .withQueryParam(parameter, isNull(value) ? WireMock.absent() : WireMock.equalTo(value))
+                .inScenario(scenario)
+                .whenScenarioStateIs(state)
                 .willSetStateTo(newState)
                 .willReturn(WireMock.aResponse()
                         .withStatus(200)

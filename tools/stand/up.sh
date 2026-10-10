@@ -55,6 +55,9 @@ kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
 
 say "3. Кластерный слой: операторы и проект Argo CD"
 kubectl apply -k "$ROOT/deploy/base/platform"
+# Только стенд: метрики ресурсов для `kubectl top` и клиентов кластера —
+# с флагом, верным лишь для kind (довод — шапка файла).
+kubectl apply -f "$ROOT/tools/stand/metrics-server.yaml"
 
 say "4. Секреты ролей базы (вне репозитория, генерируются один раз)"
 kubectl create namespace "$ENVIRONMENT" --dry-run=client -o yaml | kubectl apply -f - >/dev/null

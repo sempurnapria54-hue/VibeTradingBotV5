@@ -3,6 +3,7 @@ package com.example.connector.okx.unit.mapping;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import com.example.connector.okx.exception.ExternalStatusException;
 import com.example.connector.okx.integration.external.api.model.okx.response.AttachAlgoOrdOkxResponse;
 import com.example.connector.okx.mapping.AlgoOrderMapper;
@@ -348,5 +349,39 @@ class SnapshotToDomainCreationTest {
         assertThat(candleMapper.snapshotToDomain(null)).isNull();
         assertThat(cashFlowMapper.snapshotToDomain(null)).isNull();
         assertThat(balanceMapper.snapshotToDomain(null)).isNull();
+    }
+
+    /**
+     * Эхо двух осей сверки едет в словаре домена; молчание стороны сверку не
+     * запускает, а слово вне словаря отказывает на ЭТОМ переходе — снапшот
+     * его ещё нёс литералом (docs/models/mapping/AlgoOrder.md §«Сверка
+     * эха»; `U6.39`-`U6.41`).
+     */
+    @Test
+    @DisplayName("U21.19 — эхо стороны и признака условной заявки в словаре домена; сторона вне словаря отказывает здесь")
+    void u21_19_theAlgoEchoLandsInTheDomainDictionary() {
+        var source = OkxFixture.algoOrder();
+        source.setSide("sell");
+        source.setReduceOnly("true");
+
+        AlgoOrder algoOrder = algoOrderMapper.snapshotToDomain(algoOrderMapper.integrationToSnapshot(source));
+
+        assertThat(algoOrder.getDirection()).isEqualTo(AlgoOrder.Direction.SELL);
+        assertThat(algoOrder.getPositionReducingOnly()).isEqualTo(Boolean.TRUE);
+
+        source.setSide("");
+
+        AlgoOrder silent = algoOrderMapper.snapshotToDomain(algoOrderMapper.integrationToSnapshot(source));
+
+        assertThat(silent.getDirection()).isNull();
+        assertThat(silent.getPositionReducingOnly()).isEqualTo(Boolean.TRUE);
+
+        source.setSide("long");
+        AlgoOrderExternalSnapshot outside = algoOrderMapper.integrationToSnapshot(source);
+
+        assertThat(outside.getSide()).isEqualTo("long");
+        assertThatThrownBy(() -> algoOrderMapper.snapshotToDomain(outside))
+                .isInstanceOf(ExternalInvariantViolationException.class)
+                .hasMessageContaining("long");
     }
 }

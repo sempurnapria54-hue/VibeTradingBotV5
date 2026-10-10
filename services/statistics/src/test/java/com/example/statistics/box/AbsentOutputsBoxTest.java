@@ -341,7 +341,7 @@ class AbsentOutputsBoxTest extends StatisticsBox {
     @DisplayName("B13.2 — Сервис не зовёт соседей")
     void theServiceCallsNoNeighbours() {
         aggregates(DEAL_GRAIN, TENANT);
-        Integer identityBefore = identity.paths().size();
+        Integer identityMark = identity.mark();
         Set<String> topicsBefore = externalTopics();
 
         everyTrope("2");
@@ -349,8 +349,7 @@ class AbsentOutputsBoxTest extends StatisticsBox {
             aggregates(DEAL_GRAIN, TENANT);
         }
 
-        List<String> duringTropes =
-                identity.paths().subList(identityBefore, identity.paths().size());
+        List<String> duringTropes = identity.pathsSince(identityMark);
         assertThat(duringTropes)
                 .as("за полный набор троп к провайдеру ушли только описание издателя и "
                         + "ключи: точек подтверждения токена сервис не зовёт вовсе")
@@ -591,7 +590,7 @@ class AbsentOutputsBoxTest extends StatisticsBox {
         }
         recompute();
         aggregates(DEAL_GRAIN, TENANT);
-        Integer identityBefore = identity.paths().size();
+        Integer identityMark = identity.mark();
         Map<String, Long> endsBefore = endOffsets();
         Set<String> topicsBefore = externalTopics();
 
@@ -604,10 +603,10 @@ class AbsentOutputsBoxTest extends StatisticsBox {
                         + "не на их отсутствии")
                 .hasSize(3)
                 .allSatisfy(row -> assertThat(row.get("losingDeals")).isEqualTo(1));
-        assertThat(identity.paths().size())
+        assertThat(identity.pathsSince(identityMark))
                 .as("наружу не ушло ни одного вызова: исходящего вызова у проходов нет "
                         + "вовсе")
-                .isEqualTo(identityBefore);
+                .isEmpty();
         assertThat(endOffsets())
                 .as("и ни одного события: концы обеих тем не сдвинулись")
                 .isEqualTo(endsBefore);

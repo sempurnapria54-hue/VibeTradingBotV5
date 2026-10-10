@@ -44,6 +44,15 @@ final class Feed {
     /** Половина спреда: ею стороны стакана разводятся с последней ценой. */
     private static final BigDecimal SPREAD_HALF = new BigDecimal("0.1");
 
+    /**
+     * Ценовая база триггера встроенной защиты, которую объявляют определения
+     * ящика ({@link Definitions}): эхо площадки по умолчанию с ней совпадает.
+     */
+    private static final String DECLARED_TRIGGER_BASE = "LAST";
+
+    /** Режим маржи контура: им площадка отдаёт всякую нашу позицию. */
+    private static final String CONTOUR_MARGIN_MODE = "ISOLATED";
+
     /** Пустая раскладка: ею ставится «операнда этого рода владелец не дал». */
     private static final String EMPTY_LAYOUT = "{}";
 
@@ -432,6 +441,45 @@ final class Feed {
     }
 
     /**
+     * Добытая нога, НАЛИТАЯ целиком, чья встроенная защита НЕ ВСТАЛА: элемент
+     * защиты в её теле несёт непустой код отказа постановки.
+     *
+     * <p><b>Значение кода исхода не меняет</b> — предикат читает его
+     * непустоту (docs/spec/order-lifecycle.json, величина
+     * {@code attachedFailsToPlace}); кейс подаёт любое.
+     *
+     * @param externalId           биржевой идентификатор ноги
+     * @param internalId           её клиентский идентификатор
+     * @param size                 налитый размер в контрактах — он же размер ноги
+     * @param averagePrice         средняя цена налива
+     * @param protectionInternalId клиентский идентификатор встроенной защиты
+     * @param stopTrigger          цена срабатывания её стопа
+     * @param failCode             код отказа постановки защиты
+     */
+    static String filledOrderWithFailedProtection(String externalId, String internalId, String size,
+                                                  String averagePrice, String protectionInternalId,
+                                                  String stopTrigger, String failCode) {
+        return """
+                {
+                  "internalId": "%s",
+                  "externalId": "%s",
+                  "status": "COMPLETED",
+                  "type": "ENTRY_ATTACHED_STOP_LOSS",
+                  "side": "BUY",
+                  "externalStatus": "filled",
+                  "size": "%s",
+                  "accumulatedFillSize": "%s",
+                  "averagePrice": "%s",
+                  "fee": "-0.1",
+                  "attachedAlgoOrders": [%s],
+                  "externalCreatedAt": "2026-09-20T10:00:01Z",
+                  "externalModifiedAt": "2026-09-20T10:00:03Z"
+                }
+                """.formatted(internalId, externalId, size, size, averagePrice,
+                protectionElement(protectionInternalId, size, stopTrigger, DECLARED_TRIGGER_BASE, failCode));
+    }
+
+    /**
      * Добытая нога, налитая ЧАСТЬЮ: налив меньше размера, а встроенная
      * защита стоит в её теле.
      *
@@ -452,6 +500,42 @@ final class Feed {
      */
     static String partiallyFilledOrder(String externalId, String internalId, String status, String size,
                                        String filled, String protectionInternalId, String stopTrigger) {
+        return partiallyFilledOrderWith(externalId, internalId, status, size, filled,
+                protectionElement(protectionInternalId, size, stopTrigger, DECLARED_TRIGGER_BASE, null));
+    }
+
+    /**
+     * Та же нога, налитая частью, чья встроенная защита НЕ ВСТАЛА: элемент
+     * защиты несёт непустой код отказа постановки
+     * ({@link #filledOrderWithFailedProtection} — довод о значении кода).
+     *
+     * @param failCode код отказа постановки защиты
+     */
+    static String partiallyFilledOrderWithFailedProtection(String externalId, String internalId, String status,
+                                                           String size, String filled,
+                                                           String protectionInternalId, String stopTrigger,
+                                                           String failCode) {
+        return partiallyFilledOrderWith(externalId, internalId, status, size, filled,
+                protectionElement(protectionInternalId, size, stopTrigger, DECLARED_TRIGGER_BASE, failCode));
+    }
+
+    /**
+     * Та же нога, налитая частью, у чьей встроенной защиты ЭХО базы триггера
+     * названо кейсом: им ставится расхождение эха с объявленной базой
+     * (docs/models/mapping/Order.md, сверка базы встроенной защиты).
+     *
+     * @param triggerPriceType эхо ценовой базы триггера защиты
+     */
+    static String partiallyFilledOrderEchoingBase(String externalId, String internalId, String status,
+                                                  String size, String filled, String protectionInternalId,
+                                                  String stopTrigger, String triggerPriceType) {
+        return partiallyFilledOrderWith(externalId, internalId, status, size, filled,
+                protectionElement(protectionInternalId, size, stopTrigger, triggerPriceType, null));
+    }
+
+    /** Тело ноги, налитой частью, с уже собранным элементом встроенной защиты. */
+    private static String partiallyFilledOrderWith(String externalId, String internalId, String status,
+                                                   String size, String filled, String protectionElement) {
         return """
                 {
                   "internalId": "%s",
@@ -464,21 +548,37 @@ final class Feed {
                   "accumulatedFillSize": "%s",
                   "averagePrice": "100",
                   "fee": "-0.05",
-                  "attachedAlgoOrders": [
-                    {
-                      "internalId": "%s",
-                      "type": "ATTACHED_STOP_LOSS",
-                      "size": "%s",
-                      "stopLossTriggerPrice": "%s",
-                      "triggerPriceType": "LAST"
-                    }
-                  ],
+                  "attachedAlgoOrders": [%s],
                   "externalCreatedAt": "2026-09-20T10:00:01Z",
                   "externalModifiedAt": "2026-09-20T10:00:03Z"
                 }
                 """.formatted(internalId, externalId, status,
-                "CANCELED".equals(status) ? "canceled" : "partially_filled", size, filled,
-                protectionInternalId, size, stopTrigger);
+                "CANCELED".equals(status) ? "canceled" : "partially_filled", size, filled, protectionElement);
+    }
+
+    /**
+     * Элемент встроенной защиты в теле ноги.
+     *
+     * <p><b>Код отказа постановки — член, а не пустое значение</b>: пусто —
+     * ключа в теле нет вовсе, как у защиты, которая встала.
+     *
+     * @param internalId       клиентский идентификатор защиты
+     * @param size             её размер в контрактах
+     * @param stopTrigger      цена срабатывания её стопа
+     * @param triggerPriceType эхо ценовой базы триггера
+     * @param failCode         код отказа постановки; пусто — ключа нет
+     */
+    private static String protectionElement(String internalId, String size, String stopTrigger,
+                                            String triggerPriceType, String failCode) {
+        String failCodeMember = isNull(failCode) ? "" : ", \"failCode\": \"%s\"".formatted(failCode);
+        return """
+                {
+                  "internalId": "%s",
+                  "type": "ATTACHED_STOP_LOSS",
+                  "size": "%s",
+                  "stopLossTriggerPrice": "%s",
+                  "triggerPriceType": "%s"%s
+                }""".formatted(internalId, size, stopTrigger, triggerPriceType, failCodeMember);
     }
 
     /**
@@ -552,11 +652,30 @@ final class Feed {
      */
     static String livePosition(String externalId, String externalInstrumentId, String size,
                                String entryPrice, String createdAt) {
+        return livePositionInMode(externalId, externalInstrumentId, size, entryPrice, createdAt,
+                CONTOUR_MARGIN_MODE);
+    }
+
+    /**
+     * Живой эпизод позиции НАЗВАННОГО режима маржи: им ставится запись иного
+     * режима, чем режим контура, — её открыла заявка, которой мы не
+     * отправляли (docs/components/AnomalyJob.md, запись позиции читается
+     * нашей только в режиме маржи контура).
+     *
+     * @param externalId           биржевой идентификатор эпизода
+     * @param externalInstrumentId биржевое имя инструмента
+     * @param size                 размер экспозиции в контрактах
+     * @param entryPrice           средняя цена входа
+     * @param createdAt            биржевой момент открытия эпизода
+     * @param marginMode           режим маржи записи в словаре домена
+     */
+    static String livePositionInMode(String externalId, String externalInstrumentId, String size,
+                                     String entryPrice, String createdAt, String marginMode) {
         return """
                 {
                   "externalId": "%s",
                   "externalInstrumentId": "%s",
-                  "marginMode": "ISOLATED",
+                  "marginMode": "%s",
                   "status": "ACTIVE",
                   "direction": "LONG",
                   "externalSize": "%s",
@@ -567,7 +686,7 @@ final class Feed {
                   "externalCreatedAt": "%s",
                   "externalModifiedAt": "%s"
                 }
-                """.formatted(externalId, externalInstrumentId, size, entryPrice, entryPrice,
+                """.formatted(externalId, externalInstrumentId, marginMode, size, entryPrice, entryPrice,
                 createdAt, createdAt);
     }
 

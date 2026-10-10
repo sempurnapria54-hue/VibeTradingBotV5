@@ -1,5 +1,7 @@
 package com.example.bff.config;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 import com.example.bff.util.Constants;
 import com.example.platform.exception.handler.AccessDenialHandler;
 import com.example.platform.exception.handler.BearerTokenFailureInstaller;
@@ -7,6 +9,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -37,6 +43,13 @@ import org.springframework.security.web.SecurityFilterChain;
  * решение, а периметр решений не принимает
  * (docs/rules/api-access-policy.md §«Где проверяется право операции: у
  * домена, а не у периметра»).
+ *
+ * <p><b>Токен без субъекта — непринятый принципал</b>
+ * (docs/rules/api-access-policy.md §«Два контура доступа сосуществуют, пока
+ * жив донор»): на вопрос «кто это был» он не отвечает, а субъект — ключ
+ * кэша членств. Отвергает его звено проверки токена, то есть точка входа
+ * отказа отвечает {@code 401} до резолва контекста; пропущенный дальше, он
+ * доходил бы до кэша пустым ключом.
  *
  * <p>CSRF выключен и это не унаследованная оговорка: поверхность
  * stateless, сессии нет, тропа — заголовок {@code Authorization},
@@ -72,5 +85,17 @@ public class SecurityConfig {
                         .authenticationEntryPoint(denialHandler)
                         .accessDeniedHandler(denialHandler))
                 .build();
+    }
+
+    /**
+     * Валидатор присутствия субъекта: автоконфигурация декодера добавляет
+     * его к умолчаниям (подпись, издатель, срок), а не заменяет их.
+     * Субъект, не являющийся непустой строкой, — тот же отказ, что и
+     * отсутствующий.
+     */
+    @Bean
+    public OAuth2TokenValidator<Jwt> subjectPresenceValidator() {
+        return new JwtClaimValidator<Object>(JwtClaimNames.SUB,
+                subject -> subject instanceof String value && isNotBlank(value));
     }
 }

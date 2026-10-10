@@ -1,7 +1,9 @@
 package com.example.connector.okx.unit.mapping;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.connector.okx.exception.ExternalInvariantViolationException;
 import com.example.connector.okx.integration.external.api.model.okx.response.AlgoOrderOkxResponse;
 import com.example.connector.okx.mapping.AlgoOrderMapper;
 import com.example.connector.okx.snapshot.AlgoOrderExternalSnapshot;
@@ -245,5 +247,30 @@ class AlgoOrderToSnapshotTest {
         response.setFailCode("51008");
 
         assertThat(mapper.integrationToSnapshot(response).getFailCode()).isEqualTo("51008");
+    }
+
+    /**
+     * Признак разбирается на этом переходе, сторона — на следующем
+     * (`U21.19`), и место отказа у них разное: эхо стороны едет литералом
+     * источника, а слово признака вне формы контракта роняет уже построение
+     * снапшота (`U4.22`).
+     */
+    @Test
+    @DisplayName("U10.18 — эхо стороны едет строкой, признак разобран здесь и отказывает здесь")
+    void u10_18_theSideEchoStaysAWordAndTheFlagIsParsedHere() {
+        AlgoOrderOkxResponse response = OkxFixture.algoOrder();
+        response.setSide("sell");
+        response.setReduceOnly("true");
+
+        AlgoOrderExternalSnapshot snapshot = mapper.integrationToSnapshot(response);
+
+        assertThat(snapshot.getSide()).isEqualTo("sell");
+        assertThat(snapshot.getReduceOnly()).isEqualTo(Boolean.TRUE);
+
+        response.setReduceOnly("yes");
+
+        assertThatThrownBy(() -> mapper.integrationToSnapshot(response))
+                .isInstanceOf(ExternalInvariantViolationException.class)
+                .hasMessageContaining("yes");
     }
 }

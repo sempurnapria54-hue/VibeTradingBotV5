@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Кейсы навеса справочных правил инструмента: группа `U7`, клетки `U10.3`,
- * `U11.7`, `U13.3` и `U13.6` документа
+ * `U11.7`, `U13.3`, `U13.6` и `U13.7` документа
  * `.claude/tests/cases/jsonb-overlay-roundtrip.md`.
  *
  * <p><b>Правило изъятия у копий одно, и ожидание объявлено один раз.</b>
@@ -232,6 +232,38 @@ public abstract class InstrumentRulesOverlayCopyContract extends JsonbOverlayPro
                         "minSize",
                         "maxSize",
                         "maintenanceMarginRate");
+    }
+
+    // --- U13.7: круговой ход позиционных тиров ---------------------------
+
+    /**
+     * Тиры проходят круг записи и чтения своей копией: строка тира
+     * собирается обратно записью {@link PositionTier} — каноническим
+     * конструктором, без пустого конструктора и сеттеров, — и перечень
+     * возвращается тождественным, порядок строк сохранён. Клетки `U13.3` и
+     * `U13.6` мерят только сторону записи, и сборку записи читателем не
+     * проверяет ни одна из них.
+     */
+    @Test
+    @DisplayName("U13.7 — тиры проходят круг записи и чтения: записи PositionTier собраны тождественными, порядок сохранён")
+    protected void u13_7_positionTiersSurviveTheRoundTripAsRecordsInOrder() {
+        InstrumentExternalRules rules = everyFieldRules();
+        rules.setPositionTiers(List.of(
+                new PositionTier(new BigDecimal("1"), new BigDecimal("1000"), new BigDecimal("0.004")),
+                new PositionTier(new BigDecimal("1001"), new BigDecimal("5000"), new BigDecimal("0.0065"))));
+        String json = writeRules(rules);
+
+        InstrumentExternalRules read = readRules(json);
+
+        assertThat(read.getPositionTiers())
+                .as("U13.7: вход %s — каждая строка тира собрана записью", json)
+                .hasOnlyElementsOfType(PositionTier.class)
+                .containsExactlyElementsOf(rules.getPositionTiers());
+        assertThat(read)
+                .as("U13.7: вход %s — прочие поля тождественны за вычетом изъятых", json)
+                .usingRecursiveComparison()
+                .ignoringFields(OWNER_ID_FIELD, FEE_RATE_FIELD)
+                .isEqualTo(rules);
     }
 
     // --- материал кейсов --------------------------------------------------

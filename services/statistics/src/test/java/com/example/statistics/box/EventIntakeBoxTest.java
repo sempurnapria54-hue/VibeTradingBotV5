@@ -62,6 +62,7 @@ class EventIntakeBoxTest extends SharedStatisticsBox {
         givenReceptionStateRows();
         OffsetDateTime occurredAt = momentsAgo(Duration.ofMinutes(5));
         Long endBefore = Wire.endOffset(topic());
+        Integer identityMark = identity.mark();
 
         publish("E-1", DEAL_CLOSED, occurredAt, Bodies.dealClosed(ACCOUNT, STRATEGY));
         awaitConsumed();
@@ -103,19 +104,23 @@ class EventIntakeBoxTest extends SharedStatisticsBox {
         assertThat(rows.count(INCIDENT_AGGREGATES)).isZero();
 
         // Наружу не ушло ничего: в тему сервис не дописывает, своих тем не
-        // заводит, а единственная чужая поверхность прогона видела только
-        // обращения ЗА КЛЮЧАМИ. Непустота перечня — базовый гейт: пустой он
-        // сделал бы утверждение верным на пустом месте, и обеспечивает её
-        // чтение поверхности выше.
+        // заводит, а единственная чужая поверхность прогона за окно клетки
+        // видела только обращения ЗА КЛЮЧАМИ.
         //
-        // КОНЕЦ ТЕМЫ ЧИТАЕТСЯ ДЕЛЬТОЙ СВОЕГО ОКНА, а не абсолютным числом:
-        // тема штатного положения осей общая всем клеткам класса, и её
-        // записи копятся за весь прогон — абсолютное «одна запись» было бы
-        // утверждением о порядке методов, а не о поведении сервиса.
+        // КОНЕЦ ТЕМЫ И ЖУРНАЛ СТАБА ЧИТАЮТСЯ ДЕЛЬТОЙ СВОЕГО ОКНА, а не
+        // абсолютным числом: тема штатного положения осей общая всем клеткам
+        // класса, а журнал стаба — всем клеткам модуля, и оба копятся за весь
+        // прогон. Абсолютное утверждение было бы утверждением о порядке
+        // методов и о соседях, а не о поведении сервиса на этом входе. Пустой
+        // прирост законен: ключи, добытые раньше окна, лежат в кэше контекста,
+        // — поэтому базовый гейт стоит на журнале целиком: стаб обращения
+        // видит, и пустота прироста не есть слепота наблюдателя.
         assertThat(Wire.endOffset(topic())).isEqualTo(endBefore + 1);
+        assertThat(identity.mark()).as("B1.1: наблюдатель журнала стаба жив").isPositive();
         assertThat(Wire.topicNames()).noneMatch(name -> name.startsWith("statistics"));
-        assertThat(identity.paths()).isNotEmpty();
-        assertThat(identity.paths())
+        assertThat(identity.pathsSince(identityMark))
+                .as("B1.1: за окно клетки — приём записи и чтение поверхности — к "
+                        + "провайдеру ушли только обращения за ключами")
                 .allMatch(path -> "/jwks".equals(path) || path.startsWith("/.well-known/"));
     }
 

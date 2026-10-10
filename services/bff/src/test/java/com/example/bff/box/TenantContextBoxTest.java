@@ -55,6 +55,10 @@ class TenantContextBoxTest extends SharedBffBox {
     void b1_2_theResolutionGoesUnderTheUserToken() {
         authAnswersOneMembership();
         String presented = token();
+        // Журнал стаба провайдера обвязка не забывает: он копит обращения
+        // всех клеток модуля, и отрицание мерится приростом от отметки,
+        // снятой до входа, а не содержимым журнала целиком.
+        Long issuancesBefore = tokenIssuanceRequests();
 
         Answer answer = getWith(CONTEXT, presented);
 
@@ -62,7 +66,7 @@ class TenantContextBoxTest extends SharedBffBox {
         LoggedRequest resolve = owners.single(OwnerStub.AUTH, OwnerStub.MEMBERSHIPS_PATH);
         assertThat(resolve.header("Authorization").values())
                 .containsExactly("Bearer " + presented);
-        assertThat(identity.paths()).doesNotContain(IdentityStub.tokenPath());
+        assertThat(tokenIssuanceRequests()).isEqualTo(issuancesBefore);
     }
 
     @Test
@@ -192,5 +196,36 @@ class TenantContextBoxTest extends SharedBffBox {
         // Единственный побочный след — запросы к владельцу членств числом
         // ПРОМАХОВ кэша: десять чтений дают один промах.
         assertThat(owners.requests(OwnerStub.AUTH)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("B1.11 — Токен без claim `sub` контекста не получает")
+    void b1_11_aTokenWithoutSubjectGetsNoContext() {
+        authAnswersOneMembership();
+        String withoutSubject = identity.tokenWithoutSubject();
+
+        Answer context = getWith(CONTEXT, withoutSubject);
+        Answer ticket = postWith(TICKETS, withoutSubject, "");
+
+        assertThat(List.of(context, ticket)).allSatisfy(answer -> {
+            assertThat(answer.status()).isEqualTo(401);
+            assertThat(answer.carriesErrorDto()).isTrue();
+            assertThat(answer.errorCode()).isEqualTo(UNAUTHENTICATED);
+            assertThat(answer.body()).doesNotContain("tenantId").doesNotContain(tenant).doesNotContain("ticket");
+            assertThat(INTERNALS).allSatisfy(internal -> assertThat(answer.body()).doesNotContain(internal));
+        });
+        // Отказ раньше резолва: ни владелец членств, ни владельцы данных
+        // за входом не спрошены — пустого ключа кэш не видит вовсе.
+        assertThat(owners.count()).isZero();
+    }
+
+    /**
+     * Сколько раз стаб провайдера видел точку выдачи служебной
+     * идентичности — за весь прогон модуля, а не за клетку.
+     */
+    private Long tokenIssuanceRequests() {
+        return identity.paths().stream()
+                .filter(IdentityStub.tokenPath()::equals)
+                .count();
     }
 }

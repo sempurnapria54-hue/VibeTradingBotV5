@@ -8,7 +8,6 @@ import com.example.connector.okx.util.OkxConstants;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
@@ -34,6 +33,12 @@ import org.springframework.http.client.ClientHttpResponse;
  * клиент, которому он поставлен: бин с ключами в поле подписал бы запрос
  * второго тенанта ключами первого.
  *
+ * <p><b>Метка подписи — момент площадки, а не часы хоста</b>
+ * ({@link OkxServerClock}): метку, разошедшуюся с часами источника больше чем
+ * на 30 секунд, площадка отвергает, а часы хоста расходятся с ней штатно
+ * (docs/integrations/okx/contracts/server-time.md). Часы — общие на процесс,
+ * в отличие от ключей: смещение есть свойство хоста, а не счёта.
+ *
  * <p><b>Секреты не логируются</b> ({@code .claude/rules/codestyle.md}
  * §Логирование): ни в сообщении отказа, ни в диагностике. Отказ называет
  * только то, чего не хватило.
@@ -47,11 +52,13 @@ public class OkxSigningInterceptor implements ClientHttpRequestInterceptor {
 
     private final ExchangeCredentials credentials;
 
+    private final OkxServerClock serverClock;
+
     @Override
     public ClientHttpResponse intercept(HttpRequest request, byte[] body,
                                         ClientHttpRequestExecution execution) throws IOException {
         requireCredentials();
-        String timestamp = TIMESTAMP_FORMAT.format(Instant.now());
+        String timestamp = TIMESTAMP_FORMAT.format(serverClock.now());
         String requestPath = request.getURI().getRawPath();
         if (isNotBlank(request.getURI().getRawQuery())) {
             requestPath = requestPath + "?" + request.getURI().getRawQuery();

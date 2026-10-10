@@ -1,5 +1,6 @@
 package com.example.connector.okx.box;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,6 +43,11 @@ final class Okx {
     /** Конверт отказа: код и сообщение есть, записей нет. */
     static String failure(String code, String message) {
         return envelope(code, message);
+    }
+
+    /** Серверное время площадки: конверт успеха с одной записью {@code ts}. */
+    static String serverTime(Instant moment) {
+        return ok(record("ts", String.valueOf(moment.toEpochMilli())).text());
     }
 
     /** Конверт без поля {@code code} вовсе: вход клетки {@code B7.4}. */

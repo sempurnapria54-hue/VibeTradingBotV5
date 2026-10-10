@@ -57,15 +57,27 @@ class TrailIntegrityPathTest {
 
     private static final String RECOMPUTE_EVERY_TWO_SECONDS = "*/2 * * * * *";
 
+    private static final String ACCESS_DENIALS = "access_denials";
+
+    private static final List<Party> DATABASE_SIDES = List.of(Party.TRADING_CORE, Party.STRATEGIES, Party.AUDIT,
+            Party.STATISTICS);
+
     private static Trail trail;
 
     private static String definition;
 
     private static String dealId;
 
+    /**
+     * Строк отказа доступа у сторон в начале тропы: базы общего стенда несут
+     * строки прежних классов, и {@code E8.5} утверждает о приросте за тропу.
+     */
+    private static Map<Party, Long> denialsBefore;
+
     @BeforeAll
     static void openTrail() {
         trail = SharedStand.dealPath(TrailIntegrityPathTest.class);
+        denialsBefore = trail.counts(ACCESS_DENIALS, DATABASE_SIDES);
         trail.factSeriesStartedYesterday();
         trail.commonPreconditions();
     }
@@ -173,13 +185,11 @@ class TrailIntegrityPathTest {
                 "critical_anomaly_reports", "manual_operation_reports")) {
             assertThat(((Number) incidents.get(zero)).intValue()).as("E8.5: счётчик " + zero + " нулевой").isZero();
         }
-        for (Party party : List.of(Party.TRADING_CORE, Party.STRATEGIES, Party.AUDIT, Party.STATISTICS)) {
-            Database database = trail.database(party);
-            if (database.hasTable("access_denials")) {
-                assertThat(database.count("access_denials"))
-                        .as("E8.5: строк отказа доступа у " + party.module() + " нет").isZero();
-            }
-        }
+        assertThat(denialsBefore).as("E8.5: отметка снята у всех сторон с базой отказов")
+                .containsKeys(Party.STRATEGIES, Party.AUDIT, Party.STATISTICS);
+        assertThat(trail.counts(ACCESS_DENIALS, DATABASE_SIDES))
+                .as("E8.5: строк отказа доступа за тропу не прибавилось ни у одной стороны (отметка — начало тропы)")
+                .isEqualTo(denialsBefore);
         assertThat(core.hasTable("audit_records") || core.hasTable("incident_facts"))
                 .as("E8.5: в базе ядра чужих таблиц нет").isFalse();
         assertThat(trail.database(Party.AUDIT).hasTable("deals")).as("E8.5: в базе журнала таблиц ядра нет")

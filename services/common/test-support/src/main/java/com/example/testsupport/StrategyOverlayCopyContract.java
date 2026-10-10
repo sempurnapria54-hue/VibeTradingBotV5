@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Кейсы навеса дерева стратегии: группы `U4`, `U5`, `U6` и клетки `U10.1`,
- * `U10.2`, `U11.7`, `U13.2` документа
+ * `U10.2`, `U11.7`, `U11.8`, `U13.2` документа
  * `.claude/tests/cases/jsonb-overlay-roundtrip.md`.
  *
  * <p><b>Ожидание объявлено один раз и прогоняется каждым деревом своей
@@ -459,7 +459,7 @@ public abstract class StrategyOverlayCopyContract extends JsonbOverlayProbe {
      */
     @Test
     @DisplayName("U11.8 — строка условия прежней формы — с таймфреймом правила и источником цены — читается без них")
-    protected void aConditionRowOfThePreviousFormIsReadWithoutTheRetiredKeys() {
+    protected void u11_8_aConditionRowOfThePreviousFormIsReadWithoutTheRetiredKeys() {
         String previousForm = CONDITION_JSON
                 .replace("\"ruleType\":\"INDICATOR_COMPARE\",",
                         "\"ruleType\":\"INDICATOR_COMPARE\",\"timeframe\":\"ONE_HOUR\",")

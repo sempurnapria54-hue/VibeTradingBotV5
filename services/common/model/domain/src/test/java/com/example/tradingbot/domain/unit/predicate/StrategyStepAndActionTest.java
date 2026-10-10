@@ -316,11 +316,10 @@ class StrategyStepAndActionTest {
      * Перевыставление входа — замещение заявочного действия с целью — уровень
      * ставит заново: роль первичная, и сторону его стопа преконтроль мерит
      * (docs/spec/strategy-reference.json, величина {@code actionIsLevelTransfer}).
-     * Метки клетка не несёт — её назначает документ кейсов.
      */
     @Test
     @DisplayName("U16.34 — перевыставление входа с ключом цели — первичная постановка, а не перенос")
-    void aReplacedEntryWithATargetIsAPrimaryPlacement() {
+    void u16_34_aReplacedEntryWithATargetIsAPrimaryPlacement() {
         StrategyOrderAction replacedEntry = orderAction(4L, StrategyTradeDirection.LONG, false);
         replacedEntry.setActionType(StrategyActionType.REPLACE_ACTION);
         replacedEntry.setTargetActionKey("order-1");

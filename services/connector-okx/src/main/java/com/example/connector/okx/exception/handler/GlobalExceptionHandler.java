@@ -3,6 +3,7 @@ package com.example.connector.okx.exception.handler;
 import static java.util.Objects.isNull;
 
 import com.example.connector.okx.exception.CredentialsRejectedException;
+import com.example.connector.okx.exception.ExchangeClockRejectedException;
 import com.example.connector.okx.exception.CredentialsUnavailableException;
 import com.example.connector.okx.exception.ExchangeIntegrationException;
 import com.example.connector.okx.exception.ExternalInvariantViolationException;
@@ -81,6 +82,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     /**
+     * Общий класс недоступности поверхности
+     * ({@code docs/rules/error-handling-policy.md}, перечень классов отказа).
+     */
+    private static final String PEER_UNAVAILABLE = "PEER_UNAVAILABLE";
+
+    /**
      * Ключей счёта нет в хранилище.
      *
      * <p>{@code 422}, а не {@code 404} и не {@code 500}: запрос понят,
@@ -122,6 +129,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ExternalInvariantViolationException.class)
     public ResponseEntity<ErrorApiResponse> onInvariantViolation(ExternalInvariantViolationException failure) {
         return response(HttpStatus.BAD_GATEWAY, ExchangeFailureClass.EXTERNAL_INVARIANT_VIOLATION.name(), failure.getMessage());
+    }
+
+    /**
+     * Площадка не приняла метку подписи и после перемера смещения часов.
+     *
+     * <p><b>Общий класс недоступности, а не класс границы, и {@code 503}.</b>
+     * Классы границы говорят, что площадка ответила О ВЫЗОВЕ; здесь вызов к
+     * рассмотрению не принят, и коннектор сообщает о себе — приватный вызов
+     * сейчас неисполним по причине среды, которую он сам исправляет. Ядро
+     * читает такой отказ пропуском прохода, не тратя бюджета повторов
+     * ({@code docs/rules/runtime-error-classification.md}); класс границы
+     * {@code EXCHANGE_ERROR} он тратил бы, и сделки уходили бы в ошибку за то,
+     * что хост спал.
+     */
+    @ExceptionHandler(ExchangeClockRejectedException.class)
+    public ResponseEntity<ErrorApiResponse> onClockRejected(ExchangeClockRejectedException failure) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, PEER_UNAVAILABLE, failure.getMessage());
     }
 
     /** Ошибка API площадки, разбора ответа либо транспорта: ретраится ядром. */

@@ -209,6 +209,11 @@ public class RefreshOrderExecutor implements CommandExecutor {
      * риска и гейт доказанного отсутствия риска сделки
      * (docs/lifecycles/Order.md §«Нога в {@code ERROR}: живость на площадке
      * читается наблюдением»).
+     *
+     * <p><b>Исключение одно — расхождение эха встроенной защиты с нашей
+     * строкой:</b> живости оно не пишет, на обеих тропах предъявления
+     * ({@link #requireParentBodyEchoMatch}, {@link #requireEchoMatch}); дом
+     * исключения — тот же раздел docs/lifecycles/Order.md.
      */
     private Order fetchOrFail(Order order, DealContext dealContext) {
         Order fetched;

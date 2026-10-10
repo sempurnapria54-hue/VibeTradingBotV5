@@ -39,7 +39,10 @@ import org.junit.jupiter.params.provider.ValueSource;
  * контура (docs/models/mapping/Balance.md). У режима маржи записи позиции
  * исходов два, а не три: пустоты нет вовсе — площадка отдаёт режим у
  * каждой записи, и только им различает нашу запись и чужую
- * (docs/models/mapping/Position.md).
+ * (docs/models/mapping/Position.md). У эха стороны условной заявки исходы
+ * три, и отказ у него — нарушение формы контракта, а не неизвестный
+ * статус, как у стороны обычной заявки (docs/models/mapping/AlgoOrder.md
+ * §«Сверка эха»).
  */
 class ConverterDictionaryTest {
 
@@ -299,5 +302,39 @@ class ConverterDictionaryTest {
     @DisplayName("U6.38 — пустой режим маржи закрытия даёт режим контура")
     void u6_38_anEmptyClosureMarginModeIsTheContourMode() {
         assertThat(converter.marginMode(null)).isEqualTo("isolated");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"buy,BUY", "sell,SELL"})
+    @DisplayName("U6.39 — эхо стороны условной заявки в словарь домена")
+    void u6_39_theAlgoSideEchoBecomesDomain(String raw, AlgoOrder.Direction expected) {
+        assertThat(converter.algoSideToDomain(raw)).isEqualTo(expected);
+    }
+
+    /**
+     * Молчание источника сверку стороны не запускает. Объявленная асимметрия
+     * со стороной обычной заявки (`U6.7`): здесь пустая строка — пустота,
+     * перевод спрашивает {@code isBlank}.
+     */
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  "})
+    @DisplayName("U6.40 — пустое, пробельное и отсутствующее эхо стороны условной заявки дают пустоту")
+    void u6_40_anEmptyAlgoSideEchoIsEmptiness(String raw) {
+        assertThat(converter.algoSideToDomain(raw)).isNull();
+    }
+
+    /**
+     * Слово вне формы контракта, а не неизвестный статус: класс отказа иной,
+     * чем у стороны обычной заявки (`U6.9`).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"long", "BUY"})
+    @DisplayName("U6.41 — эхо стороны условной заявки вне словаря отказывает нарушением инварианта, значение в сообщении")
+    void u6_41_anAlgoSideEchoOutsideTheDictionaryRefusesWithItsValue(String raw) {
+        assertThatThrownBy(() -> converter.algoSideToDomain(raw))
+                .isInstanceOf(ExternalInvariantViolationException.class)
+                .isNotInstanceOf(ExternalStatusException.class)
+                .hasMessageContaining(raw);
     }
 }

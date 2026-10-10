@@ -14,12 +14,13 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Клетки {@code B10.1} — {@code B10.7} и {@code B10.11} — {@code B10.16},
- * {@code B10.18}, {@code B10.19}: агрегатная выборка чтения на штатном положении осей
+ * Клетки {@code B10.1} — {@code B10.7}, {@code B10.11} — {@code B10.16} и
+ * {@code B10.18} — {@code B10.21}: агрегатная выборка чтения на штатном
+ * положении осей
  * (.claude/tests/cases/statistics.md §«B10 — Агрегатная выборка чтения»).
  *
  * <p><b>Класс равен КОНФИГУРАЦИИ КОНТЕКСТА, и делит группу ровно она.</b>
- * Пятнадцать клеток здесь берут штатное положение осей и расходятся только
+ * Семнадцать клеток здесь берут штатное положение осей и расходятся только
  * тем, какие факты каждая себе кладёт и какой вопрос задаёт поверхности;
  * четыре клетки СТРАНИЦЫ ({@code B10.8} — {@code B10.10}, {@code B10.17})
  * живут своим классом, потому что входом им служит сама ось — размер
@@ -35,7 +36,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * <b>такт пересчёта подаёт сам кейс</b>: у события два следствия, разнесённые
  * во времени разными исполнителями, и предметом этой группы является второе
  * из них — выдача уже собранных строк. Подача фактов сообщением сделала бы
- * пятнадцать клеток зависящими от живости приёма, а тропу «слушатель кладёт
+ * семнадцать клеток зависящими от живости приёма, а тропу «слушатель кладёт
  * факт» держат клетки {@code B1}.
  *
  * <p><b>Факты лежат в ПОЛНОЧЬ своих суток</b> ({@link #midnightDaysAgo}):
@@ -249,25 +250,24 @@ class AggregateReadBoxTest extends StatisticsBox {
                 .isEqualTo(1L);
     }
 
+    /**
+     * Правая граница своей клеткой ({@code B10.20}): обязательность границ —
+     * два члена одной охраны, и каждый снимается отдельно.
+     */
     @Test
-    @DisplayName("B10.3 — Окна нет либо названа одна граница: вопрос не принят")
-    void aMissingOrHalfNamedWindowIsNotAccepted() {
+    @DisplayName("B10.3 — Окна нет либо не названа левая граница: вопрос не принят")
+    void aMissingWindowOrAMissingLeftBoundIsNotAccepted() {
         Facts.deal("E-10-3", TENANT, midnightDaysAgo(DAY));
         recompute();
 
         Answer withoutBoth = ask(GRAIN, DEAL_GRAIN);
-        Answer leftOnly = ask(GRAIN, DEAL_GRAIN, FROM, day(WINDOW));
         Answer rightOnly = ask(GRAIN, DEAL_GRAIN, TO, day(0));
 
-        for (Answer answer : List.of(withoutBoth, leftOnly, rightOnly)) {
-            assertThat(answer.asObject().get(CODE_FIELD))
-                    .as("у всех трёх один класс отказа").isEqualTo(QUERY_REJECTED);
-            assertThat(reason(answer))
-                    .as("текст называет обязательность ОБЕИХ границ")
-                    .contains("Окно").contains("обе границы");
-            assertThat(answer.asObject())
-                    .as("чтения без предела не происходит ни в одном из трёх случаев")
-                    .doesNotContainKey(DEAL_ROWS);
+        List<Map.Entry<Answer, String>> questions = List.of(
+                Map.entry(withoutBoth, "без обеих границ"),
+                Map.entry(rightOnly, "без левой границы"));
+        for (Map.Entry<Answer, String> question : questions) {
+            assertWindowNotAccepted("B10.3", question.getKey(), question.getValue());
         }
         assertThat(rows.count(DEAL_AGGREGATES))
                 .as("вход поставлен: строка, которую отдало бы окно по умолчанию, лежит")
@@ -319,6 +319,10 @@ class AggregateReadBoxTest extends StatisticsBox {
                 .doesNotContainKey(DEAL_ROWS);
     }
 
+    /**
+     * Сутки позиции своей клеткой ({@code B10.21}): обязательные компоненты
+     * позиции — два члена одной охраны, и каждый снимается отдельно.
+     */
     @Test
     @DisplayName("B10.6 — Позиция названа наполовину: вопрос не принят")
     void aHalfNamedCursorIsNotAccepted() {
@@ -326,26 +330,21 @@ class AggregateReadBoxTest extends StatisticsBox {
         recompute();
 
         Answer bucketOnly = page(DEAL_GRAIN, WINDOW, CURSOR_BUCKET, day(DAY));
-        Answer accountOnly = page(DEAL_GRAIN, WINDOW, CURSOR_ACCOUNT, Facts.ACCOUNT);
         Answer tailOnly = page(DEAL_GRAIN, WINDOW,
                 CURSOR_STRATEGY, Facts.STRATEGY, CURSOR_CURRENCY, Bodies.CURRENCY);
         Answer neither = page(DEAL_GRAIN, WINDOW);
 
-        for (Answer half : List.of(bucketOnly, accountOnly, tailOnly)) {
-            assertThat(half.asObject().get(CODE_FIELD))
-                    .as("половина позиции позиции не определяет").isEqualTo(QUERY_REJECTED);
-            assertThat(reason(half))
-                    .as("текст называет ПАРУ обязательных компонентов")
-                    .contains("сутками зерна и биржевым счётом вместе");
-            assertThat(half.asObject())
-                    .as("чтения с начала окна под видом продолжения не происходит")
-                    .doesNotContainKey(DEAL_ROWS);
+        List<Map.Entry<Answer, String>> halves = List.of(
+                Map.entry(bucketOnly, "названы только сутки, счёт позиции не назван"),
+                Map.entry(tailOnly, "названы только определение и валюта"));
+        for (Map.Entry<Answer, String> half : halves) {
+            assertHalfCursorNotAccepted("B10.6", half.getKey(), half.getValue());
         }
         assertThat(neither.status())
-                .as("а вопрос БЕЗ обеих половин принят: это первая страница")
+                .as("B10.6: а вопрос БЕЗ обеих половин принят: это первая страница")
                 .isEqualTo(200);
         assertThat(neither.dealRows())
-                .as("половина позиции отличима от её отсутствия").hasSize(1);
+                .as("B10.6: половина позиции отличима от её отсутствия").hasSize(1);
     }
 
     @Test
@@ -422,6 +421,43 @@ class AggregateReadBoxTest extends StatisticsBox {
         assertThat(absentTail.status())
                 .as("законная пустота ключа — ОТСУТСТВИЕ компонента: такой вопрос принят")
                 .isEqualTo(200);
+    }
+
+    /**
+     * Своя клетка, а не вход {@code B10.3}: член охраны о правой границе
+     * снимается отдельно от члена о левой, и проба, перебиравшая обе половины
+     * одним циклом, на красном не называла, чей член снят.
+     */
+    @Test
+    @DisplayName("B10.20 — Правая граница окна не названа: вопрос не принят")
+    void aMissingRightBoundIsNotAccepted() {
+        Facts.deal("E-10-20", TENANT, midnightDaysAgo(DAY));
+        recompute();
+
+        Answer leftOnly = ask(GRAIN, DEAL_GRAIN, FROM, day(WINDOW));
+
+        assertWindowNotAccepted("B10.20", leftOnly, "без правой границы");
+        assertThat(page(DEAL_GRAIN, WINDOW).dealRows())
+                .as("B10.20: вход поставлен — та же левая граница с правой отдаёт строку")
+                .hasSize(1);
+    }
+
+    /**
+     * Своя клетка, а не вход {@code B10.6}: член охраны о сутках позиции
+     * снимается отдельно от члена о счёте.
+     */
+    @Test
+    @DisplayName("B10.21 — Позиция названа без суток зерна: вопрос не принят")
+    void aCursorWithoutTheGrainDayIsNotAccepted() {
+        Facts.deal("E-10-21", TENANT, midnightDaysAgo(DAY));
+        recompute();
+
+        Answer accountOnly = page(DEAL_GRAIN, WINDOW, CURSOR_ACCOUNT, Facts.ACCOUNT);
+
+        assertHalfCursorNotAccepted("B10.21", accountOnly, "назван только счёт, сутки позиции не названы");
+        assertThat(page(DEAL_GRAIN, WINDOW).dealRows())
+                .as("B10.21: вход поставлен — вопрос без позиции отдаёт строку окна")
+                .hasSize(1);
     }
 
     @Test
@@ -660,6 +696,47 @@ class AggregateReadBoxTest extends StatisticsBox {
      */
     private Answer ask(String... operands) {
         return get(aggregatePath(operands), TENANT);
+    }
+
+    /**
+     * Исход вопроса, у которого окно названо не целиком: класс отказа, текст
+     * об обязательности обеих границ, строк не отдано.
+     *
+     * @param label    метка клетки — для текста падения
+     * @param answer   ответ поверхности
+     * @param question какой вопрос задан — для текста падения
+     */
+    private static void assertWindowNotAccepted(String label, Answer answer, String question) {
+        assertThat(answer.asObject().get(CODE_FIELD))
+                .as("%s, вопрос %s: класс отказа — вопрос не принят", label, question)
+                .isEqualTo(QUERY_REJECTED);
+        assertThat(reason(answer))
+                .as("%s, вопрос %s: текст называет обязательность ОБЕИХ границ", label, question)
+                .contains("Окно").contains("обе границы");
+        assertThat(answer.asObject())
+                .as("%s, вопрос %s: чтения без предела не происходит", label, question)
+                .doesNotContainKey(DEAL_ROWS);
+    }
+
+    /**
+     * Исход вопроса, у которого позиция названа наполовину: класс отказа,
+     * текст о паре обязательных компонентов, строк не отдано.
+     *
+     * @param label    метка клетки — для текста падения
+     * @param answer   ответ поверхности
+     * @param question какая половина названа — для текста падения
+     */
+    private static void assertHalfCursorNotAccepted(String label, Answer answer, String question) {
+        assertThat(answer.asObject().get(CODE_FIELD))
+                .as("%s, %s: половина позиции позиции не определяет", label, question)
+                .isEqualTo(QUERY_REJECTED);
+        assertThat(reason(answer))
+                .as("%s, %s: текст называет ПАРУ обязательных компонентов", label, question)
+                .contains("сутками зерна и биржевым счётом вместе");
+        assertThat(answer.asObject())
+                .as("%s, %s: чтения с начала окна под видом продолжения не происходит",
+                        label, question)
+                .doesNotContainKey(DEAL_ROWS);
     }
 
     /** Пояснение отказа: им читается ПОВОД, тогда как класс читается кодом. */

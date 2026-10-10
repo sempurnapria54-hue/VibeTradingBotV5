@@ -25,6 +25,15 @@ public class OkxConstants {
      */
     public static final String ORDER_NOT_EXIST_CODE = "51603";
 
+    /**
+     * Код OKX «метка подписи истекла»: {@code OK-ACCESS-TIMESTAMP} разошлась с
+     * часами источника больше чем на 30 секунд
+     * (docs/integrations/okx/rules/request-signing.md). Наш дефект сборки
+     * запроса, а не отказ кредов; граница его исправляет перемером смещения
+     * (docs/integrations/okx/contracts/server-time.md).
+     */
+    public static final String TIMESTAMP_EXPIRED_CODE = "50102";
+
     /** Значение confirm OKX для закрытой свечи. */
     public static final String CONFIRM_CLOSED = "1";
 

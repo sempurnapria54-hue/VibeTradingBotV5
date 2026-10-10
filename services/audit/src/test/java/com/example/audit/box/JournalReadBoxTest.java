@@ -13,14 +13,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.json.JsonParserFactory;
 
 /**
- * Клетки {@code B8.1}-{@code B8.15} и {@code B8.17} — журнальная выборка
+ * Клетки {@code B8.1}-{@code B8.15}, {@code B8.17}-{@code B8.20} — журнальная выборка
  * чтения на штатном положении осей
  * (.claude/tests/cases/audit.md §«B8 — Журнальная выборка чтения»).
  *
  * <p><b>Класс равен КОНФИГУРАЦИИ КОНТЕКСТА</b>, как у четырёх соседних
- * групп: шестнадцать клеток берут штатные оси у {@link SharedAuditBox} и
+ * групп: девятнадцать клеток берут штатные оси у {@link SharedAuditBox} и
  * расходятся только состоянием журнала, которое каждая ставит себе сама.
- * Семнадцатая клетка группы ({@code B8.16}) живёт своим классом, потому что
+ * Двадцатая клетка группы ({@code B8.16}) живёт своим классом, потому что
  * входом ей служит САМА ось — предел окна и размер страницы.
  *
  * <p><b>У этой группы поверхность впервые ПОДАЁТ ВХОД, а не только
@@ -172,23 +172,10 @@ class JournalReadBoxTest extends SharedAuditBox {
     void aQuestionWithoutAWindowIsNotAccepted() {
         given("E-WINDOWLESS", Duration.ofMinutes(10), Bodies.reference());
         awaitAccepted(1L);
-        OffsetDateTime to = now();
 
         Answer withoutBoth = get(JOURNAL_RECORDS, TENANT);
-        Answer leftOnly = get(JOURNAL_RECORDS + "?" + FROM + "=" + moment(to.minus(WINDOW)), TENANT);
-        Answer rightOnly = get(JOURNAL_RECORDS + "?" + TO + "=" + moment(to), TENANT);
 
-        for (Answer answer : List.of(withoutBoth, leftOnly, rightOnly)) {
-            assertThat(answer.asObject().get(CODE_FIELD))
-                    .as("у всех трёх один класс отказа: вопрос не принят")
-                    .isEqualTo(QUERY_REJECTED);
-            assertThat(String.valueOf(answer.asObject().get(MESSAGE_FIELD)))
-                    .as("текст называет обязательность окна")
-                    .contains("Окно").contains("обязательно");
-            assertThat(answer.asObject())
-                    .as("строк не отдано ни одной: молчаливой подстановки окна нет")
-                    .doesNotContainKey(RECORDS_FIELD);
-        }
+        assertWindowRequired(withoutBoth, "без обеих границ");
         assertThat(rows.count(JOURNAL_TABLE))
                 .as("вход поставлен: строка, которую отдало бы окно по умолчанию, в журнале лежит")
                 .isEqualTo(1L);
@@ -245,15 +232,9 @@ class JournalReadBoxTest extends SharedAuditBox {
         OffsetDateTime to = now();
 
         Answer momentOnly = pageOf(to.minus(WINDOW), to, CURSOR_MOMENT, iso(to));
-        Answer identityOnly = pageOf(to.minus(WINDOW), to, CURSOR_ID, "E-CURSOR");
         Answer neither = pageOf(to.minus(WINDOW), to);
 
-        for (Answer half : List.of(momentOnly, identityOnly)) {
-            assertThat(half.asObject().get(CODE_FIELD))
-                    .as("половина курсора позиции не определяет").isEqualTo(QUERY_REJECTED);
-            assertThat(String.valueOf(half.asObject().get(MESSAGE_FIELD)))
-                    .as("текст называет ПАРУ").contains("парой");
-        }
+        assertCursorPairRequired(momentOnly, "момент без идентичности");
         assertThat(neither.status())
                 .as("а вопрос БЕЗ обеих половин принят: это первая страница окна")
                 .isEqualTo(200);
@@ -564,6 +545,93 @@ class JournalReadBoxTest extends SharedAuditBox {
                 .isEqualTo(document(Bodies.richDocument()));
         assertThat(page.records().getLast().get(CONTENT_FIELD))
                 .isEqualTo(document(Bodies.reference()));
+    }
+
+    @Test
+    @DisplayName("B8.18 — Левая граница окна не названа: вопрос не принят")
+    void aQuestionWithoutTheLeftBoundIsNotAccepted() {
+        given("E-RIGHT-ONLY", Duration.ofMinutes(10), Bodies.reference());
+        awaitAccepted(1L);
+
+        Answer rightOnly = get(JOURNAL_RECORDS + "?" + TO + "=" + moment(now()), TENANT);
+
+        assertWindowRequired(rightOnly, "только правая граница");
+        assertThat(rows.count(JOURNAL_TABLE))
+                .as("вход поставлен: строка, которую отдало бы окно, открытое слева, в журнале лежит")
+                .isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("B8.19 — Правая граница окна не названа: вопрос не принят")
+    void aQuestionWithoutTheRightBoundIsNotAccepted() {
+        given("E-LEFT-ONLY", Duration.ofMinutes(10), Bodies.reference());
+        awaitAccepted(1L);
+
+        Answer leftOnly = get(JOURNAL_RECORDS + "?" + FROM + "=" + moment(now().minus(WINDOW)), TENANT);
+
+        assertWindowRequired(leftOnly, "только левая граница");
+        assertThat(rows.count(JOURNAL_TABLE))
+                .as("вход поставлен: строка, которую отдало бы окно, открытое справа, в журнале лежит")
+                .isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("B8.20 — Курсор назван идентичностью без момента: вопрос не принят")
+    void aCursorNamedByIdentityWithoutMomentIsNotAccepted() {
+        given("E-CURSOR-ID", Duration.ofMinutes(10), Bodies.reference());
+        awaitAccepted(1L);
+        OffsetDateTime to = now();
+
+        Answer identityOnly = pageOf(to.minus(WINDOW), to, CURSOR_ID, "E-CURSOR-ID");
+
+        assertCursorPairRequired(identityOnly, "идентичность без момента");
+        assertThat(rows.count(JOURNAL_TABLE))
+                .as("вход поставлен: строка, которую отдало бы чтение с начала окна, в журнале лежит")
+                .isEqualTo(1L);
+    }
+
+    /**
+     * Отказ вопроса без окна: класс «вопрос не принят», текст называет
+     * ОБЯЗАТЕЛЬНОСТЬ окна, а не порядок его границ, строк не отдано.
+     *
+     * <p>Текст несущий у клеток с одной названной границей: снятый конъюнкт
+     * {@code JournalQuery#hasWindow} класса отказа не меняет — следующий за
+     * ним предикат порядка окна на пустой границе тоже отвечает «не принят»,
+     * — и два исхода различает только повод.
+     *
+     * @param answer ответ на вопрос
+     * @param input  какой вход подан — для сообщения падения
+     */
+    private static void assertWindowRequired(Answer answer, String input) {
+        assertThat(answer.asObject().get(CODE_FIELD))
+                .as("вход «%s»: класс отказа — вопрос не принят", input)
+                .isEqualTo(QUERY_REJECTED);
+        assertThat(String.valueOf(answer.asObject().get(MESSAGE_FIELD)))
+                .as("вход «%s»: текст называет обязательность окна, а не порядок границ", input)
+                .contains("Окно").contains("обязательно")
+                .doesNotContain("раньше левой");
+        assertThat(answer.asObject())
+                .as("вход «%s»: строк не отдано ни одной — молчаливой подстановки окна нет", input)
+                .doesNotContainKey(RECORDS_FIELD);
+    }
+
+    /**
+     * Отказ вопроса с половиной курсора: класс «вопрос не принят», текст
+     * называет пару, с начала окна вопрос молча не читается.
+     *
+     * @param answer ответ на вопрос
+     * @param input  какая половина подана — для сообщения падения
+     */
+    private static void assertCursorPairRequired(Answer answer, String input) {
+        assertThat(answer.asObject().get(CODE_FIELD))
+                .as("вход «%s»: половина курсора позиции не определяет", input)
+                .isEqualTo(QUERY_REJECTED);
+        assertThat(String.valueOf(answer.asObject().get(MESSAGE_FIELD)))
+                .as("вход «%s»: текст называет ПАРУ", input)
+                .contains("парой");
+        assertThat(answer.asObject())
+                .as("вход «%s»: с начала окна не прочитано — строк не отдано", input)
+                .doesNotContainKey(RECORDS_FIELD);
     }
 
     /**

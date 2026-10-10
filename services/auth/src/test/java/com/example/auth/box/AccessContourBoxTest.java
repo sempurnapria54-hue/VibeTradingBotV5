@@ -42,8 +42,8 @@ class AccessContourBoxTest extends SharedAuthBox {
      * закрытая группа гасила бы под отказом {@code 401}, а не состоянием.
      */
     @Test
-    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
-    void theProbeGroupsAreOpenAndAnswerWithState() {
+    @DisplayName("B5.9 — группы проб живости и готовности открыты и отвечают состоянием")
+    void b5_9_theProbeGroupsAreOpenAndAnswerWithState() {
         Answer liveness = get("/actuator/health/liveness");
         Answer readiness = get("/actuator/health/readiness");
 

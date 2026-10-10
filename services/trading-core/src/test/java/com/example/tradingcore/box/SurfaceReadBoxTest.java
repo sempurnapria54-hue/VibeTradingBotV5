@@ -169,7 +169,7 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
      * валидации тела назначения сняты вместе с операцией назначения.
      */
     @Test
-    @DisplayName("Принятые числа риск-аппетита отдаются все шесть, без тенанта в пути и в теле")
+    @DisplayName("B11.14 — принятые числа риск-аппетита отдаются все шесть, без тенанта в пути и в теле")
     void theAcceptedRiskAppetiteIsReadWithAllSixNumbersAndNoTenant() {
         Answer read = get(RISK_APPETITE);
 
@@ -185,7 +185,7 @@ class SurfaceReadBoxTest extends SharedTradingCoreBox {
     }
 
     @Test
-    @DisplayName("Плечо пары выше предела плеча конфигурации отвергается, строки не пишется")
+    @DisplayName("B11.15 — плечо пары выше предела плеча конфигурации отвергается, строки не пишется")
     void aLeverageAboveTheConfiguredLimitIsRefusedAndWritesNothing() {
         provision(List.of(ACCOUNT), Map.of(INSTRUMENT, EXTERNAL_INSTRUMENT));
 

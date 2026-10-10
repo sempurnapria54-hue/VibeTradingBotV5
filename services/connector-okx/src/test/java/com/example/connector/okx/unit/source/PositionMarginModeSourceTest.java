@@ -37,7 +37,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Режим маржи позиции на читателе источника: отбор записи контура при
- * живом чтении по инструменту и режим в теле закрытия
+ * живом чтении по инструменту и режим в теле закрытия — группа `U1`
+ * документа `.claude/tests/cases/connector-okx.md`
  * (docs/models/mapping/Position.md §«Invariant checks (общая идея)», §«OKX
  * close-position request body»).
  *
@@ -63,7 +64,7 @@ class PositionMarginModeSourceTest {
     /** Порядок записей в ответе не задан: кросс-запись впереди нашей не должна её подменить. */
     @Test
     @DisplayName("U1.1 — живое чтение берёт запись режима контура, а не первую в ответе")
-    void theLiveReadTakesTheContourModeRecordNotTheFirstOne() {
+    void u1_1_theLiveReadTakesTheContourModeRecordNotTheFirstOne() {
         when(client.getPositions(any(), eq(INSTRUMENT)))
                 .thenReturn(ok(List.of(record("pos-cross", "cross", "7"), record("pos-iso", "isolated", "3"))));
 
@@ -77,7 +78,7 @@ class PositionMarginModeSourceTest {
     /** Чужая запись — не нарушение контракта: отбор, а не сверка, и отказа нет. */
     @Test
     @DisplayName("U1.2 — одна запись иного режима — позиции контура нет, отказа нет")
-    void aLoneForeignModeRecordMeansNoContourPosition() {
+    void u1_2_aLoneForeignModeRecordMeansNoContourPosition() {
         when(client.getPositions(any(), eq(INSTRUMENT)))
                 .thenReturn(ok(List.of(record("pos-cross", "cross", "7"))));
 
@@ -87,7 +88,7 @@ class PositionMarginModeSourceTest {
     /** Срез отбора не делает: каждая запись едет со своим режимом. */
     @Test
     @DisplayName("U1.3 — счёт-широкий срез отдаёт записи обоих режимов, каждую со своим режимом")
-    void theAccountWideSliceCarriesEveryRecordWithItsMode() {
+    void u1_3_theAccountWideSliceCarriesEveryRecordWithItsMode() {
         when(client.getAllPositions(any()))
                 .thenReturn(ok(List.of(record("pos-cross", "cross", "7"), record("pos-iso", "isolated", "3"))));
 
@@ -98,14 +99,14 @@ class PositionMarginModeSourceTest {
 
     @Test
     @DisplayName("U1.4 — закрытие без режима уходит режимом контура")
-    void aClosureWithoutAModeTravelsWithTheContourMode() {
+    void u1_4_aClosureWithoutAModeTravelsWithTheContourMode() {
         assertThat(sentClosure(null).getMgnMode()).isEqualTo("isolated");
     }
 
     /** Снятие риска вне графа сделок закрывает чужую запись её собственным режимом. */
     @Test
     @DisplayName("U1.5 — закрытие с режимом уходит этим режимом")
-    void aClosureWithAModeTravelsWithThatMode() {
+    void u1_5_aClosureWithAModeTravelsWithThatMode() {
         ClosePositionOkxRequest sent = sentClosure(Instrument.MarginMode.CROSS);
 
         assertThat(sent.getMgnMode()).isEqualTo("cross");

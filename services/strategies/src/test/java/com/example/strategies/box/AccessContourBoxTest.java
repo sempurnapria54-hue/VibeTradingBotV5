@@ -134,8 +134,8 @@ class AccessContourBoxTest extends SharedStrategiesBox {
      * {@code UP}.
      */
     @Test
-    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
-    void theProbeGroupsAreOpenAndAnswerWithState() {
+    @DisplayName("B8.11 — Группы проб живости и готовности открыты и отвечают состоянием")
+    void b8_11_theProbeGroupsAreOpenAndAnswerWithState() {
         Answer liveness = getAnonymously(LIVENESS_GROUP);
         Answer readiness = getAnonymously(READINESS_GROUP);
 

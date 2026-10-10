@@ -1,5 +1,6 @@
 package com.example.connector.okx.config;
 
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.context.annotation.Configuration;
@@ -43,6 +44,18 @@ public class OkxClientConfig {
     @Bean
     public ClientHttpRequestFactory okxRequestFactory() {
         return ClientHttpRequestFactoryBuilder.detect().build();
+    }
+
+    /**
+     * Часы процесса — операнд часов площадки
+     * ({@code com.example.connector.okx.integration.external.api.client.OkxServerClock}):
+     * смещение есть разность двух моментов, и бином часы ради того, чтобы
+     * проверка этой разности не зависела от того, сдвинулись ли они между
+     * чтениями.
+     */
+    @Bean
+    public Clock processClock() {
+        return Clock.systemUTC();
     }
 
     @Bean

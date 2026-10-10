@@ -25,9 +25,6 @@ import org.junit.jupiter.api.Test;
  */
 class AccessContourBoxTest extends SharedBffBox {
 
-    /** Признаки устройства, которых в теле отказа быть не должно. */
-    private static final List<String> INTERNALS = List.of("Exception", "com.example", "\tat ", "java.");
-
     /** Поле состояния в ответе группы пробы. */
     private static final String HEALTH_STATUS = "status";
 
@@ -96,8 +93,8 @@ class AccessContourBoxTest extends SharedBffBox {
      * гасила бы под отказом {@code 401}, а не состоянием.
      */
     @Test
-    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
-    void theProbeGroupsAreOpenAndAnswerWithState() {
+    @DisplayName("B9.11 — Группы проб живости и готовности открыты и отвечают состоянием")
+    void b9_11_theProbeGroupsAreOpenAndAnswerWithState() {
         Answer liveness = getAnonymously(LIVENESS_GROUP);
         Answer readiness = getAnonymously(READINESS_GROUP);
 

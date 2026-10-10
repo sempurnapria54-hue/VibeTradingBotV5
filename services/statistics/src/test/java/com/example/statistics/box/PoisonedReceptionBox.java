@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import org.awaitility.Awaitility;
 import org.springframework.test.annotation.DirtiesContext;
 
 /**
@@ -64,8 +66,22 @@ abstract class PoisonedReceptionBox extends StatisticsBox {
      * @param header имя заголовка, которого на записи не будет
      */
     protected Map<String, String> envelopeWithout(String header) {
+        return envelopeWithout(DEAL_CLOSED, header);
+    }
+
+    /**
+     * Полный конверт НАЗВАННОГО класса без названного заголовка.
+     *
+     * <p>Класс стои́т параметром там, где единица клетки видна только у
+     * ненесомого класса: у несомого тот же пустой заголовок ловит второй
+     * охранник — предикат полноты факта.
+     *
+     * @param eventType класс события на конверте
+     * @param header    имя заголовка, которого на записи не будет
+     */
+    protected Map<String, String> envelopeWithout(String eventType, String header) {
         Map<String, String> headers =
-                new LinkedHashMap<>(envelope(POISON_EVENT, DEAL_CLOSED, occurredAt));
+                new LinkedHashMap<>(envelope(POISON_EVENT, eventType, occurredAt));
         headers.remove(header);
         return headers;
     }
@@ -96,6 +112,34 @@ abstract class PoisonedReceptionBox extends StatisticsBox {
     protected void poison(Map<String, String> headers, String key, String payload) {
         Wire.publish(topic(), key, headers, payload);
         awaitHalted();
+    }
+
+    /**
+     * Кладёт сообщение с ПУСТЫМ значением обязательного входа и ждёт его
+     * исхода — каким бы он ни оказался.
+     *
+     * <p><b>Ожидание трёхстороннее</b> — приём встал, строка факта легла либо
+     * запись зачтена принятой, — и это не смягчение ассерта: ассерт пишет
+     * {@link #assertReceptionHalted()}, а здесь ждётся только конец обработки.
+     * Пустая форма проходит сквозь охрану ровно тогда, когда охрана мерит
+     * ссылку, а не значение, и исход такой записи — не остановка, а строка
+     * факта либо продвинутое смещение. Ожидание одного лишь флага истекало бы
+     * тогда по таймауту целую минуту и сообщало бы то же самое позже, без
+     * названия исхода.
+     *
+     * @param headers заголовки конверта
+     * @param key     ключ записи — тенант
+     * @param payload содержимое дословно
+     */
+    protected void poisonUntilSettled(Map<String, String> headers, String key, String payload) {
+        Wire.publish(topic(), key, headers, payload);
+        Awaitility.await()
+                .atMost(RECEPTION_WAIT)
+                .pollInterval(POLL)
+                .until(() -> Objects.equals(Boolean.TRUE, pair(topic()).get(HALTED_COLUMN))
+                        || rows.count(DEAL_FACTS) + rows.count(INCIDENT_FACTS) > 0
+                        || Objects.equals(Wire.endOffset(topic()),
+                                Wire.committedOffset(consumerGroup(), topic())));
     }
 
     /** Отравленное сообщение штатного вида: конверт без названного заголовка. */

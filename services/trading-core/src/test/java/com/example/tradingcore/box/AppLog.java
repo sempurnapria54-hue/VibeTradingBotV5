@@ -1,5 +1,6 @@
 package com.example.tradingcore.box;
 
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
@@ -56,6 +57,27 @@ final class AppLog {
     static String since(Integer mark) {
         attach();
         return textFrom(mark);
+    }
+
+    /**
+     * Записи уровня {@code ERROR} после отметки — их сообщения, по строке на
+     * запись; прочие уровни и цепочки причин не входят.
+     *
+     * <p><b>Уровень — часть ожидания, а не фильтр удобства:</b> клетка,
+     * утверждающая «причина уходит в журнал уровнем ERROR», по тексту всех
+     * уровней была бы зелена и на той же строке уровнем WARN.
+     */
+    static String errorsSince(Integer mark) {
+        attach();
+        List<ILoggingEvent> events = List.copyOf(APPENDER.list);
+        StringBuilder collected = new StringBuilder();
+        for (int index = mark; index < events.size(); index++) {
+            ILoggingEvent event = events.get(index);
+            if (Level.ERROR.equals(event.getLevel())) {
+                collected.append(event.getFormattedMessage()).append('\n');
+            }
+        }
+        return collected.toString();
     }
 
     private static String textFrom(Integer from) {

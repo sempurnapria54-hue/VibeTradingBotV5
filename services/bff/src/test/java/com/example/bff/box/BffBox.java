@@ -118,6 +118,9 @@ abstract class BffBox {
     /** Класс всего непредусмотренного. */
     protected static final String INTERNAL_FAILURE = "INTERNAL_FAILURE";
 
+    /** Признаки устройства, которых в теле отказа быть не должно. */
+    protected static final List<String> INTERNALS = List.of("Exception", "com.example", "\tat ", "java.");
+
     /** Тенант зонда назначения: он не тенант ни одной клетки. */
     private static final String WARMUP_TENANT = "TW";
 

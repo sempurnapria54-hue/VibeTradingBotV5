@@ -7,6 +7,7 @@ import com.example.tests.e2e.Stub;
 import com.example.tests.e2e.Trail;
 import com.example.tests.e2e.Trail.Answer;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,6 +70,15 @@ public final class ExitTrail {
 
     public static final String SECOND_ORDER = "okx-order-2";
 
+    /** Биржевой идентификатор reduce-only ноги частичного выхода транша. */
+    static final String EXIT_ORDER = "okx-order-exit";
+
+    /** Ключ действия частичного выхода у определения {@link #partialExitDefinition(String)}. */
+    static final String PARTIAL_EXIT_KEY = "bull_partial_exit";
+
+    /** Код отказа постановки встроенной защиты у площадки: предикат читает непустоту, а не значение. */
+    static final String UNPLACED_STOP_CODE = "51279";
+
     public static final String CANCELED = "canceled";
 
     static final String EFFECTIVE = "effective";
@@ -89,6 +99,15 @@ public final class ExitTrail {
     private static final String ATTACHED_SCENARIO = "attached";
 
     private static final String ENTRY_SCENARIO = "entry";
+
+    /** Сценарий reduce-only ноги у площадки: принятая нога переводит его в {@link #LEG_FILLED}. */
+    private static final String LEG_SCENARIO = "exit-leg";
+
+    private static final String LEG_FILLED = "filled";
+
+    private static final String EMPTY = """
+            {"code": "0", "msg": "", "data": []}
+            """;
 
     /** Состояние сценария позиции тропы: позиция закрыта. */
     public static final String FLAT = "flat";
@@ -448,6 +467,22 @@ public final class ExitTrail {
      * @param trail тропа
      */
     static void exchangeTriggersAttachedStop(Trail trail) {
+        exchangeTriggersAttachedStop(trail, mirroredCloseRecord());
+    }
+
+    /**
+     * Встроенная защита вошедшего транша сработала у площадки тем же ходом, что
+     * {@link #exchangeTriggersAttachedStop(Trail)}, а история закрытых эпизодов
+     * отдаёт названную запись закрытия: средняя цена выхода и результат
+     * эпизода — числа площадки, а не цена входа
+     * (.claude/tests/cases/e2e-exit-and-close.md §«E8.1 — Гэп через стоп:
+     * убыток сверх заявленного риска едет числом площадки, и реакции на
+     * превышение нет», предусловия).
+     *
+     * @param trail  тропа
+     * @param record запись закрытия эпизода
+     */
+    static void exchangeTriggersAttachedStop(Trail trail, String record) {
         List<Map<String, Object>> attached = attachedProtections(trail);
         trail.exchange().answers(Trail.EXCHANGE_ALGO_PENDING, materialized(List.of()));
         trail.exchange().answersWhere(ALGO_HISTORY, "state", EFFECTIVE, """
@@ -458,7 +493,7 @@ public final class ExitTrail {
                 """);
         trail.exchange().answers(POSITIONS_HISTORY, """
                 {"code": "0", "msg": "", "data": [%s]}
-                """.formatted(mirroredCloseRecord()));
+                """.formatted(record));
     }
 
     /**
@@ -542,6 +577,190 @@ public final class ExitTrail {
         ((ObjectNode) scaleIn.path("actions").get(0)).put("key", "bull_scale_in");
         ((ArrayNode) tranche.path("stepsByStatus").path("MANAGING")).add(scaleIn);
         return definition.toString();
+    }
+
+    /**
+     * Эталон с шагом выхода «только условие», у транша бычьей детали которого
+     * снята отдельная защита и её подстройка: транш покрыт одной встроенной
+     * защитой входной ноги и уходит в ведение сам, а собственной reduce-only
+     * ноги у него нет (.claude/tests/cases/e2e-exit-and-close.md §«E8.1 — Гэп
+     * через стоп: убыток сверх заявленного риска едет числом площадки, и
+     * реакции на превышение нет», предусловия). Отдельная защита дала бы
+     * у площадки вторую условную заявку, которую снимала бы дочистка транша, —
+     * а кейс пинит, что снятий защиты не прибавилось.
+     *
+     * @return тело определения
+     */
+    static String attachedStopOnlyDefinition() {
+        JsonNode definition = Json.tree(conditionOnlyExit());
+        ObjectNode steps = (ObjectNode) bullDetail(definition).path("tranches").get(0).path("stepsByStatus");
+        steps.remove("ENTRY_FINALIZED");
+        steps.remove("MANAGING");
+        return definition.toString();
+    }
+
+    /**
+     * Определение {@link #attachedStopOnlyDefinition()}, у транша которого в
+     * ведении стои́т шаг частичного выхода: reduce-only заявка названной долей
+     * экспозиции транша, условие «позиция открыта»
+     * (.claude/tests/cases/e2e-exit-and-close.md §«E8.6 — Частичный выход
+     * reduce-only ногой до стопа: сделка закрыта стопом, а проскок пуст и
+     * виден разностью пары счётчиков», предусловия; форма действия —
+     * docs/rules/no-partial-close.md §«Механизм частичного выхода»).
+     *
+     * @param fractionPercents доля экспозиции транша, процент
+     * @return тело определения
+     */
+    static String partialExitDefinition(String fractionPercents) {
+        JsonNode definition = Json.tree(attachedStopOnlyDefinition());
+        ObjectNode steps = (ObjectNode) bullDetail(definition).path("tranches").get(0).path("stepsByStatus");
+        steps.set("MANAGING", Json.tree("""
+                [{"stepType": "PARTIAL_EXIT",
+                  "condition": {"rules": [{"level": 1, "ruleType": "POSITION_OPENED"}]},
+                  "actions": [{"actionKind": "ORDER", "key": "%s", "actionType": "CREATE_ACTION",
+                    "orderType": "ENTRY", "direction": "LONG", "allocationPercents": %s,
+                    "positionReducingOnly": true}],
+                  "marketDataExpiredSetting": {"protectedPositionAction": "WAIT",
+                    "unprotectedPositionAction": "GRACEFUL_CLOSE"}}]
+                """.formatted(PARTIAL_EXIT_KEY, fractionPercents)));
+        return definition.toString();
+    }
+
+    /**
+     * Пролог частичного выхода: сделка по {@link #partialExitDefinition(String)}
+     * на свежей паре, входная нога налита, позиция наблюдена, а площадка
+     * заранее принимает reduce-only ногу транша и отдаёт её налитой по
+     * названной цене (.claude/tests/cases/e2e-exit-and-close.md §«E8.6 —
+     * Частичный выход reduce-only ногой до стопа: сделка закрыта стопом, а
+     * проскок пуст и виден разностью пары счётчиков», предусловия).
+     *
+     * <p><b>Ответы на ногу ставятся до первого прохода после налива:</b> шаг
+     * частичного выхода истинен с той же позиции, что открыла транш, и нога
+     * уходит одним из проходов пролога. Ответ, заведённый позже, застал бы
+     * её постановку подтверждением входной ноги — биржевым идентификатором
+     * чужой заявки.
+     *
+     * <p><b>Размер ноги выводится тем же правилом, что у калькулятора:</b>
+     * доля экспозиции транша, округлённая вниз до шага лота — у инструмента
+     * тропы шаг единичный (docs/spec/order-sizing.json). Площадка отдаёт
+     * ногу налитой этим размером, и позиция после неё читается остатком.
+     *
+     * @param trail            тропа
+     * @param fractionPercents доля частичного выхода, процент
+     * @param legPrice         средняя цена исполнения reduce-only ноги
+     * @return идентичность сделки
+     */
+    static String walkToPartialExit(Trail trail, String fractionPercents, String legPrice) {
+        trail.pairWithoutDeal();
+        trail.exchangeAcceptsCommands();
+        exchangeAcceptsTeardown(trail);
+        trail.exchange().forgetScenarios();
+        trail.activeDefinition(partialExitDefinition(fractionPercents));
+        String deal = trail.openDeal();
+        trail.entrySubmitted();
+        trail.relayCore();
+        trail.exchangeFillsEntry();
+        exchangeKeepsCanceledHistory(trail, List.of());
+        BigDecimal size = (BigDecimal) trail.database(Party.TRADING_CORE)
+                .query("select size from orders where "
+                        + Trail.BY_DEAL + " and external_id = ?",
+                        trail.account(), Trail.EXTERNAL_ORDER).getFirst().get("size");
+        BigDecimal legSize = size.multiply(new BigDecimal(fractionPercents)).movePointLeft(2)
+                .setScale(0, RoundingMode.DOWN);
+        exchangeHoldsPosition(trail, plain(size));
+        exchangeFillsReduceOnlyLeg(trail, plain(legSize), plain(size.subtract(legSize)), legPrice);
+        trail.passUntil("пролог: налив наблюдён", () -> isFalse(trail.database(Party.TRADING_CORE)
+                .query("select id from orders where "
+                        + Trail.BY_DEAL + " and external_id = ? and external_status = 'filled'",
+                        trail.account(), Trail.EXTERNAL_ORDER).isEmpty()));
+        trail.relayCore();
+        trail.passUntil("позиция наблюдена, экспозиция транша ненулевая", () -> isTrue(livePositionMirrored(trail))
+                && dealRead(trail, deal).path("tranches").get(0).path("exposure").decimalValue().signum() > 0);
+        trail.relayCore();
+        return deal;
+    }
+
+    /**
+     * Площадка принимает reduce-only ногу транша под своим идентификатором и
+     * отдаёт её налитой названным размером и ценой; принятая нога переводит
+     * сценарий, и позиция инструмента с этого момента читается остатком.
+     *
+     * <p>Нога опознаётся стороной заявки: входная нога тропы — покупка, а
+     * reduce-only нога выхода из длинной позиции — продажа.
+     *
+     * @param trail     тропа
+     * @param legSize   размер ноги в контрактах
+     * @param remainder размер позиции после ноги в контрактах
+     * @param legPrice  средняя цена исполнения ноги
+     */
+    static void exchangeFillsReduceOnlyLeg(Trail trail, String legSize, String remainder, String legPrice) {
+        Stub exchange = trail.exchange();
+        String ack = """
+                {"code": "0", "msg": "", "data": [{"ordId": "%s", "clOrdId": "{{jsonPath request.body '$.clOrdId'}}",
+                  "sCode": "0", "sMsg": "", "ts": "1758240100000"}]}
+                """.formatted(EXIT_ORDER);
+        exchange.answersPostTemplated(Trail.EXCHANGE_ORDER, ack);
+        exchange.answersPostMoving(Trail.EXCHANGE_ORDER, "$.side", "sell", LEG_SCENARIO, Stub.STARTED, LEG_FILLED,
+                ack);
+        exchange.answersWhere(Trail.EXCHANGE_ORDER, "ordId", EXIT_ORDER, """
+                {"code": "0", "msg": "", "data": [{"instId": "%s", "ordId": "%s",
+                  "clOrdId": "{{request.query.clOrdId}}", "ordType": "market", "side": "sell", "posSide": "net",
+                  "reduceOnly": "true", "state": "filled", "px": "", "sz": "%s", "accFillSz": "%s", "avgPx": "%s",
+                  "fee": "-0.05", "feeCcy": "USDT", "cTime": "1758240100000", "uTime": "1758240101000"}]}
+                """.formatted(Trail.EXTERNAL_INSTRUMENT, EXIT_ORDER, legSize, legSize, legPrice));
+        exchange.answersInState(Trail.EXCHANGE_POSITIONS, LEG_SCENARIO, LEG_FILLED, positionBody(remainder));
+    }
+
+    /**
+     * Встроенная защита, держащая остаток после reduce-only ноги, сработала у
+     * площадки тем же ходом, что {@link #exchangeTriggersAttachedStop(Trail, String)};
+     * позиция читается плоской и после принятой ноги — её закрыл стоп.
+     *
+     * @param trail  тропа
+     * @param record запись закрытия эпизода — со смешанной средней ценой ноги и стопа
+     */
+    static void exchangeTriggersStopAfterLeg(Trail trail, String record) {
+        exchangeTriggersAttachedStop(trail, record);
+        trail.exchange().answersInState(Trail.EXCHANGE_POSITIONS, LEG_SCENARIO, LEG_FILLED, EMPTY);
+    }
+
+    /**
+     * Площадка отдаёт отправленную входную ногу налитой целиком, а в её теле —
+     * встроенную защиту с непустым кодом отказа постановки; среди живых
+     * условных заявок и в их истории её нет; позиция инструмента жива
+     * размером налива, а принятое закрытие делает её плоской с записью
+     * закрытия (.claude/tests/cases/e2e-exit-and-close.md §«E8.3 — Отказ
+     * постановки встроенного стопа на налитом входе: биржевая ступень 2 и
+     * снятие риска у площадки», предусловия).
+     *
+     * <p><b>Ценовая база элемента — эхо объявленной:</b> расхождение эха
+     * встроенной защиты с нашей строкой даёт отказ чтения раньше любого
+     * решения, и кейс мерил бы его, а не отказ постановки.
+     *
+     * @param trail тропа
+     */
+    static void exchangeFillsEntryWithUnplacedStop(Trail trail) {
+        Map<String, Object> order = trail.database(Party.TRADING_CORE)
+                .query("select internal_id, size from orders where "
+                        + Trail.BY_DEAL + " and external_id is not null", trail.account()).getFirst();
+        Map<String, Object> protection = attachedProtections(trail).getFirst();
+        String size = plain(order.get("size"));
+        trail.exchange().answers(Trail.EXCHANGE_ORDER, """
+                {"code": "0", "msg": "", "data": [{"instId": "%s", "ordId": "%s", "clOrdId": "%s",
+                  "ordType": "market", "side": "buy", "posSide": "net", "state": "filled", "px": "",
+                  "sz": "%s", "accFillSz": "%s", "avgPx": "%s", "fee": "-0.1", "feeCcy": "USDT",
+                  "attachAlgoOrds": [{"attachAlgoId": "okx-attach-%s", "attachAlgoClOrdId": "%s", "sz": "%s",
+                    "slTriggerPx": "%s", "slTriggerPxType": "mark", "failCode": "%s",
+                    "failReason": "SL trigger price cannot be higher than the last price"}],
+                  "cTime": "1758240000000", "uTime": "1758240001000"}]}
+                """.formatted(Trail.EXTERNAL_INSTRUMENT, Trail.EXTERNAL_ORDER, order.get("internal_id"), size, size,
+                Trail.ENTRY_PRICE, protection.get("internal_id"), protection.get("internal_id"),
+                plain(protection.get("size")), plain(protection.get("stop_loss_trigger_price")),
+                UNPLACED_STOP_CODE));
+        trail.exchange().answers(Trail.EXCHANGE_ALGO_PENDING, materialized(List.of()));
+        exchangeKeepsCanceledHistory(trail, List.of());
+        exchangeHoldsPosition(trail, size);
+        exchangeMirrorsClose(trail);
     }
 
     /** Бычья деталь определения. */
@@ -683,11 +902,29 @@ public final class ExitTrail {
      */
     static String closeRecord(Long createdAt, Long modifiedAt, String pnl, String fee, String funding,
                               String realizedPnl) {
+        return closeRecord(createdAt, modifiedAt, Trail.ENTRY_PRICE, pnl, fee, funding, realizedPnl);
+    }
+
+    /**
+     * Запись закрытия эпизода позиции тропы у площадки с названной средней
+     * ценой фактического выхода.
+     *
+     * @param createdAt         биржевое время открытия эпизода, мс
+     * @param modifiedAt        биржевое время закрытия эпизода, мс
+     * @param closeAveragePrice средняя цена фактического выхода эпизода
+     * @param pnl               результат без издержек
+     * @param fee               комиссия — знаковая, как у площадки
+     * @param funding           финансирование — знаковое, как у площадки
+     * @param realizedPnl       готовый net эпизода
+     * @return запись ответа площадки
+     */
+    static String closeRecord(Long createdAt, Long modifiedAt, String closeAveragePrice, String pnl, String fee,
+                              String funding, String realizedPnl) {
         return """
                 {"posId": "%s", "instId": "%s", "direction": "long", "realizedPnl": "%s", "ccy": "USDT",
                   "closeAvgPx": "%s", "pnl": "%s", "fee": "%s", "fundingFee": "%s", "liqPenalty": "0", "type": "2",
                   "cTime": "%d", "uTime": "%d"}
-                """.formatted(EXTERNAL_POSITION, Trail.EXTERNAL_INSTRUMENT, realizedPnl, Trail.ENTRY_PRICE, pnl, fee,
+                """.formatted(EXTERNAL_POSITION, Trail.EXTERNAL_INSTRUMENT, realizedPnl, closeAveragePrice, pnl, fee,
                 funding, createdAt, modifiedAt);
     }
 
@@ -933,12 +1170,17 @@ public final class ExitTrail {
      * @param size  размер позиции в контрактах
      */
     static void exchangeHoldsPosition(Trail trail, String size) {
-        trail.exchange().answers(Trail.EXCHANGE_POSITIONS, """
+        trail.exchange().answers(Trail.EXCHANGE_POSITIONS, positionBody(size));
+    }
+
+    /** Ответ площадки на чтение позиции инструмента: живая позиция тропы названного размера. */
+    private static String positionBody(String size) {
+        return """
                 {"code": "0", "msg": "", "data": [{"instId": "%s", "instType": "SWAP", "posId": "%s",
                   "pos": "%s", "avgPx": "%s", "markPx": "2001", "lever": "10", "mgnMode": "isolated",
                   "posSide": "net", "upl": "0.1", "margin": "20", "liqPx": "1800",
                   "cTime": "1758240000000", "uTime": "1758240001000"}]}
-                """.formatted(Trail.EXTERNAL_INSTRUMENT, EXTERNAL_POSITION, size, Trail.ENTRY_PRICE));
+                """.formatted(Trail.EXTERNAL_INSTRUMENT, EXTERNAL_POSITION, size, Trail.ENTRY_PRICE);
     }
 
     /**

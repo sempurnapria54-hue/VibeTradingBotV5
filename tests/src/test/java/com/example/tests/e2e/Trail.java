@@ -778,6 +778,32 @@ public final class Trail implements AutoCloseable {
                 .getFirst().get("rows")).longValue();
     }
 
+    /**
+     * Число строк таблицы ЦЕЛИКОМ у каждой названной стороны, у которой
+     * таблица есть, — отметка разностного ассерта.
+     *
+     * <p>Ход заведён для таблиц, чьи строки пары не несут ни одной колонкой
+     * ({@link #rows} их отвергает): след отказа доступа пишется раньше, чем
+     * тенант установлен. Базы сторон общего стенда несут строки прежних
+     * классов, поэтому ассерт о такой таблице — прирост от отметки, снятой в
+     * начале тропы, а не счёт целиком. Отметка, снятая до свежего
+     * развёртывания стороны ({@link #renew}), к её новой базе не относится.
+     *
+     * @param table   таблица
+     * @param parties стороны с базой
+     * @return число строк по сторонам, у которых таблица есть
+     */
+    public Map<Party, Long> counts(String table, List<Party> parties) {
+        Map<Party, Long> counts = new EnumMap<>(Party.class);
+        for (Party party : parties) {
+            Database database = database(party);
+            if (isTrue(database.hasTable(table))) {
+                counts.put(party, database.count(table));
+            }
+        }
+        return counts;
+    }
+
     // ---------------------------------------------------------------- ходы и чтения
 
     /**
@@ -1025,7 +1051,22 @@ public final class Trail implements AutoCloseable {
      * @param phase фаза рынка раскладки
      */
     public void marketPhaseIs(String phase) {
-        marketData.answersPost(PEER_FEATURES, featuresBody(phase));
+        marketPhaseIs(phase, ENTRY_PRICE);
+    }
+
+    /**
+     * Стаб владельца рыночных данных отдаёт ту же раскладку фич с названной
+     * фазой рынка и названной последней ценой: решение выхода, принятое на
+     * цене выше входа, решено в прибыли, чем бы ни исполнилось
+     * (.claude/tests/cases/e2e-exit-and-close.md §«E8.2 — Проскок рыночного
+     * выхода, обративший прибыль решения в убыток, серию двигает и сверку не
+     * ломает», предусловия).
+     *
+     * @param phase     фаза рынка раскладки
+     * @param lastPrice последняя цена раскладки
+     */
+    public void marketPhaseIs(String phase, String lastPrice) {
+        marketData.answersPost(PEER_FEATURES, featuresBody(phase, lastPrice));
     }
 
     /**
@@ -1036,7 +1077,7 @@ public final class Trail implements AutoCloseable {
      * @param indicatorKey авторское имя операнда
      */
     public void marketLosesIndicator(String indicatorKey) {
-        JsonNode features = Json.tree(featuresBody("BULL_TREND"));
+        JsonNode features = Json.tree(featuresBody("BULL_TREND", ENTRY_PRICE));
         ((ObjectNode) features.path("latestIndicators")).remove(indicatorKey);
         marketData.answersPost(PEER_FEATURES, features.toString());
     }
@@ -1591,7 +1632,7 @@ public final class Trail implements AutoCloseable {
      * так её отдаёт владелец данных (форму соседа мерит его ящик), и имя вне
      * эталона гасило бы условие молча, как отсутствующий операнд.
      */
-    private static String featuresBody(String phase) {
+    private static String featuresBody(String phase, String lastPrice) {
         String candle = OffsetDateTime.now(ZoneOffset.UTC).withSecond(0).withNano(0).toString();
         return """
                 {
@@ -1613,7 +1654,7 @@ public final class Trail implements AutoCloseable {
                     "externalTimestamp": "%1$s"
                   }
                 }
-                """.formatted(candle, ENTRY_PRICE, phase);
+                """.formatted(candle, lastPrice, phase);
     }
 
     private Map<String, String> settingsOf(Party party) {

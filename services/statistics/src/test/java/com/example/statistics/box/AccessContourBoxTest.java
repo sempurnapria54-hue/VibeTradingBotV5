@@ -207,15 +207,22 @@ class AccessContourBoxTest extends SharedStatisticsBox {
     @Test
     @DisplayName("B11.2 — Токен, подписанный чужим ключом, не принимается")
     void aTokenSignedWithAForeignKeyIsRefused() {
+        Integer identityMark = identity.mark();
+
         Answer answer = getWith(question(), identity.foreignKeyToken());
 
         assertThat(answer.status()).isEqualTo(401);
         assertThat(answer.carriesErrorDto()).isTrue();
         assertThat(answer.errorCode()).isEqualTo(UNAUTHENTICATED);
-        assertThat(identity.paths())
-                .as("за подтверждением сервис ходил только к точкам ключей: подпись "
-                        + "проверена локально, и вызова к провайдеру на каждый запрос нет")
-                .isNotEmpty()
+        // Журнал стаба общий всем клеткам модуля и копится за прогон, поэтому
+        // отрицание читается ПРИРОСТОМ от отметки, снятой до входа. Пустой
+        // прирост законен — ключи могли быть добыты раньше окна, — и базовый
+        // гейт стоит на журнале целиком: наблюдатель обращения видит.
+        assertThat(identity.mark()).as("B11.2: наблюдатель журнала стаба жив").isPositive();
+        assertThat(identity.pathsSince(identityMark))
+                .as("B11.2: за вход с чужой подписью сервис ходил только к точкам ключей: "
+                        + "подпись проверена локально, и вызова к провайдеру на каждый "
+                        + "запрос нет")
                 .allMatch(path -> path.contains("jwks") || path.contains("openid-configuration"));
 
         Map<String, Object> denial = onlyDenial();
@@ -275,8 +282,8 @@ class AccessContourBoxTest extends SharedStatisticsBox {
      * {@code UP}.
      */
     @Test
-    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
-    void theProbeGroupsAreOpenAndAnswerWithState() {
+    @DisplayName("B11.12 — Группы проб живости и готовности открыты и отвечают состоянием")
+    void b11_12_theProbeGroupsAreOpenAndAnswerWithState() {
         Answer liveness = getAnonymously(LIVENESS_GROUP);
         Answer readiness = getAnonymously(READINESS_GROUP);
 

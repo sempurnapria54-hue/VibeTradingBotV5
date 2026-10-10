@@ -14,7 +14,8 @@ import org.junit.jupiter.api.Test;
  * идентификатор владельца и ставку комиссии — то же правило, что у копии
  * рыночных данных.
  *
- * <p>Кейсы — `U7`, `U10.3`, `U11.7`, `U13.3` (.claude/tests/cases/jsonb-overlay-roundtrip.md);
+ * <p>Кейсы — `U7`, `U10.3`, `U11.7`, `U13.3`, `U13.6`, `U13.7`
+ * (.claude/tests/cases/jsonb-overlay-roundtrip.md);
  * клетка `U7.4` живёт здесь, потому что адресует именно эту копию.
  */
 class InstrumentExternalRulesJsonConverterTest extends InstrumentRulesOverlayCopyContract {

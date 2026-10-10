@@ -11,6 +11,8 @@ namespace: dev
 resources:
   - ../base
   - env.yaml
+  # Носитель оси resourceProfile у dev: квота и умолчания контейнера.
+  - resource-limits.yaml
 
 # Место тега образа — единственное на сервис в наборе окружения.
 # Тег НЕИЗМЕНЯЕМ и продвигается: собирается один раз на коммит и дальше
@@ -22,21 +24,21 @@ resources:
 # нет: он описывает продвинутое, а не построенное.
 images:
   - name: registry.invalid/vibetrading/bff
-    newTag: 0.0.1-40bb9b8b-20261009123404
+    newTag: 0.0.1-44933517-20261010111841
   - name: registry.invalid/vibetrading/strategies
-    newTag: 0.0.1-40bb9b8b-20261009123404
+    newTag: 0.0.1-44933517-20261010111841
   - name: registry.invalid/vibetrading/statistics
-    newTag: 0.0.1-40bb9b8b-20261009123404
+    newTag: 0.0.1-44933517-20261010111841
   - name: registry.invalid/vibetrading/audit
-    newTag: 0.0.1-40bb9b8b-20261009123404
+    newTag: 0.0.1-44933517-20261010111841
   - name: registry.invalid/vibetrading/trading-core
-    newTag: 0.0.1-a3fe2abf-20261009180311
+    newTag: 0.0.1-44933517-20261010111841
   - name: registry.invalid/vibetrading/market-data
-    newTag: 0.0.1-40bb9b8b-20261009123404
+    newTag: 0.0.1-44933517-20261010111841
   - name: registry.invalid/vibetrading/connector-okx
-    newTag: 0.0.1-bda600b9-20261009171859
+    newTag: 0.0.1-44933517-20261010111841
   - name: registry.invalid/vibetrading/auth
-    newTag: 0.0.1-40bb9b8b-20261009123404
+    newTag: 0.0.1-44933517-20261010111841
 patches:
   # Имя хоста ингресса — ось различия окружений
   # (docs/architecture/platform.md §«Чем различаются окружения»).

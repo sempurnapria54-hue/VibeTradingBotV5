@@ -48,6 +48,7 @@ public class OkxSignedRestClientFactory implements SignedRestClientFactory {
     private final RestClient.Builder builder;
     private final ClientHttpRequestFactory requestFactory;
     private final OkxWriteLoggingInterceptor writeLoggingInterceptor;
+    private final OkxServerClock serverClock;
 
     @Override
     public RestClient forCredentials(ExchangeCredentials credentials) {
@@ -55,7 +56,7 @@ public class OkxSignedRestClientFactory implements SignedRestClientFactory {
                 .requestFactory(requestFactory)
                 .baseUrl(properties.getBaseUrl())
                 .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> { })
-                .requestInterceptor(new OkxSigningInterceptor(credentials))
+                .requestInterceptor(new OkxSigningInterceptor(credentials, serverClock))
                 .requestInterceptor(writeLoggingInterceptor)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
         if (isTrue(credentials.isDemo())) {

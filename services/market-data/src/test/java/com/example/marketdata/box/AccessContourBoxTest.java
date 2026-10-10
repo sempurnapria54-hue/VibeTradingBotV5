@@ -114,8 +114,8 @@ class AccessContourBoxTest extends SharedMarketDataBox {
      * {@code UP}.
      */
     @Test
-    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
-    void theProbeGroupsAreOpenAndAnswerWithState() {
+    @DisplayName("B8.14 — группы проб живости и готовности открыты и отвечают состоянием")
+    void b8_14_theProbeGroupsAreOpenAndAnswerWithState() {
         Answer liveness = getAnonymously(LIVENESS_GROUP);
         Answer readiness = getAnonymously(READINESS_GROUP);
 

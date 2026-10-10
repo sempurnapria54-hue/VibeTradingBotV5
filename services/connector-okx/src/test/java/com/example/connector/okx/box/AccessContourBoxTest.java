@@ -44,8 +44,8 @@ class AccessContourBoxTest extends SharedConnectorBox {
      * и закрытая группа гасила бы под отказом {@code 401}, а не состоянием.
      */
     @Test
-    @DisplayName("Группы проб живости и готовности открыты и отвечают состоянием")
-    void theProbeGroupsAreOpenAndAnswerWithState() {
+    @DisplayName("B8.9 — группы проб живости и готовности открыты и отвечают состоянием")
+    void b8_9_theProbeGroupsAreOpenAndAnswerWithState() {
         Answer liveness = getAnonymously("/actuator/health/liveness");
         Answer readiness = getAnonymously("/actuator/health/readiness");
 

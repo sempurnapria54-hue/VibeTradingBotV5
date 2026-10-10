@@ -5,6 +5,7 @@ import static com.example.tradingcore.unit.risk.RiskFixture.context;
 import static com.example.tradingcore.unit.risk.RiskFixture.emptyDeal;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.tradingbot.domain.model.aggregate.deal.Deal;
 import com.example.tradingbot.domain.model.aggregate.deal.DealTranche;
 import com.example.tradingcore.domain.command.risk.DealRiskNumbers;
 import com.example.tradingcore.domain.command.risk.RiskBlockAction;
@@ -23,6 +24,9 @@ import org.junit.jupiter.api.Test;
  * Бессрочность кода: признак рядом со значением — группа {@code U25}
  * документа `.claude/tests/cases/trading-core-risk.md` (дом —
  * docs/components/models/RiskCheckResult.md §«Бессрочность отказа»).
+ * {@code U25.5} мерит и второй флаг своего кода — членство в карв-ауте
+ * (дом — docs/processes/risk-evaluation.md
+ * §«Карв-аут исчерпанного бюджета сделки»).
  *
  * <p><b>Клейм отсутствия второго носителя читается РЕФЛЕКСИЕЙ, а не
  * текстом:</b> «признак читается только у значения» есть утверждение о
@@ -64,17 +68,29 @@ class CodePermanenceTest {
     }
 
     @Test
-    @DisplayName("Глобальный кумулятивный потолок и потолки уровней счёта и тенанта: временны́е")
-    void theGlobalCumulativeAndTheLevelCeilingsAreTemporary() {
+    @DisplayName("U25.14 — глобальный кумулятивный потолок и потолки уровней счёта и тенанта: временны́е")
+    void u25_14_theGlobalCumulativeAndTheLevelCeilingsAreTemporary() {
         assertTemporary(RiskCheckCode.RISK_PER_DEAL_CUMULATIVE_GLOBAL_EXCEEDED,
                 RiskCheckCode.RISK_PER_ACCOUNT_SIMULTANEOUS_EXCEEDED,
                 RiskCheckCode.RISK_PER_TENANT_SIMULTANEOUS_EXCEEDED);
     }
 
     @Test
-    @DisplayName("U25.5 — незаявленное деталью число потолка: временный")
-    void u25_5_theUndeclaredDetailNumberIsTemporary() {
-        assertTemporary(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
+    @DisplayName("U25.5 — незаявленное деталью число потолка: бессрочный и вне карв-аута")
+    void u25_5_theUndeclaredDetailNumberIsPermanentAndOutsideTheCarveOut() {
+        assertPermanent(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED);
+
+        RiskBlockAction beforeLiveRisk = resolver.resolve(context(emptyDeal()), DealTranche.Status.PRECHECK,
+                blockedVerdict(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED));
+        assertThat(beforeLiveRisk.getType())
+                .as("до живого риска бессрочный вердикт закрывает кандидата")
+                .isEqualTo(RiskBlockAction.Type.CLOSE_CANDIDATE_DEAL);
+        assertThat(beforeLiveRisk.getCloseReason()).isEqualTo(Deal.CloseReason.RISK_CONTROL);
+
+        assertThat(resolver.resolve(context(emptyDeal()), DealTranche.Status.ENTRY_SUBMITTED,
+                blockedVerdict(RiskCheckCode.RISK_APPETITE_NOT_CONFIGURED)).getType())
+                .as("при живом риске — ошибочная тропа сделки: точку достигает только порча копии детали")
+                .isEqualTo(RiskBlockAction.Type.MOVE_DEAL_TO_ERROR);
     }
 
     @Test

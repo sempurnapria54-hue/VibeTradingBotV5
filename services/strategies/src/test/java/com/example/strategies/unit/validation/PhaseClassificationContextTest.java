@@ -41,6 +41,9 @@ class PhaseClassificationContextTest {
     /** Реджект поля, которого оценка типа не читает. */
     private static final String FIELD_NOT_READ = "STRATEGY_CONDITION_FIELD_NOT_READ";
 
+    /** Реджект нескалярного операнда сравнения или пересечения. */
+    private static final String NOT_SCALAR = "STRATEGY_CONDITION_OPERAND_NOT_SCALAR";
+
     /** Клауза бычьего тренда — сравнение двух скользящих средних. */
     private static final int TREND_CLAUSE = 1;
 
@@ -85,7 +88,9 @@ class PhaseClassificationContextTest {
         List<String> violations = violations(request);
 
         assertThat(matching(violations, ".ruleType PROFIT_PERCENTS_REACHED " + RULE_NOT_ALLOWED)).hasSize(1);
+        assertThat(matching(violations, ".operator " + FIELD_NOT_READ)).hasSize(1);
         assertThat(matching(violations, ".leftOperand " + FIELD_NOT_READ)).hasSize(1);
+        assertThat(matching(violations, ".rightOperand " + FIELD_NOT_READ)).hasSize(1);
         assertThat(matching(violations, "references unknown indicator setting key")).isEmpty();
     }
 
@@ -118,7 +123,8 @@ class PhaseClassificationContextTest {
 
     /**
      * Сверх белого списка операнд фазы в сравнении нескаляр — его отвергает и
-     * контракт типа; предмет клетки — член белого списка.
+     * контракт типа независимо от контекста ({@code U28.45}); клетка пинит оба
+     * нарушения, каждое своим путём.
      */
     @Test
     @DisplayName("U26.6 — источник операнда — рыночная фаза: классификация не опирается на свой результат")
@@ -126,7 +132,10 @@ class PhaseClassificationContextTest {
         CreateStrategyApiRequest request = reference();
         phaseConditionRule(request, TREND_CLAUSE).setLeftOperand(newOperand("MARKET_PHASE"));
 
-        assertThat(matching(violations(request), ".sourceType MARKET_PHASE " + RULE_NOT_ALLOWED)).hasSize(1);
+        List<String> violations = violations(request);
+
+        assertThat(matching(violations, ".sourceType MARKET_PHASE " + RULE_NOT_ALLOWED)).hasSize(1);
+        assertThat(matching(violations, ".leftOperand " + NOT_SCALAR)).hasSize(1);
     }
 
     @Test

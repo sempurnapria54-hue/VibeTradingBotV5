@@ -31,7 +31,9 @@ import org.junit.jupiter.api.Test;
  * <p><b>Тропа до преконтроля — та же, что у группы команд</b>
  * ({@link #openGatedDeal}): проекции тиком синка, ставка комиссии своим
  * тиком, сделка с траншем тиком отбора входа, снимок средств первым тиком
- * сопровождения. Прямой записи в предусловиях группы нет ни одной.
+ * сопровождения. Прямая запись в предусловиях группы стоит только у
+ * состояний, писателя которым нет: неполный граф сделки ({@code B4.8}) и
+ * режим маржи пары, переставленный после входа ({@code B4.2}).
  *
  * <p><b>Вердикт добывается ОПЕРАНДОМ, а не подменой бина.</b> Бессрочный
  * даёт дистанция встроенного стопа внутри round-trip комиссии, временный —
@@ -89,6 +91,12 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
 
     /** След отказа преконтроля в журнале приложения и в строках исполнения. */
     private static final String PRECHECK_BLOCKED = "Risk precheck blocked action";
+
+    /** Код отказа преконтроля по режиму маржи пары. */
+    private static final String MARGIN_MODE_NOT_ISOLATED = "MARGIN_MODE_NOT_ISOLATED";
+
+    /** Режим маржи вне контура: им ставится операнд клетки {@code B4.2}. */
+    private static final String CROSS_MARGIN = "CROSS";
 
     /** Мягкая ступень пары «счёт, инструмент». */
     private static final String ENTRY_BLOCKED = "ENTRY_BLOCKED";
@@ -256,18 +264,29 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         assertThat(connector.requests(placementPath(ACCOUNT))).isEmpty();
     }
 
+    /**
+     * Операнд выбран по признаку «отказ без фильтра класса действия»: проверка
+     * режима маржи пары стоит в обеих точках входа преконтроля — у
+     * рассчитанного действия и у снятия отдельной защиты — и отвергает ВСЯКОЕ
+     * спрошенное действие, создаёт оно риск или нет. Прежний операнд — плечо
+     * пары, снятое после входа, — отказывал только действию, создающему риск,
+     * и на тропе выхода был слеп: молчание преконтроля там читалось бы
+     * одинаково, спрашивают его или нет.
+     *
+     * <p><b>Режим переставлен ПРЯМОЙ ЗАПИСЬЮ строки пары</b>, и это названо:
+     * писателя у этого значения нет — строку пары ядро материализует только
+     * изолированной (docs/models/domain/core/Instrument.md
+     * §«Ступень и настройки счёта на инструменте — своя таблица ядра»).
+     */
     @Test
     @DisplayName("B4.2 — преконтроль не спрашивается у добычи, выхода, дочистки и safety")
-    void thePrecheckIsNotAskedOnTheExitPath() {
+    void b4_2_thePrecheckIsNotAskedOnTheExitPath() {
         openLiveDeal();
-        // Плечо пары снято ПОСЛЕ входа: пустое плечо отвергает всякое
-        // действие, создающее риск, которое преконтроль спрашивает. Прежде
-        // операндом были снятые числа риск-аппетита — пустые числа
-        // отвергали ЛЮБОЕ спрошенное действие, — но числа теперь ось
-        // окружения, принимаемая ядром при старте, и внутри клетки их не
-        // снять (docs/rules/risk-policy.md, правило о числах риск-аппетита).
-        assertThat(put(PAIR_SETTINGS + "/" + ACCOUNT + "/" + INSTRUMENT, "{}").status()).isEqualTo(200);
+        assertThat(rows.put("update account_instrument_states set margin_mode = ?"
+                        + " where exchange_account_id = ? and instrument_id = ?",
+                CROSS_MARGIN, accountId(ACCOUNT), instrumentId(INSTRUMENT))).isEqualTo(1);
         standExchangeFollowingCommands("-5");
+        Long reportsBefore = rows.count("anomaly_reports");
         Integer mark = AppLog.mark();
 
         exitByDeletion(workingDefinition());
@@ -279,12 +298,24 @@ class DealRiskGateBoxTest extends SharedLiveDealBox {
         assertThat(connector.requests(attachedCancellationPath(ACCOUNT))).hasSize(1);
         assertThat(dealStatus()).isEqualTo("CLOSED");
         // Отказа преконтроля на этой тропе нет ни в одном носителе: ни в
-        // строках исполнения, ни в журнале происшествий, ни в журнале
-        // приложения.
-        assertThat(rows.all("deal_strategy_action_states").toString()).doesNotContain(PRECHECK_BLOCKED);
-        assertThat(rows.all("deal_system_action_states").toString()).doesNotContain(PRECHECK_BLOCKED);
-        assertThat(rows.count("anomaly_reports")).isZero();
-        assertThat(AppLog.since(mark)).doesNotContain(PRECHECK_BLOCKED);
+        // строках исполнения стратегических и системных действий, ни в
+        // журнале происшествий, ни в журнале приложения от отметки клетки.
+        assertThat(rows.all("deal_strategy_action_states").toString())
+                .doesNotContain(PRECHECK_BLOCKED)
+                .doesNotContain(MARGIN_MODE_NOT_ISOLATED);
+        assertThat(rows.all("deal_system_action_states").toString())
+                .doesNotContain(PRECHECK_BLOCKED)
+                .doesNotContain(MARGIN_MODE_NOT_ISOLATED);
+        assertThat(rows.count("anomaly_reports")).isEqualTo(reportsBefore);
+        assertThat(AppLog.since(mark))
+                .doesNotContain(PRECHECK_BLOCKED)
+                .doesNotContain(MARGIN_MODE_NOT_ISOLATED);
+        // Операнд стоит до конца клетки: молчание предъявлено, а не выведено
+        // из исчезнувшего операнда.
+        assertThat(rows.select("select margin_mode from account_instrument_states"
+                        + " where exchange_account_id = ? and instrument_id = ?",
+                accountId(ACCOUNT), instrumentId(INSTRUMENT)).getFirst().get("margin_mode"))
+                .isEqualTo(CROSS_MARGIN);
     }
 
     @Test

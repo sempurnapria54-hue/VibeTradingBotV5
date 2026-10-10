@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Тела вызовов поверхности владельца определений — вход ящика.
@@ -146,6 +148,116 @@ final class Bodies {
                     })));
         }
         return text(tree);
+    }
+
+    /**
+     * Эталон, у которого из узла, найденного локатором, опущено поле: вход
+     * клеток группы {@code B11} (.claude/tests/cases/strategies.md).
+     *
+     * <p><b>Опускается ровно одна единица в ровно одном узле.</b> Локатор
+     * отдаёт узел, который строка кейса называет («первая клауза»,
+     * «входное действие»); узел, которого локатор не нашёл, роняет сборку
+     * тела, а не молча оставляет эталон целым.
+     *
+     * @param node  локатор узла в дереве эталона
+     * @param field имя опускаемого поля
+     */
+    static String referenceWithout(Function<ObjectNode, JsonNode> node, String field) {
+        ObjectNode tree = tree();
+        ((ObjectNode) node.apply(tree)).remove(field);
+        return text(tree);
+    }
+
+    /**
+     * Эталон, в перечень которого дописан названный элемент: узел, которого
+     * в эталоне нет вовсе (объявление {@code MACD}, {@code OBV} и т. п.).
+     *
+     * @param array   локатор перечня в дереве эталона
+     * @param element дописываемый элемент — документ JSON
+     */
+    static String referenceWithElement(Function<ObjectNode, JsonNode> array, String element) {
+        ObjectNode tree = tree();
+        ((ArrayNode) array.apply(tree)).add(parsed(element));
+        return text(tree);
+    }
+
+    /**
+     * Эталон, узлу которого дописано поле-объект: блок, которого в эталоне
+     * нет (размещение цены входного действия).
+     *
+     * @param node  локатор узла в дереве эталона
+     * @param field имя дописываемого поля
+     * @param value его значение — документ JSON
+     */
+    static String referenceWithField(Function<ObjectNode, JsonNode> node, String field, String value) {
+        ObjectNode tree = tree();
+        ((ObjectNode) node.apply(tree)).set(field, parsed(value));
+        return text(tree);
+    }
+
+    /**
+     * Входной шаг эталона: первый шаг транша, несущий входное действие.
+     *
+     * <p>Опознаётся родом ордера — тем же признаком, что и входное
+     * действие, — а не путём «деталь 0, транш 0, шаг 0».
+     */
+    static JsonNode entryStep(ObjectNode tree) {
+        return trancheSteps(tree).stream()
+                .filter(step -> actionsOf(step).stream().anyMatch(Bodies::isEntryAction))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("В эталоне нет входного шага"));
+    }
+
+    /** Входное действие эталона: первое действие, чей род ордера занимает нотинал. */
+    static JsonNode entryAction(ObjectNode tree) {
+        return firstAction(tree, Bodies::isEntryAction);
+    }
+
+    /**
+     * Первое действие эталона в порядке документа, отвечающее признаку:
+     * сперва шаги траншей, затем агрегатные шаги детали.
+     *
+     * @param tree дерево эталона
+     * @param sign признак действия
+     */
+    static JsonNode firstAction(ObjectNode tree, Predicate<JsonNode> sign) {
+        List<JsonNode> steps = new ArrayList<>(trancheSteps(tree));
+        for (JsonNode detail : elementsOf(tree, "details")) {
+            detail.path("stepsByStatus").forEach(list -> list.forEach(steps::add));
+        }
+        return steps.stream()
+                .flatMap(step -> actionsOf(step).stream())
+                .filter(sign)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("В эталоне нет действия с названным признаком"));
+    }
+
+    private static List<JsonNode> trancheSteps(ObjectNode tree) {
+        List<JsonNode> steps = new ArrayList<>();
+        for (JsonNode detail : elementsOf(tree, "details")) {
+            for (JsonNode tranche : elementsOf(detail, "tranches")) {
+                tranche.path("stepsByStatus").forEach(list -> list.forEach(steps::add));
+            }
+        }
+        return steps;
+    }
+
+    private static List<JsonNode> actionsOf(JsonNode step) {
+        List<JsonNode> actions = new ArrayList<>();
+        elementsOf(step, "actions").forEach(actions::add);
+        return actions;
+    }
+
+    private static Boolean isEntryAction(JsonNode action) {
+        return ENTRY_ORDER_TYPES.contains(action.path("orderType").asText(""));
+    }
+
+    private static JsonNode parsed(String json) {
+        try {
+            return MAPPER.readTree(json);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Узел тела не разобрался: " + json, failure);
+        }
     }
 
     private static void forEachEntryAction(ObjectNode tree, Consumer<ObjectNode> change) {

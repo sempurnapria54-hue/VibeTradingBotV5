@@ -90,7 +90,7 @@ class E1IngressSmokeTest {
                 .as("E1.1: отказ не единым форматом периметра — маршрут не доехал до периметра: %s", context)
                 .isEqualTo(UNAUTHENTICATED);
         assertThat(unrouted.status())
-                .as("E1.1: путь вне маршрутов /api/v1 и /realms/vibetrading имеет маршрут: %s", unrouted)
+                .as("E1.1: путь вне маршрутов /api/v1, /realms/vibetrading и /resources имеет маршрут: %s", unrouted)
                 .isEqualTo(404);
         assertThat(unrouted.errorCode())
                 .as("E1.1: путь вне маршрутов дошёл до периметра — ответ единым форматом: %s", unrouted)

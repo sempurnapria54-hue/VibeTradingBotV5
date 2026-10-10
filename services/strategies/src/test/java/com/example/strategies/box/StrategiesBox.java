@@ -401,6 +401,13 @@ abstract class StrategiesBox {
                 .PUT(HttpRequest.BodyPublishers.ofString(body)));
     }
 
+    /** Смена статуса БЕЗ заголовка контекста. */
+    protected Answer putWithoutTenant(String path, String body) {
+        return send(authorized(request(path))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(body)));
+    }
+
     private HttpRequest.Builder request(String path) {
         return HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + path))

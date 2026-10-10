@@ -10,7 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * идентификатор владельца и ставку комиссии — то же правило, что у копии
  * ядра.
  *
- * <p>Кейсы — `U7`, `U10.3`, `U11.7`, `U13.3` (.claude/tests/cases/jsonb-overlay-roundtrip.md).
+ * <p>Кейсы — `U7`, `U10.3`, `U11.7`, `U13.3`, `U13.6`, `U13.7`
+ * (.claude/tests/cases/jsonb-overlay-roundtrip.md).
  */
 class InstrumentExternalRulesJsonConverterTest extends InstrumentRulesOverlayCopyContract {
 

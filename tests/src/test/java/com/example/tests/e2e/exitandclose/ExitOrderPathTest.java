@@ -77,6 +77,10 @@ class ExitOrderPathTest {
 
     private static final String NEVER = "0 0 0 1 1 *";
 
+    private static final String ACCESS_DENIALS = "access_denials";
+
+    private static final List<Party> DENIAL_SIDES = List.of(Party.AUDIT, Party.STATISTICS);
+
     private static final List<Party> SIDES = List.of(Party.CONNECTOR, Party.TRADING_CORE, Party.STRATEGIES,
             Party.AUDIT, Party.STATISTICS);
 
@@ -105,6 +109,12 @@ class ExitOrderPathTest {
 
     private static JsonNode aggregate;
 
+    /**
+     * Строк отказа доступа у сторон в начале тропы: базы общего стенда несут
+     * строки прежних классов, и {@code E7.4} утверждает о приросте за тропу.
+     */
+    private static Map<Party, Long> denialsBefore;
+
     @BeforeAll
     static void openTrail() {
         trail = SharedStand.dealPath(ExitOrderPathTest.class);
@@ -112,6 +122,7 @@ class ExitOrderPathTest {
         dealFactSeriesStartedYesterday(trail);
         trail.side(Party.TRADING_CORE).set(EXPLORATORY, "false");
         trail.renew(Party.TRADING_CORE);
+        denialsBefore = trail.counts(ACCESS_DENIALS, DENIAL_SIDES);
     }
 
     @AfterAll
@@ -234,10 +245,11 @@ class ExitOrderPathTest {
                 .as("E7.4: события подъёма ступени нет").isEmpty();
         assertThat(core.query("select code from anomaly_reports where "
                 + Trail.BY_ACCOUNT, trail.account())).as("E7.4: отчётов нет").isEmpty();
-        for (Party party : List.of(Party.AUDIT, Party.STATISTICS)) {
-            assertThat(trail.database(party).count("access_denials"))
-                    .as("E7.4: строк отказа доступа у " + party.module() + " нет").isZero();
-        }
+        assertThat(denialsBefore).as("E7.4: отметка снята у обеих сторон с базой отказов")
+                .containsOnlyKeys(DENIAL_SIDES);
+        assertThat(trail.counts(ACCESS_DENIALS, DENIAL_SIDES))
+                .as("E7.4: строк отказа доступа у audit и statistics за тропу не прибавилось (отметка — начало тропы)")
+                .isEqualTo(denialsBefore);
         assertThat(core.query("select risk_base from exchange_accounts where internal_id = ?",
                 trail.account()).getFirst().get("risk_base"))
                 .as("E7.4: база риска счёта не двигалась").isEqualTo(riskBase);

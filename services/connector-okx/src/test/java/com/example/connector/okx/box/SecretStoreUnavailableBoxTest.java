@@ -12,8 +12,10 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.vault.VaultContainer;
 
 /**
- * Хранилище секретов недоступно — клетка {@code B1.7} документа
- * `.claude/tests/cases/connector-okx.md`.
+ * Хранилище секретов недоступно — клетки {@code B1.7}, {@code B1.13} и
+ * половина «хранилище недоступно» клетки {@code B9.3} документа
+ * `.claude/tests/cases/connector-okx.md`: класс собран по конфигурации
+ * контекста — мёртвому адресу хранилища, — а не по группе.
  *
  * <p><b>Контейнер у кейса СВОЙ по первому основанию: кейс лишает соседей
  * адреса.</b> Остановленный общий контейнер был бы мёртв соседям до конца
@@ -74,8 +76,8 @@ class SecretStoreUnavailableBoxTest extends ConnectorBox {
      * контекста, который мёртвого хранилища попросту не видит.
      */
     @Test
-    @DisplayName("Пробы живости и готовности не зависят от хранилища секретов")
-    void theProbesDoNotDependOnTheSecretStore() {
+    @DisplayName("B1.13 — пробы живости и готовности не зависят от хранилища секретов")
+    void b1_13_theProbesDoNotDependOnTheSecretStore() {
         Answer overall = getAnonymously("/actuator/health");
         Answer liveness = getAnonymously("/actuator/health/liveness");
         Answer readiness = getAnonymously("/actuator/health/readiness");
@@ -85,6 +87,25 @@ class SecretStoreUnavailableBoxTest extends ConnectorBox {
         assertThat(liveness.body()).contains("UP");
         assertThat(readiness.status()).isEqualTo(200);
         assertThat(readiness.body()).contains("UP");
+    }
+
+    /**
+     * Свойств процесса из хранилища коннектор не берёт, и потому его подъём от
+     * хранилища не зависит: контекст поднят на адресе, по которому никто не
+     * отвечает, а публичному чтению ключи не нужны вовсе. Неподъём уронил бы
+     * весь класс, но ожидания «публичное чтение отвечает» не мерил бы никто —
+     * эту половину клетки держит метод, а не подъём.
+     */
+    @Test
+    @DisplayName("B9.3 — контекст поднимается при недоступном хранилище, и публичное чтение отвечает")
+    void b9_3_aPublicReadAnswersWhileTheSecretStoreIsDead() {
+        exchange.answers(OkxConstants.INSTRUMENTS_PATH, Okx.ok(Okx.instrument(INSTRUMENT).text()));
+
+        Answer answer = get(market("/instruments?externalInstrumentType=SWAP"));
+
+        assertThat(answer.status()).isEqualTo(200);
+        assertThat(answer.asList()).hasSize(1);
+        assertThat(exchange.requests(OkxConstants.INSTRUMENTS_PATH)).hasSize(1);
     }
 
     private static String startAndStop() {

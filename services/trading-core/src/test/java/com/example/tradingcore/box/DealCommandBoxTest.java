@@ -55,6 +55,12 @@ import org.junit.jupiter.api.Test;
  */
 class DealCommandBoxTest extends SharedLiveDealBox {
 
+    /**
+     * Эхо ценовой базы встроенной защиты, расходящееся с объявленной
+     * определением ящика ({@code LAST}).
+     */
+    private static final String DIVERGED_TRIGGER_BASE = "MARK";
+
     /** Класс события решения о заявке. */
     private static final String ORDER_DECIDED = "ORDER_DECIDED";
 
@@ -257,6 +263,98 @@ class DealCommandBoxTest extends SharedLiveDealBox {
         // завершилась отказом, а причина в базе есть.
         assertThat(rows.all("orders").getFirst().get("close_reason"))
                 .isEqualTo("UNKNOWN_EXTERNAL_STATUS");
+    }
+
+    /**
+     * Эхо базы триггера встроенной защиты в теле добытой ноги разошлось с
+     * объявленной: это контролируемый отказ чтения, и строка ноги этим
+     * проходом не пишется вовсе — ни статус, ни налив, ни наблюдённая
+     * живость: ответ, нарушивший контракт, наблюдением не является
+     * (docs/lifecycles/Order.md
+     * §«Нога в {@code ERROR}: живость на площадке читается наблюдением»,
+     * строка о расхождении эха). Реакция принадлежит
+     * классу отказа (docs/rules/controlled-exchange-exceptions.md).
+     *
+     * <p><b>Тело ноги несёт то, что запись наблюдения сдвинула бы</b>: частичный
+     * налив и живой статус против отправленной ноги без налива, — иначе
+     * отсутствие записи не отличалось бы от записи тех же значений. Тропы
+     * самостоятельной записи защиты и разбора истории мерят клетки
+     * {@code U15.7}, {@code U15.8} (.claude/tests/cases/trading-core-calc.md).
+     *
+     * <p>Отмену ноги, которую гонит снятие риска того же тика, площадка
+     * принимает: отказ отмены был бы вторым отказом в той же клетке.
+     */
+    @Test
+    @DisplayName("B3.16 — расхождение эха базы встроенной защиты даёт отказ без записи строки и без живости")
+    void b3_16_theEchoDivergenceRefusesTheReadWithoutWritingTheRowOrItsLiveness() {
+        submitEntry(workingDefinition());
+        Map<String, Object> legBefore = entryRow();
+        Object protectionStatusBefore = protectionRow().get("status");
+        connector.answers(lookupPath(ACCOUNT), Feed.partiallyFilledOrderEchoingBase(entryExternalId(),
+                entryClientId(), "PARTIALLY_COMPLETED", entrySize(), partialFill(), protectionClientId(),
+                protectionTrigger(), DIVERGED_TRIGGER_BASE));
+        connector.answers(cancellationPath(ACCOUNT), Feed.ack(entryExternalId(), entryClientId()));
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        // Отказ — класса нарушения инварианта: сделка в ошибке, биржевая
+        // ступень 2.
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(dealStatus()).isEqualTo("ERROR");
+        // Строка ноги этим ответом не записана: ни статус, ни налив, ни
+        // наблюдённая живость.
+        Map<String, Object> leg = entryRow();
+        assertThat(leg.get("status")).as("B3.16: статус ноги").isEqualTo(legBefore.get("status"));
+        assertThat(leg.get("accumulated_fill_size")).as("B3.16: налив ноги")
+                .isEqualTo(legBefore.get("accumulated_fill_size"));
+        assertThat(leg.get("external_live")).as("B3.16: наблюдённая живость ноги")
+                .isEqualTo(legBefore.get("external_live"));
+        // Защита статуса не сменила и причины не получила.
+        assertThat(protectionRow().get("status")).isEqualTo(protectionStatusBefore);
+        assertThat(protectionRow().get("close_reason")).isNull();
+    }
+
+    /**
+     * Площадка не приняла метку подписи и после перемера смещения часов у
+     * коннектора — коннектор отвечает общим словом недоступности, а не классом
+     * границы (docs/components/IntegrationService.md). Ядро читает его
+     * молчащим коннектором: проход пропускается, бюджет повторов строки не
+     * тратится (docs/rules/runtime-error-classification.md, раздел о
+     * расхождении часов с площадкой).
+     *
+     * <p><b>Отказ подаётся на КОМАНДЕ, а не на чтении</b>: чтение, отвергнутое
+     * по метке, коннектор повторяет сам, а команду — нет, и её повтор
+     * принадлежит ядру. Тиков под отказом два: бюджет, который тратился бы,
+     * на втором стал бы виден, а повтор команды — состояться.
+     */
+    @Test
+    @DisplayName("B3.17 — отказ площадки по метке подписи бюджета повторов не тратит и сделку в ошибку не уводит")
+    void b3_17_theTimestampRefusalSpendsNoRetryBudgetAndDoesNotMoveTheDealToError() {
+        openCommandDeal(workingDefinition());
+        tick(Tick.DEAL_ORCHESTRATOR);
+        Map<String, Object> rowBefore = actionState();
+        String dealBefore = dealStatus();
+        Long reportsBefore = rows.count("anomaly_reports");
+        connector.answers(placementPath(ACCOUNT), 503, Feed.peerFailure(PEER_UNAVAILABLE));
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+
+        tick(Tick.DEAL_ORCHESTRATOR);
+        tick(Tick.DEAL_ORCHESTRATOR);
+
+        // Команда повторена следующим проходом — повтор её принадлежит ядру.
+        assertThat(connector.requests(placementPath(ACCOUNT))).as("B3.17: постановка на каждом тике").hasSize(2);
+        // Строка исполнения отказа не учла: ни попытки, ни отложенного
+        // повтора, ни смены статуса.
+        Map<String, Object> row = actionState();
+        assertThat(row.get("attempt_count")).as("B3.17: попытки строки").isEqualTo(rowBefore.get("attempt_count"));
+        assertThat(row.get("status")).as("B3.17: статус строки").isEqualTo(rowBefore.get("status"));
+        assertThat(row.get("next_retry_at")).as("B3.17: отложенный повтор").isEqualTo(rowBefore.get("next_retry_at"));
+        // Сделка в ошибку не ушла, ступени не поднялись, отчётов не прибавилось.
+        assertThat(dealStatus()).as("B3.17: статус сделки").isEqualTo(dealBefore);
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        assertThat(pairRung(INSTRUMENT)).isEqualTo(NO_RUNG);
+        assertThat(rows.count("anomaly_reports")).as("B3.17: отчёты аномалий").isEqualTo(reportsBefore);
     }
 
     @Test

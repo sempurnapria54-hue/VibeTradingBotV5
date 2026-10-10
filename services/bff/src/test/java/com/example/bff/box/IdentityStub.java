@@ -153,6 +153,23 @@ final class IdentityStub {
     }
 
     /**
+     * Токен без claim {@code sub}, корректный по всем прочим осям:
+     * подписан публикуемым ключом, выдан этим издателем, живой.
+     *
+     * <p>Claim не заводится вовсе, а не ставится пустым значением: у
+     * сериализатора пустое значение исчезает из содержимого только по
+     * умолчанию его настройки, и вход клетки держался бы на нём.
+     */
+    String tokenWithoutSubject() {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .issuer(issuer())
+                .issueTime(Date.from(Instant.now().minus(5, ChronoUnit.MINUTES)))
+                .expirationTime(Date.from(Instant.now().plus(10, ChronoUnit.MINUTES)))
+                .build();
+        return signed(PUBLISHED_KEY_ID, claims);
+    }
+
+    /**
      * Пути всех обращений, полученных стабом.
      *
      * <p>Ими наблюдается, что за подтверждением токена сервис ходил
@@ -178,13 +195,23 @@ final class IdentityStub {
      * @param expiresAt момент истечения токена
      */
     private String sign(String keyId, String issuer, String subject, Instant expiresAt) {
-        RSAKey signing = UNPUBLISHED_KEY_ID.equals(keyId) ? unpublishedKey : publishedKey;
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .issuer(issuer)
                 .subject(subject)
                 .issueTime(Date.from(Instant.now().minus(5, ChronoUnit.MINUTES)))
                 .expirationTime(Date.from(expiresAt))
                 .build();
+        return signed(keyId, claims);
+    }
+
+    /**
+     * Подписывает готовое содержимое токена названным ключом.
+     *
+     * @param keyId  идентификатор ключа подписи
+     * @param claims содержимое токена
+     */
+    private String signed(String keyId, JWTClaimsSet claims) {
+        RSAKey signing = UNPUBLISHED_KEY_ID.equals(keyId) ? unpublishedKey : publishedKey;
         SignedJWT jwt = new SignedJWT(
                 new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(keyId).build(), claims);
         try {

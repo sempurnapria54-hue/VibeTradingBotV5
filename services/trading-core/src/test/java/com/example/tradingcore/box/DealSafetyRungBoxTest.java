@@ -1,5 +1,6 @@
 package com.example.tradingcore.box;
 
+import static org.apache.commons.lang3.BooleanUtils.isFalse;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.tradingbot.domain.model.aggregate.strategy.Strategy;
@@ -30,7 +31,12 @@ import org.springframework.test.context.DynamicPropertySource;
  * проактивной детекции на живом риске по инструменту вне контура
  * ({@link #standForeignInstrumentRisk}) и ручная поверхность
  * ({@code fullHalt}, {@code freeze}). Который из двух — называет вход
- * кейса; прямой записи в предусловиях группы нет ни одной.
+ * кейса. Третий вход — проход сопровождения, затребовавший ступень выходной
+ * проверкой отправленного входа ({@code B5.18}, {@code B5.19}). Строку прямой
+ * записью группа заводит одну, и стоит она у состояния, к которому тропы ящика
+ * нет: вторая нога перевыставленного входа ({@code B5.19} — исполнителя
+ * замещения входа в ядре нет); прочая прямая запись лишь состаривает строки,
+ * заведённые самим сервисом ({@link #ageObservations()}).
  *
  * <p><b>Живая экспозиция ставится общей сборкой</b> ({@link LiveDealBox}):
  * вход налит целиком, эпизод позиции жив, встроенная защита
@@ -145,6 +151,15 @@ class DealSafetyRungBoxTest extends LiveDealBox {
 
     /** Причина пометки ноги, чей статус площадки не разобран. */
     private static final String UNKNOWN_EXTERNAL_STATUS = "UNKNOWN_EXTERNAL_STATUS";
+
+    /** Хвост идентификаторов новой ноги перевыставленного входа. */
+    private static final String REPLACEMENT_SUFFIX = "-re";
+
+    /** Сценарий стаба: новая нога перевыставленного входа у площадки. */
+    private static final String REPLACEMENT_SCENARIO = "replacement-entry";
+
+    /** Query-параметр поиска ноги, которым разводятся ноги одного транша. */
+    private static final String EXTERNAL_ID = "externalId";
 
     @DynamicPropertySource
     static void substrate(DynamicPropertyRegistry registry) {
@@ -670,9 +685,145 @@ class DealSafetyRungBoxTest extends LiveDealBox {
                 .isNotEqualTo("COMPLETED");
     }
 
+    /**
+     * Отправленный вход налит целиком, а встроенная защита в теле ноги не
+     * встала: добыча ноги уводит защиту в ошибку отказом постановки, и
+     * следующий проход читает выходную проверку обработчика отправленного
+     * входа РАНЬШЕ эмиссии консолидации (docs/components/TrancheEntrySubmittedHandler.md
+     * §«Выходные проверки»). Обязательства покрытия у транша нет — защитных
+     * шагов определение не объявляет, — и исход у нарушения один: биржевая
+     * ступень 2, которую запрашивает проход, а не детектор с гистерезисом.
+     *
+     * <p>Предусловие поставлено тропой ящика целиком: защиту в ошибку уводит
+     * добыча ноги проходом, прямой записи в клетке нет.
+     */
+    @Test
+    @DisplayName("B5.18 — отказ постановки встроенного стопа на налитом целиком входе поднимает биржевую ступень 2"
+            + " проходом, а не детектором")
+    void b5_18_aFilledEntryWhoseEmbeddedStopFailedToPlaceRaisesTheExchangeRungByThePass() {
+        submitEntry(workingDefinition());
+        standExchangeFollowingCommands(LOSS);
+        standEntryWithFailedProtection(filledEntryWithFailedProtection());
+        passesUntilProtectionFailsToPlace();
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        Long raisedBefore = countEvents(HOLD_RAISED_EVENT);
+        Long shutdownsBefore = countEvents(DEAL_SHUTDOWN_INITIATED);
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+
+        passesUntil(() -> isFalse(Objects.equals("ACTIVE", dealStatus())));
+
+        // Защита в ошибке с причиной отказа постановки — ассерт прямой по
+        // строке: поверхности у защиты нет.
+        assertThat(protectionRow().get("status")).isEqualTo("ERROR");
+        assertThat(protectionRow().get("close_reason")).isEqualTo(PROTECTION_PLACEMENT_FAILED);
+        // Консолидация не затребована: транш остаётся на отправленном входе.
+        assertThat(trancheStatus()).isEqualTo("ENTRY_SUBMITTED");
+        // Биржевая ступень 2 поднята проходом: отчёт своим кодом, и
+        // наблюдательной строки того же кода перед ним нет.
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(countEvents(HOLD_RAISED_EVENT)).isEqualTo(raisedBefore + 1);
+        assertThat(rows.rowsWhere("anomaly_reports", "code", LIVE_RISK_UNCOVERED)).hasSize(1);
+        // Ребро в ошибку — решение обработчика: причина остановки пуста, и
+        // факта остановки сделки не прибавилось.
+        assertThat(dealStatus()).isEqualTo("ERROR");
+        assertThat(dealRow().get("shutdown_reason")).isNull();
+        assertThat(countEvents(DEAL_SHUTDOWN_INITIATED)).isEqualTo(shutdownsBefore);
+        // Снятие риска: позиция закрыта; живой ноги у налитого входа нет, а
+        // встроенная защита в ошибке в очередь снятия не входит.
+        assertThat(connector.requests(closurePath(ACCOUNT))).isNotEmpty();
+        assertThat(connector.requests(cancellationPath(ACCOUNT))).isEmpty();
+        assertThat(connector.requests(attachedCancellationPath(ACCOUNT))).isEmpty();
+    }
+
+    /**
+     * Перевыставленный вход: прежняя нога снята после частичного налива, и
+     * её встроенная защита не встала; новая нога жива и без налива. Живость
+     * новой ноги выходную проверку не глушит — потерянная защита принадлежит
+     * снятой (docs/components/TrancheEntrySubmittedHandler.md
+     * §«Выходные проверки», второе состояние).
+     *
+     * <p><b>Вторая нога поставлена ПРЯМОЙ ЗАПИСЬЮ строки</b>, и это названо, а
+     * не упущено: перевыставление входа пишет замещение, а исполнителя
+     * замещения входа в ядре нет (клетка {@code B3.11}), то есть тропы ящика
+     * к этому состоянию не существует. Строка копирует замысел прежней ноги и
+     * ссылается на неё как на замещаемую; прочее предусловие — тропой ящика.
+     */
+    @Test
+    @DisplayName("B5.19 — перевыставленный вход с потерянной защитой снятой ноги поднимает биржевую ступень 2,"
+            + " хотя новая нога жива")
+    void b5_19_aReplacedEntryWithTheLostProtectionOfTheCancelledLegRaisesTheExchangeRung() {
+        openPartiallyFilledDeal();
+        String replacementClientId = entryClientId() + REPLACEMENT_SUFFIX;
+        String replacementExternalId = entryExternalId() + REPLACEMENT_SUFFIX;
+        standReplacementLeg(replacementClientId, replacementExternalId);
+        standExchangeFollowingCommands(LOSS, LOSS, partialFill());
+        connector.answers(pendingProtectionsPath(ACCOUNT), Feed.emptyArray());
+        connector.answersWhen(lookupPath(ACCOUNT), EXTERNAL_ID, entryExternalId(),
+                partiallyFilledEntryWithFailedProtection("CANCELED"));
+        connector.flipsOn(REPLACEMENT_SCENARIO, cancellationPath(ACCOUNT),
+                Feed.ack(replacementExternalId, replacementClientId), "CANCELED");
+        connector.answersInStateWhen(REPLACEMENT_SCENARIO, lookupPath(ACCOUNT), PeerStub.INITIAL, EXTERNAL_ID,
+                replacementExternalId, Feed.order(replacementExternalId, replacementClientId, "ACTIVE"));
+        connector.answersInStateWhen(REPLACEMENT_SCENARIO, lookupPath(ACCOUNT), "CANCELED", EXTERNAL_ID,
+                replacementExternalId, Feed.order(replacementExternalId, replacementClientId, "CANCELED"));
+        passesUntilProtectionFailsToPlace();
+        assertThat(entryStatus()).isEqualTo("CANCELED");
+        assertThat(accountRung()).isEqualTo(NO_RUNG);
+        Long raisedBefore = countEvents(HOLD_RAISED_EVENT);
+        Long shutdownsBefore = countEvents(DEAL_SHUTDOWN_INITIATED);
+        PeerStub.all().forEach(PeerStub::forgetRequests);
+
+        passesUntil(() -> isFalse(Objects.equals("ACTIVE", dealStatus())));
+
+        // Живость новой ноги проверку не заглушила: биржевая ступень 2 без
+        // наблюдательной строки перед отчётом.
+        assertThat(accountRung()).isEqualTo(TRADE_BLOCKED);
+        assertThat(rows.rowsWhere("anomaly_reports", "code", LIVE_RISK_UNCOVERED)).hasSize(1);
+        assertThat(countEvents(HOLD_RAISED_EVENT)).isEqualTo(raisedBefore + 1);
+        // Консолидации нет: вход не финализирован, его финализацию читает
+        // новая нога.
+        assertThat(trancheStatus()).isEqualTo("ENTRY_SUBMITTED");
+        assertThat(dealStatus()).isEqualTo("ERROR");
+        assertThat(dealRow().get("shutdown_reason")).isNull();
+        assertThat(countEvents(DEAL_SHUTDOWN_INITIATED)).isEqualTo(shutdownsBefore);
+        // Снятие риска: отмена живой новой ноги ушла РАНЬШЕ закрытия позиции,
+        // а встроенная защита в ошибке в очередь снятия не входит.
+        List<String> commands = commandCalls();
+        assertThat(commands).contains(cancellationPath(ACCOUNT), closurePath(ACCOUNT));
+        assertThat(commands.indexOf(cancellationPath(ACCOUNT))).isLessThan(commands.indexOf(closurePath(ACCOUNT)));
+        assertThat(connector.requests(attachedCancellationPath(ACCOUNT))).isEmpty();
+    }
+
     // ------------------------------------------------------------------
     // Предусловия группы
     // ------------------------------------------------------------------
+
+    /**
+     * Вторая входная нога транша — ПРЯМОЙ ЗАПИСЬЮ строки (довод — у клетки
+     * {@code B5.19}): живая, без налива, с замыслом прежней ноги и ссылкой на
+     * неё как на замещаемую.
+     *
+     * @param internalId клиентский идентификатор новой ноги
+     * @param externalId её биржевой идентификатор
+     */
+    private void standReplacementLeg(String internalId, String externalId) {
+        Long replacementId = rows.insert("""
+                insert into orders (deal_id, deal_tranche_id, internal_id, external_id, status, type, side, size,
+                                    accumulated_fill_size, position_reducing_only, replaces_internal_id,
+                                    planned_entry_price, planned_stop_price, planned_size_contracts,
+                                    planned_contract_value, planned_risk_amount, planned_risk_currency,
+                                    external_live, created_at, modified_at)
+                select deal_id, deal_tranche_id, ?, ?, 'ACTIVE', type, side, size,
+                       0, position_reducing_only, internal_id,
+                       planned_entry_price, planned_stop_price, planned_size_contracts,
+                       planned_contract_value, planned_risk_amount, planned_risk_currency,
+                       true, now(), now()
+                from orders where id = ?
+                returning id
+                """, internalId, externalId, entryRow().get("id"));
+        assertThat(replacementId).isNotNull();
+        assertThat(ordersOfDeal()).hasSize(2);
+    }
 
     /**
      * Активная сделка счёта: её подбирает каскад жёсткой ступени, и её

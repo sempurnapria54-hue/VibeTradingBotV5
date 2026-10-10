@@ -92,6 +92,25 @@ abstract class LiveDealBox extends TradingCoreBox {
     /** Жёсткая ступень биржевого счёта. */
     protected static final String TRADE_BLOCKED = "TRADE_BLOCKED";
 
+    /**
+     * Код отказа постановки встроенной защиты, который отдаёт площадка.
+     * Значение исхода не меняет — предикат читает непустоту
+     * (docs/spec/order-lifecycle.json, {@code attachedFailsToPlace}).
+     */
+    protected static final String PLACEMENT_FAIL_CODE = "box-placement-refused";
+
+    /** Причина ошибки встроенной защиты, которая не встала. */
+    protected static final String PROTECTION_PLACEMENT_FAILED = "PROTECTION_PLACEMENT_FAILED";
+
+    /** Код биржевой ступени 2 по непокрытому живому риску. */
+    protected static final String LIVE_RISK_UNCOVERED = "EXCHANGE_LIVE_RISK_UNCOVERED";
+
+    /** Класс события подъёма ступени. */
+    protected static final String HOLD_RAISED_EVENT = "HOLD_RAISED";
+
+    /** Класс события остановки сделки. */
+    protected static final String DEAL_SHUTDOWN_INITIATED = "DEAL_SHUTDOWN_INITIATED";
+
     /** Отсутствие ступени: рабочее состояние объекта. */
     protected static final String NO_RUNG = "ACTIVE";
 
@@ -276,6 +295,58 @@ abstract class LiveDealBox extends TradingCoreBox {
     private String partiallyFilledEntry(String status, String filled) {
         return Feed.partiallyFilledOrder(entryExternalId(), entryClientId(), status, entrySize(), filled,
                 protectionClientId(), protectionTrigger());
+    }
+
+    /**
+     * Входная нога последней сделки, налитая ЦЕЛИКОМ, чья встроенная защита
+     * не встала: элемент защиты в теле несёт код отказа постановки.
+     */
+    protected String filledEntryWithFailedProtection() {
+        return Feed.filledOrderWithFailedProtection(entryExternalId(), entryClientId(), entrySize(), LAST_PRICE,
+                protectionClientId(), protectionTrigger(), PLACEMENT_FAIL_CODE);
+    }
+
+    /**
+     * Входная нога последней сделки, налитая ПОЛОВИНОЙ, в названном статусе,
+     * чья встроенная защита не встала.
+     *
+     * @param status доменный статус ноги: живой частичный налив либо снятая
+     */
+    protected String partiallyFilledEntryWithFailedProtection(String status) {
+        return Feed.partiallyFilledOrderWithFailedProtection(entryExternalId(), entryClientId(), status,
+                entrySize(), partialFill(), protectionClientId(), protectionTrigger(), PLACEMENT_FAIL_CODE);
+    }
+
+    /**
+     * Ставит у стаба названное тело входной ноги и УБИРАЕТ запись её защиты из
+     * живых материализованных: защиты, которая не встала, площадка среди живых
+     * не держит.
+     *
+     * <p><b>Ставится ПОСЛЕ</b>
+     * {@link #standExchangeFollowingCommands(String, String, String)}: тот
+     * кладёт в живые запись защиты сделки, а заготовка без сценария, новее
+     * сценарной, берёт верх над ней.
+     *
+     * @param entryBody тело входной ноги, которое отдаёт поиск по идентификатору
+     */
+    protected void standEntryWithFailedProtection(String entryBody) {
+        connector.answers(lookupPath(ACCOUNT), entryBody);
+        connector.answers(pendingProtectionsPath(ACCOUNT), Feed.emptyArray());
+    }
+
+    /**
+     * Тикает проход сопровождения, пока добыча ноги не уведёт её встроенную
+     * защиту в ошибку отказом постановки, — предусловие клеток о потерянной
+     * защите отправленного входа, поставленное тропой ящика.
+     *
+     * <p><b>Ступень этим ходом ещё не поднята</b>, и это проверяемо: добыча
+     * пишет защиту последним ходом прохода, а выходная проверка обработчика
+     * отправленного входа читает её следующим (docs/components/TrancheEntrySubmittedHandler.md
+     * §«Выходные проверки»).
+     */
+    protected void passesUntilProtectionFailsToPlace() {
+        passesUntil(() -> Objects.equals("ERROR", String.valueOf(protectionRow().get("status"))));
+        assertThat(protectionRow().get("close_reason")).isEqualTo(PROTECTION_PLACEMENT_FAILED);
     }
 
     /**
